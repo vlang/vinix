@@ -67,3 +67,40 @@ fn test_semantic_source_changes_invalidate_fingerprints_without_qualifying_dispa
 		os.write_file(work + '/' + path, source)!
 	}
 }
+
+fn test_compiled_lines_follow_architecture_blocks_and_refuse_build_options() {
+	body := [r'	$if amd64 {', '		syscall_table[68] = voidptr(x86)', r'	} $else {',
+		'		syscall_table[186] = voidptr(arm)', '	}', '	for i := 0; i < max; i++ {',
+		'		if a != unsafe { nil } && b != unsafe { nil } {', '		}', '	}']
+	x86 := compiled_lines(body, 'x86_64')!
+	assert x86.any(it.contains('voidptr(x86)')) && !x86.any(it.contains('voidptr(arm)'))
+	arm := compiled_lines(body, 'aarch64')!
+	assert arm.any(it.contains('voidptr(arm)')) && !arm.any(it.contains('voidptr(x86)'))
+	for bad in [[r'$if prod {', 'syscall_table[1] = voidptr(x)', '}'],
+		[r'$if prod {', 'table.init_storage_syscalls()', '}'],
+		[r'$if amd64 { syscall_table[1] = voidptr(x) }'], ['}'], ['{'],
+		[r'} $else {']] {
+		compiled_lines(bad, 'x86_64') or { continue }
+		assert false, 'accepted ${bad}'
+	}
+}
+
+fn test_later_boot_registrations_replace_the_generic_table() {
+	root := os.real_path(os.dir(@FILE) + '/../..')
+	report := coverage(root)!
+	for row in [
+		['aarch64', '90', 'syscall_linux_capget', 'kernel/syscall/table/container_arm64.v:init_container_syscalls'],
+		['aarch64', '222', 'security_linux_mmap', 'kernel/syscall/table/storage_arm64.v:init_storage_syscalls'],
+		['aarch64', '171', 'sys.syscall_adjtimex', 'kernel/syscall/table/clock_control_arm64.v:init_clock_control_syscalls'],
+		['x86_64', '68', 'sysvmsg.syscall_msgget', 'kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls'],
+		['x86_64', '9', 'syscall_linux_mmap_hardened', 'kernel/syscall/table/security_amd64.v:init_security_syscalls'],
+		['x86_64', '0', 'syscall_linux_read', 'kernel/syscall/table/linux_table_amd64.v:init_syscall_table'],
+	] {
+		rows := report.syscalls.filter(it.arch == row[0] && it.number == row[1].int())
+		assert rows.len == 1, row.str()
+		assert rows[0].handler == row[2] && rows[0].source == row[3], rows[0].str()
+	}
+	for arch in ['aarch64', 'x86_64'] {
+		assert report.inputs.keys().contains('kernel/main_' + if arch == 'aarch64' { 'arm64.v' } else { 'amd64.v' })
+	}
+}

@@ -12,6 +12,14 @@ struct Entry {
 	name    string
 	handler string
 	status  string
+	// File and function of the registration that boot leaves in place.
+	source string
+}
+
+struct Registration {
+	number  int
+	handler string
+	source  string
 }
 
 struct Coverage {
@@ -35,11 +43,14 @@ fn definitions(source string) !map[int]string {
 	return result
 }
 
+// handlers parses the assignments of one registration function, in order. A
+// function never assigns the same number twice; a later function may.
 fn handlers(source string) !map[int]string {
 	mut result := map[int]string{}
 	for raw in source.split_into_lines() {
-		line := raw.trim_space()
-		if !line.starts_with('syscall_table[') || !line.contains('= voidptr(') { continue }
+		line := raw.all_before('//').trim_space()
+		if !line.starts_with('syscall_table[') { continue }
+		if !line.contains('= voidptr(') { return error('unrecognised dispatch: ' + line) }
 		index := line.all_after('syscall_table[').all_before(']')
 		if index == 'i' { continue }
 		number := if index == 'seccomp_verdict_nr' { 511 } else { strconv.atoi(index)! }
@@ -50,7 +61,151 @@ fn handlers(source string) !map[int]string {
 		if name == '' { return error('empty syscall handler') }
 		result[number] = name
 	}
-	if result.len < 200 { return error('incomplete syscall dispatch') }
+	return result
+}
+
+// The kernel is compiled for exactly one architecture; build options such as
+// `$if prod {` vary between the kernels this inventory describes, so a
+// registration under one would be unknowable here and is refused.
+fn arch_condition(condition string, arch string) !int {
+	negated := condition.starts_with('!')
+	name := condition.trim_left('!').trim_space()
+	value := match name {
+		'amd64', 'x64' { arch == 'x86_64' }
+		'arm64', 'aarch64' { arch == 'aarch64' }
+		else { return -1 }
+	}
+	return if value != negated { 1 } else { 0 }
+}
+
+// compiled_lines keeps the lines an architecture compiles. Blocks are tracked
+// by their braces; each records 1 (compiled), 0 (not) or -1 (build option).
+fn is_registration(line string) bool {
+	return line.starts_with('syscall_table[') || line.starts_with('init_')
+		|| line.starts_with('table.init_')
+}
+
+fn compiled_lines(lines []string, arch string) ![]string {
+	mut result := []string{}
+	mut states := []int{}
+	mut conditions := []string{}
+	for raw in lines {
+		line := raw.all_before('//').trim_space()
+		if line.starts_with(r'$if ') && !line.ends_with('{') {
+			if line.contains('syscall_table[') || line.contains('init_syscall') || line.contains('_syscalls()') {
+				return error('one-line conditional registration: ' + line)
+			}
+			continue
+		}
+		if line.starts_with(r'$if ') {
+			condition := line.all_after(r'$if ').all_before_last('{').trim_space()
+			states << arch_condition(condition, arch)!
+			conditions << condition
+			continue
+		}
+		if line == r'} $else {' {
+			if conditions.len == 0 || conditions.last() == '' {
+				return error(r'$else without $if')
+			}
+			state := arch_condition(conditions.last(), arch)!
+			states[states.len - 1] = if state < 0 { -1 } else { 1 - state }
+			conditions[conditions.len - 1] = ''
+			continue
+		}
+		mut enabled := 1
+		for state in states {
+			if state < enabled { enabled = state }
+		}
+		if enabled == 1 {
+			result << line
+		} else if enabled < 0 && is_registration(line) {
+			return error('registration under a build option: ' + line)
+		}
+		// Count the line's net braces: `} else {` and `unsafe { nil }` balance.
+		net := line.count('{') - line.count('}')
+		for _ in 0 .. -net {
+			if states.len == 0 { return error('unbalanced braces: ' + line) }
+			states.delete_last()
+			conditions.delete_last()
+		}
+		for _ in 0 .. net {
+			states << 1
+			conditions << ''
+		}
+	}
+	if states.len != 0 { return error('unterminated block') }
+	return result
+}
+
+fn function_body(source string, name string) ?[]string {
+	lines := source.split_into_lines()
+	for i, line in lines {
+		if line.starts_with('fn ${name}() {') || line.starts_with('pub fn ${name}() {') {
+			for j in i + 1 .. lines.len {
+				if lines[j] == '}' { return lines[i + 1..j] }
+			}
+			return none
+		}
+	}
+	return none
+}
+
+fn table_file_for(root string, arch string, name string) !string {
+	excluded := if arch == 'aarch64' { '_amd64.v' } else { '_arm64.v' }
+	mut found := []string{}
+	mut files := os.ls(root + '/kernel/syscall/table')!
+	files.sort()
+	for file in files {
+		if !file.ends_with('.v') || file.ends_with('_test.v') || file.ends_with(excluded) { continue }
+		path := 'kernel/syscall/table/' + file
+		if _ := function_body(os.read_file(root + '/' + path)!, name) { found << path }
+	}
+	if found.len != 1 { return error('expected one definition of ${name} for ${arch}: ${found}') }
+	return found[0]
+}
+
+// registrations follows boot: kmain calls the table's init functions in order,
+// and each may call another; a later assignment replaces an earlier one.
+fn registrations(root string, arch string, name string, mut inputs map[string]string, depth int) ![]Registration {
+	if depth > 4 { return error('registration calls nest too deeply: ' + name) }
+	path := table_file_for(root, arch, name)!
+	source := os.read_file(root + '/' + path)!
+	inputs[path] = sha256.sum(source.bytes()).hex()
+	body := function_body(source, name) or { return error('missing ' + name) }
+	lines := compiled_lines(body, arch)!
+	mut result := []Registration{}
+	mut own := []string{}
+	for line in lines {
+		if line.starts_with('init_') && line.ends_with('()') {
+			result << registrations(root, arch, line.all_before('('), mut inputs, depth + 1)!
+		} else if line.starts_with('syscall_table[') {
+			own << line
+			for number, handler in handlers(line)! {
+				result << Registration{number, handler, path + ':' + name}
+			}
+		}
+	}
+	// Within one function a number is assigned once.
+	handlers(own.join('\n'))!
+	return result
+}
+
+fn dispatch_for(root string, arch string, mut inputs map[string]string) !map[int]Registration {
+	main_path := 'kernel/main_' + if arch == 'aarch64' { 'arm64.v' } else { 'amd64.v' }
+	main_source := os.read_file(root + '/' + main_path)!
+	inputs[main_path] = sha256.sum(main_source.bytes()).hex()
+	mut result := map[int]Registration{}
+	mut calls := 0
+	for line in compiled_lines(main_source.split_into_lines(), arch)! {
+		if !line.starts_with('table.init_') { continue }
+		if !line.ends_with('()') { return error('unrecognised registration call: ' + line) }
+		calls++
+		for registration in registrations(root, arch, line.all_after('table.').all_before('('), mut
+			inputs, 0)! {
+			result[registration.number] = registration
+		}
+	}
+	if calls == 0 || result.len < 200 { return error('incomplete syscall dispatch') }
 	return result
 }
 
@@ -94,21 +249,14 @@ fn coverage(root string) !Coverage {
 	}
 	for arch in ['aarch64', 'x86_64'] {
 		reference := 'tools/linux-compat/reference/' + arch + '-syscall.h'
-		table := 'kernel/syscall/table/' + if arch == 'aarch64' {
-			'syscall_table_arm64.v'
-		} else {
-			'linux_table_amd64.v'
-		}
 		ref_text := os.read_file(root + '/' + reference)!
-		table_text := os.read_file(root + '/' + table)!
 		inputs[reference] = sha256.sum(ref_text.bytes()).hex()
-		inputs[table] = sha256.sum(table_text.bytes()).hex()
 		names := definitions(ref_text)!
-		dispatch := handlers(table_text)!
+		dispatch := dispatch_for(root, arch, mut inputs)!
 		for number in 0 .. 512 {
 			if number !in names && number !in dispatch { continue }
 			name := names[number] or { 'vinix_private' }
-			handler := dispatch[number] or { 'vacant' }
+			registration := dispatch[number] or { Registration{number, 'vacant', ''} }
 			// Wiring is evidence of dispatch only, never semantic qualification.
 			status := if number !in names {
 				'private'
@@ -117,7 +265,7 @@ fn coverage(root string) !Coverage {
 			} else {
 				'wired; unqualified'
 			}
-			entries << Entry{arch, number, name, handler, status}
+			entries << Entry{arch, number, name, registration.handler, status, registration.source}
 		}
 	}
 	return Coverage{'musl 1.2.5 Linux syscall namespace; native ELF64', inputs, entries}
@@ -135,9 +283,10 @@ fn markdown(report Coverage) string {
 		wired := rows.filter(it.status.starts_with('wired')).len
 		lines << ['## ' + arch, '',
 			'${wired}/${rows.len} baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).', '',
-			'| Number | Linux name | Handler | Dispatch status |', '| --- | --- | --- | --- |']
+			'| Number | Linux name | Handler | Dispatch status | Registered by |', '| --- | --- | --- | --- | --- |']
 		for entry in report.syscalls.filter(it.arch == arch) {
-			lines << '| ${entry.number} | ${entry.name} | `${entry.handler}` | ${entry.status} |'
+			source := if entry.source == '' { '' } else { '`' + entry.source + '`' }
+			lines << '| ${entry.number} | ${entry.name} | `${entry.handler}` | ${entry.status} | ${source} |'
 		}
 		lines << ''
 	}

@@ -8,690 +8,698 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 
 ## aarch64
 
-222/306 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
+235/306 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
 
-| Number | Linux name | Handler | Dispatch status |
-| --- | --- | --- | --- |
-| 0 | io_setup | `vacant` | unavailable |
-| 1 | io_destroy | `vacant` | unavailable |
-| 2 | io_submit | `vacant` | unavailable |
-| 3 | io_cancel | `vacant` | unavailable |
-| 4 | io_getevents | `vacant` | unavailable |
-| 5 | setxattr | `fs.syscall_setxattr` | wired; unqualified |
-| 6 | lsetxattr | `fs.syscall_lsetxattr` | wired; unqualified |
-| 7 | fsetxattr | `fs.syscall_fsetxattr` | wired; unqualified |
-| 8 | getxattr | `fs.syscall_getxattr` | wired; unqualified |
-| 9 | lgetxattr | `fs.syscall_lgetxattr` | wired; unqualified |
-| 10 | fgetxattr | `fs.syscall_fgetxattr` | wired; unqualified |
-| 11 | listxattr | `fs.syscall_listxattr` | wired; unqualified |
-| 12 | llistxattr | `fs.syscall_llistxattr` | wired; unqualified |
-| 13 | flistxattr | `fs.syscall_flistxattr` | wired; unqualified |
-| 14 | removexattr | `fs.syscall_removexattr` | wired; unqualified |
-| 15 | lremovexattr | `fs.syscall_lremovexattr` | wired; unqualified |
-| 16 | fremovexattr | `fs.syscall_fremovexattr` | wired; unqualified |
-| 17 | getcwd | `fs.syscall_getcwd` | wired; unqualified |
-| 18 | lookup_dcookie | `vacant` | unavailable |
-| 19 | eventfd2 | `file.syscall_eventfd2` | wired; unqualified |
-| 20 | epoll_create1 | `file.syscall_epoll_create1` | wired; unqualified |
-| 21 | epoll_ctl | `file.syscall_epoll_ctl` | wired; unqualified |
-| 22 | epoll_pwait | `file.syscall_epoll_pwait` | wired; unqualified |
-| 23 | dup | `syscall_linux_dup` | wired; unqualified |
-| 24 | dup3 | `syscall_linux_dup3` | wired; unqualified |
-| 25 | fcntl | `syscall_linux_fcntl` | wired; unqualified |
-| 26 | inotify_init1 | `fs.syscall_inotify_init` | wired; unqualified |
-| 27 | inotify_add_watch | `fs.syscall_inotify_add_watch` | wired; unqualified |
-| 28 | inotify_rm_watch | `fs.syscall_inotify_rm_watch` | wired; unqualified |
-| 29 | ioctl | `fs.syscall_ioctl` | wired; unqualified |
-| 30 | ioprio_set | `vacant` | unavailable |
-| 31 | ioprio_get | `vacant` | unavailable |
-| 32 | flock | `file.syscall_flock` | wired; unqualified |
-| 33 | mknodat | `vacant` | unavailable |
-| 34 | mkdirat | `fs.syscall_mkdirat` | wired; unqualified |
-| 35 | unlinkat | `fs.syscall_unlinkat` | wired; unqualified |
-| 36 | symlinkat | `fs.syscall_symlinkat` | wired; unqualified |
-| 37 | linkat | `fs.syscall_linkat` | wired; unqualified |
-| 38 | renameat | `fs.syscall_renameat` | wired; unqualified |
-| 39 | umount2 | `fs.syscall_umount` | wired; unqualified |
-| 40 | mount | `fs.syscall_mount` | wired; unqualified |
-| 41 | pivot_root | `vacant` | unavailable |
-| 42 | nfsservctl | `vacant` | unavailable |
-| 43 | statfs | `fs.syscall_statfs` | wired; unqualified |
-| 44 | fstatfs | `fs.syscall_fstatfs` | wired; unqualified |
-| 45 | truncate | `fs.syscall_truncate` | wired; unqualified |
-| 46 | ftruncate | `syscall_linux_ftruncate` | wired; unqualified |
-| 47 | fallocate | `file.syscall_fallocate` | wired; unqualified |
-| 48 | faccessat | `syscall_linux_faccessat` | wired; unqualified |
-| 49 | chdir | `fs.syscall_chdir` | wired; unqualified |
-| 50 | fchdir | `fs.syscall_fchdir` | wired; unqualified |
-| 51 | chroot | `vacant` | unavailable |
-| 52 | fchmod | `fs.syscall_fchmod` | wired; unqualified |
-| 53 | fchmodat | `fs.syscall_fchmodat` | wired; unqualified |
-| 54 | fchownat | `fs.syscall_fchownat` | wired; unqualified |
-| 55 | fchown | `fs.syscall_fchown` | wired; unqualified |
-| 56 | openat | `syscall_linux_openat` | wired; unqualified |
-| 57 | close | `syscall_linux_close` | wired; unqualified |
-| 58 | vhangup | `vacant` | unavailable |
-| 59 | pipe2 | `pipe.syscall_pipe_checked` | wired; unqualified |
-| 60 | quotactl | `vacant` | unavailable |
-| 61 | getdents64 | `syscall_linux_getdents64` | wired; unqualified |
-| 62 | lseek | `syscall_linux_lseek` | wired; unqualified |
-| 63 | read | `syscall_linux_read` | wired; unqualified |
-| 64 | write | `syscall_linux_write` | wired; unqualified |
-| 65 | readv | `syscall_linux_readv` | wired; unqualified |
-| 66 | writev | `syscall_linux_writev` | wired; unqualified |
-| 67 | pread64 | `syscall_linux_pread64` | wired; unqualified |
-| 68 | pwrite64 | `syscall_linux_pwrite64` | wired; unqualified |
-| 69 | preadv | `syscall_linux_preadv` | wired; unqualified |
-| 70 | pwritev | `syscall_linux_pwritev` | wired; unqualified |
-| 71 | sendfile | `syscall_linux_sendfile` | wired; unqualified |
-| 72 | pselect6 | `file.syscall_pselect6` | wired; unqualified |
-| 73 | ppoll | `file.syscall_ppoll` | wired; unqualified |
-| 74 | signalfd4 | `userland.syscall_signalfd4` | wired; unqualified |
-| 75 | vmsplice | `pipe.syscall_vmsplice` | wired; unqualified |
-| 76 | splice | `pipe.syscall_splice` | wired; unqualified |
-| 77 | tee | `pipe.syscall_tee` | wired; unqualified |
-| 78 | readlinkat | `syscall_linux_readlinkat` | wired; unqualified |
-| 79 | newfstatat | `syscall_linux_fstatat` | wired; unqualified |
-| 80 | fstat | `syscall_linux_fstat` | wired; unqualified |
-| 81 | sync | `fs.syscall_sync` | wired; unqualified |
-| 82 | fsync | `file.syscall_fsync` | wired; unqualified |
-| 83 | fdatasync | `file.syscall_fsync` | wired; unqualified |
-| 84 | sync_file_range | `file.syscall_sync_file_range` | wired; unqualified |
-| 85 | timerfd_create | `file.syscall_timerfd_create` | wired; unqualified |
-| 86 | timerfd_settime | `file.syscall_timerfd_settime` | wired; unqualified |
-| 87 | timerfd_gettime | `file.syscall_timerfd_gettime` | wired; unqualified |
-| 88 | utimensat | `fs.syscall_utimensat` | wired; unqualified |
-| 89 | acct | `vacant` | unavailable |
-| 90 | capget | `vacant` | unavailable |
-| 91 | capset | `vacant` | unavailable |
-| 92 | personality | `vacant` | unavailable |
-| 93 | exit | `userland.syscall_exit` | wired; unqualified |
-| 94 | exit_group | `userland.syscall_exit_group` | wired; unqualified |
-| 95 | waitid | `userland.syscall_waitid` | wired; unqualified |
-| 96 | set_tid_address | `userland.syscall_set_tid_address` | wired; unqualified |
-| 97 | unshare | `vacant` | unavailable |
-| 98 | futex | `syscall_linux_futex` | wired; unqualified |
-| 99 | set_robust_list | `userland.syscall_set_robust_list` | wired; unqualified |
-| 100 | get_robust_list | `userland.syscall_get_robust_list` | wired; unqualified |
-| 101 | nanosleep | `sys.syscall_nanosleep` | wired; unqualified |
-| 102 | getitimer | `syscall_linux_getitimer` | wired; unqualified |
-| 103 | setitimer | `syscall_linux_setitimer` | wired; unqualified |
-| 104 | kexec_load | `vacant` | unavailable |
-| 105 | init_module | `vacant` | unavailable |
-| 106 | delete_module | `vacant` | unavailable |
-| 107 | timer_create | `posixtimer.syscall_timer_create` | wired; unqualified |
-| 108 | timer_gettime | `posixtimer.syscall_timer_gettime` | wired; unqualified |
-| 109 | timer_getoverrun | `posixtimer.syscall_timer_getoverrun` | wired; unqualified |
-| 110 | timer_settime | `posixtimer.syscall_timer_settime` | wired; unqualified |
-| 111 | timer_delete | `posixtimer.syscall_timer_delete` | wired; unqualified |
-| 112 | clock_settime | `vacant` | unavailable |
-| 113 | clock_gettime | `sys.syscall_clock_gettime` | wired; unqualified |
-| 114 | clock_getres | `sys.syscall_clock_getres` | wired; unqualified |
-| 115 | clock_nanosleep | `sys.syscall_clock_nanosleep` | wired; unqualified |
-| 116 | syslog | `vacant` | unavailable |
-| 117 | ptrace | `vacant` | unavailable |
-| 118 | sched_setparam | `syscall_linux_sched_setparam` | wired; unqualified |
-| 119 | sched_setscheduler | `syscall_linux_sched_setscheduler` | wired; unqualified |
-| 120 | sched_getscheduler | `syscall_linux_sched_getscheduler` | wired; unqualified |
-| 121 | sched_getparam | `syscall_linux_sched_getparam` | wired; unqualified |
-| 122 | sched_setaffinity | `syscall_linux_sched_setaffinity` | wired; unqualified |
-| 123 | sched_getaffinity | `syscall_linux_sched_getaffinity` | wired; unqualified |
-| 124 | sched_yield | `syscall_linux_sched_yield` | wired; unqualified |
-| 125 | sched_get_priority_max | `syscall_linux_sched_get_priority_max` | wired; unqualified |
-| 126 | sched_get_priority_min | `syscall_linux_sched_get_priority_min` | wired; unqualified |
-| 127 | sched_rr_get_interval | `syscall_linux_sched_rr_get_interval` | wired; unqualified |
-| 128 | restart_syscall | `vacant` | unavailable |
-| 129 | kill | `userland.syscall_kill` | wired; unqualified |
-| 130 | tkill | `userland.syscall_tkill` | wired; unqualified |
-| 131 | tgkill | `userland.syscall_tgkill` | wired; unqualified |
-| 132 | sigaltstack | `userland.syscall_sigaltstack` | wired; unqualified |
-| 133 | rt_sigsuspend | `userland.syscall_rt_sigsuspend` | wired; unqualified |
-| 134 | rt_sigaction | `userland.syscall_rt_sigaction` | wired; unqualified |
-| 135 | rt_sigprocmask | `userland.syscall_rt_sigprocmask` | wired; unqualified |
-| 136 | rt_sigpending | `syscall_linux_rt_sigpending` | wired; unqualified |
-| 137 | rt_sigtimedwait | `userland.syscall_rt_sigtimedwait` | wired; unqualified |
-| 138 | rt_sigqueueinfo | `vacant` | unavailable |
-| 139 | rt_sigreturn | `userland.syscall_sigreturn` | wired; unqualified |
-| 140 | setpriority | `syscall_linux_setpriority` | wired; unqualified |
-| 141 | getpriority | `syscall_linux_getpriority` | wired; unqualified |
-| 142 | reboot | `vacant` | unavailable |
-| 143 | setregid | `userland.syscall_setregid` | wired; unqualified |
-| 144 | setgid | `userland.syscall_setgid` | wired; unqualified |
-| 145 | setreuid | `userland.syscall_setreuid` | wired; unqualified |
-| 146 | setuid | `userland.syscall_setuid` | wired; unqualified |
-| 147 | setresuid | `userland.syscall_setresuid` | wired; unqualified |
-| 148 | getresuid | `userland.syscall_getresuid` | wired; unqualified |
-| 149 | setresgid | `userland.syscall_setresgid` | wired; unqualified |
-| 150 | getresgid | `userland.syscall_getresgid` | wired; unqualified |
-| 151 | setfsuid | `vacant` | unavailable |
-| 152 | setfsgid | `vacant` | unavailable |
-| 153 | times | `syscall_linux_times` | wired; unqualified |
-| 154 | setpgid | `syscall_linux_setpgid` | wired; unqualified |
-| 155 | getpgid | `syscall_linux_getpgid` | wired; unqualified |
-| 156 | getsid | `userland.syscall_getsid` | wired; unqualified |
-| 157 | setsid | `userland.syscall_setsid` | wired; unqualified |
-| 158 | getgroups | `userland.syscall_getgroups` | wired; unqualified |
-| 159 | setgroups | `userland.syscall_setgroups` | wired; unqualified |
-| 160 | uname | `syscall_linux_uname` | wired; unqualified |
-| 161 | sethostname | `net.syscall_sethostname` | wired; unqualified |
-| 162 | setdomainname | `net.syscall_setdomainname` | wired; unqualified |
-| 163 | getrlimit | `syscall_linux_getrlimit` | wired; unqualified |
-| 164 | setrlimit | `syscall_linux_setrlimit` | wired; unqualified |
-| 165 | getrusage | `sys.syscall_getrusage` | wired; unqualified |
-| 166 | umask | `fs.syscall_umask` | wired; unqualified |
-| 167 | prctl | `syscall_linux_prctl` | wired; unqualified |
-| 168 | getcpu | `numa.syscall_getcpu` | wired; unqualified |
-| 169 | gettimeofday | `sys.syscall_gettimeofday` | wired; unqualified |
-| 170 | settimeofday | `vacant` | unavailable |
-| 171 | adjtimex | `vacant` | unavailable |
-| 172 | getpid | `userland.syscall_getpid` | wired; unqualified |
-| 173 | getppid | `userland.syscall_getppid` | wired; unqualified |
-| 174 | getuid | `userland.syscall_getuid` | wired; unqualified |
-| 175 | geteuid | `userland.syscall_geteuid` | wired; unqualified |
-| 176 | getgid | `userland.syscall_getgid` | wired; unqualified |
-| 177 | getegid | `userland.syscall_getegid` | wired; unqualified |
-| 178 | gettid | `syscall_linux_gettid` | wired; unqualified |
-| 179 | sysinfo | `sys.syscall_sysinfo` | wired; unqualified |
-| 180 | mq_open | `vacant` | unavailable |
-| 181 | mq_unlink | `vacant` | unavailable |
-| 182 | mq_timedsend | `vacant` | unavailable |
-| 183 | mq_timedreceive | `vacant` | unavailable |
-| 184 | mq_notify | `vacant` | unavailable |
-| 185 | mq_getsetattr | `vacant` | unavailable |
-| 186 | msgget | `sysvmsg.syscall_msgget` | wired; unqualified |
-| 187 | msgctl | `sysvmsg.syscall_msgctl` | wired; unqualified |
-| 188 | msgrcv | `sysvmsg.syscall_msgrcv` | wired; unqualified |
-| 189 | msgsnd | `sysvmsg.syscall_msgsnd` | wired; unqualified |
-| 190 | semget | `sysvsem.syscall_semget` | wired; unqualified |
-| 191 | semctl | `sysvsem.syscall_semctl` | wired; unqualified |
-| 192 | semtimedop | `sysvsem.syscall_semtimedop` | wired; unqualified |
-| 193 | semop | `sysvsem.syscall_semop` | wired; unqualified |
-| 194 | shmget | `sysvshm.syscall_shmget` | wired; unqualified |
-| 195 | shmctl | `sysvshm.syscall_shmctl` | wired; unqualified |
-| 196 | shmat | `sysvshm.syscall_shmat` | wired; unqualified |
-| 197 | shmdt | `sysvshm.syscall_shmdt` | wired; unqualified |
-| 198 | socket | `socket.syscall_socket` | wired; unqualified |
-| 199 | socketpair | `socket.syscall_socketpair` | wired; unqualified |
-| 200 | bind | `socket.syscall_bind` | wired; unqualified |
-| 201 | listen | `socket.syscall_listen` | wired; unqualified |
-| 202 | accept | `syscall_linux_accept` | wired; unqualified |
-| 203 | connect | `socket.syscall_connect` | wired; unqualified |
-| 204 | getsockname | `socket.syscall_getsockname` | wired; unqualified |
-| 205 | getpeername | `socket.syscall_getpeername` | wired; unqualified |
-| 206 | sendto | `syscall_linux_sendto` | wired; unqualified |
-| 207 | recvfrom | `syscall_linux_recvfrom` | wired; unqualified |
-| 208 | setsockopt | `socket.syscall_setsockopt` | wired; unqualified |
-| 209 | getsockopt | `socket.syscall_getsockopt` | wired; unqualified |
-| 210 | shutdown | `socket.syscall_shutdown` | wired; unqualified |
-| 211 | sendmsg | `syscall_linux_sendmsg` | wired; unqualified |
-| 212 | recvmsg | `socket.syscall_recvmsg` | wired; unqualified |
-| 213 | readahead | `vacant` | unavailable |
-| 214 | brk | `mmap.syscall_brk` | wired; unqualified |
-| 215 | munmap | `mmap.syscall_munmap` | wired; unqualified |
-| 216 | mremap | `mmap.syscall_mremap` | wired; unqualified |
-| 217 | add_key | `vacant` | unavailable |
-| 218 | request_key | `vacant` | unavailable |
-| 219 | keyctl | `vacant` | unavailable |
-| 220 | clone | `userland.syscall_clone` | wired; unqualified |
-| 221 | execve | `userland.syscall_execve` | wired; unqualified |
-| 222 | mmap | `syscall_linux_mmap` | wired; unqualified |
-| 223 | fadvise64 | `file.syscall_fadvise64` | wired; unqualified |
-| 224 | swapon | `fs.syscall_swapon` | wired; unqualified |
-| 225 | swapoff | `fs.syscall_swapoff` | wired; unqualified |
-| 226 | mprotect | `mmap.syscall_mprotect` | wired; unqualified |
-| 227 | msync | `mmap.syscall_msync` | wired; unqualified |
-| 228 | mlock | `mmap.syscall_mlock` | wired; unqualified |
-| 229 | munlock | `mmap.syscall_munlock` | wired; unqualified |
-| 230 | mlockall | `mmap.syscall_mlockall` | wired; unqualified |
-| 231 | munlockall | `mmap.syscall_munlockall` | wired; unqualified |
-| 232 | mincore | `mmap.syscall_mincore` | wired; unqualified |
-| 233 | madvise | `mmap.syscall_madvise` | wired; unqualified |
-| 234 | remap_file_pages | `vacant` | unavailable |
-| 235 | mbind | `numa.syscall_mbind` | wired; unqualified |
-| 236 | get_mempolicy | `numa.syscall_get_mempolicy` | wired; unqualified |
-| 237 | set_mempolicy | `numa.syscall_set_mempolicy` | wired; unqualified |
-| 238 | migrate_pages | `vacant` | unavailable |
-| 239 | move_pages | `vacant` | unavailable |
-| 240 | rt_tgsigqueueinfo | `vacant` | unavailable |
-| 241 | perf_event_open | `vacant` | unavailable |
-| 242 | accept4 | `syscall_linux_accept4` | wired; unqualified |
-| 243 | recvmmsg | `syscall_linux_recvmmsg` | wired; unqualified |
-| 245 | vinix_private | `cpu.syscall_set_tls` | private |
-| 246 | vinix_private | `userland.syscall_sigentry` | private |
-| 260 | wait4 | `userland.syscall_wait4` | wired; unqualified |
-| 261 | prlimit64 | `syscall_linux_prlimit64` | wired; unqualified |
-| 262 | fanotify_init | `vacant` | unavailable |
-| 263 | fanotify_mark | `vacant` | unavailable |
-| 264 | name_to_handle_at | `vacant` | unavailable |
-| 265 | open_by_handle_at | `vacant` | unavailable |
-| 266 | clock_adjtime | `vacant` | unavailable |
-| 267 | syncfs | `fs.syscall_syncfs` | wired; unqualified |
-| 268 | setns | `vacant` | unavailable |
-| 269 | sendmmsg | `syscall_linux_sendmmsg` | wired; unqualified |
-| 270 | process_vm_readv | `syscall_linux_process_vm_readv` | wired; unqualified |
-| 271 | process_vm_writev | `syscall_linux_process_vm_writev` | wired; unqualified |
-| 272 | kcmp | `vacant` | unavailable |
-| 273 | finit_module | `vacant` | unavailable |
-| 274 | sched_setattr | `syscall_linux_sched_setattr` | wired; unqualified |
-| 275 | sched_getattr | `syscall_linux_sched_getattr` | wired; unqualified |
-| 276 | renameat2 | `fs.syscall_renameat2` | wired; unqualified |
-| 277 | seccomp | `vacant` | unavailable |
-| 278 | getrandom | `syscall_linux_getrandom` | wired; unqualified |
-| 279 | memfd_create | `fs.syscall_memfd_create` | wired; unqualified |
-| 280 | bpf | `syscall_linux_bpf` | unavailable |
-| 281 | execveat | `userland.syscall_execveat` | wired; unqualified |
-| 282 | userfaultfd | `vacant` | unavailable |
-| 283 | membarrier | `syscall_linux_membarrier` | wired; unqualified |
-| 284 | mlock2 | `mmap.syscall_mlock2` | wired; unqualified |
-| 285 | copy_file_range | `pipe.syscall_copy_file_range` | wired; unqualified |
-| 286 | preadv2 | `syscall_linux_preadv2` | wired; unqualified |
-| 287 | pwritev2 | `syscall_linux_pwritev2` | wired; unqualified |
-| 288 | pkey_mprotect | `vacant` | unavailable |
-| 289 | pkey_alloc | `vacant` | unavailable |
-| 290 | pkey_free | `vacant` | unavailable |
-| 291 | statx | `syscall_linux_statx` | wired; unqualified |
-| 292 | io_pgetevents | `vacant` | unavailable |
-| 293 | rseq | `vacant` | unavailable |
-| 294 | kexec_file_load | `vacant` | unavailable |
-| 424 | pidfd_send_signal | `userland.syscall_pidfd_send_signal` | wired; unqualified |
-| 425 | io_uring_setup | `vacant` | unavailable |
-| 426 | io_uring_enter | `vacant` | unavailable |
-| 427 | io_uring_register | `vacant` | unavailable |
-| 428 | open_tree | `vacant` | unavailable |
-| 429 | move_mount | `vacant` | unavailable |
-| 430 | fsopen | `vacant` | unavailable |
-| 431 | fsconfig | `vacant` | unavailable |
-| 432 | fsmount | `vacant` | unavailable |
-| 433 | fspick | `vacant` | unavailable |
-| 434 | pidfd_open | `userland.syscall_pidfd_open` | wired; unqualified |
-| 435 | clone3 | `userland.syscall_clone3` | wired; unqualified |
-| 436 | close_range | `file.syscall_close_range` | wired; unqualified |
-| 437 | openat2 | `syscall_linux_openat2` | wired; unqualified |
-| 438 | pidfd_getfd | `vacant` | unavailable |
-| 439 | faccessat2 | `syscall_linux_faccessat2` | wired; unqualified |
-| 440 | process_madvise | `vacant` | unavailable |
-| 441 | epoll_pwait2 | `file.syscall_epoll_pwait2` | wired; unqualified |
-| 442 | mount_setattr | `vacant` | unavailable |
-| 444 | landlock_create_ruleset | `vacant` | unavailable |
-| 445 | landlock_add_rule | `vacant` | unavailable |
-| 446 | landlock_restrict_self | `vacant` | unavailable |
-| 448 | process_mrelease | `vacant` | unavailable |
-| 449 | futex_waitv | `vacant` | unavailable |
-| 450 | set_mempolicy_home_node | `vacant` | unavailable |
-| 451 | cachestat | `vacant` | unavailable |
-| 452 | fchmodat2 | `vacant` | unavailable |
-| 511 | vinix_private | `syscall_seccomp_verdict` | private |
+| Number | Linux name | Handler | Dispatch status | Registered by |
+| --- | --- | --- | --- | --- |
+| 0 | io_setup | `vacant` | unavailable |  |
+| 1 | io_destroy | `vacant` | unavailable |  |
+| 2 | io_submit | `vacant` | unavailable |  |
+| 3 | io_cancel | `vacant` | unavailable |  |
+| 4 | io_getevents | `vacant` | unavailable |  |
+| 5 | setxattr | `fs.syscall_setxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 6 | lsetxattr | `fs.syscall_lsetxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 7 | fsetxattr | `fs.syscall_fsetxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 8 | getxattr | `fs.syscall_getxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 9 | lgetxattr | `fs.syscall_lgetxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 10 | fgetxattr | `fs.syscall_fgetxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 11 | listxattr | `fs.syscall_listxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 12 | llistxattr | `fs.syscall_llistxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 13 | flistxattr | `fs.syscall_flistxattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 14 | removexattr | `fs.syscall_removexattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 15 | lremovexattr | `fs.syscall_lremovexattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 16 | fremovexattr | `fs.syscall_fremovexattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 17 | getcwd | `fs.syscall_getcwd` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 18 | lookup_dcookie | `vacant` | unavailable |  |
+| 19 | eventfd2 | `file.syscall_eventfd2` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 20 | epoll_create1 | `file.syscall_epoll_create1` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 21 | epoll_ctl | `file.syscall_epoll_ctl` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 22 | epoll_pwait | `file.syscall_epoll_pwait` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 23 | dup | `syscall_linux_dup` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 24 | dup3 | `syscall_linux_dup3` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 25 | fcntl | `syscall_linux_fcntl` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 26 | inotify_init1 | `fs.syscall_inotify_init` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 27 | inotify_add_watch | `fs.syscall_inotify_add_watch` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 28 | inotify_rm_watch | `fs.syscall_inotify_rm_watch` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 29 | ioctl | `fs.syscall_ioctl` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 30 | ioprio_set | `vacant` | unavailable |  |
+| 31 | ioprio_get | `vacant` | unavailable |  |
+| 32 | flock | `file.syscall_flock` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 33 | mknodat | `fs.syscall_mknodat` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 34 | mkdirat | `fs.syscall_mkdirat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 35 | unlinkat | `fs.syscall_unlinkat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 36 | symlinkat | `fs.syscall_symlinkat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 37 | linkat | `fs.syscall_linkat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 38 | renameat | `fs.syscall_renameat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 39 | umount2 | `fs.syscall_umount` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 40 | mount | `fs.syscall_mount` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 41 | pivot_root | `fs.syscall_pivot_root` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 42 | nfsservctl | `vacant` | unavailable |  |
+| 43 | statfs | `fs.syscall_statfs` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 44 | fstatfs | `fs.syscall_fstatfs` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 45 | truncate | `fs.syscall_truncate` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 46 | ftruncate | `syscall_linux_ftruncate` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 47 | fallocate | `file.syscall_fallocate` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 48 | faccessat | `syscall_linux_faccessat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 49 | chdir | `fs.syscall_chdir` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 50 | fchdir | `fs.syscall_fchdir` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 51 | chroot | `fs.syscall_chroot` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 52 | fchmod | `fs.syscall_fchmod` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 53 | fchmodat | `fs.syscall_fchmodat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 54 | fchownat | `fs.syscall_fchownat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 55 | fchown | `fs.syscall_fchown` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 56 | openat | `syscall_linux_openat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 57 | close | `syscall_linux_close` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 58 | vhangup | `vacant` | unavailable |  |
+| 59 | pipe2 | `pipe.syscall_pipe_checked` | wired; unqualified | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 60 | quotactl | `vacant` | unavailable |  |
+| 61 | getdents64 | `syscall_linux_getdents64` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 62 | lseek | `syscall_linux_lseek` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 63 | read | `syscall_linux_read` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 64 | write | `syscall_linux_write` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 65 | readv | `syscall_linux_readv` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 66 | writev | `syscall_linux_writev` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 67 | pread64 | `syscall_linux_pread64` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 68 | pwrite64 | `syscall_linux_pwrite64` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 69 | preadv | `syscall_linux_preadv` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 70 | pwritev | `syscall_linux_pwritev` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 71 | sendfile | `syscall_linux_sendfile` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 72 | pselect6 | `file.syscall_pselect6` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 73 | ppoll | `file.syscall_ppoll` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 74 | signalfd4 | `userland.syscall_signalfd4` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 75 | vmsplice | `pipe.syscall_vmsplice` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 76 | splice | `pipe.syscall_splice` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 77 | tee | `pipe.syscall_tee` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 78 | readlinkat | `syscall_linux_readlinkat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 79 | newfstatat | `syscall_linux_fstatat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 80 | fstat | `syscall_linux_fstat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 81 | sync | `storage_sync` | wired; unqualified | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 82 | fsync | `storage_fsync` | wired; unqualified | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 83 | fdatasync | `storage_fsync` | wired; unqualified | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 84 | sync_file_range | `file.syscall_sync_file_range` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 85 | timerfd_create | `file.syscall_timerfd_create` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 86 | timerfd_settime | `file.syscall_timerfd_settime` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 87 | timerfd_gettime | `file.syscall_timerfd_gettime` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 88 | utimensat | `fs.syscall_utimensat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 89 | acct | `vacant` | unavailable |  |
+| 90 | capget | `syscall_linux_capget` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 91 | capset | `syscall_linux_capset` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 92 | personality | `vacant` | unavailable |  |
+| 93 | exit | `userland.syscall_exit` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 94 | exit_group | `userland.syscall_exit_group` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 95 | waitid | `userland.syscall_waitid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 96 | set_tid_address | `userland.syscall_set_tid_address` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 97 | unshare | `fs.syscall_unshare` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 98 | futex | `syscall_linux_futex` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 99 | set_robust_list | `userland.syscall_set_robust_list` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 100 | get_robust_list | `userland.syscall_get_robust_list` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 101 | nanosleep | `sys.syscall_nanosleep` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 102 | getitimer | `syscall_linux_getitimer` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 103 | setitimer | `syscall_linux_setitimer` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 104 | kexec_load | `vacant` | unavailable |  |
+| 105 | init_module | `vacant` | unavailable |  |
+| 106 | delete_module | `vacant` | unavailable |  |
+| 107 | timer_create | `posixtimer.syscall_timer_create` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 108 | timer_gettime | `posixtimer.syscall_timer_gettime` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 109 | timer_getoverrun | `posixtimer.syscall_timer_getoverrun` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 110 | timer_settime | `posixtimer.syscall_timer_settime` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 111 | timer_delete | `posixtimer.syscall_timer_delete` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 112 | clock_settime | `sys.syscall_clock_settime` | wired; unqualified | `kernel/syscall/table/clock_control_arm64.v:init_clock_control_syscalls` |
+| 113 | clock_gettime | `sys.syscall_clock_gettime` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 114 | clock_getres | `sys.syscall_clock_getres` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 115 | clock_nanosleep | `sys.syscall_clock_nanosleep` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 116 | syslog | `vacant` | unavailable |  |
+| 117 | ptrace | `vacant` | unavailable |  |
+| 118 | sched_setparam | `syscall_linux_sched_setparam` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 119 | sched_setscheduler | `syscall_linux_sched_setscheduler` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 120 | sched_getscheduler | `syscall_linux_sched_getscheduler` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 121 | sched_getparam | `syscall_linux_sched_getparam` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 122 | sched_setaffinity | `syscall_linux_sched_setaffinity` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 123 | sched_getaffinity | `syscall_linux_sched_getaffinity` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 124 | sched_yield | `syscall_linux_sched_yield` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 125 | sched_get_priority_max | `syscall_linux_sched_get_priority_max` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 126 | sched_get_priority_min | `syscall_linux_sched_get_priority_min` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 127 | sched_rr_get_interval | `syscall_linux_sched_rr_get_interval` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 128 | restart_syscall | `vacant` | unavailable |  |
+| 129 | kill | `userland.syscall_kill` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 130 | tkill | `userland.syscall_tkill` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 131 | tgkill | `userland.syscall_tgkill` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 132 | sigaltstack | `userland.syscall_sigaltstack` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 133 | rt_sigsuspend | `userland.syscall_rt_sigsuspend` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 134 | rt_sigaction | `userland.syscall_rt_sigaction` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 135 | rt_sigprocmask | `userland.syscall_rt_sigprocmask` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 136 | rt_sigpending | `syscall_linux_rt_sigpending` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 137 | rt_sigtimedwait | `userland.syscall_rt_sigtimedwait` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 138 | rt_sigqueueinfo | `vacant` | unavailable |  |
+| 139 | rt_sigreturn | `userland.syscall_sigreturn` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 140 | setpriority | `syscall_linux_setpriority` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 141 | getpriority | `syscall_linux_getpriority` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 142 | reboot | `storage_reboot` | wired; unqualified | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 143 | setregid | `userland.syscall_setregid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 144 | setgid | `userland.syscall_setgid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 145 | setreuid | `userland.syscall_setreuid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 146 | setuid | `userland.syscall_setuid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 147 | setresuid | `userland.syscall_setresuid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 148 | getresuid | `userland.syscall_getresuid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 149 | setresgid | `userland.syscall_setresgid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 150 | getresgid | `userland.syscall_getresgid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 151 | setfsuid | `vacant` | unavailable |  |
+| 152 | setfsgid | `vacant` | unavailable |  |
+| 153 | times | `syscall_linux_times` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 154 | setpgid | `syscall_linux_setpgid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 155 | getpgid | `syscall_linux_getpgid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 156 | getsid | `userland.syscall_getsid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 157 | setsid | `userland.syscall_setsid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 158 | getgroups | `userland.syscall_getgroups` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 159 | setgroups | `userland.syscall_setgroups` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 160 | uname | `syscall_linux_uname` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 161 | sethostname | `net.syscall_sethostname` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 162 | setdomainname | `net.syscall_setdomainname` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 163 | getrlimit | `syscall_linux_getrlimit` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 164 | setrlimit | `syscall_linux_setrlimit` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 165 | getrusage | `sys.syscall_getrusage` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 166 | umask | `fs.syscall_umask` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 167 | prctl | `syscall_container_prctl` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 168 | getcpu | `numa.syscall_getcpu` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 169 | gettimeofday | `sys.syscall_gettimeofday` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 170 | settimeofday | `sys.syscall_settimeofday` | wired; unqualified | `kernel/syscall/table/clock_control_arm64.v:init_clock_control_syscalls` |
+| 171 | adjtimex | `sys.syscall_adjtimex` | wired; unqualified | `kernel/syscall/table/clock_control_arm64.v:init_clock_control_syscalls` |
+| 172 | getpid | `userland.syscall_getpid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 173 | getppid | `userland.syscall_getppid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 174 | getuid | `userland.syscall_getuid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 175 | geteuid | `userland.syscall_geteuid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 176 | getgid | `userland.syscall_getgid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 177 | getegid | `userland.syscall_getegid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 178 | gettid | `syscall_linux_gettid` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 179 | sysinfo | `sys.syscall_sysinfo` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 180 | mq_open | `vacant` | unavailable |  |
+| 181 | mq_unlink | `vacant` | unavailable |  |
+| 182 | mq_timedsend | `vacant` | unavailable |  |
+| 183 | mq_timedreceive | `vacant` | unavailable |  |
+| 184 | mq_notify | `vacant` | unavailable |  |
+| 185 | mq_getsetattr | `vacant` | unavailable |  |
+| 186 | msgget | `sysvmsg.syscall_msgget` | wired; unqualified | `kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls` |
+| 187 | msgctl | `sysvmsg.syscall_msgctl` | wired; unqualified | `kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls` |
+| 188 | msgrcv | `sysvmsg.syscall_msgrcv` | wired; unqualified | `kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls` |
+| 189 | msgsnd | `sysvmsg.syscall_msgsnd` | wired; unqualified | `kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls` |
+| 190 | semget | `sysvsem.syscall_semget` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 191 | semctl | `sysvsem.syscall_semctl` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 192 | semtimedop | `sysvsem.syscall_semtimedop` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 193 | semop | `sysvsem.syscall_semop` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 194 | shmget | `sysvshm.syscall_shmget` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 195 | shmctl | `sysvshm.syscall_shmctl` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 196 | shmat | `sysvshm.syscall_shmat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 197 | shmdt | `sysvshm.syscall_shmdt` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 198 | socket | `socket.syscall_socket` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 199 | socketpair | `socket.syscall_socketpair` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 200 | bind | `socket.syscall_bind` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 201 | listen | `socket.syscall_listen` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 202 | accept | `syscall_linux_accept` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 203 | connect | `socket.syscall_connect` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 204 | getsockname | `socket.syscall_getsockname` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 205 | getpeername | `socket.syscall_getpeername` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 206 | sendto | `syscall_linux_sendto` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 207 | recvfrom | `syscall_linux_recvfrom` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 208 | setsockopt | `socket.syscall_setsockopt` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 209 | getsockopt | `socket.syscall_getsockopt` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 210 | shutdown | `socket.syscall_shutdown` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 211 | sendmsg | `syscall_linux_sendmsg` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 212 | recvmsg | `socket.syscall_recvmsg` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 213 | readahead | `vacant` | unavailable |  |
+| 214 | brk | `mmap.syscall_brk` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 215 | munmap | `mmap.syscall_munmap` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 216 | mremap | `mmap.syscall_mremap` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 217 | add_key | `vacant` | unavailable |  |
+| 218 | request_key | `vacant` | unavailable |  |
+| 219 | keyctl | `vacant` | unavailable |  |
+| 220 | clone | `userland.syscall_clone` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 221 | execve | `userland.syscall_execve` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 222 | mmap | `security_linux_mmap` | wired; unqualified | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 223 | fadvise64 | `file.syscall_fadvise64` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 224 | swapon | `fs.syscall_swapon` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 225 | swapoff | `fs.syscall_swapoff` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 226 | mprotect | `mmap.syscall_mprotect` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 227 | msync | `mmap.syscall_msync` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 228 | mlock | `mmap.syscall_mlock` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 229 | munlock | `mmap.syscall_munlock` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 230 | mlockall | `mmap.syscall_mlockall` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 231 | munlockall | `mmap.syscall_munlockall` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 232 | mincore | `mmap.syscall_mincore` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 233 | madvise | `mmap.syscall_madvise` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 234 | remap_file_pages | `vacant` | unavailable |  |
+| 235 | mbind | `numa.syscall_mbind` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 236 | get_mempolicy | `numa.syscall_get_mempolicy` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 237 | set_mempolicy | `numa.syscall_set_mempolicy` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 238 | migrate_pages | `vacant` | unavailable |  |
+| 239 | move_pages | `vacant` | unavailable |  |
+| 240 | rt_tgsigqueueinfo | `vacant` | unavailable |  |
+| 241 | perf_event_open | `vacant` | unavailable |  |
+| 242 | accept4 | `syscall_linux_accept4` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 243 | recvmmsg | `syscall_linux_recvmmsg` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 245 | vinix_private | `cpu.syscall_set_tls` | private | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 246 | vinix_private | `userland.syscall_sigentry` | private | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 247 | vinix_private | `mmap.syscall_mimmutable` | private | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 248 | vinix_private | `fs.syscall_pledge` | private | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 249 | vinix_private | `fs.syscall_unveil` | private | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 250 | vinix_private | `mmap.syscall_minherit` | private | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 260 | wait4 | `userland.syscall_wait4` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 261 | prlimit64 | `syscall_linux_prlimit64` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 262 | fanotify_init | `vacant` | unavailable |  |
+| 263 | fanotify_mark | `vacant` | unavailable |  |
+| 264 | name_to_handle_at | `vacant` | unavailable |  |
+| 265 | open_by_handle_at | `vacant` | unavailable |  |
+| 266 | clock_adjtime | `sys.syscall_clock_adjtime` | wired; unqualified | `kernel/syscall/table/clock_control_arm64.v:init_clock_control_syscalls` |
+| 267 | syncfs | `storage_syncfs` | wired; unqualified | `kernel/syscall/table/storage_arm64.v:init_storage_syscalls` |
+| 268 | setns | `fs.syscall_setns` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 269 | sendmmsg | `syscall_linux_sendmmsg` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 270 | process_vm_readv | `syscall_linux_process_vm_readv` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 271 | process_vm_writev | `syscall_linux_process_vm_writev` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 272 | kcmp | `vacant` | unavailable |  |
+| 273 | finit_module | `vacant` | unavailable |  |
+| 274 | sched_setattr | `syscall_linux_sched_setattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 275 | sched_getattr | `syscall_linux_sched_getattr` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 276 | renameat2 | `fs.syscall_renameat2` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 277 | seccomp | `syscall_linux_seccomp` | wired; unqualified | `kernel/syscall/table/container_arm64.v:init_container_syscalls` |
+| 278 | getrandom | `syscall_linux_getrandom` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 279 | memfd_create | `fs.syscall_memfd_create` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 280 | bpf | `syscall_linux_bpf` | unavailable | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 281 | execveat | `userland.syscall_execveat` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 282 | userfaultfd | `vacant` | unavailable |  |
+| 283 | membarrier | `syscall_linux_membarrier` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 284 | mlock2 | `mmap.syscall_mlock2` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 285 | copy_file_range | `pipe.syscall_copy_file_range` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 286 | preadv2 | `syscall_linux_preadv2` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 287 | pwritev2 | `syscall_linux_pwritev2` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 288 | pkey_mprotect | `vacant` | unavailable |  |
+| 289 | pkey_alloc | `vacant` | unavailable |  |
+| 290 | pkey_free | `vacant` | unavailable |  |
+| 291 | statx | `syscall_linux_statx` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 292 | io_pgetevents | `vacant` | unavailable |  |
+| 293 | rseq | `vacant` | unavailable |  |
+| 294 | kexec_file_load | `vacant` | unavailable |  |
+| 424 | pidfd_send_signal | `userland.syscall_pidfd_send_signal` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 425 | io_uring_setup | `vacant` | unavailable |  |
+| 426 | io_uring_enter | `vacant` | unavailable |  |
+| 427 | io_uring_register | `vacant` | unavailable |  |
+| 428 | open_tree | `vacant` | unavailable |  |
+| 429 | move_mount | `vacant` | unavailable |  |
+| 430 | fsopen | `vacant` | unavailable |  |
+| 431 | fsconfig | `vacant` | unavailable |  |
+| 432 | fsmount | `vacant` | unavailable |  |
+| 433 | fspick | `vacant` | unavailable |  |
+| 434 | pidfd_open | `userland.syscall_pidfd_open` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 435 | clone3 | `userland.syscall_clone3` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 436 | close_range | `file.syscall_close_range` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 437 | openat2 | `syscall_linux_openat2` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 438 | pidfd_getfd | `vacant` | unavailable |  |
+| 439 | faccessat2 | `syscall_linux_faccessat2` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 440 | process_madvise | `vacant` | unavailable |  |
+| 441 | epoll_pwait2 | `file.syscall_epoll_pwait2` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
+| 442 | mount_setattr | `vacant` | unavailable |  |
+| 444 | landlock_create_ruleset | `vacant` | unavailable |  |
+| 445 | landlock_add_rule | `vacant` | unavailable |  |
+| 446 | landlock_restrict_self | `vacant` | unavailable |  |
+| 448 | process_mrelease | `vacant` | unavailable |  |
+| 449 | futex_waitv | `vacant` | unavailable |  |
+| 450 | set_mempolicy_home_node | `vacant` | unavailable |  |
+| 451 | cachestat | `vacant` | unavailable |  |
+| 452 | fchmodat2 | `vacant` | unavailable |  |
+| 511 | vinix_private | `syscall_seccomp_verdict` | private | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
 
 ## x86_64
 
-266/363 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
+274/363 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
 
-| Number | Linux name | Handler | Dispatch status |
-| --- | --- | --- | --- |
-| 0 | read | `syscall_linux_read` | wired; unqualified |
-| 1 | write | `syscall_linux_write` | wired; unqualified |
-| 2 | open | `syscall_linux_open` | wired; unqualified |
-| 3 | close | `syscall_linux_close` | wired; unqualified |
-| 4 | stat | `syscall_linux_stat` | wired; unqualified |
-| 5 | fstat | `syscall_linux_fstat` | wired; unqualified |
-| 6 | lstat | `syscall_linux_lstat` | wired; unqualified |
-| 7 | poll | `file.syscall_poll` | wired; unqualified |
-| 8 | lseek | `syscall_linux_lseek` | wired; unqualified |
-| 9 | mmap | `syscall_linux_mmap` | wired; unqualified |
-| 10 | mprotect | `mmap.syscall_mprotect` | wired; unqualified |
-| 11 | munmap | `mmap.syscall_munmap` | wired; unqualified |
-| 12 | brk | `mmap.syscall_brk` | wired; unqualified |
-| 13 | rt_sigaction | `userland.syscall_rt_sigaction` | wired; unqualified |
-| 14 | rt_sigprocmask | `userland.syscall_rt_sigprocmask` | wired; unqualified |
-| 15 | rt_sigreturn | `userland.syscall_linux_rt_sigreturn` | wired; unqualified |
-| 16 | ioctl | `fs.syscall_ioctl` | wired; unqualified |
-| 17 | pread64 | `syscall_linux_pread64` | wired; unqualified |
-| 18 | pwrite64 | `syscall_linux_pwrite64` | wired; unqualified |
-| 19 | readv | `syscall_linux_readv` | wired; unqualified |
-| 20 | writev | `syscall_linux_writev` | wired; unqualified |
-| 21 | access | `syscall_linux_access` | wired; unqualified |
-| 22 | pipe | `syscall_linux_pipe` | wired; unqualified |
-| 23 | select | `file.syscall_select` | wired; unqualified |
-| 24 | sched_yield | `syscall_linux_sched_yield` | wired; unqualified |
-| 25 | mremap | `mmap.syscall_mremap` | wired; unqualified |
-| 26 | msync | `mmap.syscall_msync` | wired; unqualified |
-| 27 | mincore | `mmap.syscall_mincore` | wired; unqualified |
-| 28 | madvise | `mmap.syscall_madvise` | wired; unqualified |
-| 29 | shmget | `sysvshm.syscall_shmget` | wired; unqualified |
-| 30 | shmat | `sysvshm.syscall_shmat` | wired; unqualified |
-| 31 | shmctl | `sysvshm.syscall_shmctl` | wired; unqualified |
-| 32 | dup | `syscall_linux_dup` | wired; unqualified |
-| 33 | dup2 | `syscall_linux_dup2` | wired; unqualified |
-| 34 | pause | `userland.syscall_pause` | wired; unqualified |
-| 35 | nanosleep | `sys.syscall_nanosleep` | wired; unqualified |
-| 36 | getitimer | `syscall_linux_getitimer` | wired; unqualified |
-| 37 | alarm | `syscall_linux_alarm` | wired; unqualified |
-| 38 | setitimer | `syscall_linux_setitimer` | wired; unqualified |
-| 39 | getpid | `userland.syscall_getpid` | wired; unqualified |
-| 40 | sendfile | `syscall_linux_sendfile` | wired; unqualified |
-| 41 | socket | `socket.syscall_socket` | wired; unqualified |
-| 42 | connect | `socket.syscall_connect` | wired; unqualified |
-| 43 | accept | `syscall_linux_accept` | wired; unqualified |
-| 44 | sendto | `socket.syscall_sendto` | wired; unqualified |
-| 45 | recvfrom | `socket.syscall_recvfrom` | wired; unqualified |
-| 46 | sendmsg | `socket.syscall_sendmsg` | wired; unqualified |
-| 47 | recvmsg | `socket.syscall_recvmsg` | wired; unqualified |
-| 48 | shutdown | `socket.syscall_shutdown` | wired; unqualified |
-| 49 | bind | `socket.syscall_bind` | wired; unqualified |
-| 50 | listen | `socket.syscall_listen` | wired; unqualified |
-| 51 | getsockname | `socket.syscall_getsockname` | wired; unqualified |
-| 52 | getpeername | `socket.syscall_getpeername` | wired; unqualified |
-| 53 | socketpair | `socket.syscall_socketpair` | wired; unqualified |
-| 54 | setsockopt | `socket.syscall_setsockopt` | wired; unqualified |
-| 55 | getsockopt | `socket.syscall_getsockopt` | wired; unqualified |
-| 56 | clone | `userland.syscall_clone` | wired; unqualified |
-| 57 | fork | `userland.syscall_fork` | wired; unqualified |
-| 58 | vfork | `userland.syscall_vfork` | wired; unqualified |
-| 59 | execve | `userland.syscall_execve` | wired; unqualified |
-| 60 | exit | `userland.syscall_exit` | wired; unqualified |
-| 61 | wait4 | `userland.syscall_wait4` | wired; unqualified |
-| 62 | kill | `userland.syscall_kill` | wired; unqualified |
-| 63 | uname | `syscall_linux_uname` | wired; unqualified |
-| 64 | semget | `sysvsem.syscall_semget` | wired; unqualified |
-| 65 | semop | `sysvsem.syscall_semop` | wired; unqualified |
-| 66 | semctl | `sysvsem.syscall_semctl` | wired; unqualified |
-| 67 | shmdt | `sysvshm.syscall_shmdt` | wired; unqualified |
-| 68 | msgget | `vacant` | unavailable |
-| 69 | msgsnd | `vacant` | unavailable |
-| 70 | msgrcv | `vacant` | unavailable |
-| 71 | msgctl | `vacant` | unavailable |
-| 72 | fcntl | `syscall_linux_fcntl` | wired; unqualified |
-| 73 | flock | `file.syscall_flock` | wired; unqualified |
-| 74 | fsync | `file.syscall_fsync` | wired; unqualified |
-| 75 | fdatasync | `file.syscall_fsync` | wired; unqualified |
-| 76 | truncate | `fs.syscall_truncate` | wired; unqualified |
-| 77 | ftruncate | `syscall_linux_ftruncate` | wired; unqualified |
-| 78 | getdents | `syscall_linux_getdents` | wired; unqualified |
-| 79 | getcwd | `fs.syscall_getcwd` | wired; unqualified |
-| 80 | chdir | `fs.syscall_chdir` | wired; unqualified |
-| 81 | fchdir | `fs.syscall_fchdir` | wired; unqualified |
-| 82 | rename | `syscall_linux_rename` | wired; unqualified |
-| 83 | mkdir | `syscall_linux_mkdir` | wired; unqualified |
-| 84 | rmdir | `syscall_linux_rmdir` | wired; unqualified |
-| 85 | creat | `syscall_linux_creat` | wired; unqualified |
-| 86 | link | `syscall_linux_link` | wired; unqualified |
-| 87 | unlink | `syscall_linux_unlink` | wired; unqualified |
-| 88 | symlink | `syscall_linux_symlink` | wired; unqualified |
-| 89 | readlink | `syscall_linux_readlink` | wired; unqualified |
-| 90 | chmod | `syscall_linux_chmod` | wired; unqualified |
-| 91 | fchmod | `fs.syscall_fchmod` | wired; unqualified |
-| 92 | chown | `syscall_linux_chown` | wired; unqualified |
-| 93 | fchown | `fs.syscall_fchown` | wired; unqualified |
-| 94 | lchown | `syscall_linux_lchown` | wired; unqualified |
-| 95 | umask | `fs.syscall_umask` | wired; unqualified |
-| 96 | gettimeofday | `sys.syscall_gettimeofday` | wired; unqualified |
-| 97 | getrlimit | `syscall_linux_getrlimit` | wired; unqualified |
-| 98 | getrusage | `sys.syscall_getrusage` | wired; unqualified |
-| 99 | sysinfo | `sys.syscall_sysinfo` | wired; unqualified |
-| 100 | times | `syscall_linux_times` | wired; unqualified |
-| 101 | ptrace | `vacant` | unavailable |
-| 102 | getuid | `userland.syscall_getuid` | wired; unqualified |
-| 103 | syslog | `vacant` | unavailable |
-| 104 | getgid | `userland.syscall_getgid` | wired; unqualified |
-| 105 | setuid | `userland.syscall_setuid` | wired; unqualified |
-| 106 | setgid | `userland.syscall_setgid` | wired; unqualified |
-| 107 | geteuid | `userland.syscall_geteuid` | wired; unqualified |
-| 108 | getegid | `userland.syscall_getegid` | wired; unqualified |
-| 109 | setpgid | `syscall_linux_setpgid` | wired; unqualified |
-| 110 | getppid | `userland.syscall_getppid` | wired; unqualified |
-| 111 | getpgrp | `syscall_linux_getpgrp` | wired; unqualified |
-| 112 | setsid | `userland.syscall_setsid` | wired; unqualified |
-| 113 | setreuid | `userland.syscall_setreuid` | wired; unqualified |
-| 114 | setregid | `userland.syscall_setregid` | wired; unqualified |
-| 115 | getgroups | `userland.syscall_getgroups` | wired; unqualified |
-| 116 | setgroups | `userland.syscall_setgroups` | wired; unqualified |
-| 117 | setresuid | `userland.syscall_setresuid` | wired; unqualified |
-| 118 | getresuid | `userland.syscall_getresuid` | wired; unqualified |
-| 119 | setresgid | `userland.syscall_setresgid` | wired; unqualified |
-| 120 | getresgid | `userland.syscall_getresgid` | wired; unqualified |
-| 121 | getpgid | `syscall_linux_getpgid` | wired; unqualified |
-| 122 | setfsuid | `vacant` | unavailable |
-| 123 | setfsgid | `vacant` | unavailable |
-| 124 | getsid | `userland.syscall_getsid` | wired; unqualified |
-| 125 | capget | `syscall_linux_capget` | wired; unqualified |
-| 126 | capset | `syscall_linux_capset` | wired; unqualified |
-| 127 | rt_sigpending | `syscall_linux_rt_sigpending` | wired; unqualified |
-| 128 | rt_sigtimedwait | `userland.syscall_rt_sigtimedwait` | wired; unqualified |
-| 129 | rt_sigqueueinfo | `vacant` | unavailable |
-| 130 | rt_sigsuspend | `userland.syscall_rt_sigsuspend` | wired; unqualified |
-| 131 | sigaltstack | `userland.syscall_sigaltstack` | wired; unqualified |
-| 132 | utime | `syscall_linux_utime` | wired; unqualified |
-| 133 | mknod | `syscall_linux_mknod` | wired; unqualified |
-| 134 | uselib | `vacant` | unavailable |
-| 135 | personality | `vacant` | unavailable |
-| 136 | ustat | `vacant` | unavailable |
-| 137 | statfs | `fs.syscall_statfs` | wired; unqualified |
-| 138 | fstatfs | `fs.syscall_fstatfs` | wired; unqualified |
-| 139 | sysfs | `vacant` | unavailable |
-| 140 | getpriority | `syscall_linux_getpriority` | wired; unqualified |
-| 141 | setpriority | `syscall_linux_setpriority` | wired; unqualified |
-| 142 | sched_setparam | `syscall_linux_sched_setparam` | wired; unqualified |
-| 143 | sched_getparam | `syscall_linux_sched_getparam` | wired; unqualified |
-| 144 | sched_setscheduler | `syscall_linux_sched_setscheduler` | wired; unqualified |
-| 145 | sched_getscheduler | `syscall_linux_sched_getscheduler` | wired; unqualified |
-| 146 | sched_get_priority_max | `syscall_linux_sched_get_priority_max` | wired; unqualified |
-| 147 | sched_get_priority_min | `syscall_linux_sched_get_priority_min` | wired; unqualified |
-| 148 | sched_rr_get_interval | `syscall_linux_sched_rr_get_interval` | wired; unqualified |
-| 149 | mlock | `mmap.syscall_mlock` | wired; unqualified |
-| 150 | munlock | `mmap.syscall_munlock` | wired; unqualified |
-| 151 | mlockall | `mmap.syscall_mlockall` | wired; unqualified |
-| 152 | munlockall | `mmap.syscall_munlockall` | wired; unqualified |
-| 153 | vhangup | `vacant` | unavailable |
-| 154 | modify_ldt | `syscall_linux_modify_ldt` | wired; unqualified |
-| 155 | pivot_root | `fs.syscall_pivot_root` | wired; unqualified |
-| 156 | _sysctl | `vacant` | unavailable |
-| 157 | prctl | `syscall_container_prctl` | wired; unqualified |
-| 158 | arch_prctl | `syscall_linux_arch_prctl` | wired; unqualified |
-| 159 | adjtimex | `vacant` | unavailable |
-| 160 | setrlimit | `syscall_linux_setrlimit` | wired; unqualified |
-| 161 | chroot | `fs.syscall_chroot` | wired; unqualified |
-| 162 | sync | `fs.syscall_sync` | wired; unqualified |
-| 163 | acct | `vacant` | unavailable |
-| 164 | settimeofday | `vacant` | unavailable |
-| 165 | mount | `fs.syscall_mount` | wired; unqualified |
-| 166 | umount2 | `fs.syscall_umount` | wired; unqualified |
-| 167 | swapon | `fs.syscall_swapon` | wired; unqualified |
-| 168 | swapoff | `fs.syscall_swapoff` | wired; unqualified |
-| 169 | reboot | `syscall_linux_reboot` | wired; unqualified |
-| 170 | sethostname | `net.syscall_sethostname` | wired; unqualified |
-| 171 | setdomainname | `net.syscall_setdomainname` | wired; unqualified |
-| 172 | iopl | `vacant` | unavailable |
-| 173 | ioperm | `vacant` | unavailable |
-| 174 | create_module | `vacant` | unavailable |
-| 175 | init_module | `vacant` | unavailable |
-| 176 | delete_module | `vacant` | unavailable |
-| 177 | get_kernel_syms | `vacant` | unavailable |
-| 178 | query_module | `vacant` | unavailable |
-| 179 | quotactl | `vacant` | unavailable |
-| 180 | nfsservctl | `vacant` | unavailable |
-| 181 | getpmsg | `vacant` | unavailable |
-| 182 | putpmsg | `vacant` | unavailable |
-| 183 | afs_syscall | `vacant` | unavailable |
-| 184 | tuxcall | `vacant` | unavailable |
-| 185 | security | `vacant` | unavailable |
-| 186 | gettid | `syscall_linux_gettid` | wired; unqualified |
-| 187 | readahead | `vacant` | unavailable |
-| 188 | setxattr | `fs.syscall_setxattr` | wired; unqualified |
-| 189 | lsetxattr | `fs.syscall_lsetxattr` | wired; unqualified |
-| 190 | fsetxattr | `fs.syscall_fsetxattr` | wired; unqualified |
-| 191 | getxattr | `fs.syscall_getxattr` | wired; unqualified |
-| 192 | lgetxattr | `fs.syscall_lgetxattr` | wired; unqualified |
-| 193 | fgetxattr | `fs.syscall_fgetxattr` | wired; unqualified |
-| 194 | listxattr | `fs.syscall_listxattr` | wired; unqualified |
-| 195 | llistxattr | `fs.syscall_llistxattr` | wired; unqualified |
-| 196 | flistxattr | `fs.syscall_flistxattr` | wired; unqualified |
-| 197 | removexattr | `fs.syscall_removexattr` | wired; unqualified |
-| 198 | lremovexattr | `fs.syscall_lremovexattr` | wired; unqualified |
-| 199 | fremovexattr | `fs.syscall_fremovexattr` | wired; unqualified |
-| 200 | tkill | `userland.syscall_tkill` | wired; unqualified |
-| 201 | time | `syscall_linux_time` | wired; unqualified |
-| 202 | futex | `syscall_linux_futex` | wired; unqualified |
-| 203 | sched_setaffinity | `syscall_linux_sched_setaffinity` | wired; unqualified |
-| 204 | sched_getaffinity | `syscall_linux_sched_getaffinity` | wired; unqualified |
-| 205 | set_thread_area | `syscall_linux_set_thread_area` | wired; unqualified |
-| 206 | io_setup | `vacant` | unavailable |
-| 207 | io_destroy | `vacant` | unavailable |
-| 208 | io_getevents | `vacant` | unavailable |
-| 209 | io_submit | `vacant` | unavailable |
-| 210 | io_cancel | `vacant` | unavailable |
-| 211 | get_thread_area | `syscall_linux_get_thread_area` | wired; unqualified |
-| 212 | lookup_dcookie | `vacant` | unavailable |
-| 213 | epoll_create | `syscall_linux_epoll_create` | wired; unqualified |
-| 214 | epoll_ctl_old | `vacant` | unavailable |
-| 215 | epoll_wait_old | `vacant` | unavailable |
-| 216 | remap_file_pages | `vacant` | unavailable |
-| 217 | getdents64 | `syscall_linux_getdents64` | wired; unqualified |
-| 218 | set_tid_address | `userland.syscall_set_tid_address` | wired; unqualified |
-| 219 | restart_syscall | `vacant` | unavailable |
-| 220 | semtimedop | `sysvsem.syscall_semtimedop` | wired; unqualified |
-| 221 | fadvise64 | `file.syscall_fadvise64` | wired; unqualified |
-| 222 | timer_create | `posixtimer.syscall_timer_create` | wired; unqualified |
-| 223 | timer_settime | `posixtimer.syscall_timer_settime` | wired; unqualified |
-| 224 | timer_gettime | `posixtimer.syscall_timer_gettime` | wired; unqualified |
-| 225 | timer_getoverrun | `posixtimer.syscall_timer_getoverrun` | wired; unqualified |
-| 226 | timer_delete | `posixtimer.syscall_timer_delete` | wired; unqualified |
-| 227 | clock_settime | `vacant` | unavailable |
-| 228 | clock_gettime | `sys.syscall_clock_gettime` | wired; unqualified |
-| 229 | clock_getres | `sys.syscall_clock_getres` | wired; unqualified |
-| 230 | clock_nanosleep | `sys.syscall_clock_nanosleep` | wired; unqualified |
-| 231 | exit_group | `userland.syscall_exit_group` | wired; unqualified |
-| 232 | epoll_wait | `syscall_linux_epoll_wait` | wired; unqualified |
-| 233 | epoll_ctl | `file.syscall_epoll_ctl` | wired; unqualified |
-| 234 | tgkill | `userland.syscall_tgkill` | wired; unqualified |
-| 235 | utimes | `syscall_linux_utimes` | wired; unqualified |
-| 236 | vserver | `vacant` | unavailable |
-| 237 | mbind | `numa.syscall_mbind` | wired; unqualified |
-| 238 | set_mempolicy | `numa.syscall_set_mempolicy` | wired; unqualified |
-| 239 | get_mempolicy | `numa.syscall_get_mempolicy` | wired; unqualified |
-| 240 | mq_open | `vacant` | unavailable |
-| 241 | mq_unlink | `vacant` | unavailable |
-| 242 | mq_timedsend | `vacant` | unavailable |
-| 243 | mq_timedreceive | `vacant` | unavailable |
-| 244 | mq_notify | `vacant` | unavailable |
-| 245 | mq_getsetattr | `vacant` | unavailable |
-| 246 | kexec_load | `vacant` | unavailable |
-| 247 | waitid | `userland.syscall_waitid` | wired; unqualified |
-| 248 | add_key | `vacant` | unavailable |
-| 249 | request_key | `vacant` | unavailable |
-| 250 | keyctl | `vacant` | unavailable |
-| 251 | ioprio_set | `vacant` | unavailable |
-| 252 | ioprio_get | `vacant` | unavailable |
-| 253 | inotify_init | `syscall_linux_inotify_init` | wired; unqualified |
-| 254 | inotify_add_watch | `fs.syscall_inotify_add_watch` | wired; unqualified |
-| 255 | inotify_rm_watch | `fs.syscall_inotify_rm_watch` | wired; unqualified |
-| 256 | migrate_pages | `vacant` | unavailable |
-| 257 | openat | `syscall_linux_openat` | wired; unqualified |
-| 258 | mkdirat | `fs.syscall_mkdirat` | wired; unqualified |
-| 259 | mknodat | `fs.syscall_mknodat` | wired; unqualified |
-| 260 | fchownat | `fs.syscall_fchownat` | wired; unqualified |
-| 261 | futimesat | `syscall_linux_futimesat` | wired; unqualified |
-| 262 | newfstatat | `syscall_linux_fstatat` | wired; unqualified |
-| 263 | unlinkat | `fs.syscall_unlinkat` | wired; unqualified |
-| 264 | renameat | `fs.syscall_renameat` | wired; unqualified |
-| 265 | linkat | `fs.syscall_linkat` | wired; unqualified |
-| 266 | symlinkat | `fs.syscall_symlinkat` | wired; unqualified |
-| 267 | readlinkat | `syscall_linux_readlinkat` | wired; unqualified |
-| 268 | fchmodat | `fs.syscall_fchmodat` | wired; unqualified |
-| 269 | faccessat | `syscall_linux_faccessat` | wired; unqualified |
-| 270 | pselect6 | `file.syscall_pselect6` | wired; unqualified |
-| 271 | ppoll | `file.syscall_ppoll` | wired; unqualified |
-| 272 | unshare | `fs.syscall_unshare` | wired; unqualified |
-| 273 | set_robust_list | `userland.syscall_set_robust_list` | wired; unqualified |
-| 274 | get_robust_list | `userland.syscall_get_robust_list` | wired; unqualified |
-| 275 | splice | `pipe.syscall_splice` | wired; unqualified |
-| 276 | tee | `pipe.syscall_tee` | wired; unqualified |
-| 277 | sync_file_range | `file.syscall_sync_file_range` | wired; unqualified |
-| 278 | vmsplice | `pipe.syscall_vmsplice` | wired; unqualified |
-| 279 | move_pages | `vacant` | unavailable |
-| 280 | utimensat | `fs.syscall_utimensat` | wired; unqualified |
-| 281 | epoll_pwait | `file.syscall_epoll_pwait` | wired; unqualified |
-| 282 | signalfd | `syscall_linux_signalfd` | wired; unqualified |
-| 283 | timerfd_create | `file.syscall_timerfd_create` | wired; unqualified |
-| 284 | eventfd | `syscall_linux_eventfd` | wired; unqualified |
-| 285 | fallocate | `file.syscall_fallocate` | wired; unqualified |
-| 286 | timerfd_settime | `file.syscall_timerfd_settime` | wired; unqualified |
-| 287 | timerfd_gettime | `file.syscall_timerfd_gettime` | wired; unqualified |
-| 288 | accept4 | `syscall_linux_accept4` | wired; unqualified |
-| 289 | signalfd4 | `userland.syscall_signalfd4` | wired; unqualified |
-| 290 | eventfd2 | `file.syscall_eventfd2` | wired; unqualified |
-| 291 | epoll_create1 | `file.syscall_epoll_create1` | wired; unqualified |
-| 292 | dup3 | `syscall_linux_dup3` | wired; unqualified |
-| 293 | pipe2 | `pipe.syscall_pipe_checked` | wired; unqualified |
-| 294 | inotify_init1 | `fs.syscall_inotify_init` | wired; unqualified |
-| 295 | preadv | `syscall_linux_preadv` | wired; unqualified |
-| 296 | pwritev | `syscall_linux_pwritev` | wired; unqualified |
-| 297 | rt_tgsigqueueinfo | `vacant` | unavailable |
-| 298 | perf_event_open | `vacant` | unavailable |
-| 299 | recvmmsg | `syscall_linux_recvmmsg` | wired; unqualified |
-| 300 | fanotify_init | `vacant` | unavailable |
-| 301 | fanotify_mark | `vacant` | unavailable |
-| 302 | prlimit64 | `syscall_linux_prlimit64` | wired; unqualified |
-| 303 | name_to_handle_at | `vacant` | unavailable |
-| 304 | open_by_handle_at | `vacant` | unavailable |
-| 305 | clock_adjtime | `vacant` | unavailable |
-| 306 | syncfs | `fs.syscall_syncfs` | wired; unqualified |
-| 307 | sendmmsg | `syscall_linux_sendmmsg` | wired; unqualified |
-| 308 | setns | `fs.syscall_setns` | wired; unqualified |
-| 309 | getcpu | `numa.syscall_getcpu` | wired; unqualified |
-| 310 | process_vm_readv | `syscall_linux_process_vm_readv` | wired; unqualified |
-| 311 | process_vm_writev | `syscall_linux_process_vm_writev` | wired; unqualified |
-| 312 | kcmp | `vacant` | unavailable |
-| 313 | finit_module | `vacant` | unavailable |
-| 314 | sched_setattr | `syscall_linux_sched_setattr` | wired; unqualified |
-| 315 | sched_getattr | `syscall_linux_sched_getattr` | wired; unqualified |
-| 316 | renameat2 | `fs.syscall_renameat2` | wired; unqualified |
-| 317 | seccomp | `syscall_linux_seccomp` | wired; unqualified |
-| 318 | getrandom | `syscall_linux_getrandom` | wired; unqualified |
-| 319 | memfd_create | `fs.syscall_memfd_create` | wired; unqualified |
-| 320 | kexec_file_load | `vacant` | unavailable |
-| 321 | bpf | `syscall_linux_bpf` | unavailable |
-| 322 | execveat | `userland.syscall_execveat` | wired; unqualified |
-| 323 | userfaultfd | `vacant` | unavailable |
-| 324 | membarrier | `syscall_linux_membarrier` | wired; unqualified |
-| 325 | mlock2 | `mmap.syscall_mlock2` | wired; unqualified |
-| 326 | copy_file_range | `pipe.syscall_copy_file_range` | wired; unqualified |
-| 327 | preadv2 | `syscall_linux_preadv2` | wired; unqualified |
-| 328 | pwritev2 | `syscall_linux_pwritev2` | wired; unqualified |
-| 329 | pkey_mprotect | `vacant` | unavailable |
-| 330 | pkey_alloc | `vacant` | unavailable |
-| 331 | pkey_free | `vacant` | unavailable |
-| 332 | statx | `syscall_linux_statx` | wired; unqualified |
-| 333 | io_pgetevents | `vacant` | unavailable |
-| 334 | rseq | `syscall_linux_rseq` | unavailable |
-| 424 | pidfd_send_signal | `userland.syscall_pidfd_send_signal` | wired; unqualified |
-| 425 | io_uring_setup | `vacant` | unavailable |
-| 426 | io_uring_enter | `vacant` | unavailable |
-| 427 | io_uring_register | `vacant` | unavailable |
-| 428 | open_tree | `vacant` | unavailable |
-| 429 | move_mount | `vacant` | unavailable |
-| 430 | fsopen | `vacant` | unavailable |
-| 431 | fsconfig | `vacant` | unavailable |
-| 432 | fsmount | `vacant` | unavailable |
-| 433 | fspick | `vacant` | unavailable |
-| 434 | pidfd_open | `userland.syscall_pidfd_open` | wired; unqualified |
-| 435 | clone3 | `userland.syscall_clone3` | wired; unqualified |
-| 436 | close_range | `file.syscall_close_range` | wired; unqualified |
-| 437 | openat2 | `syscall_linux_openat2` | wired; unqualified |
-| 438 | pidfd_getfd | `vacant` | unavailable |
-| 439 | faccessat2 | `syscall_linux_faccessat2` | wired; unqualified |
-| 440 | process_madvise | `vacant` | unavailable |
-| 441 | epoll_pwait2 | `file.syscall_epoll_pwait2` | wired; unqualified |
-| 442 | mount_setattr | `vacant` | unavailable |
-| 444 | landlock_create_ruleset | `vacant` | unavailable |
-| 445 | landlock_add_rule | `vacant` | unavailable |
-| 446 | landlock_restrict_self | `vacant` | unavailable |
-| 447 | memfd_secret | `vacant` | unavailable |
-| 448 | process_mrelease | `vacant` | unavailable |
-| 449 | futex_waitv | `vacant` | unavailable |
-| 450 | set_mempolicy_home_node | `vacant` | unavailable |
-| 451 | cachestat | `vacant` | unavailable |
-| 452 | fchmodat2 | `vacant` | unavailable |
-| 511 | vinix_private | `syscall_seccomp_verdict` | private |
+| Number | Linux name | Handler | Dispatch status | Registered by |
+| --- | --- | --- | --- | --- |
+| 0 | read | `syscall_linux_read` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 1 | write | `syscall_linux_write` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 2 | open | `syscall_linux_open` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 3 | close | `syscall_linux_close` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 4 | stat | `syscall_linux_stat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 5 | fstat | `syscall_linux_fstat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 6 | lstat | `syscall_linux_lstat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 7 | poll | `file.syscall_poll` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 8 | lseek | `syscall_linux_lseek` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 9 | mmap | `syscall_linux_mmap_hardened` | wired; unqualified | `kernel/syscall/table/security_amd64.v:init_security_syscalls` |
+| 10 | mprotect | `mmap.syscall_mprotect` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 11 | munmap | `mmap.syscall_munmap` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 12 | brk | `mmap.syscall_brk` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 13 | rt_sigaction | `userland.syscall_rt_sigaction` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 14 | rt_sigprocmask | `userland.syscall_rt_sigprocmask` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 15 | rt_sigreturn | `userland.syscall_linux_rt_sigreturn` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 16 | ioctl | `fs.syscall_ioctl` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 17 | pread64 | `syscall_linux_pread64` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 18 | pwrite64 | `syscall_linux_pwrite64` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 19 | readv | `syscall_linux_readv` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 20 | writev | `syscall_linux_writev` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 21 | access | `syscall_linux_access` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 22 | pipe | `syscall_linux_pipe_checked` | wired; unqualified | `kernel/syscall/table/pipe_usercopy_amd64.v:init_pipe_usercopy_syscalls` |
+| 23 | select | `file.syscall_select` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 24 | sched_yield | `syscall_linux_sched_yield` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 25 | mremap | `mmap.syscall_mremap` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 26 | msync | `mmap.syscall_msync` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 27 | mincore | `mmap.syscall_mincore` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 28 | madvise | `mmap.syscall_madvise` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 29 | shmget | `sysvshm.syscall_shmget` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 30 | shmat | `sysvshm.syscall_shmat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 31 | shmctl | `sysvshm.syscall_shmctl` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 32 | dup | `syscall_linux_dup` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 33 | dup2 | `syscall_linux_dup2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 34 | pause | `userland.syscall_pause` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 35 | nanosleep | `sys.syscall_nanosleep` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 36 | getitimer | `syscall_linux_getitimer` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 37 | alarm | `syscall_linux_alarm` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 38 | setitimer | `syscall_linux_setitimer` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 39 | getpid | `userland.syscall_getpid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 40 | sendfile | `syscall_linux_sendfile` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 41 | socket | `socket.syscall_socket` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 42 | connect | `socket.syscall_connect` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 43 | accept | `syscall_linux_accept` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 44 | sendto | `socket.syscall_sendto` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 45 | recvfrom | `socket.syscall_recvfrom` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 46 | sendmsg | `socket.syscall_sendmsg` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 47 | recvmsg | `socket.syscall_recvmsg` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 48 | shutdown | `socket.syscall_shutdown` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 49 | bind | `socket.syscall_bind` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 50 | listen | `socket.syscall_listen` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 51 | getsockname | `socket.syscall_getsockname` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 52 | getpeername | `socket.syscall_getpeername` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 53 | socketpair | `socket.syscall_socketpair` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 54 | setsockopt | `socket.syscall_setsockopt` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 55 | getsockopt | `socket.syscall_getsockopt` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 56 | clone | `userland.syscall_clone` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 57 | fork | `userland.syscall_fork` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 58 | vfork | `userland.syscall_vfork` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 59 | execve | `userland.syscall_execve` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 60 | exit | `userland.syscall_exit` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 61 | wait4 | `userland.syscall_wait4` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 62 | kill | `userland.syscall_kill` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 63 | uname | `syscall_linux_uname` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 64 | semget | `sysvsem.syscall_semget` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 65 | semop | `sysvsem.syscall_semop` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 66 | semctl | `sysvsem.syscall_semctl` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 67 | shmdt | `sysvshm.syscall_shmdt` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 68 | msgget | `sysvmsg.syscall_msgget` | wired; unqualified | `kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls` |
+| 69 | msgsnd | `sysvmsg.syscall_msgsnd` | wired; unqualified | `kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls` |
+| 70 | msgrcv | `sysvmsg.syscall_msgrcv` | wired; unqualified | `kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls` |
+| 71 | msgctl | `sysvmsg.syscall_msgctl` | wired; unqualified | `kernel/syscall/table/sysv_message.v:init_sysv_message_syscalls` |
+| 72 | fcntl | `syscall_linux_fcntl` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 73 | flock | `file.syscall_flock` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 74 | fsync | `storage_fsync` | wired; unqualified | `kernel/syscall/table/storage_amd64.v:init_storage_syscalls` |
+| 75 | fdatasync | `storage_fsync` | wired; unqualified | `kernel/syscall/table/storage_amd64.v:init_storage_syscalls` |
+| 76 | truncate | `fs.syscall_truncate` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 77 | ftruncate | `syscall_linux_ftruncate` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 78 | getdents | `syscall_linux_getdents` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 79 | getcwd | `fs.syscall_getcwd` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 80 | chdir | `fs.syscall_chdir` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 81 | fchdir | `fs.syscall_fchdir` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 82 | rename | `syscall_linux_rename` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 83 | mkdir | `syscall_linux_mkdir` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 84 | rmdir | `syscall_linux_rmdir` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 85 | creat | `syscall_linux_creat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 86 | link | `syscall_linux_link` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 87 | unlink | `syscall_linux_unlink` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 88 | symlink | `syscall_linux_symlink` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 89 | readlink | `syscall_linux_readlink` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 90 | chmod | `syscall_linux_chmod` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 91 | fchmod | `fs.syscall_fchmod` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 92 | chown | `syscall_linux_chown` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 93 | fchown | `fs.syscall_fchown` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 94 | lchown | `syscall_linux_lchown` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 95 | umask | `fs.syscall_umask` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 96 | gettimeofday | `sys.syscall_gettimeofday` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 97 | getrlimit | `syscall_linux_getrlimit` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 98 | getrusage | `sys.syscall_getrusage` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 99 | sysinfo | `sys.syscall_sysinfo` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 100 | times | `syscall_linux_times` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 101 | ptrace | `vacant` | unavailable |  |
+| 102 | getuid | `userland.syscall_getuid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 103 | syslog | `vacant` | unavailable |  |
+| 104 | getgid | `userland.syscall_getgid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 105 | setuid | `userland.syscall_setuid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 106 | setgid | `userland.syscall_setgid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 107 | geteuid | `userland.syscall_geteuid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 108 | getegid | `userland.syscall_getegid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 109 | setpgid | `syscall_linux_setpgid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 110 | getppid | `userland.syscall_getppid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 111 | getpgrp | `syscall_linux_getpgrp` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 112 | setsid | `userland.syscall_setsid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 113 | setreuid | `userland.syscall_setreuid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 114 | setregid | `userland.syscall_setregid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 115 | getgroups | `userland.syscall_getgroups` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 116 | setgroups | `userland.syscall_setgroups` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 117 | setresuid | `userland.syscall_setresuid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 118 | getresuid | `userland.syscall_getresuid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 119 | setresgid | `userland.syscall_setresgid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 120 | getresgid | `userland.syscall_getresgid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 121 | getpgid | `syscall_linux_getpgid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 122 | setfsuid | `vacant` | unavailable |  |
+| 123 | setfsgid | `vacant` | unavailable |  |
+| 124 | getsid | `userland.syscall_getsid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 125 | capget | `syscall_linux_capget` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 126 | capset | `syscall_linux_capset` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 127 | rt_sigpending | `syscall_linux_rt_sigpending` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 128 | rt_sigtimedwait | `userland.syscall_rt_sigtimedwait` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 129 | rt_sigqueueinfo | `vacant` | unavailable |  |
+| 130 | rt_sigsuspend | `userland.syscall_rt_sigsuspend` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 131 | sigaltstack | `userland.syscall_sigaltstack` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 132 | utime | `syscall_linux_utime` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 133 | mknod | `syscall_linux_mknod` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 134 | uselib | `vacant` | unavailable |  |
+| 135 | personality | `vacant` | unavailable |  |
+| 136 | ustat | `vacant` | unavailable |  |
+| 137 | statfs | `fs.syscall_statfs` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 138 | fstatfs | `fs.syscall_fstatfs` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 139 | sysfs | `vacant` | unavailable |  |
+| 140 | getpriority | `syscall_linux_getpriority` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 141 | setpriority | `syscall_linux_setpriority` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 142 | sched_setparam | `syscall_linux_sched_setparam` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 143 | sched_getparam | `syscall_linux_sched_getparam` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 144 | sched_setscheduler | `syscall_linux_sched_setscheduler` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 145 | sched_getscheduler | `syscall_linux_sched_getscheduler` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 146 | sched_get_priority_max | `syscall_linux_sched_get_priority_max` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 147 | sched_get_priority_min | `syscall_linux_sched_get_priority_min` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 148 | sched_rr_get_interval | `syscall_linux_sched_rr_get_interval` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 149 | mlock | `mmap.syscall_mlock` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 150 | munlock | `mmap.syscall_munlock` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 151 | mlockall | `mmap.syscall_mlockall` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 152 | munlockall | `mmap.syscall_munlockall` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 153 | vhangup | `vacant` | unavailable |  |
+| 154 | modify_ldt | `syscall_linux_modify_ldt` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 155 | pivot_root | `fs.syscall_pivot_root` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 156 | _sysctl | `vacant` | unavailable |  |
+| 157 | prctl | `syscall_container_prctl` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 158 | arch_prctl | `syscall_linux_arch_prctl` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 159 | adjtimex | `sys.syscall_adjtimex` | wired; unqualified | `kernel/syscall/table/clock_control_amd64.v:init_clock_control_syscalls` |
+| 160 | setrlimit | `syscall_linux_setrlimit` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 161 | chroot | `fs.syscall_chroot` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 162 | sync | `storage_sync` | wired; unqualified | `kernel/syscall/table/storage_amd64.v:init_storage_syscalls` |
+| 163 | acct | `vacant` | unavailable |  |
+| 164 | settimeofday | `sys.syscall_settimeofday` | wired; unqualified | `kernel/syscall/table/clock_control_amd64.v:init_clock_control_syscalls` |
+| 165 | mount | `fs.syscall_mount` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 166 | umount2 | `fs.syscall_umount` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 167 | swapon | `fs.syscall_swapon` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 168 | swapoff | `fs.syscall_swapoff` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 169 | reboot | `syscall_linux_reboot` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 170 | sethostname | `net.syscall_sethostname` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 171 | setdomainname | `net.syscall_setdomainname` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 172 | iopl | `vacant` | unavailable |  |
+| 173 | ioperm | `vacant` | unavailable |  |
+| 174 | create_module | `vacant` | unavailable |  |
+| 175 | init_module | `vacant` | unavailable |  |
+| 176 | delete_module | `vacant` | unavailable |  |
+| 177 | get_kernel_syms | `vacant` | unavailable |  |
+| 178 | query_module | `vacant` | unavailable |  |
+| 179 | quotactl | `vacant` | unavailable |  |
+| 180 | nfsservctl | `vacant` | unavailable |  |
+| 181 | getpmsg | `vacant` | unavailable |  |
+| 182 | putpmsg | `vacant` | unavailable |  |
+| 183 | afs_syscall | `vacant` | unavailable |  |
+| 184 | tuxcall | `vacant` | unavailable |  |
+| 185 | security | `vacant` | unavailable |  |
+| 186 | gettid | `syscall_linux_gettid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 187 | readahead | `vacant` | unavailable |  |
+| 188 | setxattr | `fs.syscall_setxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 189 | lsetxattr | `fs.syscall_lsetxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 190 | fsetxattr | `fs.syscall_fsetxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 191 | getxattr | `fs.syscall_getxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 192 | lgetxattr | `fs.syscall_lgetxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 193 | fgetxattr | `fs.syscall_fgetxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 194 | listxattr | `fs.syscall_listxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 195 | llistxattr | `fs.syscall_llistxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 196 | flistxattr | `fs.syscall_flistxattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 197 | removexattr | `fs.syscall_removexattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 198 | lremovexattr | `fs.syscall_lremovexattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 199 | fremovexattr | `fs.syscall_fremovexattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 200 | tkill | `userland.syscall_tkill` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 201 | time | `syscall_linux_time` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 202 | futex | `syscall_linux_futex` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 203 | sched_setaffinity | `syscall_linux_sched_setaffinity` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 204 | sched_getaffinity | `syscall_linux_sched_getaffinity` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 205 | set_thread_area | `syscall_linux_set_thread_area` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 206 | io_setup | `vacant` | unavailable |  |
+| 207 | io_destroy | `vacant` | unavailable |  |
+| 208 | io_getevents | `vacant` | unavailable |  |
+| 209 | io_submit | `vacant` | unavailable |  |
+| 210 | io_cancel | `vacant` | unavailable |  |
+| 211 | get_thread_area | `syscall_linux_get_thread_area` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 212 | lookup_dcookie | `vacant` | unavailable |  |
+| 213 | epoll_create | `syscall_linux_epoll_create` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 214 | epoll_ctl_old | `vacant` | unavailable |  |
+| 215 | epoll_wait_old | `vacant` | unavailable |  |
+| 216 | remap_file_pages | `vacant` | unavailable |  |
+| 217 | getdents64 | `syscall_linux_getdents64` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 218 | set_tid_address | `userland.syscall_set_tid_address` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 219 | restart_syscall | `vacant` | unavailable |  |
+| 220 | semtimedop | `sysvsem.syscall_semtimedop` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 221 | fadvise64 | `file.syscall_fadvise64` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 222 | timer_create | `posixtimer.syscall_timer_create` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 223 | timer_settime | `posixtimer.syscall_timer_settime` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 224 | timer_gettime | `posixtimer.syscall_timer_gettime` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 225 | timer_getoverrun | `posixtimer.syscall_timer_getoverrun` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 226 | timer_delete | `posixtimer.syscall_timer_delete` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 227 | clock_settime | `sys.syscall_clock_settime` | wired; unqualified | `kernel/syscall/table/clock_control_amd64.v:init_clock_control_syscalls` |
+| 228 | clock_gettime | `sys.syscall_clock_gettime` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 229 | clock_getres | `sys.syscall_clock_getres` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 230 | clock_nanosleep | `sys.syscall_clock_nanosleep` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 231 | exit_group | `userland.syscall_exit_group` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 232 | epoll_wait | `syscall_linux_epoll_wait` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 233 | epoll_ctl | `file.syscall_epoll_ctl` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 234 | tgkill | `userland.syscall_tgkill` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 235 | utimes | `syscall_linux_utimes` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 236 | vserver | `vacant` | unavailable |  |
+| 237 | mbind | `numa.syscall_mbind` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 238 | set_mempolicy | `numa.syscall_set_mempolicy` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 239 | get_mempolicy | `numa.syscall_get_mempolicy` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 240 | mq_open | `vacant` | unavailable |  |
+| 241 | mq_unlink | `vacant` | unavailable |  |
+| 242 | mq_timedsend | `vacant` | unavailable |  |
+| 243 | mq_timedreceive | `vacant` | unavailable |  |
+| 244 | mq_notify | `vacant` | unavailable |  |
+| 245 | mq_getsetattr | `vacant` | unavailable |  |
+| 246 | kexec_load | `vacant` | unavailable |  |
+| 247 | waitid | `userland.syscall_waitid` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 248 | add_key | `vacant` | unavailable |  |
+| 249 | request_key | `vacant` | unavailable |  |
+| 250 | keyctl | `vacant` | unavailable |  |
+| 251 | ioprio_set | `vacant` | unavailable |  |
+| 252 | ioprio_get | `vacant` | unavailable |  |
+| 253 | inotify_init | `syscall_linux_inotify_init` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 254 | inotify_add_watch | `fs.syscall_inotify_add_watch` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 255 | inotify_rm_watch | `fs.syscall_inotify_rm_watch` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 256 | migrate_pages | `vacant` | unavailable |  |
+| 257 | openat | `syscall_linux_openat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 258 | mkdirat | `fs.syscall_mkdirat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 259 | mknodat | `fs.syscall_mknodat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 260 | fchownat | `fs.syscall_fchownat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 261 | futimesat | `syscall_linux_futimesat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 262 | newfstatat | `syscall_linux_fstatat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 263 | unlinkat | `fs.syscall_unlinkat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 264 | renameat | `fs.syscall_renameat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 265 | linkat | `fs.syscall_linkat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 266 | symlinkat | `fs.syscall_symlinkat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 267 | readlinkat | `syscall_linux_readlinkat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 268 | fchmodat | `fs.syscall_fchmodat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 269 | faccessat | `syscall_linux_faccessat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 270 | pselect6 | `file.syscall_pselect6` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 271 | ppoll | `file.syscall_ppoll` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 272 | unshare | `fs.syscall_unshare` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 273 | set_robust_list | `userland.syscall_set_robust_list` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 274 | get_robust_list | `userland.syscall_get_robust_list` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 275 | splice | `pipe.syscall_splice` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 276 | tee | `pipe.syscall_tee` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 277 | sync_file_range | `file.syscall_sync_file_range` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 278 | vmsplice | `pipe.syscall_vmsplice` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 279 | move_pages | `vacant` | unavailable |  |
+| 280 | utimensat | `fs.syscall_utimensat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 281 | epoll_pwait | `file.syscall_epoll_pwait` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 282 | signalfd | `syscall_linux_signalfd` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 283 | timerfd_create | `file.syscall_timerfd_create` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 284 | eventfd | `syscall_linux_eventfd` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 285 | fallocate | `file.syscall_fallocate` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 286 | timerfd_settime | `file.syscall_timerfd_settime` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 287 | timerfd_gettime | `file.syscall_timerfd_gettime` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 288 | accept4 | `syscall_linux_accept4` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 289 | signalfd4 | `userland.syscall_signalfd4` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 290 | eventfd2 | `file.syscall_eventfd2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 291 | epoll_create1 | `file.syscall_epoll_create1` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 292 | dup3 | `syscall_linux_dup3` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 293 | pipe2 | `pipe.syscall_pipe_checked` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 294 | inotify_init1 | `fs.syscall_inotify_init` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 295 | preadv | `syscall_linux_preadv` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 296 | pwritev | `syscall_linux_pwritev` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 297 | rt_tgsigqueueinfo | `vacant` | unavailable |  |
+| 298 | perf_event_open | `vacant` | unavailable |  |
+| 299 | recvmmsg | `syscall_linux_recvmmsg` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 300 | fanotify_init | `vacant` | unavailable |  |
+| 301 | fanotify_mark | `vacant` | unavailable |  |
+| 302 | prlimit64 | `syscall_linux_prlimit64` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 303 | name_to_handle_at | `vacant` | unavailable |  |
+| 304 | open_by_handle_at | `vacant` | unavailable |  |
+| 305 | clock_adjtime | `sys.syscall_clock_adjtime` | wired; unqualified | `kernel/syscall/table/clock_control_amd64.v:init_clock_control_syscalls` |
+| 306 | syncfs | `storage_syncfs` | wired; unqualified | `kernel/syscall/table/storage_amd64.v:init_storage_syscalls` |
+| 307 | sendmmsg | `syscall_linux_sendmmsg` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 308 | setns | `fs.syscall_setns` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 309 | getcpu | `numa.syscall_getcpu` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 310 | process_vm_readv | `syscall_linux_process_vm_readv` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 311 | process_vm_writev | `syscall_linux_process_vm_writev` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 312 | kcmp | `vacant` | unavailable |  |
+| 313 | finit_module | `vacant` | unavailable |  |
+| 314 | sched_setattr | `syscall_linux_sched_setattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 315 | sched_getattr | `syscall_linux_sched_getattr` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 316 | renameat2 | `fs.syscall_renameat2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 317 | seccomp | `syscall_linux_seccomp` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 318 | getrandom | `syscall_linux_getrandom` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 319 | memfd_create | `fs.syscall_memfd_create` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 320 | kexec_file_load | `vacant` | unavailable |  |
+| 321 | bpf | `syscall_linux_bpf` | unavailable | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 322 | execveat | `userland.syscall_execveat` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 323 | userfaultfd | `vacant` | unavailable |  |
+| 324 | membarrier | `syscall_linux_membarrier` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 325 | mlock2 | `mmap.syscall_mlock2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 326 | copy_file_range | `pipe.syscall_copy_file_range` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 327 | preadv2 | `syscall_linux_preadv2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 328 | pwritev2 | `syscall_linux_pwritev2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 329 | pkey_mprotect | `vacant` | unavailable |  |
+| 330 | pkey_alloc | `vacant` | unavailable |  |
+| 331 | pkey_free | `vacant` | unavailable |  |
+| 332 | statx | `syscall_linux_statx` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 333 | io_pgetevents | `vacant` | unavailable |  |
+| 334 | rseq | `syscall_linux_rseq` | unavailable | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 424 | pidfd_send_signal | `userland.syscall_pidfd_send_signal` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 425 | io_uring_setup | `vacant` | unavailable |  |
+| 426 | io_uring_enter | `vacant` | unavailable |  |
+| 427 | io_uring_register | `vacant` | unavailable |  |
+| 428 | open_tree | `vacant` | unavailable |  |
+| 429 | move_mount | `vacant` | unavailable |  |
+| 430 | fsopen | `vacant` | unavailable |  |
+| 431 | fsconfig | `vacant` | unavailable |  |
+| 432 | fsmount | `vacant` | unavailable |  |
+| 433 | fspick | `vacant` | unavailable |  |
+| 434 | pidfd_open | `userland.syscall_pidfd_open` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 435 | clone3 | `userland.syscall_clone3` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 436 | close_range | `file.syscall_close_range` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 437 | openat2 | `syscall_linux_openat2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 438 | pidfd_getfd | `vacant` | unavailable |  |
+| 439 | faccessat2 | `syscall_linux_faccessat2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 440 | process_madvise | `vacant` | unavailable |  |
+| 441 | epoll_pwait2 | `file.syscall_epoll_pwait2` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
+| 442 | mount_setattr | `vacant` | unavailable |  |
+| 444 | landlock_create_ruleset | `vacant` | unavailable |  |
+| 445 | landlock_add_rule | `vacant` | unavailable |  |
+| 446 | landlock_restrict_self | `vacant` | unavailable |  |
+| 447 | memfd_secret | `vacant` | unavailable |  |
+| 448 | process_mrelease | `vacant` | unavailable |  |
+| 449 | futex_waitv | `vacant` | unavailable |  |
+| 450 | set_mempolicy_home_node | `vacant` | unavailable |  |
+| 451 | cachestat | `vacant` | unavailable |  |
+| 452 | fchmodat2 | `vacant` | unavailable |  |
+| 500 | vinix_private | `mmap.syscall_mimmutable` | private | `kernel/syscall/table/security_amd64.v:init_security_syscalls` |
+| 501 | vinix_private | `fs.syscall_pledge` | private | `kernel/syscall/table/security_amd64.v:init_security_syscalls` |
+| 502 | vinix_private | `fs.syscall_unveil` | private | `kernel/syscall/table/security_amd64.v:init_security_syscalls` |
+| 503 | vinix_private | `mmap.syscall_minherit` | private | `kernel/syscall/table/security_amd64.v:init_security_syscalls` |
+| 511 | vinix_private | `syscall_seccomp_verdict` | private | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
 
 ## Source hashes
 
@@ -699,70 +707,81 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | --- | --- |
 | `kernel/c/pthread.h` | `349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2` |
 | `kernel/event/event.v` | `a92daf2add03c5304742ad1b112ca04635b94f49e4279e8316f2bee57da6b708` |
-| `kernel/file/file.v` | `28652a59a4a68e0fe0471e4d25104ca8eb6244083032c6f7e8c12b0a2230ad85` |
-| `kernel/fs/mount.v` | `9dee3e7ec56633049daef688d2f1852f93f8c7db731e0e7a949f0c45377beb0d` |
+| `kernel/file/file.v` | `d1a17d49344b1dc5f16b83d0aba620d6f261060f24fb370e62c9e169e2fb4c3b` |
+| `kernel/fs/mount.v` | `1d3bfc4003fefbd9084295f24b041b8097e4778e112faee3c7a1de459d4c7c2a` |
 | `kernel/fs/mount_policy.v` | `053bcf1f4dcab563c5643f3236d9b3f6de1844e1cea7f86347be9b8f01fa6c61` |
 | `kernel/fs/namespaces.v` | `4834923fb76fd965144382dfd08f4f3178ea105dea7677ec30cb72de60d1e302` |
-| `kernel/fs/procfs.v` | `e7269b6a3af4967c05817ef289d6034206aaf6e3dd3da4ea1ed14a1f673478b6` |
-| `kernel/fs/removed.v` | `bcfe397ddd09aa40f8c49f27e9f9fac33da22cbeb6e68d309c3c4cc7d1d65661` |
+| `kernel/fs/procfs.v` | `5fcf478ce5c0d94e0955416998c39689448915bc38b73fde6448ed30732a727c` |
+| `kernel/fs/removed.v` | `873ebe7a6438b48b94e0157ec492e385aad31fc20e5330cfb6b6163553a1d88c` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
-| `kernel/fs/vfs.v` | `6a4f1e7b7c47ce65d5a3b8e8ca88cd81b4c52e2992b2924c1db4ec2711204361` |
+| `kernel/fs/vfs.v` | `73387a711f2018d92ab2e3a25b1e66cf8f6a4c958ac31c6ba4774693de876763` |
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/kbudget/budget.v` | `980b9ae894bda6376f920e22bbca0aa953e02bd0349977bfe054a24580869b06` |
 | `kernel/kprint/kprint_amd64.v` | `fac3ed46448ec9e481dd44c2d8b715834087b2175374974170a2e0ce2286076b` |
 | `kernel/kprint/kprint_arm64.v` | `f7745a82aa8e57c8bfcb12697c29be47ce77c07feee6755150687ea78a4f113c` |
-| `kernel/kprint/printf_policy.v` | `118820ff0c5d3af102434c3a7e04cbb2dedab312942694e4d03baf00018dd302` |
+| `kernel/kprint/printf_policy.v` | `76842880f6f9ad86c2c52b3e06a2ddf6ece110296d3ebd524a78a47d7316a0e2` |
 | `kernel/lib/stubs/pthread.v` | `01fbf5114665adc10e951c3ec4d1e7ea6b25180b0b43f505fa44e39f8f41d500` |
+| `kernel/main_amd64.v` | `87fa7f3226b98c1da8f3c0da7cd637329881fcfb481c44c7112b1081120fb5ab` |
+| `kernel/main_arm64.v` | `4a201a8a18979502ba85cd1001839809806e509ce17ca4e42287780e2c4ca3a6` |
 | `kernel/memory/mmap/immutable.v` | `0cb46fbc835de4bf21b850ac86087dc2268f269b15a1f853fafd707cd584514a` |
 | `kernel/memory/mmap/inherit.v` | `4954ec18427442a4f84cf13b6507d1875c196ae9c8fc7e43d0a155ce1b98cf30` |
-| `kernel/memory/mmap/linux.v` | `71c091b8310ff8af5d8f39c11897b57ba33e3d52c14bc56edcc8ba9616a3fbb7` |
+| `kernel/memory/mmap/linux.v` | `06b9e34180d415c5be0486882cd72d712ef6e418fbf0d3b5d0335c9a6717c9b2` |
 | `kernel/memory/mmap/lock.v` | `ed62d24aad9c905dc291995dde114ef0ecb943746f034e66df09b5883b7711d8` |
-| `kernel/memory/mmap/mmap.v` | `67c4d2abfbfbab07bfc708af2fe12e0952413b6a47bf20fc587e54e53a566c5b` |
+| `kernel/memory/mmap/mmap.v` | `c64a9b3a6a1026c2160ec335729cb5dda3af0d9200000be9e4c110796a8eff1e` |
 | `kernel/memory/mmap/paging.v` | `fa5754c63c89bd8bd5a2658ed24bb4585af5c10daf5211b5c0bda7f594971467` |
 | `kernel/memory/physical.v` | `bd28de5502a609afea9c71dc547a771fc14b6b3e3ac0a093a8f0d57bd9f7e5c5` |
 | `kernel/memory/slab.v` | `10fb53c07ba105ff216027c7e0d9d9bc9b419a500e5b8963537d7a4ac4fa8367` |
 | `kernel/memory/table_budget.v` | `72becfcd2e1dff2c510efd3af47d2cb99effca487e8e9643e0c247e261729ed6` |
 | `kernel/memory/virtual_amd64.v` | `483bb2e7ac7a1248c6f09e182a8f27b8a250f4b3e4aeba2642b4be300b00bb9d` |
 | `kernel/memory/virtual_arm64.v` | `71602c4c637ebfaad8b85d1af34ca9a3d4e1afd4ebf85fdb433fa992871693c0` |
-| `kernel/pipe/pipe.v` | `2ad825ae805ce9a9c8dfbc18d176424746cc32bdfa71491c3c427463dfd0a1c7` |
+| `kernel/pipe/pipe.v` | `ed8524f1dfeb1bfa43d55ec19c7a28f6c7f51d49ea75b1b4cec6c1f6bca539dc` |
 | `kernel/pipe/usercopy.v` | `7af5925a4de313f7d8847269f2e07a293cbfb9c585eeaf2ab926d712983cad9b` |
-| `kernel/proc/container.v` | `f66753325982603ea72a325798e309d627c910d76df03d4fbc5744fd94fd4018` |
+| `kernel/proc/container.v` | `ca0c32915d72379b30098d86303bc82b9de4ad922deab4f763803739c6eef9bf` |
 | `kernel/proc/job_groups.v` | `ded4d7355425a2e2b0bda5f1bf0064fa28124a54cfb94313f9339608ca0f5186` |
 | `kernel/proc/kernel_budget.v` | `763ca9bea7d11825b8abc293e350a3afabe911bab8e718853626d52fd2201553` |
-| `kernel/proc/pidns.v` | `bbd01136f095f3720fffa619e02bfd23b77de1ec8a823247e9189efd4779b308` |
-| `kernel/proc/proc.v` | `890b1c7c3da217074217a08bcda48d001c771391a52c56af89952a5bff36befd` |
-| `kernel/proc/proc_amd64.v` | `04cb0bb48a85c658f873507d2c1a3dca3554a73a8c7ad336274b2ec41ea81cea` |
-| `kernel/proc/proc_arm64.v` | `94d679389830b5af7ef26158791d60ea99cc573c0cc4b341ae5ef0101d069f6b` |
+| `kernel/proc/pidns.v` | `77cb283ce530e27972bad5214cbe06d9a81b5ff3f49f5929b1ae9cc053830c4a` |
+| `kernel/proc/proc.v` | `03d20f3c8b3a896eaed3e0faa41b5c13fd4d17a6096e107b64a007fee6858ebf` |
+| `kernel/proc/proc_amd64.v` | `697b651d1e257a2463e5c67148360e2cd8dbd4c1d73dd67dd940bebe44b6f507` |
+| `kernel/proc/proc_arm64.v` | `619abdb1819c7213250554f50e39d4e32287037e989b5d495df92adb2e67d557` |
 | `kernel/proc/seccomp.v` | `5cb8ae00ab6d3c0597dceae62efdb44d05b902605a450ccc9e34d77a3dab6760` |
 | `kernel/proc/securebits.v` | `292feabca897f6d4eba2455e9e411b8e04c4373a1232c5b26536b3a56d685316` |
 | `kernel/proc/state.v` | `13039f5719e97d5589ffb4b21c1f0d94eac376392236024ebd850e6c39bcf92d` |
 | `kernel/proc/thread_attach.v` | `5209866e21780214bd9994a32410c5ed7a670a3760a1a2e977db1af280e888d0` |
-| `kernel/resource/resource.v` | `98da2dd3060d4ed74a2f000c87d0d726c9e1bcebafda2f33b9055adca6a4cc3b` |
-| `kernel/sched/inherit.v` | `99bf8fe1ac4e60858774d06d43e09273600dbcfb2395c2befc04d84bc1bad278` |
+| `kernel/resource/resource.v` | `dc3b0cc9ef98607637675ef73bd5ac2967274432a244ccfda294abb75aa87319` |
+| `kernel/sched/inherit.v` | `a76080ef012ca7e7121f516c4f991f0ea8c2e0f83083ee168636a27e7679c7d7` |
 | `kernel/sched/reap.v` | `58ba75716ed70697e25209943e38d798b8b4f297a4b8d8e5eb63a38d21411423` |
-| `kernel/sched/sched_amd64.v` | `cc87d7c997c2efc44e5fc86a287e7575c9954493db5eb40a1813fb19ba557642` |
-| `kernel/sched/sched_arm64.v` | `47cf9e8deba0f3d10da99cafcb4b96467e6bc889583394fc987b69a4d30fd514` |
-| `kernel/socket/unix/unix.v` | `84875f74a964798fa7e64c6ed4a2c096ace28620fbe8bbaa3b8486d2789f5600` |
-| `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
-| `kernel/syscall/table/linux_common.v` | `1756e631becc5965aabda8d7db5ead862d53f6ea3ae982fb8688cc74f9e93c26` |
+| `kernel/sched/sched_amd64.v` | `fa0b97cdbf93778a41d8ab780400dae9725fc4b5ca3ab566513f394223429be7` |
+| `kernel/sched/sched_arm64.v` | `5a5b80e96bdde9ab98cace875ac327d18b027a6d16d0b10dceb3c48d69950b4c` |
+| `kernel/socket/unix/unix.v` | `fec45e9c6f5ac12c615b3e8790ae0307ba809381e3a36cc36c220feb37951261` |
+| `kernel/syscall/table/clock_control_amd64.v` | `d0f57fad9e51eddcf3805bef72e885c7ac160e2e25a67e7a032ac54c4a2ea712` |
+| `kernel/syscall/table/clock_control_arm64.v` | `d68badaf3327b07ec56fd424204fda71615ac7f3387d0c7fa1823be83d42969b` |
+| `kernel/syscall/table/container.v` | `d082226a790f424cf5826cc64689f910f204351541911802f49bfe833a1a36ff` |
+| `kernel/syscall/table/container_arm64.v` | `13b4623072c1c966af706d8f8954c7273f5827ee912247496e80154ad4a6dc36` |
+| `kernel/syscall/table/linux_common.v` | `a999fafe815593b7e3cf0ca6125d49b16a6d8af0fcf13dd14722cde4ead55b06` |
 | `kernel/syscall/table/linux_compat.v` | `c925dde7b04e8fb6798b48b5b0afa7007d5e43c74505e2f10bc9e8d2c9e3e688` |
-| `kernel/syscall/table/linux_table_amd64.v` | `f7e48c44a6152339e2ecb7a668102546a85cff540120109809ce3bd79c3a1bb7` |
+| `kernel/syscall/table/linux_table_amd64.v` | `89ccdc5057692b0ea0855f0f41fba03dd289fc683f364836ee1880e7d55725ac` |
+| `kernel/syscall/table/mmap_aslr_amd64.v` | `8670ac6d0f56c37f91402b0a6311b746c9bc7471fdda97e6aa2d96939cfe45ce` |
+| `kernel/syscall/table/pipe_usercopy_amd64.v` | `48c1bdd554d3dfc05a544f3d18df0d284fe3e1a074621abcf8c1688cb416e8d0` |
+| `kernel/syscall/table/security_amd64.v` | `5b6929162ebb0682c2c98cf9aab4cf12aa62021576b898ec60ab804b2a63749a` |
+| `kernel/syscall/table/storage_amd64.v` | `ad3b72a321de8a00e39b1584e1ef2cdcff73157cbe1a99f4b9350ffd342bfb63` |
+| `kernel/syscall/table/storage_arm64.v` | `e4e8be0aa3679c61a824290f2741e91d8172b8cad4d291448602d5468e983da6` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `9e27de44d482ba0581c023f2486b295f16a2f5f8b4d02f7d42d6d9940d637747` |
+| `kernel/syscall/table/sysv_message.v` | `7c06d49862ece2b1b36bc6b600fad71038eca405939b5c1089b98a2ed2dac436` |
 | `kernel/syscall/table/trace_amd64.v` | `886f920865046fc589e5e923fd2ae9c1bf1ed0a6731b5344026b480470b3cd18` |
 | `kernel/usercopy/usercopy.v` | `4c36b49cd3abe25aa70897981d0d1695edc1244c2d449c4c849fb0750e712f9e` |
 | `kernel/usercopy/word_atomic_amd64.v` | `bf4c0c08a9d6e8251fdd62d50e3d698bb3799c1aae0e0752a06ea23ff9936048` |
 | `kernel/usercopy/word_atomic_arm64.v` | `640435b8cc95418defce02e672943f19383b98566c02f130d9a917837193d7f2` |
-| `kernel/userland/clone_amd64.v` | `51421795ccc94254946247709f1e8eef0b92d001c4ac4c42de88f4082fc4d8d2` |
-| `kernel/userland/clone_arm64.v` | `084ffd1b22ef5945a930c9be9d1040a7c938964b3972155523f51cc8a42311b6` |
+| `kernel/userland/clone_amd64.v` | `dd788458a17d76ca953eff0cc83fbc56dd1171f9f89820c5c7547129bfd0bf14` |
+| `kernel/userland/clone_arm64.v` | `52ee65b78e42fd6f66dcf373ea2997d6a36916abdc41d6fda94678b0377a5f51` |
 | `kernel/userland/cred.v` | `4c0b15cdc1445213cb077f3ec25e80bc300b0808be038f0689838587153c3575` |
-| `kernel/userland/exit.v` | `f7788611aed2a790a60cde0789b089c5771a3dcd91c086cb1ee01932216ea635` |
-| `kernel/userland/linux_signal_amd64.v` | `cd84d3265e38cd99189a1c0c27f30b5db6c01f7dd23208daef1bdbcd51f37077` |
-| `kernel/userland/linux_task.v` | `716543e351544cd9574dfd88edb96b540a5ec3d0638d940e2edccb087a11f519` |
+| `kernel/userland/exit.v` | `9e2e23005dcdf943b0c14fe040ace5bc264dc2cbffc669103d48c22376d525dd` |
+| `kernel/userland/linux_signal_amd64.v` | `1b076b2c9257307283786393094ba73e70dc2f17f63447b2dba61f54895dc63a` |
+| `kernel/userland/linux_task.v` | `026e7dd06c3744735761c3a062b21f31277a98d6d4dad3e06ce567bc8ab3b0b8` |
 | `kernel/userland/seccomp_signal.v` | `b6fb6b23e10c8663d88b6d3fd6794eae1d906e162797b0c298e9bc674182f1f4` |
-| `kernel/userland/userland.v` | `5f469554fcdcb8372091dab30fdd2829a7996da2c66bf2c6d7ec2190490faa7a` |
-| `kernel/userland/userland_arm64.v` | `f86f19d0f1fed3fc5d1c1350559ded02812cd78846a5c61cf76c68d9868d8544` |
+| `kernel/userland/userland.v` | `e95e15923b44dc42ac5efc30420f471c9fef7cb718b9dc5c54bad4506226d8b2` |
+| `kernel/userland/userland_arm64.v` | `d22d7c8a3196d0ff919bc6c975951fe9b1c332d32cf8110d7239eeb15127220e` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
-| `tools/linux-compat/coverage.v` | `cf72da0beb99c8b78ca2554564ef38bf2293bd1785cb78b5603065a11ab46242` |
+| `tools/linux-compat/coverage.v` | `2b8ea6c1956f021b76a25cf0c71ebb57d489d06e04fc9d0e69cea69b48038175` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

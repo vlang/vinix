@@ -27,6 +27,15 @@ build-support/run-v-tool.sh tools/linux-compat/coverage.v --check
 v -cc cc test tools/linux-compat
 ```
 
+The generator follows boot: it reads the `table.init_*` calls in each
+architecture's `kmain`, expands every registration function in order (including
+nested calls and `$if` architecture blocks), and lets a later registration
+replace an earlier one, as the kernel does. The "Registered by" column names the
+function whose assignment boot leaves in place. Before 2026-11-20 it read only
+the generic tables and reported 13 wired AArch64 calls (among them capget,
+chroot, seccomp, setns and the clock setters) and 8 wired x86-64 calls as
+vacant, and named superseded mmap, pipe and sync handlers.
+
 Numbers with a handler are reported as wired and unqualified. A function pointer
 does not prove correct argument widths, errno, lifetime or libc behavior. All
 unassigned numbers, and the explicitly absent BPF and rseq implementations,
