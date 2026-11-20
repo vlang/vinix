@@ -4,6 +4,8 @@
 module xattrfixture
 
 #include <xattr-native-abi.h>
+#include <alloca.h>
+fn C.alloca(usize) voidptr
 
 @[typedef] struct C.FILE {}
 @[typedef] struct C.pthread_t {}
@@ -22,6 +24,7 @@ struct C.statfs { f_type isize f_bfree u64 f_ffree u64 }
 @[c_extern] __global C.errno i32
 
 fn C.printf(&char, ...) i32
+fn C.usleep(u32) i32
 fn C.sscanf(&char, &char, ...) i32
 fn C.snprintf(&char, usize, &char, ...) i32
 fn C.fopen(&char, &char) &C.FILE
@@ -108,6 +111,20 @@ fn heap_snapshot(heap &Heap) i32 {
  }
 }
 
+// A removed file's inode and blocks return when its name's reference is
+// dropped, after the removal grace period, rather than at unlink or close.
+// Wait up to ten seconds for the free counts to be exactly what they were.
+fn space_settles(path &char, before &C.statfs, mut after C.statfs, line i32) bool {
+ unsafe {
+  for attempt := 0; attempt < 100; attempt++ {
+   if !check(C.statfs(path, &after) == 0, line) { return false }
+   if before.f_bfree == after.f_bfree && before.f_ffree == after.f_ffree { return true }
+   C.usleep(100000)
+  }
+  return false
+ }
+}
+
 fn operations(fd i32, repeats i32) i32 {
  unsafe {
   for i := i32(0); i < repeats; i++ {
@@ -138,8 +155,11 @@ fn metadata_measure(path &char, backend &char) i32 {
  unsafe {
   fd := C.open(path, C.O_RDWR)
   if !check(fd >= 0 && metadata_operations(fd, 100) == 0, 81) { return 1 }
-  mut before := Heap{}; mut after := Heap{}
-  if !check(heap_snapshot(&before) == 0 && metadata_operations(fd, 200) == 0 && heap_snapshot(&after) == 0, 83) { return 1 }
+  // Stack slots: V moves a fixed-array local whose address is taken to the
+  // heap, and this -no-builtin fixture has no allocator for it.
+  before := &Heap(C.alloca(sizeof(Heap))); after := &Heap(C.alloca(sizeof(Heap)))
+  C.memset(before, 0, sizeof(Heap)); C.memset(after, 0, sizeof(Heap))
+  if !check(heap_snapshot(before) == 0 && metadata_operations(fd, 200) == 0 && heap_snapshot(after) == 0, 83) { return 1 }
   if !check(before.count == after.count, 84) { return 1 }
   for i := i32(0); i < before.count; i++ {
    kept := after.objects[i] - before.objects[i]
@@ -219,10 +239,16 @@ fn exercise(path &char, persistent i32) i32 {
   mut status := i32(0)
   if !check(C.waitpid(child, &status, 0) == child && C.WIFEXITED(status) && C.WEXITSTATUS(status) == 0, 162) { return 1 }
   if !check(operations(fd, 200) == 0, 163) { return 1 }
-  mut before := Heap{}; mut after := Heap{}
-  if !check(heap_snapshot(&before) == 0, 165) { return 1 }
+  // Stack slots: V moves a fixed-array local whose address is taken to the
+  // heap, and this -no-builtin fixture has no allocator for it.
+  before := &Heap(C.alloca(sizeof(Heap))); after := &Heap(C.alloca(sizeof(Heap)))
+  C.memset(before, 0, sizeof(Heap)); C.memset(after, 0, sizeof(Heap))
+  // The first /proc/slabinfo read builds procfs state that stays; keep it
+  // out of the measured window.
+  if !check(heap_snapshot(after) == 0, 165) { return 1 }
+  if !check(heap_snapshot(before) == 0, 165) { return 1 }
   if !check(operations(fd, 200) == 0, 166) { return 1 }
-  if !check(heap_snapshot(&after) == 0, 167) { return 1 }
+  if !check(heap_snapshot(after) == 0, 167) { return 1 }
   if !check(before.count == after.count, 168) { return 1 }
   for i := i32(0); i < before.count; i++ {
    kept := after.objects[i] - before.objects[i]
@@ -249,8 +275,7 @@ fn block_release() i32 {
   if !check(C.unlink(c'/root/xattr-disposable') == 0, 192) { return 1 }
   if !check(C.fgetxattr(fd, c'user.only', nil, 0) == isize(sizeof(payload)), 193) { return 1 }
   if !check(C.close(fd) == 0, 194) { return 1 }
-  if !check(C.statfs(c'/root', &after) == 0, 195) { return 1 }
-  if !check(before.f_bfree == after.f_bfree, 196) { return 1 }; return 0
+  if !check(space_settles(c'/root', &before, mut after, 195), 196) { return 1 }; return 0
  }
 }
 
@@ -283,7 +308,9 @@ fn concurrent_copy_up(lower_base &char, upper_base &char, label &char) i32 {
   C.snprintf(&merged[0], sizeof(merged), c'/tmp/xattr-tmpfs/xattr-%s-merged', label)
   if !check(C.mkdir(&lower[0], 0o700) == 0 && C.mkdir(&upper[0], 0o700) == 0, 234) { return 1 }
   if !check(C.mkdir(&work[0], 0o700) == 0 && C.mkdir(&merged[0], 0o700) == 0, 235) { return 1 }
-  mut race := C.vxattr_copy_race{}
+  // The writer thread shares this stack slot; see the layout assertion.
+  mut race := &C.vxattr_copy_race(C.alloca(sizeof(C.vxattr_copy_race)))
+  C.memset(race, 0, sizeof(C.vxattr_copy_race))
   for i := i32(0); i < copy_files; i++ {
    mut path := [256]char{}; mut name := [96]char{}
    C.snprintf(&path[0], sizeof(path), c'%s/file-%02d', &lower[0], i)
@@ -326,8 +353,7 @@ fn concurrent_copy_up(lower_base &char, upper_base &char, label &char) i32 {
    if !check(C.statfs(&upper[0], &before_failure) == 0, 278) { return 1 }
    C.errno = 0; if !check(C.setxattr(&capacity_merged[0], c'user.trigger', &payload[0], sizeof(payload), 0) == -1 && C.errno == C.ENOSPC, 279) { return 1 }
    C.errno = 0; if !check(C.stat(&capacity_upper[0], &ignored) == -1 && C.errno == C.ENOENT, 280) { return 1 }
-   if !check(C.statfs(&upper[0], &after_failure) == 0, 281) { return 1 }
-   if !check(before_failure.f_bfree == after_failure.f_bfree && before_failure.f_ffree == after_failure.f_ffree, 282) { return 1 }
+   if !check(space_settles(&upper[0], &before_failure, mut after_failure, 281), 282) { return 1 }
    if !check(C.fgetxattr(capacity_fd, c'user.large', nil, 0) == 4096, 283) { return 1 }
    if !check(C.fremovexattr(capacity_fd, c'user.large') == 0, 284) { return 1 }
    if !check(C.setxattr(&capacity_merged[0], c'user.trigger', &payload[0], sizeof(payload), 0) == 0, 285) { return 1 }
@@ -339,8 +365,7 @@ fn concurrent_copy_up(lower_base &char, upper_base &char, label &char) i32 {
    if !check(C.statfs(&upper[0], &before_failure) == 0, 292) { return 1 }
    C.errno = 0; if !check(C.setxattr(&identity_merged[0], c'user.trigger', &payload[0], sizeof(payload), 0) == -1 && C.errno == C.EOVERFLOW, 293) { return 1 }
    C.errno = 0; if !check(C.stat(&identity_upper[0], &ignored) == -1 && C.errno == C.ENOENT, 294) { return 1 }
-   if !check(C.statfs(&upper[0], &after_failure) == 0, 295) { return 1 }
-   if !check(before_failure.f_bfree == after_failure.f_bfree && before_failure.f_ffree == after_failure.f_ffree, 296) { return 1 }
+   if !check(space_settles(&upper[0], &before_failure, mut after_failure, 295), 296) { return 1 }
    times := [C.timespec{tv_sec: 1700000000}, C.timespec{tv_sec: 1700000001}]!
    if !check(C.fchown(identity_fd, 321, 654) == 0 && C.futimens(identity_fd, &times[0]) == 0, 298) { return 1 }
    if !check(C.setxattr(&identity_merged[0], c'user.trigger', &payload[0], sizeof(payload), 0) == 0, 299) { return 1 }
@@ -348,7 +373,7 @@ fn concurrent_copy_up(lower_base &char, upper_base &char, label &char) i32 {
   }
   mut writer := C.pthread_t{}
   // The native callback borrows this stack record until the original join.
-  if !check(C.pthread_create(&writer, nil, C.vxattr_change_source_attributes, &race) == 0, 303) { return 1 }
+  if !check(C.pthread_create(&writer, nil, C.vxattr_change_source_attributes, race) == 0, 303) { return 1 }
   for C.atomic_load(&race.changes) == 0 && C.atomic_load(&race.failed) == 0 { C.sched_yield() }
   if !check(C.atomic_load(&race.failed) == 0, 305) { return 1 }
   for i := i32(0); i < copy_files; i++ {
