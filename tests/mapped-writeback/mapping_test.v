@@ -7,7 +7,8 @@ import memory
 import memory.mmap as mmap_mod
 
 #flag -Dvinix_stack_alloc=__builtin_alloca
-fn C.vinix_stack_alloc(bytes u64) voidptr
+// size_t, as __builtin_alloca has it: V emits a prototype for this name.
+fn C.vinix_stack_alloc(bytes uint) voidptr
 
 const page_size = u64(4096)
 const higher_half = u64(0)

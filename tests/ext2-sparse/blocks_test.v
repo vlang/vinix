@@ -1,7 +1,8 @@
 module ext2
 
 #flag -Dvinix_stack_alloc=__builtin_alloca
-fn C.vinix_stack_alloc(bytes u64) voidptr
+// size_t, as __builtin_alloca has it: V emits a prototype for this name.
+fn C.vinix_stack_alloc(bytes uint) voidptr
 
 const ext2_feature_ro_compat_large_file = u32(2)
 struct EXT2Superblock { mut: version_maj u32 = 1 non_supported_features u32 }

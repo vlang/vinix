@@ -60,7 +60,7 @@ fn check() ! {
 	}
 	start := source.index('fn (inode &EXT2Inode) fast_symlink_target(') or { return error('Missing inode I/O') }
 	end := source.index('fn (mut inode EXT2Inode) free_entry(') or { return error('Missing inode I/O end') }
-	mut io := 'module ext2\nimport stat\nimport memory\nimport errno\nimport lib\nfn C.__builtin_alloca(usize) voidptr\n' + source[start..end]
+	mut io := 'module ext2\nimport stat\nimport memory\nimport errno\nimport lib\nfn C.__builtin_alloca(uint) voidptr\n' + source[start..end]
 	io += '\n@[packed]\n' + declaration(source, 'struct EXT2BlockGroupDescriptor ')!
 	io += '\n' + declaration(source, 'fn (mut bgd EXT2BlockGroupDescriptor) read_entry(')!
 	io += '\n' + declaration(source, 'fn (mut inode EXT2Inode) read_entry(')!
