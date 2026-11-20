@@ -101,7 +101,9 @@ static int authority(int immutable_fd)
     pid_t child = fork();
     CHECK(child >= 0);
     if (!child) {
-        if (unshare(CLONE_NEWUSER)) _exit(1);
+        /* Vinix rejects user namespaces (EINVAL): there is then no container
+         * root to check, only the capability path below. */
+        if (unshare(CLONE_NEWUSER)) _exit(errno == EINVAL ? 4 : 1);
         int flags = IMMUTABLE | APPEND;
         int bad = set_level("2") != EPERM
             || ioctl(immutable_fd, FLAGS_SET, &flags) != -1 || errno != EPERM;
@@ -117,7 +119,9 @@ static int authority(int immutable_fd)
         bad |= mount("tmpfs", TEST_DIR "/host-mount", "tmpfs", 0, "") != 0;
         _exit(bad ? 2 : 0);
     }
-    CHECK(reap(child) == 0);
+    int user_namespace = reap(child);
+    CHECK(user_namespace == 0 || user_namespace == 4);
+    if (user_namespace == 4) puts("SECURELEVEL NOTE: user namespaces are unsupported; no container root to check");
     CHECK(level() >= 1);
     child = fork();
     CHECK(child >= 0);
