@@ -61,6 +61,10 @@ fn process_command(args []string, family string) !int {
 			'--fail', 'SCHED-QOS FAIL', '--smp', '4', '--memory', '8192']
 	} else if family == 'tlb' {
 		forwarded << ['--source', root() + '/tests/tlb/guest.c', '--expect', 'TLB: ALL PASS', '--fail', 'FAIL: TLB']
+	} else if family == 'syscall-retention' {
+		// Each of 15 operations waits out two 13-second settles.
+		forwarded << ['--source', root() + '/tests/syscall-retention/guest.c', '--expect', 'SYSCALL RETENTION: PASS',
+			'--fail', 'SYSCALL RETENTION FAIL', '--timeout', '1800']
 	}
 	forwarded << args
 	if family == 'memory-retention' {
@@ -123,7 +127,29 @@ fn process_command(args []string, family string) !int {
 	hosttest.write_json(work + '/inputs.json', receipt)!
 	if '--build-only' in parsed.options { return 0 }
 	configured := guesthost.launch(init, archive, work, private_kernel, arch, true)!
-	argv := configure_process_launch(configured.command, arch, memory, smp, parsed.options['--cpu'] or { 'max' })
+	mut argv := configure_process_launch(configured.command, arch, memory, smp, parsed.options['--cpu'] or { 'max' })
+	if family == 'syscall-retention' {
+		// A fresh ext2 volume, which the kernel mounts at /root, so the file
+		// operations also run on a disk filesystem.
+		tool := filesystem_tools()!
+		seed := work + '/ext2-seed'
+		if arch == 'x86_64' {
+			// x86 boots its root from the volume that carries this image's id,
+			// as tests/resource-accounting does; /root is a directory on it.
+			hosttest.module_copy_tree(work + '/rootfs', seed)!
+			for name in ['dev', 'proc', 'tmp', 'run', 'root'] { os.mkdir_all(seed + '/' + name)! }
+			write(seed + '/.vinix-image-id', hosttest.sha(archive)![..16] + '\n')!
+		} else {
+			os.mkdir_all(seed)!
+		}
+		disk := work + '/root.ext2'
+		receipt['format_command'] = hosttest.strings(filesystem_format(tool, disk, seed, 4096, false)!)
+		if arch == 'aarch64' {
+			argv = guesthost.arm_persist_launch(argv, disk, work, root())!
+		} else {
+			argv << ['-drive', 'if=ide,format=raw,file=' + disk + ',cache=writeback']
+		}
+	}
 	receipt['command'] = hosttest.strings(argv)
 	hosttest.write_json(work + '/inputs.json', receipt)!
 	println('Guest artifacts: ' + work)
