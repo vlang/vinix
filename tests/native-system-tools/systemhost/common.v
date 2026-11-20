@@ -124,14 +124,10 @@ fn archive_root(init string, state string, directories []string) !string {
 	return guesthost.archive_tree(state + '/rootfs', state + '/initramfs.tar')!
 }
 
-fn arm_config(state string, runner string, cmdline string) ! {
-	if cmdline.contains('\n') || cmdline.contains('\r') {
-		return error('Kernel command line must fit one line')
-	}
-	os.write_file(state + '/limine.conf', os.read_file(runner + '/build-support/limine.conf')! + '    cmdline: ' + cmdline + '\n')!
-	run(['xorriso', '-indev', state + '/test.iso', '-outdev', state + '/configured.iso', '-map',
-		state + '/limine.conf', '/boot/limine.conf', '-boot_image', 'any', 'replay'])!
-	os.mv(state + '/configured.iso', state + '/test.iso')!
+// The ISO keeps its own Limine entry, which names the initramfs it packed; only
+// the command line changes (see guesthost.set_arm_iso_cmdline).
+fn arm_config(state string, _runner string, cmdline string) ! {
+	guesthost.set_arm_iso_cmdline(state, cmdline)!
 }
 
 fn receipt(state string, configured guesthost.Launch, kernel string, init string, archive string, seconds int) ! {
