@@ -204,3 +204,25 @@ fn test_public_abi_roundtrip_and_descriptor_ownership() {
 	assert C.fcntl(sockets[0], C.F_GETFD) == -1
 	abi_close(unsafe { nil })
 }
+
+fn test_cookie_clear_completes_on_cleared_reply_after_queued_callback() {
+	sockets := pair()
+	mut c := open(sockets[0]) or { panic(err) }
+	defer {
+		c.close()
+		C.close(sockets[1])
+	}
+	size := [u8(8), 0, 0, 0, 8, 0, 0, 0]
+	assert (c.submit(.create, 1, 1, 0, size) or { panic(err) }) == 1
+	assert (c.submit(.cookie_clear, 0, 0, 0, [u8(0)]) or { panic(err) }) == 2
+	send_bytes(sockets[1], wire(.ack, 1, 1, 1, 0, []u8{}))
+	send_bytes(sockets[1], wire(.cookie_cleared, 2, 0, 0, 0, [u8(1)]))
+	result := c.read(2, 500) or { panic(err) }
+	assert result.available && result.header.op == .cookie_cleared && result.header.request == 2
+	assert result.payload == [u8(1)]
+	unsafe { result.payload.free() }
+	first := c.read(0, 0) or { panic(err) }
+	assert first.available && first.header.op == .ack && first.header.request == 1
+	unsafe { first.payload.free() }
+	assert !(c.read(0, 0) or { panic(err) }).available
+}

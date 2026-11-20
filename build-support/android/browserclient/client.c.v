@@ -226,8 +226,10 @@ fn (mut c Client) receive(timeout int) !Event {
 // operation waits for its own completion and leaves other callbacks queued.
 fn completion(event Event, request u64) bool {
 	// Policy IDs are allocated by the helper and may numerically equal a
-	// client request ID. They are callbacks, never command completions.
-	return event.header.request == request && event.header.op in [.ack, .cookie_result, .failure]
+	// client request ID. They are callbacks, never command completions. A
+	// cookie clear completes with its own cleared-or-not reply, not an ack.
+	return event.header.request == request
+		&& event.header.op in [.ack, .cookie_result, .cookie_cleared, .failure]
 }
 
 pub fn (mut c Client) read(request u64, timeout int) !Event {
