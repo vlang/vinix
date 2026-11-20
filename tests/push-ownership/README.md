@@ -7,15 +7,16 @@ array holding freed bytes, and frees them a second time if it frees the array's
 elements. The V1 compiler cloned a pushed string, so code written against it
 can carry this bug without showing it.
 
-`check.v` lists candidates in three forms:
+`check.v` lists candidates in four forms:
 
 1. `arr << s` where the same function later frees `s`.
 2. A bare name or field pushed onto an array whose elements the function
    frees, one by one or with `arr.free()`: on a `[]string`, `free()` frees
    every element as well as the buffer. `(&array(&arr)).free()` frees only
    the buffer, which is right for an array that borrows its strings.
-3. A struct literal pushed with a bare name as a field value, which is freed
-   later.
+. A name passed to `arr.insert(i, s)` or written in an array literal
+   (`[a, s]`) and freed later. V1 cloned both; V copies only the header.
+   Map values, field assignments and plain copies never cloned in either.
 
 Names are matched textually. A hit may name something other than a string, or
 a free on a path that returns before the push, so each one has to be read.
@@ -45,3 +46,4 @@ The hits that remain are safe:
 | `kernel/userland/userland_arm64.v` `translated_argv`, `translated_envp` | a literal and newly built strings the lists own |
 | `desktop/files.v` `paths << ancestor` | every pushed path is already a copy |
 | `desktop/app_selection.v` `packages` | catalogue literals; now freed buffer-only anyway |
+| rule 4 in `desktop/` (`clock_timers`, `session_exchange`, `session_hub`, `sessionipc/dialog`) | the string is freed once and the literal array buffer-only |

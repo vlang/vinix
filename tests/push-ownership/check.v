@@ -89,6 +89,9 @@ fn main() {
 			for line in literal_pushes(f) {
 				println(line)
 			}
+			for line in insert_and_literal_uses(f) {
+				println(line)
+			}
 		}
 	}
 }
@@ -189,6 +192,47 @@ fn literal_pushes(path string) []string {
 					other := lines[j].all_before('//')
 					if other.contains('${v}.free()') && !other.contains('.${v}.free()') {
 						found << '${path}:${i + 1}: struct literal field ${v}  (freed at ${j + 1})'
+						break
+					}
+				}
+			}
+		}
+	}
+	return found
+}
+
+// Rule 4: V1 also cloned a string passed to `arr.insert(i, s)` or written in
+// an array literal (`[a, s]`); V copies only the header there too. A name
+// used either way and freed later in the function is a candidate.
+fn insert_and_literal_uses(path string) []string {
+	text := os.read_file(path) or { return [] }
+	lines := text.split_into_lines()
+	mut found := []string{}
+	for r in functions(lines) {
+		for i in r[0] .. r[1] {
+			line := lines[i].all_before('//')
+			mut names := []string{}
+			if line.contains('.insert(') {
+				arg := line.all_after('.insert(').all_before(')').all_after(',').trim_space()
+				names << arg
+			}
+			if line.contains(':= [') || line.contains('= [') {
+				inner := line.all_after('[').all_before(']')
+				if !inner.contains('(') && !inner.contains("'") {
+					for part in inner.split(',') {
+						names << part.trim_space()
+					}
+				}
+			}
+			for name in names {
+				if name == '' || !name.bytes().all(it.is_letter() || it.is_digit() || it == `_`)
+					|| !(name[0].is_letter() || name[0] == `_`) || name in ['true', 'false', 'none'] {
+					continue
+				}
+				for j in i + 1 .. r[1] {
+					other := lines[j].all_before('//')
+					if other.contains('${name}.free()') && !other.contains('.${name}.free()') {
+						found << '${path}:${i + 1}: ${name} inserted or in an array literal  (freed at ${j + 1})'
 						break
 					}
 				}
