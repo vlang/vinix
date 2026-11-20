@@ -109,6 +109,8 @@ fn C.tcgetattr(i32, &C.termios) i32
 fn C.tcsetattr(i32, i32, &C.termios) i32
 fn C.strstr(&char, &char) &char
 fn C.strtol(&char, voidptr, i32) i64
+fn C.sscanf(&char, &char, ...) i32
+fn C.strchr(&char, i32) &char
 fn C.memset(voidptr, i32, usize) voidptr
 fn C.clock_gettime(i32, &C.timespec) i32
 fn C.nanosleep(&C.timespec, &C.timespec) i32
@@ -252,6 +254,33 @@ fn allocation_tracking() {
 			C.read(fd, byte, 1)
 			C.close(fd)
 		}
+	}
+}
+
+// Bytes in live slab objects, from /proc/slabinfo rows
+// `size-<class> <size> <objects> <pages>`. Unlike the Slab total this does not
+// count empty pages the allocator keeps, which on ARM's 16 KiB pages vary by
+// whole pages from run to run.
+fn live_slab_bytes() i64 {
+	unsafe {
+		data := &char(C.__builtin_alloca(16384))
+		fd := C.open(c'/proc/slabinfo', C.O_RDONLY)
+		if fd < 0 { return -1 }
+		length := C.read(fd, data, 16383)
+		C.close(fd)
+		if length <= 0 { return -1 }
+		data[length] = 0
+		mut total := i64(0)
+		mut line := data
+		label := &i64(C.__builtin_alloca(4 * sizeof(i64)))
+		for line != nil && *line != 0 {
+			if C.sscanf(line, c'size-%ld %ld %ld %ld', label, &label[1], &label[2], &label[3]) == 4 && label[0] == label[1] {
+				total += label[1] * label[2]
+			}
+			line = C.strchr(line, `\n`)
+			if line != nil { line++ }
+		}
+		return total
 	}
 }
 
@@ -913,7 +942,9 @@ fn manager(image &char) i32 {
 			alias = C.open(c'/dev/tty', C.O_RDWR | C.O_NOCTTY)
 			if alias >= 0 { C.close(alias) }
 		}
+		settle_grace()
 		open_before := slab_kb()
+		live_before := live_slab_bytes()
 		mut opens_ok := true
 		for i := i32(0); i < 1000; i++ {
 			alias = C.open(c'/dev/tty', C.O_RDWR | C.O_NOCTTY)
@@ -922,9 +953,16 @@ fn manager(image &char) i32 {
 				break
 			}
 		}
+		// An open's memory returns in two grace-period stages; wait for both,
+		// or its pending frees count as live. ALLOC_TRACK then shows nothing
+		// from the loop left live.
+		settle_grace()
+		settle_grace()
 		open_after := slab_kb()
-		C.printf(c'TERMINAL OPEN SLAB before=%ld after=%ld KiB\n', open_before, open_after)
-		check(opens_ok && open_before >= 0 && open_after >= 0 && open_after <= open_before + 8, c'1000 controlling-terminal opens retain bounded slab memory')
+		live_after := live_slab_bytes()
+		C.printf(c'TERMINAL OPEN SLAB before=%ld after=%ld KiB live before=%ld after=%ld bytes\n', open_before, open_after, live_before, live_after)
+		// Sixteen bytes kept per open would add 16000.
+		check(opens_ok && live_before >= 0 && live_after >= 0 && live_after <= live_before + 4096, c'1000 controlling-terminal opens retain bounded slab memory')
 		second_master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY)
 		mut second_id := u32(0)
 		check(second_master >= 0 && C.ioctl(second_master, C.TIOCSPTLCK, &unlock) == 0 && C.ioctl(second_master, C.TIOCGPTN, &second_id) == 0, c'second PTY master')
