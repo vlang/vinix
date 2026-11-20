@@ -124,3 +124,14 @@ pub fn may_read_kernel_diagnostics() bool {
 	return mac_trusted() && p.euid == 0 && is_initial_namespace(p.ns.user)
 		&& has_capability(p, cap_sys_admin)
 }
+
+// kernel_id() for a caller that holds the process table lock, so a number it
+// resolves cannot change hands before the lookup that uses it.
+pub fn kernel_id_locked(local int) int {
+	viewer := current_pid_namespace()
+	if !numbers_own(viewer) || local <= 0 {
+		return local
+	}
+	global := global_id_in(viewer, local)
+	return if global > 0 { global } else { max_pid }
+}

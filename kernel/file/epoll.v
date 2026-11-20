@@ -202,6 +202,33 @@ pub fn syscall_epoll_create1(_ voidptr, flags_word int) (u64, u64) {
 	return u64(fdnum), 0
 }
 
+// The open-file description that the set behind `epoll_handle` watches as its
+// `offset`-th registration of descriptor number `target`, for
+// kcmp(KCMP_EPOLL_TFD). Registrations of one number are counted in the order
+// they were added; Linux walks its tree by description address. Either way
+// each is reached by exactly one offset, which is what CRIU enumerates. One
+// pass under the set's spinlock. The address is returned to be compared,
+// never followed. EINVAL: not an epoll set; ENOENT: no such registration.
+pub fn epoll_registration(epoll_handle &Handle, target u32, offset u32) (u64, u64) {
+	if epoll_handle.resource == unsafe { nil } { return 0, errno.einval }
+	mut res := epoll_handle.resource
+	mut set := &EpollResource(unsafe { nil })
+	if mut res is EpollResource {
+		set = res
+	} else {
+		return 0, errno.einval
+	}
+	set.l.acquire()
+	defer { set.l.release() }
+	mut seen := u32(0)
+	for entry in set.entries {
+		if u32(entry.fd) != target { continue }
+		if seen == offset { return u64(voidptr(entry.handle)), 0 }
+		seen++
+	}
+	return 0, errno.enoent
+}
+
 pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, event_ptr u64) (u64, u64) {
 	// Linux decodes every C int from the signed low word of its register.
 	epfd := int(i32(epfd_word))

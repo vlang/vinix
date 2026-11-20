@@ -23,6 +23,7 @@ pub const clone_vm = u64(0x00000100)
 pub const clone_fs = u64(0x00000200)
 pub const clone_files = u64(0x00000400)
 pub const clone_sighand = u64(0x00000800)
+pub const clone_sysvsem = u64(0x00040000)
 pub const clone_vfork = u64(0x00004000)
 pub const clone_thread = u64(0x00010000)
 

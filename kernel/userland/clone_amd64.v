@@ -188,6 +188,7 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 		usercopy.copy_to_user(child_tid, voidptr(&tid), sizeof(u32))
 	}
 
+	if flags & clone_sysvsem != 0 { katomic.store(mut &process.sysvsem_undo, true) }
 	sched.publish_cloned_thread(new_thread)
 
 	return u64(tid), 0

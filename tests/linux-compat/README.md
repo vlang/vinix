@@ -12,6 +12,12 @@ must pass; bad pointers, errno, compiler failure, panic, timeout and late failur
 remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
 stay in the required fresh artifact directory, including on failure.
 
+`--cases kcmp` checks kcmp(2) for every type across the calling process, a
+thread, fork children and UID 1000 children, with argument words and error
+order. `syscall-reference.v --case kcmp` boots the same probe ELF on a supplied
+Linux kernel; it serves any probe that prints `LINUX <CASE> REFERENCE: PASS`
+under `--reference`. See [semantics and receipts](../../docs/linux-kcmp.md).
+
 `--cases maskwait` checks the live mask inside handlers interrupting
 rt_sigsuspend, ppoll, pselect6, epoll_pwait and epoll_pwait2. It checks saved
 frame/return masks, recursive SA_NODEFER delivery, action masks, SA_RESTART,

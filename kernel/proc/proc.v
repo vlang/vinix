@@ -324,6 +324,11 @@ pub mut:
 	// Linux PR_SET_DUMPABLE governs access to process layout as well as any
 	// future core writer. An ordinary new program starts dumpable.
 	dumpable u32 = 1
+	// Linux gives a process a SysV semaphore undo list the first time it creates
+	// a thread with CLONE_SYSVSEM, as both libcs' pthread_create do. Vinix keeps
+	// no undo lists (semop refuses SEM_UNDO), but kcmp(KCMP_SYSVSEM) reports
+	// whether one would exist. A fork child starts without one.
+	sysvsem_undo bool
 	// A parent may no longer change its child's process group after exec.
 	did_exec u32
 	stack_policy_mode u32

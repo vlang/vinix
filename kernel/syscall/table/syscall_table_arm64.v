@@ -525,6 +525,7 @@ pub fn init_syscall_table() {
 	syscall_table[167] = voidptr(syscall_linux_prctl) // __NR_prctl
 	syscall_table[270] = voidptr(syscall_linux_process_vm_readv) // process_vm_readv
 	syscall_table[271] = voidptr(syscall_linux_process_vm_writev) // process_vm_writev
+	syscall_table[272] = voidptr(userland.syscall_kcmp) // __NR_kcmp
 	syscall_table[38] = voidptr(fs.syscall_renameat) // __NR_renameat
 	syscall_table[276] = voidptr(fs.syscall_renameat2) // __NR_renameat2
 	syscall_table[43] = voidptr(fs.syscall_statfs) // __NR_statfs

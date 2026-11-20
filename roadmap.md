@@ -2594,6 +2594,17 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   lifetime review. See [the observer qualification](docs/linux-slabinfo-observer.md)
   for cold-reader results, full-workload checks and remaining section 15 gates.
 
+- [x] Generate the native syscall inventory from the boot-time registration
+  order, so later per-architecture tables replace the generic ones as they do
+  in the kernel. The corrected inventory found 13 AArch64 and 8 x86-64 calls
+  published as vacant that were wired. See [the inventory](docs/linux-syscall-coverage.md).
+
+- [x] Implement kcmp for all eight types with READ_REALCREDS permission, a
+  randomized total order and Linux's error order, including epoll targets and
+  the undo list a CLONE_SYSVSEM thread creates. The same probe ELF passes 66 + 8
+  checks on Vinix and Linux 6.12 on both architectures. See
+  [the kcmp receipts](docs/linux-kcmp.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

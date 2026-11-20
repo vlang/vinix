@@ -339,6 +339,13 @@ pub fn syscall_unshare(_ voidptr, flags u64) (u64, u64) {
 			ns_flags &= ~proc.clone_newns
 		}
 	}
+	// Linux detaches the caller from its semaphore undo list. It is tracked per
+	// process here, so only a single-threaded caller drops it.
+	if flags & u64(0x00040000) != 0 {
+		process.threads_lock.acquire()
+		if process.threads.len == 1 { katomic.store(mut &process.sysvsem_undo, false) }
+		process.threads_lock.release()
+	}
 	create_namespaces(mut process, ns_flags, false)
 	return 0, 0
 }
