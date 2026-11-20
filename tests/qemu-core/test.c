@@ -1386,8 +1386,13 @@ static int test_futex_wake_op(void)
 	CHECK(syscall(SYS_futex, &words[0], 5 | 128, 1, 1, &words[1],
 	    0x21000000) == 0);
 	CHECK(words[1] == 10);
+	/* A misaligned word is EINVAL before any access, as on Linux; an aligned
+	 * unmapped one faults. */
 	errno = 0;
 	CHECK(syscall(SYS_futex, &words[0], 5 | 128, 1, 1, (void *)1,
+	    0x21000000) == -1 && errno == EINVAL);
+	errno = 0;
+	CHECK(syscall(SYS_futex, &words[0], 5 | 128, 1, 1, (void *)8,
 	    0x21000000) == -1 && errno == EFAULT);
 	puts("QEMU CORE PASS: futex wake-op updates and compares user words");
 	return 0;
