@@ -42,6 +42,8 @@ mut:
 struct C.stat {
 mut:
 	st_mode u32
+	st_uid  u32
+	st_gid  u32
 	st_rdev u64
 }
 
@@ -121,12 +123,19 @@ fn C.execl(&char, &char, ...) i32
 fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
 fn C.posix_openpt(i32) i32
+fn C.grantpt(i32) i32
+fn C.unlockpt(i32) i32
+fn C.ptsname(i32) &char
 fn C.ioctl(i32, u64, ...) i32
 fn C.fstat(i32, &C.stat) i32
+fn C.stat(&char, &C.stat) i32
 fn C.S_ISCHR(u32) bool
 fn C.mknod(&char, u32, u64) i32
 fn C.getrlimit(i32, &C.rlimit) i32
 fn C.setrlimit(i32, &C.rlimit) i32
+fn C.setresgid(u32, u32, u32) i32
+fn C.setresuid(u32, u32, u32) i32
+fn C.setgroups(usize, &u32) i32
 fn C.dup(i32) i32
 fn C.poll(&C.pollfd, u64, i32) i32
 fn C.unlink(&char) i32
@@ -194,6 +203,88 @@ fn exited_ok(child i32) bool {
 	unsafe {
 		status := wait_status(child, 0)
 		return status >= 0 && C.WIFEXITED(status) && C.WEXITSTATUS(status) == 0
+	}
+}
+
+fn nonroot_pty_ownership() {
+	unsafe {
+		mut ready := &i32(C.__builtin_alloca(2 * sizeof(i32)))
+		mut release := &i32(C.__builtin_alloca(2 * sizeof(i32)))
+		if C.pipe(ready) != 0 {
+			check(false, c'create non-root PTY ownership pipes')
+			return
+		}
+		if C.pipe(release) != 0 {
+			C.close(ready[0]); C.close(ready[1])
+			check(false, c'create non-root PTY ownership pipes')
+			return
+		}
+		owner := C.fork()
+		if owner == 0 {
+			C.close(ready[0])
+			C.close(release[1])
+			if C.setgroups(0, nil) != 0 || C.setresgid(1000, 1000, 1000) != 0
+				|| C.setresuid(1000, 1000, 1000) != 0 { C._exit(1) }
+			master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY)
+			if master < 0 || C.grantpt(master) != 0 || C.unlockpt(master) != 0 { C._exit(2) }
+			slave_name := C.ptsname(master)
+			if slave_name == nil { C._exit(3) }
+			path := &char(C.__builtin_alloca(64))
+			C.memset(path, 0, 64)
+			C.snprintf(path, 64, c'%s', slave_name)
+			slave := C.open(path, C.O_RDWR | C.O_NOCTTY)
+			open_result := i32(if slave >= 0 { 1 } else { 0 })
+			if C.write(ready[1], path, 64) != 64
+				|| C.write(ready[1], &open_result, sizeof(i32)) != isize(sizeof(i32)) { C._exit(4) }
+			byte := &char(C.__builtin_alloca(1))
+			if C.read(release[0], byte, 1) != 1 { C._exit(5) }
+			if slave >= 0 { C.close(slave) }
+			C.close(master)
+			C._exit(0)
+		}
+		if owner < 0 {
+			C.close(ready[0]); C.close(ready[1]); C.close(release[0]); C.close(release[1])
+			check(false, c'fork non-root PTY owner')
+			return
+		}
+		C.close(ready[1])
+		C.close(release[0])
+		path := &char(C.__builtin_alloca(64))
+		mut owner_open := i32(0)
+		has_path := C.read(ready[0], path, 64) == 64
+		has_open_result := has_path && C.read(ready[0], &owner_open, sizeof(i32)) == isize(sizeof(i32))
+		information := &C.stat(C.__builtin_alloca(sizeof(C.stat)))
+		metadata_available := has_path && C.stat(path, information) == 0
+		metadata_ok := metadata_available
+			&& information.st_uid == 1000 && information.st_gid == 1000
+			&& information.st_mode & u32(0o777) == u32(0o620)
+			&& information.st_mode & u32(0o007) == 0
+		if metadata_available {
+			C.printf(c'TERMINAL NONROOT PTY owner=%u:%u mode=%o\n', information.st_uid,
+				information.st_gid, information.st_mode & u32(0o777))
+		}
+		attacker := if has_path { C.fork() } else { i32(-1) }
+		if attacker == 0 {
+			if C.setgroups(0, nil) != 0 || C.setresgid(1001, 1001, 1001) != 0
+				|| C.setresuid(1001, 1001, 1001) != 0 { C._exit(1) }
+			C.errno = 0
+			fd := C.open(path, C.O_RDWR | C.O_NOCTTY)
+			if fd >= 0 {
+				C.close(fd)
+				C._exit(2)
+			}
+			C._exit(if C.errno == C.EACCES { 0 } else { 3 })
+		}
+		attacker_status := if attacker > 0 { wait_status(attacker, 0) } else { i32(-1) }
+		if has_path && has_open_result { C.write(release[1], c'r', 1) } else { C.kill(owner, C.SIGKILL) }
+		C.close(ready[0])
+		C.close(release[1])
+		owner_status := wait_status(owner, 0)
+		attacker_denied := attacker_status >= 0 && C.WIFEXITED(attacker_status)
+			&& C.WEXITSTATUS(attacker_status) == 0
+		check(metadata_ok && has_open_result && owner_open == 1 && attacker_denied
+			&& owner_status >= 0 && C.WIFEXITED(owner_status) && C.WEXITSTATUS(owner_status) == 0,
+			c'non-root PTY belongs to its owner and denies another user')
 	}
 }
 
@@ -895,6 +986,7 @@ fn owned_open_cases() {
 fn manager(image &char) i32 {
 	unsafe {
 		check(C.setsid() > 0, c'create controlling session')
+		nonroot_pty_ownership()
 		master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY)
 		mut unlock := i32(0)
 		id := &u32(C.__builtin_alloca(sizeof(u32)))
