@@ -696,6 +696,17 @@ fn ws_web_cookie(e voidptr, url voidptr, value voidptr, setting bool) voidptr {
 		C.pthread_mutex_unlock(&ws_browser_mutex)
 		defer { C.free(payload) }
 		op := u16(header[6]) | u16(header[7]) << 8
+		if status == 1 && op == 259 {
+			// The engine refused this URL or cookie (GMS deletes cookies by
+			// setting them expired). Android's setCookie and getCookie never
+			// throw: report false or no cookie. The code is a fixed engine
+			// string such as invalid-cookie, never cookie or URL text.
+			prefix := &char(c'run-android browser: cookie refused: ')
+			C.write(2, prefix, C.strlen(prefix))
+			if length > 0 && length <= 64 { C.write(2, payload, usize(length)) }
+			C.write(2, c'\n', 1)
+			return nil
+		}
 		if status != 1 || op != (if setting { u16(256) } else { u16(260) }) {
 			throw(e, c'java/lang/IllegalStateException', c'WebView cookie operation failed')
 			return nil
