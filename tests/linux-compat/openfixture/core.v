@@ -285,6 +285,26 @@ fn invalid_directory_creation() bool {
 	}
 }
 
+// O_PATH names a node without opening it: the fixture, as init, has no
+// controlling terminal, so opening /dev/tty fails with ENXIO but an O_PATH
+// descriptor for it (as bubblewrap takes to bind it) does not.
+fn path_without_open() bool {
+	unsafe {
+		errno_ptr := C.__errno_location()
+		*errno_ptr = 0
+		opened := C.open(c'/dev/tty', C.O_RDWR)
+		refused := opened == -1 && *errno_ptr == C.ENXIO
+		if opened >= 0 { C.close(opened) }
+		path := C.open(c'/dev/tty', C.O_PATH)
+		if path >= 0 { C.close(path) }
+		if !refused || path < 0 {
+			C.printf(c'LINUX OPEN FAIL: /dev/tty open=%d O_PATH=%d errno=%d\n', opened, path, *errno_ptr)
+			return false
+		}
+		return true
+	}
+}
+
 // RESOLVE_IN_ROOT: the descriptor is the root of the walk. An absolute path,
 // `..` and an absolute link stay inside it; a magic link may lead anywhere
 // and is refused (EXDEV), as Linux refuses it in a scoped lookup.
@@ -359,7 +379,7 @@ pub fn run() i32 {
 			how.resolve = constraint
 			if !open_result(c'/tmp/linux-open-dir/link/linux-open-target', &how, 24, C.EOPNOTSUPP) { return 1 }
 		}
-		if !in_root() { return 1 }
+		if !in_root() || !path_without_open() { return 1 }
 		C.puts(c'LINUX OPEN: PASS'); C.fflush(nil)
 		for { C.pause() }
 	}

@@ -928,7 +928,14 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
  retain_open_origin(mut node_resource)?
  mut origin_transferred := false
  defer { if !origin_transferred { resource.release_resource(mut node_resource) } }
-	mut opened_resource := resource.open_resource(mut node_resource, flags) or { return none }
+	// O_PATH names the node without opening it: no device or FIFO open runs,
+	// as Linux skips f_op->open. bubblewrap binds /dev/tty from an O_PATH
+	// descriptor in a process with no controlling terminal.
+	mut opened_resource := if flags & resource.o_path != 0 {
+		resource.OpenedResource{resource: node_resource}
+	} else {
+		resource.open_resource(mut node_resource, flags) or { return none }
+	}
 	// Keep nsfs pins on the shared open description, including O_PATH. A
 	// concrete dispatch avoids boxing another interface on every open.
 	if mut node_resource is NsFSResource {
