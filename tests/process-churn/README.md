@@ -109,6 +109,10 @@ big-page deltas are zero. ARM live counts remain 17; x86 counts are 13, 14,
 15, including one residual size-16 object per timed cohort. That separate
 small residual is not treated as proof of a per-read leak.
 
+Since 0c9f9fb25 (2026-11-15) `fs__slabinfo_read` writes the report straight
+into the reader's buffer, and the check requires its two caller-stack slots
+(the class array and the writer) and no heap allocation, Text or string.
+
 The result checker accepts both fixed logs and rejects the baseline's first
 602-object increase. Corrupted logs with a short grace, missing DONE, or
 duplicate measurement are also rejected.

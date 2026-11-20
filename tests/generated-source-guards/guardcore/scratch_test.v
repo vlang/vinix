@@ -52,9 +52,8 @@ fn socket_fixture() string {
 }
 
 fn churn_fixture() string {
-	return scratch_definition('fs__slabinfo_text', '\tvinix_stack_alloc(Text);\n\tarray__free(&classes);\n\treturn lib__finish_text(*text);') +
-		scratch_definition('lib__finish_text', '\ts = Array_u8__bytestr(t.bytes);\n\tarray__free(&t.bytes);\n\treturn s;') +
-		scratch_definition('file__do_select', '\tvinix_stack_alloc(Timeout);\n\tremaining = deadline;\n\tfile__ppoll(polls);\n\tarray__free(&polls);\n\tarray__free(&indexes);') +
+	return scratch_definition('fs__slabinfo_read', '\tclasses = vinix_stack_alloc(Classes);\n\tn = memory__heap_classes_into(classes, 18);\n\toutput = vinix_stack_alloc(Writer);\n\t*output = slabreport__writer(buf, loc, count);') +
+		scratch_definition('file__do_select', '\tvinix_stack_alloc(Timeout);\n\t*remaining = file__select_remaining(deadline);\n\tfile__ppoll(polls);\n\tarray__free(&polls);\n\tarray__free(&indexes);') +
 		scratch_definition('sched__new_process', '\tnew_proc->executable_path = string__clone(old_process->executable_path);') +
 		scratch_definition('userland__clone_new_process', '\treturn new_process;')
 }
@@ -300,16 +299,15 @@ fn test_churn_formatter_select_timeout_and_inherited_path_owners() {
 	fixture := churn_fixture()
 	check_family(parse(fixture)!, 'churn', true)!
 	for before, after in {
-		'vinix_stack_alloc(Text);':                    'memdup(Text);'
-		'array__free(&classes);':                      'keep(classes);'
-		'return lib__finish_text(*text);':             'return text;'
-		'Array_u8__bytestr(t.bytes)':                  'borrow(t.bytes)'
-		'array__free(&t.bytes);':                      'keep(t.bytes);'
-		'return s;':                                   'return other;'
+		'vinix_stack_alloc(Classes);':                 'memdup(Classes);'
+		'vinix_stack_alloc(Writer);':                  'malloc(Writer);'
+		'heap_classes_into(classes, 18)':              'heap_classes(classes, 18)'
+		'slabreport__writer(buf, loc, count)':         'lib__new_text(count)'
+		'*output = ':                                  'string s = '
 		'vinix_stack_alloc(Timeout);':                 'memdup(Timeout);'
 		'array__free(&polls);':                        'keep(polls);'
 		'array__free(&indexes);':                      'keep(indexes);'
-		'remaining = deadline;':                       'remaining = 0;'
+		'file__select_remaining(deadline)':            'deadline'
 		'file__ppoll(polls);':                         'async_poll(polls);'
 		'string__clone(old_process->executable_path)': 'old_process->executable_path'
 	} {

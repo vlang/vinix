@@ -139,18 +139,19 @@ pub fn unix_socket_check(generated Generated, name string) !string {
 }
 
 pub fn churn_check(generated Generated) !string {
-	body := generated.selected('fs__slabinfo_text', 'churn')!
-	if body.count('vinix_stack_alloc(') != 1 || body.contains('memdup(') {
-		return error('slabinfo Text metadata must use one caller-stack slot')
+	// Since 0c9f9fb25 /proc/slabinfo is written straight into the reader's
+	// buffer: the class array and the writer are the only scratch.
+	body := generated.selected('fs__slabinfo_read', 'churn')!
+	if body.count('vinix_stack_alloc(') != 2 || word_calls(body, scratch_allocations, false).len > 0 {
+		return error('slabinfo classes and writer must use two caller-stack slots')
 	}
-	if body.count('array__free(&classes);') != 1 || !body.contains('return lib__finish_text(*text);') {
-		return error('existing class-array/string ownership was lost')
+	if !body.contains('memory__heap_classes_into(classes, 18)') || !body.contains('slabreport__writer(buf, loc, count)') {
+		return error('slabinfo must fill the caller-stack classes and write into the read buffer')
 	}
-	finish := generated.selected('lib__finish_text', 'churn')!
-	if finish.count('Array_u8__bytestr(t.bytes)') != 1 || finish.count('array__free(&t.bytes);') != 1 || !finish.contains('return s;') {
-		return error('finish_text must return one string and free its consumed buffer')
+	if body.contains('lib__') || body.contains('string') {
+		return error('slabinfo must not build an intermediate Text or string')
 	}
-	return 'PASS fs__slabinfo_text: caller-stack metadata, existing buffer ownership'
+	return 'PASS fs__slabinfo_read: caller-stack classes and writer, no heap allocation'
 }
 
 pub fn select_check(generated Generated) !string {
@@ -161,7 +162,8 @@ pub fn select_check(generated Generated) !string {
 	if !body.contains('array__free(&polls);') || !body.contains('array__free(&indexes);') {
 		return error('do_select poll/index array ownership was lost')
 	}
-	if !body.contains('remaining = deadline;') || !body.contains('file__ppoll(') {
+	// Since e1b1b8e5e the timeout is the time left until the deadline.
+	if !body.contains('*remaining = file__select_remaining(deadline);') || !body.contains('file__ppoll(') {
 		return error('do_select timeout initialization/consumer was lost')
 	}
 	return 'PASS file__do_select: caller-stack scratch, synchronous ppoll consumer'

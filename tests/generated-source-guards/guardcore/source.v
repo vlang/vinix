@@ -10,6 +10,10 @@ pub struct Generated {
 	offsets []int
 }
 
+// The new compiler renames identifiers that are C++ keywords (`this`,
+// `template`, `class`); bodies are returned with the names as written.
+const cpp_rename = '__v3_internal_symbol_cpp_'
+
 pub fn parse(source string) !Generated {
 	if !utf8.validate_str(source) { return error('generated C is not valid UTF-8') }
 	text := source.replace('\r\n', '\n').replace('\r', '\n')
@@ -50,9 +54,7 @@ pub fn (generated Generated) body(name string, family string) !string {
 			if family == 'procfs' && line[at + needle.len..line.len - 3].contains(';') { continue }
 			start := generated.offsets[number] + line.len + 1
 			end := generated.source.index_after('\n}\n', start) or { return error('substring not found') }
-			// The new compiler renames locals that are C++ keywords (`this`,
-			// `template`); the checks name them as written.
-			return generated.source[start..end].replace('__v3_internal_symbol_cpp_', '')
+			return generated.source[start..end].replace(cpp_rename, '')
 		}
 	}
 	return error(if family == 'procfs' {

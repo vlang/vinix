@@ -37,9 +37,9 @@ pub fn (generated Generated) selected(name string, selector string) !string {
 			return error('substring not found')
 		}
 		return if selector == 'churn' {
-			generated.source[body_start..end]
+			generated.source[body_start..end].replace(cpp_rename, '')
 		} else {
-			generated.source[start..end + 3]
+			generated.source[start..end + 3].replace(cpp_rename, '')
 		}
 	}
 	return error(if selector == 'churn' {
@@ -82,7 +82,7 @@ pub fn (generated Generated) timer_body(name string) !string {
 			if generated.source[start..closing].contains(';') { continue }
 			opening := closing + 2
 			end := balanced_end(generated.source, opening)!
-			return generated.source[opening..end]
+			return generated.source[opening..end].replace(cpp_rename, '')
 		}
 	}
 	return error('missing definition: ${name}')
