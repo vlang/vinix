@@ -84,11 +84,12 @@ fn (mut s HDAStream) bring_up() {
 	s.regs.ctl0 = s.regs.ctl0 & ~sdctl0_srst
 	devcore.spin_until(stream_out_of_reset, voidptr(s.regs), reset_timeout_ns)
 	s.initialize_output()
+	// The reset put the controller back at the start of the ring.
+	s.hw_pos = 0
 	s.regs.fmt = s.kept_format
 	if s.was_playing {
 		s.was_playing = false
-		s.cur_user_pos = 0
-		katomic.store(mut &s.remaining_data, u32(0))
+		s.forget_ring()
 		event.trigger(mut s.event, true)
 	}
 }

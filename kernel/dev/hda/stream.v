@@ -28,6 +28,9 @@ pub mut:
 	bdl_phys       u64
 	cur_user_pos   u32
 	remaining_data u32
+	// Where the controller was at the last interrupt: what it has played
+	// since is zeroed and taken off remaining_data.
+	hw_pos u32
 	cur_volume     u32
 	channels       u8
 	is_output      bool
@@ -85,9 +88,11 @@ pub fn (mut s HDAStream) initialize(index u8, is_output bool) {
 		unsafe {
 			s.bdl[i].address = u64(memory.pmm_alloc(1))
 			s.bdl[i].length = u32(page_size)
-			if i != 0 && (i * page_size) % chunk_size == 0 {
-				s.bdl[i].ioc = 1
-			}
+			// Every page interrupts, the first as well: accounting follows the
+			// controller's position, and a long gap between interrupts only
+			// delays the silence that replaces what was played.
+			s.bdl[i].ioc = 1
+			C.memset(voidptr(s.bdl[i].address + higher_half), 0, page_size)
 		}
 	}
 
@@ -201,7 +206,16 @@ fn (mut s HDAStream) reset() {
 	devcore.spin_until(stream_out_of_reset, voidptr(s.regs), reset_timeout_ns)
 
 	s.initialize_output()
+	s.forget_ring()
+}
+
+// An empty, silent ring at its start, as after a reset of the stream:
+// nothing queued, and nothing left from before to be played.
+fn (mut s HDAStream) forget_ring() {
 	s.cur_user_pos = 0
+	s.hw_pos = 0
+	katomic.store(mut &s.remaining_data, u32(0))
+	s.clear_ring(0, u32(total_buffer_size))
 }
 
 fn (s HDAStream) is_playing() bool {
@@ -210,6 +224,17 @@ fn (s HDAStream) is_playing() bool {
 
 fn (mut s HDAStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 	mut first_write := false
+	// A stream that ran dry has kept going over silence, past where the last
+	// write ended. Queue new sound from the page after the controller's
+	// position, counting the silence before it, or it would wait a whole
+	// turn of the ring.
+	if s.regs.ctl0 & sdctl0_run != 0 && katomic.load(&s.remaining_data) == 0 {
+		pos := s.position()
+		next := (pos / u32(page_size) + 1) * u32(page_size)
+		if katomic.cas(mut s.remaining_data, 0, next - pos) {
+			s.cur_user_pos = next % u32(total_buffer_size)
+		}
+	}
 
 	mut i := u64(0)
 	for {
@@ -291,6 +316,11 @@ fn (mut s HDAStream) wait_until_empty() {
 		s_remaining := katomic.load(&s.remaining_data)
 		if s_remaining == 0 {
 			break
+		}
+		// A write starts the stream only once two pages are queued. Less than
+		// that, waited for here, would never be played and never interrupt.
+		if s.regs.ctl0 & sdctl0_run == 0 {
+			s.play(true)
 		} else if s_remaining <= u32(total_buffer_size - chunk_size) {
 			mut progress := u64(0)
 			for {
@@ -326,14 +356,38 @@ fn (mut s HDAStream) wait_until_empty() {
 	}
 }
 
+fn (s &HDAStream) position() u32 {
+	return katomic.load(&s.regs.lpib) % u32(total_buffer_size)
+}
+
+// Zero `length` bytes of the ring from `at`, wrapping at its end.
+fn (mut s HDAStream) clear_ring(at u32, length u32) {
+	mut pos := at
+	mut left := length
+	for left > 0 {
+		offset := pos % u32(page_size)
+		piece := if left < u32(page_size) - offset { left } else { u32(page_size) - offset }
+		unsafe {
+			desc := &s.bdl[pos / u32(page_size)]
+			C.memset(voidptr(desc.address + offset + higher_half), 0, piece)
+		}
+		pos = (pos + piece) % u32(total_buffer_size)
+		left -= piece
+	}
+}
+
+// Take what the controller played since the last interrupt off what is
+// queued, however many pages that was, and zero it. A stream that runs dry
+// keeps going over the ring, and must then play silence, not the ring's
+// old contents.
 fn (mut s HDAStream) handle_irq() {
+	pos := s.position()
+	played := (pos + u32(total_buffer_size) - s.hw_pos) % u32(total_buffer_size)
+	s.clear_ring(s.hw_pos, played)
+	s.hw_pos = pos
 	for {
 		old := katomic.load(&s.remaining_data)
-		new_value := if old <= u32(chunk_size) {
-			u32(0)
-		} else {
-			old - u32(chunk_size)
-		}
+		new_value := if old <= played { u32(0) } else { old - played }
 		if katomic.cas(mut s.remaining_data, old, new_value) {
 			break
 		}
