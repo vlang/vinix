@@ -112,6 +112,7 @@ mut:
 	port        u32
 	speed       u32
 	ep0         Ring
+	ep0_failed  bool
 	input_phys  u64
 	input_virt  u64
 	output_phys u64
@@ -136,6 +137,9 @@ __global (
 	xhci_event_cycle  u32
 	xhci_functions    [8]HidFunction
 	xhci_function_cnt int
+	// Keep the final EP0 producer state, without allocating recovery state.
+	xhci_devices [17]Device
+	xhci_ep0_failed [17]bool
 	// What was allocated, for release_pages().
 	xhci_pages      [max_pages]u64
 	xhci_page_count int
@@ -351,6 +355,9 @@ fn await_transfer(slot u32, dci u32, trb u64) ?Event {
 // that many bytes into the device's buffer when `request_type` is IN, and
 // writes them from it when it is OUT.
 fn control(mut dev Device, request_type u8, request u8, value u16, index u16, length u16) bool {
+	if dev.ep0_failed {
+		return false
+	}
 	data_in := request_type & 0x80 != 0
 	mut transfer_type := u32(0)
 	if length > 0 {
@@ -370,7 +377,11 @@ fn control(mut dev Device, request_type u8, request u8, value u16, index u16, le
 		u32(0)
 	}))
 	ring_doorbell(dev.slot, 1)
-	await_transfer(dev.slot, 1, last) or { return false }
+	await_transfer(dev.slot, 1, last) or {
+		// Failed TDs may still own DMA; never reuse EP0 until reinitialisation.
+		dev.ep0_failed = true
+		return false
+	}
 	return true
 }
 
@@ -505,6 +516,8 @@ fn attach(port u32) {
 		return
 	}
 	take_hid_functions(mut dev, u64(total))
+	xhci_devices[dev.slot] = dev
+	xhci_ep0_failed[dev.slot] = dev.ep0_failed
 }
 
 // Bring the controller up. Returns false if there is none.
@@ -553,8 +566,10 @@ fn controller_resume(mut core devcore.Device) bool {
 		return true
 	}
 	katomic.store(mut &xhci_stopped, u32(1))
-	deadline := now_ns() + 1000000000
-	for katomic.load(&xhci_polling) != 0 && now_ns() < deadline {
+	// No timed free: recovery may still own these rings during a bounded
+	// command/control wait. Wait for the poller to relinquish them before
+	// freeing DMA; stopping prevents further drain/recovery iterations.
+	for katomic.load(&xhci_polling) != 0 {
 	}
 	xhci_ready = false
 	forget_keys()
@@ -674,6 +689,8 @@ fn start(dev &pci.PCIDevice) bool {
 		println('xhci: controller did not start')
 		return false
 	}
+	xhci_devices = [17]Device{}
+	xhci_ep0_failed = [17]bool{}
 
 	// Firmware and a controller reset may leave switchable ports unpowered.
 	// Power them before looking for devices, then allow connection debounce.
@@ -702,40 +719,25 @@ fn start(dev &pci.PCIDevice) bool {
 	return true
 }
 
-fn handle_event(ev Event) {
-	if event_type(ev) != trb_transfer_event {
-		return
-	}
-	slot := event_slot(ev)
-	dci := event_endpoint(ev)
-	for i := 0; i < xhci_function_cnt; i++ {
-		mut f := &xhci_functions[i]
-		if f.slot != slot || f.dci != dci {
-			continue
-		}
-		code := event_code(ev)
-		if code == cc_success || code == cc_short_packet {
-			residual := ev.status & 0xffffff
-			length := if residual < f.packet { f.packet - residual } else { u32(0) }
-			f.report(length)
-		}
-		queue_report(mut f)
-		return
-	}
+fn recovery_stopped() bool {
+	return katomic.load(&xhci_stopped) != 0
 }
 
 // One round: what the controller has to report, and a held key repeating.
 // On AArch64 this is called from virtio_input.poll(), under its lock; on
-// x86-64 by this driver's own thread. A round reads memory, and touches the
-// controller only to acknowledge an event it found there.
+// x86-64 by this driver's own thread. Recovery commands run only after the
+// event drain, never recursively from a completion handler.
 fn poll() {
 	katomic.store(mut &xhci_polling, u32(1))
 	if katomic.load(&xhci_stopped) == 0 && xhci_ready {
-		for {
+		for !recovery_stopped() {
 			ev := next_event() or { break }
 			handle_event(ev)
 		}
-		repeat_keys()
+		recover_endpoints()
+		if !recovery_stopped() {
+			repeat_keys()
+		}
 	}
 	katomic.store(mut &xhci_polling, u32(0))
 }
@@ -762,6 +764,20 @@ fn show_stats(_ voidptr, mut text lib.Text) {
 	text.add_unsigned(xhci_pointer_reports)
 	text.add('\nset up again: ')
 	text.add_unsigned(xhci_resumes)
+	text.add('\ntransfer errors: ')
+	text.add_unsigned(xhci_transfer_errors)
+	text.add('\nlast error slot: ')
+	text.add_unsigned(u64(xhci_last_error_slot))
+	text.add('\nlast error DCI: ')
+	text.add_unsigned(u64(xhci_last_error_dci))
+	text.add('\nlast error code: ')
+	text.add_unsigned(u64(xhci_last_error_code))
+	text.add('\nrecoveries: ')
+	text.add_unsigned(xhci_recoveries)
+	text.add('\nrecovery failures: ')
+	text.add_unsigned(xhci_recovery_failures)
+	text.add('\nunexpected events: ')
+	text.add_unsigned(xhci_unexpected_events)
 	text.add('\npages: ')
 	text.add_unsigned(u64(xhci_page_count))
 	text.add_byte(`\n`)
