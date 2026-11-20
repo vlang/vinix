@@ -310,7 +310,8 @@ static void pending_signal_ownership(void) {
     CHECK(sigtimedwait(&usr1, &info, &zero) == SIGUSR1);
     CHECK(kill(getpid(), SIGUSR1) == 0);
     start_thread(&t, pending_signal_worker, (void *)2); CHECK(pthread_join(t, NULL) == 0);
-    start_thread(&t, pending_signal_worker, NULL); CHECK(pthread_join(t, NULL) == 0);
+    // As on Linux, the faulting copy consumed the signal it selected.
+    CHECK(sigtimedwait(&usr1, &info, &zero) == -1 && errno == EAGAIN);
     CHECK(kill(getpid(), SIGUSR1) == 0);
     start_thread(&t, pending_signal_worker, (void *)3); CHECK(pthread_join(t, NULL) == 0);
     CHECK(kill(getpid(), SIGUSR1) == 0);
