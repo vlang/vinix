@@ -87,6 +87,8 @@ fn C.calloc(usize, usize) voidptr
 fn C.free(voidptr)
 fn C.strlen(&char) usize
 fn C.strdup(&char) &char
+fn C.strchr(&char, i32) &char
+fn C.strndup(&char, usize) &char
 fn C.memcpy(voidptr, voidptr, usize) voidptr
 fn C.memset(voidptr, i32, usize) voidptr
 fn C.AssetManager_new() voidptr

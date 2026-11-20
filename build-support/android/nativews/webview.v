@@ -23,6 +23,8 @@ mut:
 	width      i32
 	height     i32
 	bitmap     i64
+	// Exposed JavaScript interfaces (browseripc js_interfaces text), or nil.
+	interfaces &char
 }
 
 __global ws_browser_library voidptr
@@ -240,7 +242,10 @@ fn ws_web_create(e voidptr, object voidptr, node &WsWebView) bool {
 		}
 		node.created = true
 		js := u8(node.javascript)
-		return ws_web_send(4, node, &js, 1) != 0
+		if ws_web_send(4, node, &js, 1) == 0 { return false }
+		// Interfaces added before the first load apply to that load.
+		if node.interfaces == nil { return true }
+		return ws_web_send(16, node, &u8(node.interfaces), u32(C.strlen(node.interfaces))) != 0
 	}
 }
 
@@ -289,6 +294,107 @@ fn ws_web_javascript(e voidptr, object voidptr, enabled u8) {
 	}
 }
 
+fn ws_web_interfaces(e voidptr, object voidptr, spec voidptr) {
+	unsafe {
+		if !ws_web_ui(e) { return }
+		mut node := ws_web_node(ws_view(e, object))
+		if node == nil { return }
+		chars := ws_utf(e, spec)
+		if chars == nil || pending(e) { return }
+		copy := C.strdup(chars)
+		ws_release(e, spec, chars)
+		if copy == nil {
+			throw(e, c'java/lang/OutOfMemoryError', c'WebView JavaScript interfaces')
+			return
+		}
+		C.free(node.interfaces)
+		node.interfaces = copy
+		if !node.created || node.failed { return }
+		C.pthread_mutex_lock(&ws_browser_mutex)
+		request := ws_web_send(16, node, &u8(copy), u32(C.strlen(copy)))
+		C.pthread_mutex_unlock(&ws_browser_mutex)
+		if request == 0 {
+			node.failed = true
+			throw(e, c'java/lang/IllegalStateException', c'WebView JavaScript interfaces failed')
+		}
+	}
+}
+
+// One synchronous page call (browseripc js_call): payload is the call id, then
+// "interface\nmethod\narguments", NUL-terminated by ws_web_read_copy. Java
+// answers "=" and a tagged value or "!" and a message. Every call is answered,
+// including a Java exception, or the page would wait for its timeout.
+fn ws_web_js_call(e voidptr, object voidptr, node &WsWebView, payload &u8, length u32) {
+	unsafe {
+		id := ws_web_u64(payload)
+		navigation := node.navigation
+		view := node.id
+		text := &char(&payload[8])
+		first := C.strchr(text, i32(`\n`))
+		if first == nil { return }
+		second := C.strchr(first + 1, i32(`\n`))
+		if second == nil { return }
+		iface := C.strndup(text, usize(first - text))
+		method := C.strndup(first + 1, usize(second - first - 1))
+		defer {
+			C.free(iface)
+			C.free(method)
+		}
+		if iface == nil || method == nil { return }
+		args := [Value{ l: ws_string(e, iface) }, Value{ l: ws_string(e, method) },
+			Value{ l: ws_string(e, second + 1) }]!
+		mut answer := voidptr(nil)
+		if !pending(e) {
+			answer = obj(e, object, c'android/webkit/WebView', c'internalJavascriptCall',
+				c'(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;', &args[0])
+		}
+		for arg in args { if arg.l != nil { Drop(slot(e, 23))(e, arg.l) } }
+		mut status := u8(1)
+		mut result := &char(c'Java exception')
+		mut chars := &char(nil)
+		if pending(e) {
+			WsApplicationClear(slot(e, 17))(e)
+		} else if answer != nil {
+			chars = ws_utf(e, answer)
+			if chars != nil && (chars[0] == `=` || chars[0] == `!`) {
+				status = if chars[0] == `=` { u8(0) } else { u8(1) }
+				result = chars + 1
+			}
+		}
+		// Java may synchronously destroy the view or navigate it.
+		current := ws_web_node(ws_view(e, object))
+		if current != nil && current.id == view && current.navigation == navigation && !current.failed {
+			ws_web_js_reply(current, id, status, result)
+		}
+		if chars != nil { ws_release(e, answer, chars) }
+		if answer != nil { Drop(slot(e, 23))(e, answer) }
+	}
+}
+
+fn ws_web_js_reply(node &WsWebView, id u64, status u8, text &char) {
+	unsafe {
+		size := 9 + C.strlen(text)
+		// Room for the exception fallback below as well.
+		reply := &u8(C.malloc(size + 64))
+		if reply == nil { return }
+		defer { C.free(reply) }
+		for i in 0 .. 8 { reply[i] = u8(id >> (8 * i)) }
+		reply[8] = status
+		C.memcpy(&reply[9], text, size - 9)
+		C.pthread_mutex_lock(&ws_browser_mutex)
+		if ws_web_send(17, node, reply, u32(size)) == 0 && status == 0 {
+			// A value the transport rejects (for example text that is not valid
+			// UTF-8) still has to release the page: report it as an exception.
+			fallback := &char(c'Java bridge result could not be sent')
+			fallback_size := 9 + C.strlen(fallback)
+			reply[8] = 1
+			C.memcpy(&reply[9], fallback, fallback_size - 9)
+			ws_web_send(17, node, reply, u32(fallback_size))
+		}
+		C.pthread_mutex_unlock(&ws_browser_mutex)
+	}
+}
+
 fn ws_web_forget(e voidptr, widget &WsView) {
 	unsafe {
 		if !ws_browser_initialized { return }
@@ -308,6 +414,7 @@ fn ws_web_forget(e voidptr, widget &WsView) {
 				}
 				Drop(slot(e, 227))(e, node.object)
 				ws_bitmap_unref(node.bitmap)
+				C.free(node.interfaces)
 				C.free(node)
 				return
 			}
@@ -521,6 +628,8 @@ fn ws_web_pump(e voidptr) {
 					call(e, object, c'android/webkit/WebView', c'internalLoadChanged', c'(ILjava/lang/String;)V', &args[0])
 				} else if op == 259 {
 					ws_web_notify_failure(e, object)
+				} else if op == 263 && length > 8 {
+					ws_web_js_call(e, object, node, payload, length)
 				} else if op == 261 && length > 8 {
 					args := [Value{ l: ws_string(e, &char(&payload[8])) }]!
 					override := boolean(e, object, c'android/webkit/WebView', c'internalShouldOverrideUrlLoading', c'(Ljava/lang/String;)Z', &args[0])
