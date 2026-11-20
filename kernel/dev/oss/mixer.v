@@ -229,8 +229,11 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 			}
 		}
 		ctl_mix_extinfo {
-			mut info := OssMixExt{}
-			mixer_argument(argp, voidptr(&info), sizeof(OssMixExt))?
+			// A stack slot: copying in by address moved a local to the heap and
+			// nothing freed it, one struct per ioctl.
+			mut info := unsafe { &OssMixExt(C.vinix_stack_alloc(sizeof(OssMixExt))) }
+			unsafe { *info = OssMixExt{} }
+			mixer_argument(argp, voidptr(info), sizeof(OssMixExt))?
 
 			match info.ctrl {
 				0 {
@@ -247,12 +250,12 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 						C.memcpy(&root.name, name.str, name.len + 1)
 						name.free()
 					}
-					mixer_result(argp, voidptr(&info), sizeof(OssMixExt))?
+					mixer_result(argp, voidptr(info), sizeof(OssMixExt))?
 					return 0
 				}
 				1 {
 					info.entry_type = mixt_marker
-					mixer_result(argp, voidptr(&info), sizeof(OssMixExt))?
+					mixer_result(argp, voidptr(info), sizeof(OssMixExt))?
 					return 0
 				}
 				2 {
@@ -270,7 +273,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 						C.memcpy(&info.ext_name, name.str, name.len + 1)
 						name.free()
 					}
-					mixer_result(argp, voidptr(&info), sizeof(OssMixExt))?
+					mixer_result(argp, voidptr(info), sizeof(OssMixExt))?
 					return 0
 				}
 				else {
@@ -280,8 +283,11 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 			}
 		}
 		ctl_mixerinfo {
-			mut info := OssMixerInfo{}
-			mixer_argument(argp, voidptr(&info), sizeof(OssMixerInfo))?
+			// A stack slot: copying in by address moved a local to the heap and
+			// nothing freed it, one struct per ioctl.
+			mut info := unsafe { &OssMixerInfo(C.vinix_stack_alloc(sizeof(OssMixerInfo))) }
+			unsafe { *info = OssMixerInfo{} }
+			mixer_argument(argp, voidptr(info), sizeof(OssMixerInfo))?
 
 			mut text := lib.new_text(32)
 			text.add(dev.main_device.device.name())
@@ -307,7 +313,7 @@ fn (mut dev OssMixerDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?i
 			info.nrext = 3
 			info.priority = 1
 			info.legacy_device = i32(dev.index)
-			mixer_result(argp, voidptr(&info), sizeof(OssMixerInfo))?
+			mixer_result(argp, voidptr(info), sizeof(OssMixerInfo))?
 			return 0
 		}
 		else {

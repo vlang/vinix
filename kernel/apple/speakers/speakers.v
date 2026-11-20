@@ -845,17 +845,20 @@ fn allocate_rings() ?(u64, u64) {
 
 // ---- driver messages ----
 
-fn take_event(mut e [3]i32) bool {
+fn take_event(e &i32) bool {
 	mut s := &speaker_stream
 	s.lock()
-	taken := C.vinix_apple_speakers_take_event(&e[0]) != 0
+	taken := C.vinix_apple_speakers_take_event(e) != 0
 	s.unlock()
 	return taken
 }
 
 fn print_events() {
-	mut e := [3]i32{}
-	for take_event(mut e) {
+	// A stack slot for the C side to fill: passing a fixed-array local by
+	// address moved it to the heap on every service lap, and it was never freed.
+	slot := unsafe { &i32(C.vinix_stack_alloc(3 * sizeof(i32))) }
+	for take_event(slot) {
+		e := unsafe { [slot[0], slot[1], slot[2]]! }
 		code := int(e[0])
 		side := if e[1] == 0 { c'left' } else { c'right' }
 		if code == ev_amp {
