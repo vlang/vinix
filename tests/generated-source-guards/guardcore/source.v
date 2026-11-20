@@ -50,7 +50,9 @@ pub fn (generated Generated) body(name string, family string) !string {
 			if family == 'procfs' && line[at + needle.len..line.len - 3].contains(';') { continue }
 			start := generated.offsets[number] + line.len + 1
 			end := generated.source.index_after('\n}\n', start) or { return error('substring not found') }
-			return generated.source[start..end]
+			// The new compiler renames locals that are C++ keywords (`this`,
+			// `template`); the checks name them as written.
+			return generated.source[start..end].replace('__v3_internal_symbol_cpp_', '')
 		}
 	}
 	return error(if family == 'procfs' {
