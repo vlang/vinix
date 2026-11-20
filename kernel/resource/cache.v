@@ -351,16 +351,29 @@ mut:
 	add_seals(seals u32) ?
 }
 
+struct SealCall {
+mut:
+	resource SealableResource
+}
+
+// As for statfs below: dispatching through the narrowed interface allocated
+// an unfreed wrapper on every fcntl, so keep it in caller-frame storage.
 pub fn get_seals(mut res Resource) ?u32 {
 	if mut res is SealableResource {
-		return res.get_seals()
+		mut call := unsafe { &SealCall(C.vinix_stack_alloc(sizeof(SealCall))) }
+		unsafe { call.resource = SealableResource(res) }
+		mut backend := unsafe { &call.resource }
+		return backend.get_seals()
 	}
 	return none
 }
 
 pub fn add_seals(mut res Resource, seals u32) ? {
 	if mut res is SealableResource {
-		return res.add_seals(seals)
+		mut call := unsafe { &SealCall(C.vinix_stack_alloc(sizeof(SealCall))) }
+		unsafe { call.resource = SealableResource(res) }
+		mut backend := unsafe { &call.resource }
+		return backend.add_seals(seals)
 	}
 	return none
 }
