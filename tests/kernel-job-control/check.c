@@ -114,8 +114,10 @@ static void stop_continue(void) {
        "WNOWAIT preserves stop event");
  errno=0;
  check(syscall(SYS_wait4, child, UINTPTR_MAX, WUNTRACED, NULL)==-1 && errno==EFAULT,
-       "faulted stop copy preserves wait event");
- check(stopped(child, SIGSTOP), "waitpid WUNTRACED reports uncatchable SIGSTOP");
+       "faulted stop copy returns EFAULT");
+ /* As on Linux, the faulting copy consumed the event it selected; the group
+  * stays stopped. */
+ check(waitpid(child, &(int){0}, WUNTRACED|WNOHANG)==0, "faulted stop copy consumes wait event");
  unsigned long counts[4]; for(int i=0;i<4;i++) counts[i]=atomic_load(&state->loops[i]);
  usleep(100000);
  int all=1; for(int i=0;i<4;i++) all &= counts[i]==atomic_load(&state->loops[i]);
