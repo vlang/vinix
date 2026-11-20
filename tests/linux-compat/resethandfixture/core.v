@@ -2,6 +2,7 @@
 @[has_globals]
 module resethandfixture
 
+#include <alloca.h>
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
@@ -37,6 +38,7 @@ mut:
 }
 __global ( current_state &State )
 fn C.syscall(isize, ...) isize
+fn C.alloca(usize) voidptr
 fn C.__errno_location() &i32
 fn C.printf(&char, ...) i32
 fn C.fflush(voidptr) i32
@@ -154,8 +156,10 @@ fn suite(signal int, mode int) Totals {
   mut request := [2]i32{}
   mut response := [2]i32{}
   if C.pipe(&request[0]) != 0 || C.pipe(&response[0]) != 0 { fatal(8) }
-  mut s := State{signal: signal, mode: mode, request: request[1], response: response[0]}
-  current_state = &s
+  // Explicit stack storage: the handler reaches it through current_state.
+  mut s := &State(C.alloca(usize(sizeof(State))))
+  *s = State{signal: signal, mode: mode, request: request[1], response: response[0]}
+  current_state = s
   fds := [request[0], response[1]]!
   mut id := C.pthread_t{}
   if C.pthread_create(&id, nil, worker, &fds[0]) != 0 { fatal(9) }

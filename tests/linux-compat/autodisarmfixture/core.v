@@ -162,9 +162,11 @@ fn suite(configuration int, onstack bool, operation int) Totals {
   for guard in [allocation, a + 65536, b + 65536]! {
    if C.mprotect(voidptr(guard), page, C.PROT_NONE) != 0 { fatal(3) }
   }
-  mut s := State{a: a, b: b, configuration: configuration, onstack: onstack,
+  // Explicit stack storage: the handlers reach it through current_state.
+  mut s := &State(C.alloca(usize(sizeof(State))))
+  *s = State{a: a, b: b, configuration: configuration, onstack: onstack,
    operation: operation, number: configuration * 10 + int(onstack) * 5 + operation}
-  current_state = &s
+  current_state = s
   base := if configuration == 2 { usize(0) } else { a }
   mut raw := [u64(base), u64(autodisarm | u32(configuration)), u64(if base == 0 { 0 } else { 65536 })]!
   installed := C.syscall(isize(C.SYS_sigaltstack), &raw[0], nil)
