@@ -62,7 +62,8 @@ fn elf_host_command(args []string) !int {
 	for name in ['elf', 'resource', 'mmap', 'memory', 'krandom'] { os.mkdir(work + '/' + name)! }
 	write(work + '/v.mod', 'Module { name: "elf_text_tests" }\n')!
 	source := read(root() + '/kernel/elf/elf.v')!
-	mut production := 'module elf\nimport resource\nimport krandom\n'
+	// The kernel's stack slots come from its alloca macro; the host has alloca.
+	mut production := 'module elf\nimport resource\nimport krandom\n#include <alloca.h>\n#define vinix_stack_alloc alloca\nfn C.vinix_stack_alloc(size u64) voidptr\n'
 	for line in source.split_into_lines() {
 		if ['const dt_', 'const df_textrel', 'const dynamic_scan_limit', 'const pie_base ', 'const interpreter_base ', 'const image_alignment '].any(line.starts_with(it)) { production += line + '\n' }
 	}
