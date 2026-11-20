@@ -401,6 +401,10 @@ int main(void) {
 
 	/* 3. Deleting the file gives the memory back. */
 	require(unlink("/tmp/fill") == 0, "remove fill file");
+	/* A removed name gives its file back after a grace period (fs/removed.v). */
+	unsigned waited = 0;
+	while (meminfo("MemFree:") + 64 * MIB <= free_at_start && waited < 100) { usleep(100000); waited++; }
+	printf("OOM memory returned after %u ms\n", waited * 100);
 	unsigned long long free_after_unlink = meminfo("MemFree:");
 	printf("OOM %lluM free after removing the file\n", free_after_unlink / MIB);
 	require(free_after_unlink + 64 * MIB > free_at_start, "memory returns with the file");
