@@ -9,6 +9,7 @@ import katomic
 import limine
 import klock
 import aarch64.cpu
+import aarch64.uart
 
 // ARM64 output address mask for a 16 KiB granule: bits [47:14].
 pub const pte_flags_mask = u64(0x0000_FFFF_FFFF_C000)
@@ -870,6 +871,12 @@ pub fn vmm_init() {
 		u64(vmm_framebuffer_base), u64(vmm_framebuffer_len), u64(fb_entries), u64(higher_half))
 
 	protect_kernel_image_alias(text_phys, u64(voidptr(C.rodata_end)) - text_virt)
+
+	// An SPCR UART can live above the default low-4-GiB device aperture.
+	// Preserve its early HHDM alias before any print under the new tables.
+	if uart.get_base() != 0 {
+		map_mmio(uart.get_base() - higher_half, 0x1000)
+	}
 
 	// Activate the kernel page tables. This is a live switch: the MMU is already
 	// on (Limine handed off with it enabled), so the running instruction stream,

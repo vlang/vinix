@@ -1,19 +1,17 @@
 @[has_globals]
 module uart
 
-// PL011 UART registers (offsets from base)
-const uartdr = u64(0x00) // Data register
-const uartfr = u64(0x18) // Flag register
-const uartfr_txff = u8(0x20) // TX FIFO full (bit 5)
-const uartfr_rxfe = u8(0x10) // RX FIFO empty (bit 4)
-
+// Early discovery precedes _vinit; it must not reset this state afterwards.
+@[cinit]
 __global (
 	uart_base = u64(0) // HHDM-mapped UART base address
+	uart_tx_failed = false
 )
 
 // Initialise the PL011 UART with a virtual (HHDM-mapped) base address.
 pub fn initialise(virt_base u64) {
 	uart_base = virt_base
+	uart_tx_failed = false
 }
 
 // Try to read a character from the UART. Returns -1 if no data available.
@@ -21,11 +19,11 @@ pub fn getc() int {
 	if uart_base == 0 {
 		return -1
 	}
-	fr := unsafe { *&u8(uart_base + uartfr) }
-	if fr & uartfr_rxfe != 0 {
+	fr := read_register(0x18)
+	if fr & 0x10 != 0 {
 		return -1 // RX FIFO empty
 	}
-	return int(unsafe { *&u8(uart_base + uartdr) })
+	return int(read_register(0x00) & 0xff)
 }
 
 pub fn get_base() u64 {
@@ -39,42 +37,37 @@ pub fn putc_raw(c u8) {
 		return
 	}
 	// Read UARTFR (MMIO read → HVF trap)
-	fr := unsafe { *&u8(uart_base + uartfr) }
+	fr := read_register(0x18)
 	_ = fr
 	// Write UARTDR (MMIO write → HVF trap)
-	unsafe {
-		*&u8(uart_base + uartdr) = c
-	}
+	write_register(0x00, u32(c))
 	// Compiler barrier
-	asm volatile aarch64 {
-		yield
-		; ; ; memory
-	}
+	tx_relax()
 }
 
 // Keep the C ABI name used by the early console and initramfs bridges stable.
 @[export: 'aarch64__uart__putc']
 pub fn putc(c u8) {
-	if uart_base == 0 {
+	if uart_base == 0 || uart_tx_failed {
 		return
 	}
 	// Wait until TX FIFO is not full.
 	// The compiler barrier (asm volatile with memory clobber) is essential:
 	// without it, -O2 optimizes the MMIO re-read into a dead spin because
 	// V's unsafe pointer dereference generates a non-volatile C load.
-	for {
-		fr := unsafe { *&u8(uart_base + uartfr) }
-		if fr & uartfr_txff == 0 {
+	for poll := 0; poll < 65536; poll++ {
+		fr := read_register(0x18)
+		if fr == u32(0xffffffff) {
 			break
 		}
-		asm volatile aarch64 {
-			yield
-			; ; ; memory
+		if fr & 0x20 == 0 {
+			write_register(0x00, u32(c))
+			return
 		}
+		tx_relax()
 	}
-	unsafe {
-		*&u8(uart_base + uartdr) = c
-	}
+	// Keep the base for RX and mapping, but never stall on every later byte.
+	uart_tx_failed = true
 }
 
 pub fn puts(s charptr) {
