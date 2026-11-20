@@ -1276,7 +1276,8 @@ pub fn process_limits_text(pid int) string {
 	limits := process.rlimits
 	unlock_table()
 
-	mut text := lib.new_text(1500)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(1500) }
 	add_column(mut text, 'Limit', 26)
 	add_column(mut text, 'Soft Limit', 21)
 	add_column(mut text, 'Hard Limit', 21)

@@ -32,7 +32,8 @@ fn policy_path(node &VFSNode) string {
 // Built in one buffer: `directory + '/' + name` made a string for the first
 // `+` that nothing freed. Callers free the result.
 fn join_policy_path(directory string, name string) string {
-	mut text := lib.new_text(directory.len + name.len + 1)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(directory.len + name.len + 1) }
 	if directory != '/' {
 		text.add(directory)
 	}

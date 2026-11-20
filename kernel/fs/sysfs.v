@@ -211,7 +211,8 @@ fn add_sysfs_generated(mut parent VFSNode, name string, kind SysFSKind, node_id 
 
 // `prefix` then `value` in decimal: a name such as cpu0.
 fn sysfs_numbered(prefix string, value int) string {
-	mut text := lib.new_text(prefix.len + 20)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(prefix.len + 20) }
 	text.add(prefix)
 	text.add_decimal(i64(value))
 	return text.str()
@@ -219,7 +220,8 @@ fn sysfs_numbered(prefix string, value int) string {
 
 // `value` in decimal and a newline.
 fn sysfs_decimal_line(value i64) string {
-	mut text := lib.new_text(24)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(24) }
 	text.add_decimal(value)
 	text.add_byte(`\n`)
 	return text.str()
@@ -227,7 +229,8 @@ fn sysfs_decimal_line(value i64) string {
 
 // A cpulist and a newline.
 fn sysfs_list_line(mask u64) string {
-	mut text := lib.new_text(64)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(64) }
 	add_cpu_list(mut text, mask)
 	text.add_byte(`\n`)
 	return text.str()
@@ -361,7 +364,8 @@ fn (this &SysFSResource) contents() string {
 			total_kb := memory.pmm_node_total_pages(this.node) * page_size / 1024
 			free_kb := memory.pmm_node_free_pages(this.node) * page_size / 1024
 			used_kb := if total_kb > free_kb { total_kb - free_kb } else { u64(0) }
-			mut text := lib.new_text(160)
+			mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+			unsafe { *text = lib.new_text(160) }
 			add_node_meminfo_line(mut text, this.node, ' MemTotal:       ', total_kb)
 			add_node_meminfo_line(mut text, this.node, ' MemFree:        ', free_kb)
 			add_node_meminfo_line(mut text, this.node, ' MemUsed:        ', used_kb)

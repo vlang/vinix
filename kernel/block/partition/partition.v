@@ -142,7 +142,8 @@ fn (mut this Partition) mmap(handle voidptr, page u64, flags int) voidptr {
 // The device name of partition `index`: the device's own and the number. The
 // device node keeps it as its name.
 fn partition_name(prefix string, index int) string {
-	mut text := lib.new_text(prefix.len + 20)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(prefix.len + 20) }
 	text.add(prefix)
 	text.add_decimal(i64(index))
 	return text.str()

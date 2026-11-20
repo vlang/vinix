@@ -31,7 +31,8 @@ fn cpuinfo_text() string {
 	flags := cpu.user_feature_names()
 	mhz := if identity.base_mhz != 0 { u64(identity.base_mhz) } else { measured_mhz() }
 	count := numa.cpu_count()
-	mut text := lib.new_text(count * (640 + flags.len))
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(count * (640 + flags.len)) }
 	for i := 0; i < count; i++ {
 		apic_id := if i < cpu_locals.len { u64(cpu_locals[i].lapic_id) } else { u64(i) }
 		text.add('processor\t: ')

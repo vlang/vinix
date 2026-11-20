@@ -16,7 +16,8 @@ pub fn (t &Thread) current_syscall() (i64, u64) {
 
 // The caller frees the text.
 pub fn (t &Thread) syscall_args_text() string {
-	mut text := lib.new_text(160)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(160) }
 	text.add('rsi=0x')
 	text.add_radix(t.syscall_x1, 16, 0)
 	text.add(' rdx=0x')

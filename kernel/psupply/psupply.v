@@ -274,14 +274,17 @@ fn refresh(mut supply Supply, force bool) {
 	if !force && supply.read_ns != 0 && devcore.now_ns() - supply.read_ns < fresh_ns {
 		return
 	}
-	mut reading := Reading{}
+	// A stack slot: the driver callback gets its address, so a local value
+	// was moved to the heap and never freed, one per battery reading.
+	mut reading := unsafe { &Reading(C.vinix_stack_alloc(sizeof(Reading))) }
+	unsafe { *reading = Reading{} }
 	if !supply.read(supply.context, mut reading) {
 		supply.failures++
 		supply.read_ok = false
 		supply.read_ns = devcore.now_ns()
 		return
 	}
-	supply.reading = reading
+	supply.reading = *reading
 	supply.read_ok = true
 	supply.read_ns = devcore.now_ns()
 	if supply.kind != .battery || !reading.present {

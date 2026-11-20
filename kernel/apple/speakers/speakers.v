@@ -438,7 +438,8 @@ fn dma_channel(mca &devicetree.DTNode, name string, admac_handle u32) ?u32 {
 // Discovery reasons that name a part. The caller frees every reason once it
 // has printed it; interpolating the number would leave its string behind.
 fn numbered(prefix string, index int, suffix string) string {
-	mut text := lib.new_text(prefix.len + suffix.len + 4)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(prefix.len + suffix.len + 4) }
 	text.add(prefix)
 	text.add_decimal(index)
 	text.add(suffix)
@@ -446,7 +447,8 @@ fn numbered(prefix string, index int, suffix string) string {
 }
 
 fn named(prefix string, name string, suffix string) string {
-	mut text := lib.new_text(prefix.len + name.len + suffix.len)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(prefix.len + name.len + suffix.len) }
 	text.add(prefix)
 	text.add(name)
 	text.add(suffix)

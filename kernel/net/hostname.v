@@ -60,13 +60,14 @@ fn copy_name_from_user(name charptr, len u64) ?string {
 		errno.set(errno.einval)
 		return none
 	}
-	mut incoming := [uts_name_len]char{}
-	if len > 0 && !usercopy.copy_from_user(voidptr(&incoming[0]), u64(name), len) {
+	// A stack slot: the address of a fixed-array local moved it to the heap.
+	incoming := unsafe { &char(C.vinix_stack_alloc(u64(uts_name_len))) }
+	if len > 0 && !usercopy.copy_from_user(voidptr(incoming), u64(name), len) {
 		errno.set(errno.efault)
 		return none
 	}
-	incoming[len] = char(`\0`)
-	return unsafe { cstring_to_vstring(charptr(&incoming[0])) }
+	unsafe { incoming[len] = char(`\0`) }
+	return unsafe { cstring_to_vstring(charptr(incoming)) }
 }
 
 pub fn syscall_sethostname(_ voidptr, name charptr, len u64) (u64, u64) {

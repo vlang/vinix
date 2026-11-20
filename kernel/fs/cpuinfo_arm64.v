@@ -13,7 +13,8 @@ fn cpu_feature_names() string {
 fn cpuinfo_text() string {
 	features := cpu_feature_names()
 	count := numa.cpu_count()
-	mut text := lib.new_text(count * (180 + features.len))
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(count * (180 + features.len)) }
 	for i := 0; i < count; i++ {
 		text.add('processor\t: ')
 		text.add_unsigned(u64(i))

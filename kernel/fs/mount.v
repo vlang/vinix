@@ -1458,7 +1458,8 @@ pub fn mountinfo_text(pid int) string {
 	defer {
 		free_visible_mounts(mut visible)
 	}
-	mut text := lib.new_text(visible.len * 128 + 16)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(visible.len * 128 + 16) }
 	for item in visible {
 		entry := item.entry
 		// The parent is the mount this one sits in: the closest one whose
@@ -1506,7 +1507,8 @@ pub fn mounts_text(pid int) string {
 	defer {
 		free_visible_mounts(mut visible)
 	}
-	mut text := lib.new_text(visible.len * 96 + 16)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(visible.len * 96 + 16) }
 	for item in visible {
 		entry := item.entry
 		add_mount_field(mut text, entry.source)

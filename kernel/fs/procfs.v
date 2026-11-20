@@ -566,7 +566,8 @@ fn process_exe_node(pid int) &VFSNode {
 // `value` and a newline, as a /proc/sys file reads, without the string an
 // interpolated number leaves behind.
 fn decimal_line(value i64) string {
-	mut text := lib.new_text(24)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(24) }
 	text.add_decimal(value)
 	text.add_byte(`\n`)
 	return text.str()

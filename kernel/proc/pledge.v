@@ -204,7 +204,8 @@ pub fn pledge_parse(text string) ?u64 {
 
 // The names of the promises in `promises`, as pledge(2) spells them.
 pub fn pledge_names_text(promises u64) string {
-	mut text := lib.new_text(64)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(64) }
 	for i := 0; i <= pledge_last_bit; i++ {
 		bit := u64(1) << i
 		if promises & bit == 0 {
