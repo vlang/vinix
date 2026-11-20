@@ -2629,6 +2629,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Vinix and Linux 6.12 on both architectures. See
   [the receipts](docs/linux-fchmodat2-readahead.md).
 
+- [x] Implement syslog (klogctl, busybox dmesg) over the retained kernel output
+  with Linux 6.12's dmesg_restrict order, record reads, unread counts and
+  CLEAR, and restart_syscall's EINTR. The same probe ELF passes 35 + 10
+  checks on Vinix and Linux 6.12 on both architectures. See
+  [the syslog receipts](docs/linux-syslog.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

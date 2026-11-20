@@ -410,6 +410,8 @@ pub fn init_syscall_table() {
 	syscall_table[452] = voidptr(fs.syscall_fchmodat2) // fchmodat2
 	syscall_table[235] = voidptr(syscall_linux_utimes) // utimes
 	syscall_table[135] = voidptr(proc.syscall_personality) // personality
+	syscall_table[103] = voidptr(syscall_syslog) // syslog
+	syscall_table[219] = voidptr(syscall_restart_syscall) // restart_syscall
 	syscall_table[251] = voidptr(proc.syscall_ioprio_set) // ioprio_set
 	syscall_table[252] = voidptr(proc.syscall_ioprio_get) // ioprio_get
 	syscall_table[253] = voidptr(syscall_linux_inotify_init) // inotify_init

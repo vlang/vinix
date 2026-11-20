@@ -12,6 +12,11 @@ must pass; bad pointers, errno, compiler failure, panic, timeout and late failur
 remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
 stay in the required fresh artifact directory, including on failure.
 
+`--cases syslog` checks syslog(2) records, sizes, READ/READ_ALL/CLEAR positions,
+console levels, dmesg_restrict refusals and restart_syscall's EINTR; the same
+ELF runs on Linux through `syscall-reference.v --case syslog`. See
+[semantics and receipts](../../docs/linux-syslog.md).
+
 `--cases fchmodat2` and `--cases readahead` check fchmodat2 flags, symlink
 EOPNOTSUPP, AT_EMPTY_PATH targets, words and error order, and readahead
 readability, file kinds, counts and words; the same ELFs run on Linux through

@@ -13,7 +13,11 @@ mut:
 	data   [bootlog_bytes]u8
 	start  int
 	length int
+	// Every byte ever appended, so readers can name positions across wraps.
+	written u64
 }
+
+pub const bootlog_capacity = bootlog_bytes
 
 __global bootlog BootLog
 
@@ -28,6 +32,7 @@ fn (mut log BootLog) append(message voidptr, length u64) {
 			log.start = (log.start + 1) % bootlog_bytes
 		}
 	}
+	log.written += length
 }
 
 // Owned text, freed by procfs when the open file closes. Allocate before
@@ -40,4 +45,21 @@ pub fn bootlog_snapshot() string {
 	}
 	kprint_lock.release()
 	return lib.finish_text(text)
+}
+
+// Copy the retained log into `buffer`, bootlog_capacity bytes, under the print
+// lock: its length, and the position of its first byte among every byte ever
+// logged. syslog(2) reads through this.
+pub fn bootlog_capture(buffer voidptr) (int, u64) {
+	mut out := unsafe { &u8(buffer) }
+	kprint_lock.acquire()
+	for i in 0 .. bootlog.length {
+		unsafe {
+			out[i] = bootlog.data[(bootlog.start + i) % bootlog_bytes]
+		}
+	}
+	length := bootlog.length
+	base := bootlog.written - u64(bootlog.length)
+	kprint_lock.release()
+	return length, base
 }
