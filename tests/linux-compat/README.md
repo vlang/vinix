@@ -18,6 +18,11 @@ and errors, and that a second real-time signal is never silently lost; the same
 ELF runs on Linux through `syscall-reference.v --case sigqueue`. See
 [semantics and receipts](../../docs/linux-signal-senders.md).
 
+`--cases fsuid` checks setfsuid/setfsgid results, permitted ids, capability
+fixups, file access and new-file owners by filesystem ids, status columns and
+the ids following the setuid family; the same ELF runs on Linux through
+`syscall-reference.v --case fsuid`. See [semantics and receipts](../../docs/linux-fsuid.md).
+
 `--cases syslog` checks syslog(2) records, sizes, READ/READ_ALL/CLEAR positions,
 console levels, dmesg_restrict refusals and restart_syscall's EINTR; the same
 ELF runs on Linux through `syscall-reference.v --case syslog`. See

@@ -62,6 +62,7 @@ pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 		process.uid = uid
 		process.euid = uid
 		process.suid = uid
+		proc.follow_effective_uid(mut process)
 		proc.capabilities_after_setuid(mut process, old_ruid, old_euid, old_suid)
 		return 0, 0
 	}
@@ -71,6 +72,7 @@ pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 	}
 
 	process.euid = uid
+	proc.follow_effective_uid(mut process)
 	proc.capabilities_after_setuid(mut process, old_ruid, old_euid, old_suid)
 	return 0, 0
 }
@@ -90,6 +92,7 @@ pub fn syscall_setgid(_ voidptr, gid u32) (u64, u64) {
 		process.gid = gid
 		process.egid = gid
 		process.sgid = gid
+		proc.follow_effective_gid(mut process)
 		return 0, 0
 	}
 
@@ -98,6 +101,7 @@ pub fn syscall_setgid(_ voidptr, gid u32) (u64, u64) {
 	}
 
 	process.egid = gid
+	proc.follow_effective_gid(mut process)
 	return 0, 0
 }
 
@@ -138,6 +142,7 @@ pub fn syscall_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
 		process.suid = process.euid
 	}
 
+	proc.follow_effective_uid(mut process)
 	proc.capabilities_after_setuid(mut process, old_ruid, old_euid, old_suid)
 	return 0, 0
 }
@@ -177,6 +182,7 @@ pub fn syscall_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
 		process.sgid = process.egid
 	}
 
+	proc.follow_effective_gid(mut process)
 	return 0, 0
 }
 
@@ -186,6 +192,13 @@ pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 	mut process := current_process()
 	proc.lock_table()
 	defer { proc.unlock_table() }
+	// A call that would change nothing, the filesystem uid included, is a no-op
+	// that leaves a setfsuid() value alone, as on Linux.
+	if (unchanged(ruid) || ruid == process.uid)
+		&& (unchanged(euid) || (euid == process.euid && euid == process.fsuid))
+		&& (unchanged(suid) || suid == process.suid) {
+		return 0, 0
+	}
 	old_ruid, old_euid, old_suid := process.uid, process.euid, process.suid
 
 	if !may_set_uids(process) {
@@ -209,6 +222,7 @@ pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 		process.suid = suid
 	}
 
+	proc.follow_effective_uid(mut process)
 	proc.capabilities_after_setuid(mut process, old_ruid, old_euid, old_suid)
 	return 0, 0
 }
@@ -217,6 +231,12 @@ pub fn syscall_setresgid(_ voidptr, rgid u32, egid u32, sgid u32) (u64, u64) {
 	mut process := current_process()
 	proc.lock_table()
 	defer { proc.unlock_table() }
+	// Likewise for the gids and setfsgid().
+	if (unchanged(rgid) || rgid == process.gid)
+		&& (unchanged(egid) || (egid == process.egid && egid == process.fsgid))
+		&& (unchanged(sgid) || sgid == process.sgid) {
+		return 0, 0
+	}
 	old_egid := process.egid
 	defer {
 		if process.egid != old_egid {
@@ -245,6 +265,7 @@ pub fn syscall_setresgid(_ voidptr, rgid u32, egid u32, sgid u32) (u64, u64) {
 		process.sgid = sgid
 	}
 
+	proc.follow_effective_gid(mut process)
 	return 0, 0
 }
 

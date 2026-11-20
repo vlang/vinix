@@ -2642,6 +2642,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   signals still keep one pending instance, refusing another with EAGAIN. See
   [the signal sender receipts](docs/linux-signal-senders.md).
 
+- [x] Add filesystem ids that follow the effective ids and drive file permission
+  checks and new-file owners, and implement setfsuid/setfsgid with Linux 6.12's
+  permitted ids, capability fixups, dumpability and setresuid no-op rule. The
+  same probe ELF passes 20 + 22 checks on Vinix and Linux 6.12 on both
+  architectures. See [the filesystem id receipts](docs/linux-fsuid.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

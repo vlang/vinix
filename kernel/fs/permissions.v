@@ -12,7 +12,7 @@ pub const access_write = u32(2)
 pub const access_read = u32(4)
 
 fn credential_in_group(process &proc.Process, gid u32, effective bool) bool {
-	primary := if effective { process.egid } else { process.gid }
+	primary := if effective { process.fsgid } else { process.gid }
 	if primary == gid {
 		return true
 	}
@@ -57,8 +57,8 @@ pub fn check_access(node &VFSNode, requested u32, effective bool) ? {
 	}
 	mac_node(node, mandatory)?
 	process := proc.current_thread().process
-	uid := if effective { process.euid } else { process.uid }
-	gid := if effective { process.egid } else { process.gid }
+	uid := if effective { process.fsuid } else { process.uid }
+	gid := if effective { process.fsgid } else { process.gid }
 	mut res := unsafe { node.resource }
 	mut acl := []u8{} @[freed]
 	acl.flags |= .noslices
@@ -111,14 +111,14 @@ fn may_remove(parent &VFSNode, target &VFSNode) ? {
 	}
 	process := proc.current_thread().process
 	if holds_capability(process, proc.cap_fowner, true)
-		|| process.euid == parent.resource.stat.uid || process.euid == target.resource.stat.uid { return }
+		|| process.fsuid == parent.resource.stat.uid || process.fsuid == target.resource.stat.uid { return }
 	errno.set(errno.eperm)
 	return none
 }
 
 fn owns_resource(uid u32) bool {
 	process := proc.current_thread().process
-	return holds_capability(process, proc.cap_fowner, true) || process.euid == uid
+	return holds_capability(process, proc.cap_fowner, true) || process.fsuid == uid
 }
 
 fn may_keep_setgid(gid u32) bool {
@@ -136,7 +136,7 @@ fn may_chown(uid u32, new_uid u32, new_gid u32) bool {
 	if holds_capability(process, proc.cap_chown, true) {
 		return true
 	}
-	if process.euid != uid || (new_uid != u32(-1) && new_uid != uid) {
+	if process.fsuid != uid || (new_uid != u32(-1) && new_uid != uid) {
 		return false
 	}
 	return new_gid == u32(-1) || credential_in_group(process, new_gid, true)
@@ -148,20 +148,20 @@ fn apply_creation_identity(mut node VFSNode, parent &VFSNode) ? {
 	desired_gid := if parent.resource.stat.mode & 0o2000 != 0 {
 		parent.resource.stat.gid
 	} else {
-		process.egid
+		process.fsgid
 	}
 	mut desired_mode := node.resource.stat.mode
 	if stat.isdir(node.resource.stat.mode) && parent.resource.stat.mode & 0o2000 != 0 {
 		desired_mode |= 0o2000
 	}
-	if node.resource.stat.uid == process.euid && node.resource.stat.gid == desired_gid
+	if node.resource.stat.uid == process.fsuid && node.resource.stat.gid == desired_gid
 		&& node.resource.stat.mode == desired_mode {
 		return
 	}
 	mut res := node.resource
 	update := resource.MetadataUpdate{
-		uid_set: res.stat.uid != process.euid
-		uid: process.euid
+		uid_set: res.stat.uid != process.fsuid
+		uid: process.fsuid
 		gid_set: res.stat.gid != desired_gid
 		gid: desired_gid
 		mode_set: res.stat.mode != desired_mode
@@ -187,7 +187,7 @@ pub fn syscall_umask(_ voidptr, mask u32) (u64, u64) {
 fn may_link(node &VFSNode) ? {
 	process := proc.current_thread().process
 	mode := node.resource.stat.mode
-	if holds_capability(process, proc.cap_fowner, true) || process.euid == node.resource.stat.uid {
+	if holds_capability(process, proc.cap_fowner, true) || process.fsuid == node.resource.stat.uid {
 		return
 	}
 	if !stat.isreg(mode) || mode & 0o4000 != 0 || mode & 0o2010 == 0o2010 {

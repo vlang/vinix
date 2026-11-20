@@ -561,6 +561,8 @@ pub fn init_syscall_table() {
 	syscall_table[119] = voidptr(userland.syscall_setresgid) // setresgid
 	syscall_table[120] = voidptr(userland.syscall_getresgid) // getresgid
 	syscall_table[121] = voidptr(syscall_linux_getpgid) // getpgid
+	syscall_table[122] = voidptr(proc.syscall_setfsuid) // setfsuid
+	syscall_table[123] = voidptr(proc.syscall_setfsgid) // setfsgid
 	syscall_table[124] = voidptr(userland.syscall_getsid) // getsid
 	syscall_table[140] = voidptr(syscall_linux_getpriority) // getpriority
 	syscall_table[141] = voidptr(syscall_linux_setpriority) // setpriority

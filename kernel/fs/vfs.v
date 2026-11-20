@@ -3022,12 +3022,12 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	shown := optional_user_string(charptr(name), 249)
 
 	mut res := create_anonymous(0o777) or { return errno.err, errno.get() }
-	// Linux shmem files start with the creator's credentials, mode 0777
+	// Linux shmem files start with the creator's filesystem ids, mode 0777
 	// independent of umask, and no directory links. Browsers reduce the mode
 	// and reopen the same inode read-only through /proc/self/fd.
 	process := proc.current_thread().process
-	res.stat.uid = process.euid
-	res.stat.gid = process.egid
+	res.stat.uid = process.fsuid
+	res.stat.gid = process.fsgid
 	res.stat.nlink = 0
 	if mut res is TmpFSResource {
 		res.memfd = true

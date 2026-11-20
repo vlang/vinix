@@ -360,6 +360,9 @@ pub mut:
 	gid     u32
 	egid    u32
 	sgid    u32
+	// The filesystem ids, which follow euid and egid; see fsuid.v.
+	fsuid u32
+	fsgid u32
 	groups  []u32
 	rlimits [rlimit_nlimits]RLimit
 	// Creation mask inherited across fork and preserved by exec.
@@ -1174,16 +1177,15 @@ fn command_name_bounds(name string) (int, int) {
 	return start, end
 }
 
-// The real, effective, saved and filesystem ids of a status Uid: or Gid: line;
-// the filesystem id is the effective one here.
-fn add_id_fields(mut text lib.Text, real u32, effective u32, saved u32) {
+// The real, effective, saved and filesystem ids of a status Uid: or Gid: line.
+fn add_id_fields(mut text lib.Text, real u32, effective u32, saved u32, filesystem u32) {
 	text.add_unsigned(u64(real))
 	text.add_byte(`\t`)
 	text.add_unsigned(u64(effective))
 	text.add_byte(`\t`)
 	text.add_unsigned(u64(saved))
 	text.add_byte(`\t`)
-	text.add_unsigned(u64(effective))
+	text.add_unsigned(u64(filesystem))
 }
 
 fn add_command_name(mut text lib.Text, name string) {
@@ -1646,9 +1648,9 @@ pub fn process_status_text(pid int, tid int, viewer &Namespace) string {
 	text.add('\nPPid:\t')
 	text.add_decimal(shown_ppid)
 	text.add('\nTracerPid:\t0\nUid:\t')
-	add_id_fields(mut text, process.uid, process.euid, process.suid)
+	add_id_fields(mut text, process.uid, process.euid, process.suid, process.fsuid)
 	text.add('\nGid:\t')
-	add_id_fields(mut text, process.gid, process.egid, process.sgid)
+	add_id_fields(mut text, process.gid, process.egid, process.sgid, process.fsgid)
 	// NSpid lists the selected thread's number in every namespace from the reader's
 	// down to its own.
 	text.add('\nNSpid:\t')

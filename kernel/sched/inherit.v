@@ -135,6 +135,8 @@ pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, a
 		new_proc.gid = old_process.gid
 		new_proc.egid = old_process.egid
 		new_proc.sgid = old_process.sgid
+		new_proc.fsuid = old_process.fsuid
+		new_proc.fsgid = old_process.fsgid
 		new_proc.groups = old_process.groups.clone()
 		new_proc.umask = old_process.umask
 		new_proc.nice = inherited_nice(proc.current_thread())

@@ -497,6 +497,8 @@ pub fn init_syscall_table() {
 	syscall_table[148] = voidptr(userland.syscall_getresuid) // __NR_getresuid
 	syscall_table[149] = voidptr(userland.syscall_setresgid) // __NR_setresgid
 	syscall_table[150] = voidptr(userland.syscall_getresgid) // __NR_getresgid
+	syscall_table[151] = voidptr(proc.syscall_setfsuid) // __NR_setfsuid
+	syscall_table[152] = voidptr(proc.syscall_setfsgid) // __NR_setfsgid
 	syscall_table[174] = voidptr(userland.syscall_getuid) // __NR_getuid
 	syscall_table[175] = voidptr(userland.syscall_geteuid) // __NR_geteuid
 	syscall_table[176] = voidptr(userland.syscall_getgid) // __NR_getgid
