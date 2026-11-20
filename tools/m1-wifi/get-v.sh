@@ -26,8 +26,8 @@
 set -eu
 DEST=${1:-build-tools/v-m1-wifi}
 HOST_CC=${HOST_CC:-clang}
-PIN=7490a8ff04d91dc60eec12b0d9923b4d1bc87960
-VC_PIN=21490f7811a2dd366c3daa39bef8e53c1e3e5727
+PIN=1f4d705322714d6ab35a712db9d1b93db9fbcc03
+VC_PIN=0a3c639cf475a0c5e19f3b5cdf6683ed4c9a3189
 if [ -e "$DEST" ]; then
     echo "Destination already exists: $DEST (set V to its v executable instead)" >&2
     exit 1
@@ -44,6 +44,21 @@ git -C "$DEST/vc" remote add origin https://github.com/vlang/vc.git
 git -C "$DEST/vc" fetch --depth=1 origin "$VC_PIN"
 git -C "$DEST/vc" checkout --detach FETCH_HEAD
 test "$(git -C "$DEST/vc" rev-parse HEAD)" = "$VC_PIN"
-CC="$HOST_CC" make -C "$DEST" local=1 VEXE="$DEST/v"
+# Supply Boehm before make: V's post-build tools and the Vinix host generator
+# link it, and a failed detect_tcc aborts make even when the compiler itself
+# built. Build the one object from V's own bundled libgc sources.
+mkdir -p "$DEST/thirdparty/tcc/lib"
+"$HOST_CC" -O2 -D_GNU_SOURCE -DUSE_MMAP=1 -DUSE_MUNMAP=1 \
+    -DGC_THREADS=1 -DTHREAD_LOCAL_ALLOC=1 -DGC_BUILTIN_ATOMIC=1 \
+    -DALL_INTERIOR_POINTERS=1 -I "$DEST/thirdparty/libgc/include" \
+    -c "$DEST/thirdparty/libgc/gc.c" -o "$DEST/thirdparty/tcc/lib/gc.o"
+llvm-ar rcs "$DEST/thirdparty/tcc/lib/libgc.a" "$DEST/thirdparty/tcc/lib/gc.o" \
+    || ar rcs "$DEST/thirdparty/tcc/lib/libgc.a" "$DEST/thirdparty/tcc/lib/gc.o"
+
+# env -u: an inherited VEXE/VFLAGS can redirect make's output to a different
+# compiler tree. _GNU_SOURCE supplies the host's `environ` declaration.
+env -u VEXE -u VFLAGS SOURCE_DATE_EPOCH=0 V_MACOS_V3_NO_FALLBACK=1 \
+    CC="$HOST_CC" make -C "$DEST" local=1 VEXE="$DEST/v" \
+    VFLAGS="-w -cc $HOST_CC -cflags -D_GNU_SOURCE -no-parallel"
 "$DEST/v" version
 printf 'Compiler ready: %s/v\n' "$DEST"
