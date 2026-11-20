@@ -77,10 +77,10 @@ assignment, and the optional 128-byte siginfo scratch stays on the stack.
 
 ## Unsupported interfaces
 
-Non-null signal information is copied through the checked user-copy path and
-returns `ENOSYS` for a valid buffer (`EFAULT` for an invalid buffer). Signal
-scope flags and `PIDFD_THREAD` are rejected with `EINVAL`. Queued signal
-metadata needs a real signal queue before it can be accepted.
+Non-null signal information is copied through the checked user-copy path and,
+since 5509f6605, accepted and queued (`EFAULT` for an invalid buffer; see
+`docs/linux-signal-senders.md`). Signal scope flags and `PIDFD_THREAD` are
+rejected with `EINVAL`.
 
 `CLONE_PIDFD` is rejected with `EINVAL` by both `clone` and `clone3`; no child is
 created and the supplied descriptor word stays unchanged. This checkpoint does

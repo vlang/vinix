@@ -52,7 +52,7 @@ static int basic(void) {
  ERR(read(self,&b,1),EINVAL); ERR(p_signal(self,65,0,0),EINVAL); ERR(p_signal(self,0,0,1),EINVAL);
  ERR(p_signal(-1,0,0,0),EBADF); int ordinary=open("/proc/meminfo",O_RDONLY); CHECK(ordinary>=0);
  ERR(p_signal(ordinary,0,0,0),EBADF); close(ordinary);
- ERR(p_signal(self,0,(void *)1,0),EFAULT); siginfo_t info={0}; ERR(p_signal(self,0,&info,0),ENOSYS);
+ ERR(p_signal(self,0,(void *)1,0),EFAULT); siginfo_t info={0}; CHECK(p_signal(self,0,&info,0)==0);
  CHECK(p_signal(self,0,0,0)==0); close(self);
  int release; pid_t child=sleeper(&release); CHECK(child>0);
  int fd=p_open(child,0),other=p_open(child,0),dupfd=dup(fd); CHECK(fd>=0 && other>=0 && dupfd>=0);
@@ -214,13 +214,15 @@ static int permissions(void) {
  pid_t probe=fork(); CHECK(probe>=0);
  if(!probe) { if(setuid(1234)) _exit(1); if(p_signal(fd,0,0,0)!=-1||errno!=EPERM) _exit(2);
   if(p_signal(fd,SIGCONT,0,0)) _exit(5);
-  if(unshare(CLONE_NEWUSER)) _exit(3);
+  // New user namespaces are refused with EINVAL (081bd5dab): skip what needs one.
+  if(unshare(CLONE_NEWUSER)) _exit(errno==EINVAL?0:3);
   if(p_signal(fd,SIGTERM,0,0)!=-1||errno!=EPERM) _exit(4);
   _exit(0); }
  CHECK(reap(probe)==0);
  probe=fork(); CHECK(probe>=0);
  if(!probe) {
-  if(getuid()!=0||unshare(CLONE_NEWUSER)) _exit(1);
+  if(getuid()!=0) _exit(1);
+  if(unshare(CLONE_NEWUSER)) _exit(errno==EINVAL?0:1);
   if(p_signal(fd,0,0,0)!=-1||errno!=EPERM) _exit(2);
   if(p_signal(fd,SIGTERM,0,0)!=-1||errno!=EPERM) _exit(3);
   if(p_signal(fd,SIGCONT,0,0)) _exit(4);
@@ -484,6 +486,10 @@ static int timed_retention(void) {
  CHECK(epoll_ctl(ep,EPOLL_CTL_ADD,fd,&ev)==0); close(release);
  CHECK(epoll_wait(ep,&ev,1,3000)==1 && (ev.events&EPOLLIN));
  struct slab_snapshot before,after; CHECK(timed_cycles(fd,ep,200)==0);
+ // The sleeper has just exited: let its thread retire before the baseline,
+ // then let the once-a-second reaper free the sweep's quarantined processes
+ // (2 s grace): these windows create none to replace them.
+ CHECK(drain_retired()==0); usleep(3500000);
  for(int i=0;i<4;i++) CHECK(slab_snapshot(&before)==0);
  for(int window=0;window<3;window++) {
   CHECK(slab_snapshot(&before)==0&&timed_cycles(fd,ep,2000)==0&&slab_snapshot(&after)==0);
@@ -547,7 +553,8 @@ int main(int argc,char **argv) {
   printf("PIDFD PASS\n"); for(;;) pause();
  }
  // PTY removal waits out a separate VFS grace; run that semantic cohort after
- // every retention snapshot so its node/name cleanup cannot alter a baseline.
- CHECK(unsupported_clone()==0&&basic()==0&&across_exec()==0&&exec_abort()==0&&exec_signals()==0&&job_control()==0&&live_retention()==0&&waiters()==0&&races()==0&&exhaustion()==0&&exec_abort_retention()==0&&retention()==0&&timed_retention()==0&&identity_reuse()==0&&permissions()==0&&pty_signals()==0);
+ // every retention snapshot so its node/name cleanup cannot alter a baseline,
+ // and before permissions(): its unshare(CLONE_NEWPID) forbids new threads.
+ CHECK(unsupported_clone()==0&&basic()==0&&across_exec()==0&&exec_abort()==0&&exec_signals()==0&&job_control()==0&&live_retention()==0&&waiters()==0&&races()==0&&exhaustion()==0&&exec_abort_retention()==0&&retention()==0&&timed_retention()==0&&identity_reuse()==0&&pty_signals()==0&&permissions()==0);
  printf("PIDFD PASS\n"); for(;;) pause();
 }
