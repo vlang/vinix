@@ -27,7 +27,9 @@ fn test_apple_containers_follow_admitted_private_data_in_every_launch_mode_witho
 				assert extras == if kind == 'apple' { ['VINIX_IOS_DOCUMENTS=' + data + '/Documents', 'VINIX_IOS_KEYCHAIN=' + data + '/Keychains'] } else { []string{} }
 				assert !plan.arguments.any(it.contains('/ambient/'))
 				assert plan.arguments.count(it == '--unveil') == 3 // app, private data, runtime
-				promises := 'stdio rpath wpath cpath flock exec prot_exec' + if mode in [1, 3] { ' tty' } else { '' }
+				// Wine also sets its private socket's metadata and passes descriptors over it.
+				wine := if kind == 'windows' { ' fattr sendfd recvfd' } else { '' }
+				promises := 'stdio rpath wpath cpath flock exec prot_exec' + wine + if mode in [1, 3] { ' tty' } else { '' }
 				assert promises in plan.arguments
 			}
 		}
