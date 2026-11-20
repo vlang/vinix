@@ -160,7 +160,7 @@ fn test_extra_rights_are_refused_without_retaining_descriptors() {
 	header := C.vinix_launch_firsthdr(&message)
 	unsafe {
 		header.cmsg_level = C.SOL_SOCKET; header.cmsg_type = C.SCM_RIGHTS; header.cmsg_len = C.vinix_launch_len(sizeof(rights))
-		vmemcpy(C.vinix_launch_data(header), &rights[0], sizeof(rights))
+		vmemcpy(C.vinix_launch_data(header), &rights[0], int(sizeof(rights)))
 	}
 	assert C.vinix_launch_sendmsg(pair[0], &message, 0) == 1
 	mut failed := false
