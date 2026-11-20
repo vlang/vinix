@@ -1,6 +1,16 @@
 # Current Maps runtime work — 2026-11-12
 
-Latest continuation, 2026-11-15: the [GNSS metadata adapter](maps-gnss-hardware-20261115.md)
+Latest continuation, 2026-11-20: the ARM thread-lookup fix, built on the
+deployed kernel source with its original compiler, booted in r113, r114 and
+r117 with no kernel fault, past r112's fault point. In r113 Add account passed
+the GMS pre-checks and a real check-in, then MinuteMaid's
+`removeAllCookies` failed and the sign-in page never loaded. The
+[cause](maps-cookie-clear-20261120.md) was the browser client ignoring the
+engine's `cookie_cleared` reply; it is fixed in 007f894e4 and was deployed in
+r114/r117. Both of those runs then stopped earlier, on GMS's 10-s check-in
+wait, so the sign-in page is still unverified. No account has authenticated.
+
+Earlier continuation, 2026-11-15: the [GNSS metadata adapter](maps-gnss-hardware-20261115.md)
 passed the signed ARM suite in r98. Active-cycle exception reporting in
 b8a310c0a identified a null parent in the real account layout callback.
 The [window content parent](maps-window-content-runtime-20261115.md) repair

@@ -98,3 +98,30 @@ and current V with a kernel-only 2 GiB aggregate RSS ceiling, retaining the
 output cap. This larger ceiling has not been applied. SDK and focused-check
 limits remain unchanged. The r112 guest remains paused, with RAM preserved
 and complete private export unresolved; it has not validated the fix.
+
+## Guest validation, 2026-11-20
+
+The fix was validated on the kernel the Maps guests actually run rather than
+on current master. The deployed kernel (SHA256 a54505e3725e11bb2f769d62c1260f0b447a4d9fbcde21ba7f9119e08ba75151) came from
+`pidfd-wait-kernel-build-2026-10-26-r1/kernel-aarch64-r2`: revision
+ecbd3964a plus its retained `source.patch`, built by the retained V b5bcdbb.
+That compiler has `/Users/alex/code/v` baked in as its root, so today it
+compiles against the current vlib and its C does not build. A copy whose
+baked root is rewritten to an equal-length path holding the full b5bcdbb
+`vlib` (the retained `compiler/vlib` is a partial snapshot; every file in it
+matches b5bcdbb) regenerates the deployed C exactly: after restoring the root
+path in three identifiers and one string, its SHA256 is the recorded
+d472464b984da437c553e6ec044b43389af46b7b9f565b67a00dca1e76a68077. Apple clang has changed since October, so the linked
+image is not byte-identical.
+
+The same toolchain with only 4ab3de1c4's two kernel files changed produced
+SHA256 89a657a6bc52cff262230fcf6c690e04fcb22188d4e046c4b62e7fa7aabe9a19 (peak RSS 2.3 GB for `make -j4`, beyond the old
+2 GiB guard, so it ran unguarded). Its `syscall_trace_ret` masks DAIF, reads
+TPIDR_EL1, loads the slot and restores DAIF. Guests r113, r114 and r117 booted
+it, reached GMS readiness and opened Maps through onboarding and Add account
+with no kernel fault; r112 faulted on the first Maps launch. This does not
+prove the race was the only cause, but the reproduced step now passes.
+
+Work tree, rewriting and normalizing helpers (`tools/reroot.v`,
+`tools/vshim.v`) and build logs: `maps-thread-fix-kernel-20261120-r1` under
+the state directory.
