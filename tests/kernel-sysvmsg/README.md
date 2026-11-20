@@ -21,6 +21,9 @@ try-reference prevents stale nsfs nodes from reviving a dead namespace.
 The current fixed limits are 256 queues, 8192 bytes per message, 16384 bytes per
 queue by default, a privileged queue limit of 1 MiB, and a global pool of
 8 MiB including message headers and payloads, with at most 8192 message objects.
+Each queued message is also an IPC object in the kernel resource budget, which
+allows 4096 of those system-wide (see `docs/kernel-resources.md`), so that
+budget usually stops zero-byte messages first.
 Pool reservations include blocked senders, detached receives and `MSG_COPY`
 snapshots; zero-byte messages count
 toward header and queue quotas. Allocation and pool exhaustion return `ENOMEM`.
