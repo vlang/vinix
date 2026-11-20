@@ -85,7 +85,8 @@ pub fn vm_resource_states(text string) []string {
 }
 
 pub fn vm_child_exit_code(status int) int {
-	if C.WIFEXITED(status) != 0 { return C.WEXITSTATUS(status) }
+	// vlib declares WIFEXITED as returning bool.
+	if C.WIFEXITED(status) { return C.WEXITSTATUS(status) }
 	if C.WIFSIGNALED(status) != 0 { return 128 + C.WTERMSIG(status) }
 	return 1
 }
