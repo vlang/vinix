@@ -10,6 +10,7 @@ import katomic
 import posixtimer
 import proc
 import sched
+import usercopy
 
 // Linux ignores these signals when the process has not installed a handler.
 // Discard them before queueing so an ignored signal cannot spuriously wake and
@@ -40,6 +41,11 @@ pub fn syscall_getppid(_ voidptr) (u64, u64) {
 }
 
 pub fn sendsig(_thread &proc.Thread, signal u8) {
+	sendsig_from(_thread, signal, unsafe { nil })
+}
+
+// sendsig(), recording `source` (nil: none) as the signal's sender.
+fn sendsig_from(_thread &proc.Thread, signal u8, source &proc.SignalSource) {
 	if signal == 0 || signal > 64 { return }
 	mut t := unsafe { _thread }
 	// Storage pins alone do not preserve Thread.process during exit or exec.
@@ -67,7 +73,7 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 			if target.exec_transition {
 				target.exec_pending_signals |= u64(1) << (signal - 1)
 			} else {
-				sendsig_with_timer_lock(t, signal, true)
+				sendsig_with_timer_lock(t, signal, true, source)
 			}
 			if changed { proc.pin_process(target) }
 		}
@@ -78,7 +84,7 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	if changed { notify_signal_parent(target); proc.unpin_process(target) }
 }
 
-fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool) {
+fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool, source &proc.SignalSource) {
 	mut t := unsafe { _thread }
 
 	if signal == 0 || signal > 64 || katomic.load(&t.is_dead) {
@@ -97,14 +103,22 @@ fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool) {
 		&& if timer_locked { proc.job_group_orphaned_locked(t.process.pgid, t.process.sid) } else { proc.job_group_orphaned(t.process.pgid, t.process.sid) }
 	ignored := signal != sigkill && signal != sigstop && !blocked && (handler == sig_ign || orphan_stop
 		|| (handler == sig_dfl && (has_default_ignore_action(int(signal)) || signal == sigcont)))
+	// Job-control queuing may set the pending bit itself; note whether an
+	// instance was already pending before this send.
+	was_pending := katomic.load(&t.pending_signals) & (u64(1) << (signal - 1)) != 0
 	job_signal := if timer_locked { queue_job_signal_locked(mut t, int(signal), !ignored) }
 		else { queue_job_signal(mut t, int(signal), !ignored) }
 	if ignored {
 		return
 	}
 
-	if timer_locked { posixtimer.acknowledge_signal_locked(mut t, int(signal)) }
-	else { posixtimer.clear_signal_info(mut t, int(signal)) }
+	if timer_locked && source != unsafe { nil } {
+		posixtimer.record_thread_source_locked(mut t, int(signal), source, was_pending)
+	} else if timer_locked {
+		posixtimer.forget_thread_source_locked(mut t, int(signal), was_pending)
+	} else {
+		posixtimer.clear_signal_info(mut t, int(signal))
+	}
 	if !job_signal { katomic.bts(mut &t.pending_signals, signal - 1) }
 	if t.process != unsafe { nil } {
 		notify_signalfds(t.process.pid, int(signal))
@@ -122,10 +136,15 @@ fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool) {
 // wake does not give that thread exclusive ownership: a sibling entering
 // sigwait later can claim a signal queued while everybody blocked it.
 fn signal_process(mut target proc.Process, signal int) bool {
+	return signal_process_from(mut target, signal, unsafe { nil })
+}
+
+// signal_process(), recording `source` (nil: none) as the signal's sender.
+fn signal_process_from(mut target proc.Process, signal int, source &proc.SignalSource) bool {
 	if signal <= 0 || signal > 64 { return false }
 	posixtimer.lock_signal_info()
 	proc.lock_table()
-	accepted, changed := signal_process_locked(mut target, signal)
+	accepted, changed := signal_process_with_timer_lock(mut target, signal, true, source)
 	if changed { proc.pin_process(&target) }
 	proc.unlock_table()
 	posixtimer.unlock_signal_info()
@@ -140,7 +159,11 @@ fn signal_process(mut target proc.Process, signal int) bool {
 // A true second result requires the caller to pin target under the table,
 // then notify its parent and unpin only after releasing all delivery locks.
 pub fn signal_process_locked(mut target proc.Process, signal int) (bool, bool) {
-	return signal_process_with_timer_lock(mut target, signal, true)
+	return signal_process_with_timer_lock(mut target, signal, true, unsafe { nil })
+}
+
+fn signal_process_locked_from(mut target proc.Process, signal int, source &proc.SignalSource) (bool, bool) {
+	return signal_process_with_timer_lock(mut target, signal, true, source)
 }
 
 fn begin_exec_signals(mut target proc.Process, old_thread &proc.Thread) {
@@ -191,7 +214,7 @@ fn finish_exec_signals(mut target proc.Process, mut replacement proc.Thread,
 	return enqueued
 }
 
-fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_locked bool) (bool, bool) {
+fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_locked bool, source &proc.SignalSource) (bool, bool) {
 	bit := u64(1) << (signal - 1)
 	unblockable := signal == sigkill || signal == sigstop
 	target.threads_lock.acquire()
@@ -205,6 +228,11 @@ fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_loc
 		if stop_signal(signal) || signal == sigcont || signal == sigkill {
 			target.exec_pending_signals |= bit
 		} else {
+			if timer_locked && source != unsafe { nil } {
+				posixtimer.record_process_source_locked(mut target, signal, source)
+			} else if timer_locked {
+				posixtimer.forget_process_source_locked(mut target, signal)
+			}
 			katomic.bts(mut &target.shared_pending_signals, u8(signal - 1))
 		}
 		target.threads_lock.release()
@@ -236,7 +264,7 @@ fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_loc
 		if timer_locked {
 			// Keep claim_teardown out until delivery finishes: exit changes
 			// the final thread's Process before clearing this thread list.
-			queue_process_signal(mut target, chosen, signal, timer_locked)
+			queue_process_signal(mut target, chosen, signal, timer_locked, source)
 		}
 	}
 	target.threads_lock.release()
@@ -245,7 +273,7 @@ fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_loc
 		return false, changed
 	}
 
-	if !timer_locked { queue_process_signal(mut target, chosen, signal, timer_locked) }
+	if !timer_locked { queue_process_signal(mut target, chosen, signal, timer_locked, source) }
 	if !stop_signal(signal) && signal != sigcont && signal != sigkill {
 		wake_shared_signal_waiters(mut target, signal)
 	}
@@ -283,17 +311,22 @@ fn wake_shared_signal_waiters(mut process proc.Process, signal int) {
 	}
 }
 
-fn queue_process_signal(mut target proc.Process, chosen &proc.Thread, signal int, timer_locked bool) {
+fn queue_process_signal(mut target proc.Process, chosen &proc.Thread, signal int, timer_locked bool, source &proc.SignalSource) {
 	// Stop/continue carry a per-thread selection generation for the existing
 	// process job-control protocol; fatal kill must also retain its priority.
 	if stop_signal(signal) || signal == sigcont || signal == sigkill {
-		sendsig_with_timer_lock(chosen, u8(signal), timer_locked)
+		sendsig_with_timer_lock(chosen, u8(signal), timer_locked, source)
 		return
 	}
 	bit := u64(1) << (signal - 1)
 	blocked := katomic.load(&chosen.masked_signals) & bit != 0
 	handler := chosen.sigactions[signal].sa_sigaction
 	if !blocked && (handler == sig_ign || (handler == sig_dfl && has_default_ignore_action(signal))) { return }
+	if timer_locked && source != unsafe { nil } {
+		posixtimer.record_process_source_locked(mut target, signal, source)
+	} else if timer_locked {
+		posixtimer.forget_process_source_locked(mut target, signal)
+	}
 	katomic.bts(mut &target.shared_pending_signals, u8(signal - 1))
 	notify_signalfds(target.pid, signal)
 	if !blocked || katomic.load(&chosen.sigwait_set) & bit != 0 {
@@ -356,7 +389,8 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		if signal == 0 {
 			return 0, 0
 		}
-		if !signal_process(mut target, signal) {
+		source := sender_source(proc.si_user, target)
+		if !signal_process_from(mut target, signal, unsafe { &source }) {
 			// A zombie still owns its pid but has no thread left to signal.
 			return 0, 0
 		}
@@ -401,7 +435,8 @@ pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
 		if !may_signal(current_process, target, signal) { proc.unpin_process(target); continue }
 		permitted = true
 		if signal != 0 {
-			signal_process(mut target, signal)
+			source := sender_source(proc.si_user, target)
+			signal_process_from(mut target, signal, unsafe { &source })
 		}
 		proc.unpin_process(target)
 	}
@@ -458,7 +493,8 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 		return 0, 0
 	}
 
-	sendsig(target, u8(signal))
+	source := sender_source(proc.si_tkill, target.process)
+	sendsig_from(target, u8(signal), unsafe { &source })
 
 	return 0, 0
 }
@@ -468,4 +504,149 @@ fn signal_thread(tgid int, tid int, signal int) (u64, u64) {
 pub fn cpu_signal_process(target &proc.Process, signal int) {
 	mut p := unsafe { target }
 	if !p.exiting { signal_process(mut p, signal) }
+}
+
+// What kill, tkill and tgkill record: the caller's process as `target`'s pid
+// namespace numbers it (0 when it cannot see it) and the caller's real uid.
+fn sender_source(code int, target &proc.Process) proc.SignalSource {
+	sender := proc.current_thread().process
+	return proc.SignalSource{
+		code: i32(code)
+		pid:  i32(proc.pid_in(sender, target.numbered_in))
+		uid:  sender.uid
+	}
+}
+
+// Whether Linux knows the siginfo layout of `code` for `signal`: SI_KERNEL,
+// the signal's own positive codes (NSIGPOLL's for most signals), and the
+// negative codes from SI_DETHREAD up, plus SI_ASYNCNL.
+fn known_siginfo_layout(signal int, code int) bool {
+	if code == 0x80 { return true }
+	if code > 0 {
+		limit := match signal {
+			4 { 11 } // SIGILL
+			8 { 15 } // SIGFPE
+			11 { 10 } // SIGSEGV
+			7 { 5 } // SIGBUS
+			5 { 6 } // SIGTRAP
+			17 { 6 } // SIGCHLD
+			31 { 2 } // SIGSYS
+			else { 6 }
+		}
+		return code <= limit
+	}
+	return code >= -7 || code == -60
+}
+
+// Read a caller's siginfo_t as Linux does: the 48 bytes of its kernel copy,
+// and, for a layout it does not know by `layout_signal` (or the given
+// si_signo when 0) and si_code, the rest of the 128, which must be zero
+// (E2BIG). Keeps si_code, si_pid, si_uid and si_value; returns an errno and
+// the given si_signo.
+fn read_user_siginfo(info_ptr u64, layout_signal int, mut source proc.SignalSource) (u64, int) {
+	raw := unsafe { &u8(C.vinix_stack_alloc(128)) }
+	if !usercopy.copy_from_user(voidptr(raw), info_ptr, 48) { return errno.efault, 0 }
+	unsafe {
+		signo := int(*&i32(raw))
+		source.code = *&i32(u64(raw) + 8)
+		source.pid = *&i32(u64(raw) + 16)
+		source.uid = *&u32(u64(raw) + 20)
+		source.value = *&u64(u64(raw) + 24)
+		layout := if layout_signal > 0 { layout_signal } else { signo }
+		if !known_siginfo_layout(layout, int(source.code)) {
+			if !usercopy.copy_from_user(voidptr(u64(raw) + 48), info_ptr + 48, 80) {
+				return errno.efault, signo
+			}
+			for i in 48 .. 128 {
+				if raw[i] != 0 { return errno.e2big, signo }
+			}
+		}
+		return 0, signo
+	}
+}
+
+// Only a call aimed at the caller itself may carry a kernel's si_code (zero or
+// positive) or SI_TKILL, which kill and tgkill add themselves.
+fn forged_source(source &proc.SignalSource) bool {
+	return source.code >= 0 || source.code == proc.si_tkill
+}
+
+// Vinix keeps one pending instance per signal. A second real-time signal
+// queued with its own information is refused, as Linux refuses one past
+// RLIMIT_SIGPENDING; a standard signal that is already pending is merged, as
+// on Linux.
+fn queue_full(pending u64, signal int) bool {
+	return signal >= 32 && pending & (u64(1) << (signal - 1)) != 0
+}
+
+// rt_sigqueueinfo(pid, sig, info): `sig` with the caller's siginfo for the
+// process with that pid (or containing that thread). Linux's order: EFAULT,
+// EPERM for a forged code, ESRCH, EINVAL for the signal, EPERM.
+pub fn syscall_rt_sigqueueinfo(_ voidptr, pid_word u64, signal_word u64, info_ptr u64) (u64, u64) {
+	local := int(i32(u32(pid_word)))
+	signal := int(i32(u32(signal_word)))
+	mut source := proc.SignalSource{}
+	failure, _ := read_user_siginfo(info_ptr, signal, mut source)
+	if failure != 0 { return errno.err, failure }
+	caller := proc.current_thread()
+	if forged_source(&source) && proc.own_tid(caller) != local { return errno.err, errno.eperm }
+	if local <= 0 { return errno.err, errno.esrch }
+	// The process with that pid, or else the live process owning that thread:
+	// an exiting or execing thread briefly belongs to the kernel's process.
+	proc.lock_table()
+	global := proc.kernel_id_locked(local)
+	mut target := &proc.Process(unsafe { nil })
+	if global > 0 && global < proc.max_pid {
+		target = proc.process_at(global)
+		t := threads_by_tid[global]
+		if target == unsafe { nil } && t != unsafe { nil } && t.process != unsafe { nil }
+			&& voidptr(proc.process_at(t.process.pid)) == voidptr(t.process) {
+			target = t.process
+		}
+	}
+	if target == unsafe { nil } {
+		proc.unlock_table()
+		return errno.err, errno.esrch
+	}
+	proc.pin_process(target)
+	proc.unlock_table()
+	defer { proc.unpin_process(target) }
+	if signal < 0 || signal > 64 { return errno.err, errno.einval }
+	if !may_signal(caller.process, target, signal) { return errno.err, errno.eperm }
+	if signal == 0 { return 0, 0 }
+	if queue_full(katomic.load(&target.shared_pending_signals), signal) {
+		return errno.err, errno.eagain
+	}
+	// A zombie still owns its pid but has no thread left to signal.
+	signal_process_from(mut target, signal, unsafe { &source })
+	return 0, 0
+}
+
+// rt_tgsigqueueinfo(tgid, tid, sig, info): the same for one thread. Linux's
+// order: EFAULT, EINVAL for a nonpositive id, EPERM for a forged code, ESRCH,
+// EINVAL for the signal, EPERM.
+pub fn syscall_rt_tgsigqueueinfo(_ voidptr, tgid_word u64, tid_word u64, signal_word u64, info_ptr u64) (u64, u64) {
+	tgid := int(i32(u32(tgid_word)))
+	tid := int(i32(u32(tid_word)))
+	signal := int(i32(u32(signal_word)))
+	mut source := proc.SignalSource{}
+	failure, _ := read_user_siginfo(info_ptr, signal, mut source)
+	if failure != 0 { return errno.err, failure }
+	if tid <= 0 || tgid <= 0 { return errno.err, errno.einval }
+	caller := proc.current_thread()
+	if forged_source(&source) && proc.own_tid(caller) != tid { return errno.err, errno.eperm }
+	viewer := proc.current_pid_namespace()
+	mut target := proc.thread_in(viewer, tid)
+	if target == unsafe { nil } { return errno.err, errno.esrch }
+	defer { proc.unpin_thread(target) }
+	if katomic.load(&target.is_dead) || target.process == unsafe { nil }
+		|| proc.pid_in(target.process, viewer) != tgid {
+		return errno.err, errno.esrch
+	}
+	if signal < 0 || signal > 64 { return errno.err, errno.einval }
+	if !may_signal(caller.process, target.process, signal) { return errno.err, errno.eperm }
+	if signal == 0 { return 0, 0 }
+	if queue_full(katomic.load(&target.pending_signals), signal) { return errno.err, errno.eagain }
+	sendsig_from(target, u8(signal), unsafe { &source })
+	return 0, 0
 }

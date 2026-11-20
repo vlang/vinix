@@ -277,6 +277,10 @@ pub mut:
 	// Ordinary process-directed signals remain claimable by any sibling.
 	// Thread-directed signals and POSIX timer metadata stay on their Thread.
 	shared_pending_signals u64
+	// Senders of the pending process-directed signals in shared_signal_sent,
+	// valid only while the signal is pending. See SignalSource.
+	shared_signal_sent    u64
+	shared_signal_sources [64]SignalSource
 	mmap_anon_non_fixed_base u64
 	// A vfork parent pins this object until its child releases the old map.
 	// The completion flag also handles a wake before the parent starts waiting.

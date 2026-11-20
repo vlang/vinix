@@ -224,7 +224,7 @@ fn ordinary_and_filtered_signals() {
 		mut usr_mask := u64(1) << (C.SIGUSR1 - 1)
 		mut zero := C.timespec{}
 		check(C.syscall(C.SYS_rt_sigtimedwait, &usr_mask, &si, &zero, 8) == C.SIGUSR1, 177, c'syscall(SYS_rt_sigtimedwait, &usr_mask, &si, &zero, 8) == SIGUSR1')
-		check(si.si_code == C.SI_USER, 178, c'si.si_code == SI_USER')
+		check(si.si_code == C.SI_TKILL, 178, c'si.si_code == SI_TKILL')
 		mut s := C.vpt_thread_state{}
 		mut native_thread := C.pthread_t{}
 		check(C.pthread_create(&native_thread, nil, C.vpt_timer_receiver, &s) == 0, 182, c'pthread_create(&t, NULL, receiver, &s) == 0')
@@ -232,7 +232,7 @@ fn ordinary_and_filtered_signals() {
 		pause_ms(20)
 		check(C.syscall(C.SYS_tgkill, C.getpid(), s.tid, 32) == 0, 185, c'syscall(SYS_tgkill, getpid(), s.tid, 32) == 0')
 		check(C.pthread_join(native_thread, nil) == 0, 186, c'pthread_join(t, NULL) == 0')
-		check(s.result == 32 && s.code == C.SI_USER && s.value == 0 && s.elapsed < 1000000000, 187, c's.result == 32 && s.code == SI_USER && s.value == 0 && s.elapsed < 1000000000')
+		check(s.result == 32 && s.code == C.SI_TKILL && s.value == 0 && s.elapsed < 1000000000, 187, c's.result == 32 && s.code == SI_TKILL && s.value == 0 && s.elapsed < 1000000000')
 		C.puts(c'POSIX TIMER PASS: ordinary signals')
 	}
 }

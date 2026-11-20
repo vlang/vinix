@@ -29,6 +29,9 @@ The guest covers:
   immediate EAGAIN after consumption, and periodic overrun metadata.
 - An ordinary signal-32 wake and an unrelated blocked SIGUSR1 that must remain
   pending while a 40 ms timer wait times out.
+  Both are sent with tgkill, so they report SI_TKILL, as on Linux; the checks
+  expected SI_USER until Vinix recorded senders (see
+  [signal senders](../../docs/linux-signal-senders.md)).
 - Forked timer ownership and refusal to target a thread of another process.
 
 Build both architectures from an isolated worktree whose untracked kernel

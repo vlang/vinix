@@ -80,6 +80,17 @@ pub mut:
 	pending_signal_codes    [64]int
 	pending_signal_values   [64]u64
 	pending_signal_overruns [64]int
+	// Senders of the pending thread-directed signals whose bits are set in
+	// pending_signal_sent; valid only while the signal is pending.
+	pending_signal_sent    u64
+	pending_signal_sources [64]SignalSource
+	// The information of the signal this thread last claimed, taken with the
+	// claim under the signal-information lock; see posixtimer.take_signal_info.
+	claimed_signal  int
+	claimed_timer   bool
+	claimed_sent    bool
+	claimed_source  SignalSource
+	claimed_overrun int
 	// Names, including explicit empty names, inherit from the creating task.
 	comm              string
 	comm_named        bool

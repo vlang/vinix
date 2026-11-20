@@ -4,10 +4,10 @@ module userland
 
 import errno
 import file
+import katomic
 import posixtimer
 import proc
 import resource
-import usercopy
 
 pub fn syscall_pidfd_open(_ voidptr, pid i32, flags u32) (u64, u64) {
 	if pid <= 0 || flags & ~u32(resource.o_nonblock) != 0 {
@@ -40,13 +40,22 @@ pub fn syscall_pidfd_send_signal(_ voidptr, fdnum i32, signal i32, info u64, fla
 	mut res := fd.handle.resource
 	mut record := &proc.PidFile(unsafe { nil })
 	if mut res is proc.PidFile { record = res } else { return errno.err, errno.ebadf }
+	// A siginfo of the caller's: si_signo must be the signal, and only the
+	// process's own thread with its pid may send itself a kernel's code. It is
+	// read here, without the locks, and judged after the namespace check.
+	mut source := proc.SignalSource{}
+	mut info_error := u64(0)
 	if info != 0 {
-		mut supplied := [128]u8{}
-		if !usercopy.copy_from_user(voidptr(&supplied[0]), info, u64(supplied.len)) {
-			return errno.err, errno.efault
+		failure, signo := read_user_siginfo(info, 0, mut source)
+		info_error = if failure != 0 {
+			failure
+		} else if signo != int(signal) {
+			u64(errno.einval)
+		} else if forged_source(&source) && proc.current_thread().tid != record.global_pid {
+			u64(errno.eperm)
+		} else {
+			u64(0)
 		}
-		// Queued siginfo metadata needs a real signal-queue implementation.
-		return errno.err, errno.enosys
 	}
 	// fd_from_fdnum has already released the descriptor-table lock. Keep the
 	// lookup reference through authorization/delivery and drop it after both
@@ -59,12 +68,20 @@ pub fn syscall_pidfd_send_signal(_ voidptr, fdnum i32, signal i32, info u64, fla
 	proc.lock_table()
 	defer { proc.unlock_table(); posixtimer.unlock_signal_info() }
 	mut target := proc.pidfd_target_locked(record)
-	if target == unsafe { nil } { return errno.err, errno.esrch }
 	caller := proc.current_thread().process
-	if proc.pid_in(target, caller.numbered_in) == 0 { return errno.err, errno.einval }
+	// Linux checks the pidfd's namespace, then the siginfo, then the process.
+	if target != unsafe { nil } && proc.pid_in(target, caller.numbered_in) == 0 {
+		return errno.err, errno.einval
+	}
+	if info_error != 0 { return errno.err, info_error }
+	if target == unsafe { nil } { return errno.err, errno.esrch }
 	if !may_signal_pidfd(caller, target, int(signal)) { return errno.err, errno.eperm }
+	if info == 0 { source = sender_source(proc.si_user, target) }
+	if signal != 0 && info != 0 && queue_full(katomic.load(&target.shared_pending_signals), int(signal)) {
+		return errno.err, errno.eagain
+	}
 	if signal != 0 {
-		_, changed := signal_process_locked(mut target, int(signal))
+		_, changed := signal_process_locked_from(mut target, int(signal), unsafe { &source })
 		if changed { proc.pin_process(target); notify = target }
 	}
 	// An unreaped zombie still has this identity, even with no thread left.

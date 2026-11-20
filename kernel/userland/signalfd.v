@@ -65,21 +65,27 @@ fn take_for_signalfd(current &proc.Thread, wanted u64, mut info [16]u64) int {
 	mut own := unsafe { current }
 	signum, shared := take_wait_signal(mut own, wanted)
 	if signum == -1 { return 0 }
-	fill_signalfd_info(mut info, current, signum, shared)
-	if !shared { posixtimer.acknowledge_signal(mut own, signum) }
+	source := posixtimer.take_signal_info(mut own, signum, shared)
+	fill_signalfd_info(mut info, signum, source)
 	return signum
 }
 
-// struct signalfd_siginfo: ssi_signo, ssi_errno, ssi_code, then for a POSIX
-// timer its overrun at 32 and value in ssi_int and ssi_ptr, at 44 and 48.
-fn fill_signalfd_info(mut info [16]u64, holder &proc.Thread, signum int, shared bool) {
-	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(holder, signum) }
+// struct signalfd_siginfo: ssi_signo, ssi_errno, ssi_code, ssi_pid at 12 and
+// ssi_uid at 16 for a sent signal, a POSIX timer's overrun at 32, and the
+// value in ssi_int and ssi_ptr, at 44 and 48.
+fn fill_signalfd_info(mut info [16]u64, signum int, timer_info posixtimer.SignalInfo) {
 	unsafe {
 		mut words := &u32(&info[0])
 		words[0] = u32(signum)
 		words[2] = u32(timer_info.code)
 		if timer_info.found {
 			words[8] = u32(timer_info.overrun)
+			words[11] = u32(timer_info.value)
+			info[6] = timer_info.value
+		}
+		if timer_info.sent {
+			words[3] = u32(timer_info.pid)
+			words[4] = timer_info.uid
 			words[11] = u32(timer_info.value)
 			info[6] = timer_info.value
 		}

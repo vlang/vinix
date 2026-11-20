@@ -2635,6 +2635,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   checks on Vinix and Linux 6.12 on both architectures. See
   [the syslog receipts](docs/linux-syslog.md).
 
+- [x] Record and report signal senders (kill, tkill/tgkill, pidfd) and implement
+  rt_sigqueueinfo, rt_tgsigqueueinfo and pidfd_send_signal siginfo payloads with
+  Linux's error order, through handlers, sigtimedwait and signalfd. The same
+  probe ELF passes on Vinix and Linux 6.12 on both architectures; real-time
+  signals still keep one pending instance, refusing another with EAGAIN. See
+  [the signal sender receipts](docs/linux-signal-senders.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

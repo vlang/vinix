@@ -12,6 +12,12 @@ must pass; bad pointers, errno, compiler failure, panic, timeout and late failur
 remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
 stay in the required fresh artifact directory, including on failure.
 
+`--cases sigqueue` checks signal senders through sigtimedwait, signalfd and
+handlers, rt_sigqueueinfo, rt_tgsigqueueinfo and pidfd_send_signal payloads
+and errors, and that a second real-time signal is never silently lost; the same
+ELF runs on Linux through `syscall-reference.v --case sigqueue`. See
+[semantics and receipts](../../docs/linux-signal-senders.md).
+
 `--cases syslog` checks syslog(2) records, sizes, READ/READ_ALL/CLEAR positions,
 console levels, dmesg_restrict refusals and restart_syscall's EINTR; the same
 ELF runs on Linux through `syscall-reference.v --case syslog`. See

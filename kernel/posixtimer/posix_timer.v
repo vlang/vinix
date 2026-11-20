@@ -70,10 +70,15 @@ mut:
 
 pub struct SignalInfo {
 pub:
+	// A POSIX timer's: SI_TIMER, its value and overrun count.
 	found   bool
 	code    int
 	value   u64
 	overrun int
+	// Or a sender's (see proc.SignalSource): code, pid, uid and value.
+	sent bool
+	pid  i32
+	uid  u32
 }
 
 __global (
@@ -507,4 +512,105 @@ fn next_posix_deadline() u64 {
 		if delay < remaining { remaining = delay }
 	}
 	return remaining
+}
+
+// Record who sent thread-directed `signum` to `thrd`; the caller holds the
+// signal-information lock and says whether the signal was pending before this
+// send. One already pending keeps its first instance's information, none for
+// a kernel's, as Linux keeps a merged standard signal's first siginfo, except
+// a POSIX timer's: a later send replaces that, which is how musl tells a
+// SIGEV_THREAD helper to stop.
+pub fn record_thread_source_locked(mut thrd proc.Thread, signum int, source &proc.SignalSource, was_pending bool) {
+	if signum <= 0 || signum > 64 { return }
+	if was_pending && thrd.pending_signal_codes[signum - 1] != si_timer { return }
+	acknowledge_signal_locked(mut thrd, signum)
+	thrd.pending_signal_sources[signum - 1] = *source
+	thrd.pending_signal_sent |= u64(1) << (signum - 1)
+}
+
+// A send without a sender: timer information goes, as before, and a sender
+// left from an earlier instance that is no longer pending is forgotten.
+pub fn forget_thread_source_locked(mut thrd proc.Thread, signum int, was_pending bool) {
+	if signum <= 0 || signum > 64 { return }
+	acknowledge_signal_locked(mut thrd, signum)
+	if !was_pending { thrd.pending_signal_sent &= ~(u64(1) << (signum - 1)) }
+}
+
+// The process-directed counterparts, called before the shared pending bit is
+// set, so that bit says whether an instance was already pending.
+pub fn record_process_source_locked(mut process proc.Process, signum int, source &proc.SignalSource) {
+	if signum <= 0 || signum > 64 { return }
+	bit := u64(1) << (signum - 1)
+	if katomic.load(&process.shared_pending_signals) & bit != 0 { return }
+	process.shared_signal_sources[signum - 1] = *source
+	process.shared_signal_sent |= bit
+}
+
+pub fn forget_process_source_locked(mut process proc.Process, signum int) {
+	if signum <= 0 || signum > 64 { return }
+	bit := u64(1) << (signum - 1)
+	if katomic.load(&process.shared_pending_signals) & bit == 0 { process.shared_signal_sent &= ~bit }
+}
+
+// Take what delivery will report for `signum`, which `thrd` has just claimed
+// from its own pending set or, if `shared`, its process's. The caller holds
+// the signal-information lock across the claim and this, so a sender cannot
+// replace the information between them.
+pub fn claim_signal_info_locked(mut thrd proc.Thread, signum int, shared bool) {
+	thrd.claimed_signal = signum
+	thrd.claimed_timer = false
+	thrd.claimed_sent = false
+	if signum <= 0 || signum > 64 { return }
+	bit := u64(1) << (signum - 1)
+	if shared {
+		mut process := thrd.process
+		if process != unsafe { nil } && process.shared_signal_sent & bit != 0 {
+			process.shared_signal_sent &= ~bit
+			thrd.claimed_source = process.shared_signal_sources[signum - 1]
+			thrd.claimed_sent = true
+		}
+		return
+	}
+	timer := signal_info(thrd, signum)
+	if timer.found {
+		thrd.claimed_timer = true
+		thrd.claimed_source = proc.SignalSource{
+			code: i32(timer.code)
+			value: timer.value
+		}
+		thrd.claimed_overrun = timer.overrun
+	} else if thrd.pending_signal_sent & bit != 0 {
+		thrd.claimed_source = thrd.pending_signal_sources[signum - 1]
+		thrd.claimed_sent = true
+	}
+	thrd.pending_signal_sent &= ~bit
+	acknowledge_signal_locked(mut thrd, signum)
+}
+
+// What delivery reports for `signum`, which `thrd` claimed: the snapshot the
+// claim took, or, for a claim made without one, what is recorded now.
+pub fn take_signal_info(mut thrd proc.Thread, signum int, shared bool) SignalInfo {
+	posix_timers_lock.acquire()
+	defer { posix_timers_lock.release() }
+	if thrd.claimed_signal != signum { claim_signal_info_locked(mut thrd, signum, shared) }
+	thrd.claimed_signal = 0
+	source := thrd.claimed_source
+	if thrd.claimed_timer {
+		return SignalInfo{
+			found: true
+			code: int(source.code)
+			value: source.value
+			overrun: thrd.claimed_overrun
+		}
+	}
+	if thrd.claimed_sent {
+		return SignalInfo{
+			sent: true
+			code: int(source.code)
+			pid: source.pid
+			uid: source.uid
+			value: source.value
+		}
+	}
+	return SignalInfo{}
 }

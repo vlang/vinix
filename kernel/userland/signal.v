@@ -339,8 +339,8 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 		if which != -1 {
 			// Linux consumes the selected signal even when copying siginfo_t
 			// faults. Read timer metadata before acknowledging that consumption.
-			copied := info_ptr == 0 || write_signal_info(info_ptr, current_thread, which, shared)
-			if !shared { posixtimer.acknowledge_signal(mut current_thread, which) }
+			info := posixtimer.take_signal_info(mut current_thread, which, shared)
+			copied := info_ptr == 0 || write_signal_info(info_ptr, which, info)
 			if !copied { return errno.err, errno.efault }
 			return u64(which), 0
 		}
@@ -379,9 +379,18 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 // Linux checks thread-directed signals before process-wide signals. Within
 // each pending set, synchronous signal numbers precede other signal numbers.
 fn take_wait_signal(mut t proc.Thread, wanted u64) (int, bool) {
-	which := take_pending_wait_signal(&t.pending_signals, wanted)
-	if which != -1 { return which, false }
-	return take_pending_wait_signal(&t.process.shared_pending_signals, wanted), true
+	// The claim and its information are taken under one lock; see
+	// posixtimer.take_signal_info.
+	posixtimer.lock_signal_info()
+	defer { posixtimer.unlock_signal_info() }
+	mut which := take_pending_wait_signal(&t.pending_signals, wanted)
+	mut shared := false
+	if which == -1 {
+		which = take_pending_wait_signal(&t.process.shared_pending_signals, wanted)
+		shared = true
+	}
+	if which > 0 { posixtimer.claim_signal_info_locked(mut t, which, shared) }
+	return which, shared
 }
 
 fn take_pending_wait_signal(pending &u64, wanted u64) int {
@@ -404,11 +413,11 @@ fn take_pending_wait_signal(pending &u64, wanted u64) int {
 	return -1
 }
 
-// The 128-byte siginfo_t for a synchronously accepted signal. Ordinary signals
-// use SI_USER; POSIX timers retain SI_TIMER, their value, and overrun count.
-fn write_signal_info(info_ptr u64, thrd &proc.Thread, signum int, shared bool) bool {
+// The 128-byte siginfo_t for a synchronously accepted signal: SI_TIMER with its
+// value and overrun count for a POSIX timer, the sender's code, pid, uid and
+// value for a sent signal, and SI_USER otherwise.
+fn write_signal_info(info_ptr u64, signum int, timer_info posixtimer.SignalInfo) bool {
 	mut raw := [16]u64{}
-	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(thrd, signum) }
 	unsafe {
 		mut words := &u32(&raw[0])
 		words[0] = u32(signum) // si_signo
@@ -416,6 +425,11 @@ fn write_signal_info(info_ptr u64, thrd &proc.Thread, signum int, shared bool) b
 		words[2] = u32(timer_info.code) // SI_USER or SI_TIMER
 		if timer_info.found {
 			words[5] = u32(timer_info.overrun) // si_overrun
+			*&u64(u64(&raw[0]) + 24) = timer_info.value // si_value
+		}
+		if timer_info.sent {
+			words[4] = u32(timer_info.pid) // si_pid
+			words[5] = timer_info.uid // si_uid
 			*&u64(u64(&raw[0]) + 24) = timer_info.value // si_value
 		}
 	}

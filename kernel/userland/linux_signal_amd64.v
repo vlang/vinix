@@ -166,10 +166,18 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	}
 	// A POSIX timer's signal reports SI_TIMER, the overrun count and the
 	// sigevent's value; musl's SIGEV_THREAD helper ignores it otherwise.
-	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(t, which) }
+	// Timer or sender information, taken with the claim it describes.
+	timer_info := posixtimer.take_signal_info(mut t, which, shared)
 	if timer_info.found {
 		put_u32(mut buf, frame_siginfo + 8, u32(timer_info.code))
 		put_u32(mut buf, frame_siginfo + 20, u32(timer_info.overrun))
+		put_u64(mut buf, frame_siginfo + 24, timer_info.value)
+	}
+	// A sent signal: si_code, si_pid and si_uid, and si_value when queued.
+	if timer_info.sent && info_signum != which {
+		put_u32(mut buf, frame_siginfo + 8, u32(timer_info.code))
+		put_u32(mut buf, frame_siginfo + 16, u32(timer_info.pid))
+		put_u32(mut buf, frame_siginfo + 20, timer_info.uid)
 		put_u64(mut buf, frame_siginfo + 24, timer_info.value)
 	}
 	if seccomp_info.pending {
@@ -179,7 +187,6 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 		put_u32(mut buf, frame_siginfo + 24, seccomp_info.syscall)
 		put_u32(mut buf, frame_siginfo + 28, proc.audit_arch_x86_64)
 	}
-	if !shared { posixtimer.acknowledge_signal(mut t, which) }
 
 	// The registers still hold the program's FPU state; the kernel uses none.
 	fpu_save(t.fpu_storage)

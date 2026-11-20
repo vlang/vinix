@@ -441,8 +441,8 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	if which == -1 {
 		return
 	}
-	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(t, which) }
-	if !shared { posixtimer.acknowledge_signal(mut t, which) }
+	// Timer or sender information, taken with the claim it describes.
+	timer_info := posixtimer.take_signal_info(mut t, which, shared)
 
 	sigaction := take_signal_action(mut t, which, t.sigentry == 0)
 	handler := sigaction.sa_sigaction
@@ -507,6 +507,11 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 
 		mut siginfo := SigInfo{}
 		siginfo.si_signo = i32(which)
+		if timer_info.sent {
+			siginfo.si_code = i32(timer_info.code)
+			siginfo.si_pid = timer_info.pid
+			siginfo.si_uid = i32(timer_info.uid)
+		}
 
 		// The stack may be unmapped or too small for the frame, for instance a
 		// preemption signal that arrives with the SP deep in a small stack.
@@ -587,6 +592,13 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			*&u64(info_base + 16) = fault_address
 			if timer_info.found {
 				*&i32(info_base + 20) = i32(timer_info.overrun)
+				*&u64(info_base + 24) = timer_info.value
+			}
+			// A sent signal: si_code, si_pid and si_uid, and si_value when queued.
+			if timer_info.sent && !synchronous {
+				*&i32(info_base + 8) = i32(timer_info.code)
+				*&i32(info_base + 16) = timer_info.pid
+				*&u32(info_base + 20) = timer_info.uid
 				*&u64(info_base + 24) = timer_info.value
 			}
 			if seccomp_info.pending {

@@ -160,7 +160,17 @@ pub fn notify_signal_parent(target &proc.Process) {
 
 // Select a pending signal while retaining the generation of a stop signal.
 // SIGKILL wins over a stop request, and neither KILL nor STOP is maskable.
+// Claim the next deliverable signal and, under the same signal-information
+// lock, take its information for posixtimer.take_signal_info.
 fn take_pending_signal(mut t proc.Thread) (int, bool) {
+	posixtimer.lock_signal_info()
+	signal, shared := claim_pending_signal(mut t)
+	if signal > 0 { posixtimer.claim_signal_info_locked(mut t, signal, shared) }
+	posixtimer.unlock_signal_info()
+	return signal, shared
+}
+
+fn claim_pending_signal(mut t proc.Thread) (int, bool) {
 	if katomic.btr(mut &t.pending_signals, u8(sigkill - 1)) { return sigkill, false }
 	for i := u8(0); i < 64; i++ {
 		signal := int(i) + 1

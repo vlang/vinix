@@ -412,6 +412,8 @@ pub fn init_syscall_table() {
 	syscall_table[135] = voidptr(proc.syscall_personality) // personality
 	syscall_table[103] = voidptr(syscall_syslog) // syslog
 	syscall_table[219] = voidptr(syscall_restart_syscall) // restart_syscall
+	syscall_table[129] = voidptr(userland.syscall_rt_sigqueueinfo) // rt_sigqueueinfo
+	syscall_table[297] = voidptr(userland.syscall_rt_tgsigqueueinfo) // rt_tgsigqueueinfo
 	syscall_table[251] = voidptr(proc.syscall_ioprio_set) // ioprio_set
 	syscall_table[252] = voidptr(proc.syscall_ioprio_get) // ioprio_get
 	syscall_table[253] = voidptr(syscall_linux_inotify_init) // inotify_init
