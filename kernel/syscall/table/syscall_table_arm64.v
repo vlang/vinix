@@ -540,6 +540,8 @@ pub fn init_syscall_table() {
 	syscall_table[434] = voidptr(userland.syscall_pidfd_open)
 	syscall_table[438] = voidptr(userland.syscall_pidfd_getfd)
 	syscall_table[223] = voidptr(file.syscall_fadvise64) // __NR_fadvise64
+	syscall_table[213] = voidptr(file.syscall_readahead) // __NR_readahead
+	syscall_table[452] = voidptr(fs.syscall_fchmodat2) // __NR_fchmodat2
 
 	// Sockets
 	syscall_table[198] = voidptr(socket.syscall_socket) // __NR_socket

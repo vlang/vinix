@@ -2623,6 +2623,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   20 + 3 checks on Vinix and Linux 6.12 on both architectures. See
   [the pidfd_getfd receipts](docs/linux-pidfd-getfd.md).
 
+- [x] Implement fchmodat2 (glibc 2.39's lchmod) and readahead with Linux 6.12's
+  flags, symlink refusal order, AT_EMPTY_PATH targets, descriptor and file-kind
+  errors and argument words. The same probe ELFs pass 33 + 3 and 22 checks on
+  Vinix and Linux 6.12 on both architectures. See
+  [the receipts](docs/linux-fchmodat2-readahead.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

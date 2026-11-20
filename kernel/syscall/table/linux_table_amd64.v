@@ -406,6 +406,8 @@ pub fn init_syscall_table() {
 	syscall_table[199] = voidptr(fs.syscall_fremovexattr) // fremovexattr
 	syscall_table[217] = voidptr(syscall_linux_getdents64) // getdents64
 	syscall_table[221] = voidptr(file.syscall_fadvise64) // fadvise64
+	syscall_table[187] = voidptr(file.syscall_readahead) // readahead
+	syscall_table[452] = voidptr(fs.syscall_fchmodat2) // fchmodat2
 	syscall_table[235] = voidptr(syscall_linux_utimes) // utimes
 	syscall_table[135] = voidptr(proc.syscall_personality) // personality
 	syscall_table[251] = voidptr(proc.syscall_ioprio_set) // ioprio_set

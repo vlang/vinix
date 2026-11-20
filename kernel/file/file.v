@@ -1496,6 +1496,39 @@ pub fn syscall_fadvise64(_ voidptr, fdnum int, offset i64, length i64, advice in
 	return 0, 0
 }
 
+// readahead(fd, offset, count): POSIX_FADV_WILLNEED for a readable regular
+// file or block device, as Linux's ksys_readahead. A descriptor that is not
+// open for reading (O_PATH included) is EBADF; any other kind of file, or a
+// count beyond the signed range, is EINVAL. Linux accepts a negative offset,
+// which names no page to read.
+pub fn syscall_readahead(_ voidptr, fd_word u64, offset i64, count u64) (u64, u64) {
+	mut fd := fd_from_fdnum(unsafe { nil }, int(i32(u32(fd_word)))) or { return errno.err, errno.ebadf }
+	defer {
+		fd.unref()
+	}
+	mut handle := fd.handle
+	access := handle.flags & resource.o_accmode
+	if handle.flags & resource.o_path != 0 || (access != resource.o_rdonly && access != resource.o_rdwr) {
+		return errno.err, errno.ebadf
+	}
+	mut res := handle.resource
+	mode := res.stat.mode
+	if !stat.isreg(mode) && !stat.isblk(mode) {
+		return errno.err, errno.einval
+	}
+	if i64(count) < 0 {
+		return errno.err, errno.einval
+	}
+	if offset < 0 {
+		return 0, 0
+	}
+	handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
+	resource.advise_resource(mut res, voidptr(handle), u64(offset), count, 3) or {
+		return errno.err, errno.get()
+	}
+	return 0, 0
+}
+
 pub fn syscall_sync_file_range(_ voidptr, fdnum int, offset i64, count i64, flags u32) (u64, u64) {
 	if offset < 0 || count < 0 || flags & ~u32(0x7) != 0
 		|| u64(count) > u64(0x7fffffffffffffff) - u64(offset) {

@@ -12,6 +12,11 @@ must pass; bad pointers, errno, compiler failure, panic, timeout and late failur
 remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
 stay in the required fresh artifact directory, including on failure.
 
+`--cases fchmodat2` and `--cases readahead` check fchmodat2 flags, symlink
+EOPNOTSUPP, AT_EMPTY_PATH targets, words and error order, and readahead
+readability, file kinds, counts and words; the same ELFs run on Linux through
+`syscall-reference.v`. See [semantics and receipts](../../docs/linux-fchmodat2-readahead.md).
+
 `--cases pidfdgetfd` checks pidfd_getfd copies, close-on-exec, shared
 descriptions, every error and its order, EMFILE, a child's pipe, exited
 children and unprivileged access; the same ELF runs on Linux through

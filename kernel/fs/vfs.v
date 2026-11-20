@@ -1956,6 +1956,81 @@ pub fn syscall_fchmodat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64
 	return 0, 0
 }
 
+// fchmodat2(dirfd, path, mode, flags): Linux 6.6's fchmodat with flags. Only
+// AT_SYMLINK_NOFOLLOW and AT_EMPTY_PATH are known (EINVAL otherwise, checked
+// before anything else). Linux never changes a symbolic link's mode: naming
+// one without following it is EOPNOTSUPP, as is an O_PATH descriptor of one,
+// after the read-only and immutable checks and before ownership, the order of
+// its notify_change. AT_EMPTY_PATH with an empty path changes dirfd's own
+// file, an O_PATH descriptor's included. The mode is a 16-bit umode_t.
+pub fn syscall_fchmodat2(_ voidptr, dirfd_word u64, _path charptr, mode_word u64, flags_word u64) (u64, u64) {
+	flags := u32(flags_word)
+	if flags & ~u32(at_symlink_nofollow | at_empty_path) != 0 {
+		return errno.err, errno.einval
+	}
+	dirfd := int(i32(u32(dirfd_word)))
+	mode := u32(u16(mode_word))
+	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
+	if path.len == 0 && flags & at_empty_path == 0 {
+		return errno.err, errno.enoent
+	}
+	if path.len == 0 && dirfd != at_fdcwd {
+		mut fd := file.fd_from_fdnum(unsafe { nil }, dirfd) or { return errno.err, errno.ebadf }
+		defer {
+			fd.unref()
+		}
+		fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
+		if fd.handle.node != unsafe { nil } {
+			node := unsafe { &VFSNode(fd.handle.node) }
+			if read_only_on_description(node, &fd.handle.mount) { return errno.err, errno.erofs }
+			if !attr_allows_metadata(node) { return errno.err, errno.get() }
+		}
+		if stat.islnk(fd.handle.resource.stat.mode) { return errno.err, errno.eopnotsupp }
+		if !owns_resource(fd.handle.resource.stat.uid) {
+			return errno.err, errno.eperm
+		}
+		mut res := handle_resource_to_change(fd.handle.node, fd.handle.resource) or {
+			return errno.err, errno.get()
+		}
+		resource.set_mode(mut res, chmod_permissions(mode, res.stat.gid)) or { return errno.err, errno.get() }
+		if fd.handle.node != unsafe { nil } {
+			inotify_emit(unsafe { &VFSNode(fd.handle.node) }, '', in_attrib, 0)
+		}
+		return 0, 0
+	}
+	// An empty path at AT_FDCWD is the working directory.
+	target := if path.len == 0 { '.' } else { path }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := parent_and_mount_for(dirfd, target, identity) or { return errno.err, errno.get() }
+	held := retain_path_target_on_mount(parent, target, flags & at_symlink_nofollow == 0, identity) or {
+		return errno.err, errno.get()
+	}
+	defer { release_path_target(held) }
+	mut node := held.node
+	if !policy_check(node, proc.policy_fattr) {
+		return errno.err, errno.get()
+	}
+	if read_only_on_mount(node, identity) {
+		return errno.err, errno.erofs
+	}
+	if !attr_allows_metadata(node) {
+		return errno.err, errno.get()
+	}
+	if stat.islnk(node.resource.stat.mode) {
+		return errno.err, errno.eopnotsupp
+	}
+	if !owns_resource(node.resource.stat.uid) {
+		return errno.err, errno.eperm
+	}
+	mut node_resource := resource_to_change(node) or { return errno.err, errno.get() }
+	resource.set_mode(mut node_resource, chmod_permissions(mode, node_resource.stat.gid)) or { return errno.err, errno.get() }
+	inotify_emit(node, '', in_attrib, 0)
+	return 0, 0
+}
+
 pub fn syscall_chdir(_ voidptr, _path charptr) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
