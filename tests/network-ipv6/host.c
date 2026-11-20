@@ -16,6 +16,8 @@ uint32_t vinix_tcp_isn_bytes(const void *a, uint16_t b, const void *c, uint16_t 
 int vinix_virtio_net_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
 int vinix_apple_wifi_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
 int vinix_e1000_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
+int vinix_rtl8169_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
+int vinix_ath10k_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
 /* Keep the original byte-address assertions; adapt only the fixture to the
  * production stack-endpoint interface used by both multicast and unicast. */
 struct fixture_address { uint32_t family, scope; uint8_t bytes[16]; };

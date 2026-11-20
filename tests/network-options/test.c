@@ -25,6 +25,8 @@ uint32_t vinix_tcp_isn6(const uint32_t a[4], uint16_t b, const uint32_t c[4], ui
 int vinix_virtio_net_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
 int vinix_apple_wifi_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
 int vinix_e1000_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
+int vinix_rtl8169_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
+int vinix_ath10k_send(const void *p, uint64_t n) { (void)p; (void)n; return 0; }
 
 static int keepalive_probes;
 static int syn_sack, syn_timestamp, timestamp_echo, sack_reply, fail_output;
