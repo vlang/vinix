@@ -6,6 +6,13 @@ import encoding.hex
 import crypto.hmac
 import crypto.sha256
 
+// OpenSSL 3 for ChaCha20: macOS's LibreSSL `openssl` has no `enc -chacha20`.
+fn volume_recovery_openssl() string {
+	if tool := os.getenv_opt('VINIX_OPENSSL') { return tool }
+	homebrew := '/opt/homebrew/opt/openssl@3/bin/openssl'
+	return if os.exists(homebrew) { homebrew } else { 'openssl' }
+}
+
 fn test_volume_recovery_independent_crypto_exact_metadata_and_format_domains() {
 	work := os.join_path(os.temp_dir(), 'vinix-volume-recovery-oracle-${os.getpid()}')
 	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
@@ -23,7 +30,7 @@ fn test_volume_recovery_independent_crypto_exact_metadata_and_format_domains() {
 				assert envelope[288..] == hmac.new(recovery[32..], authenticated, sha256.sum256, 64)
 				mut iv := []u8{len: 16}; iv[0] = 1; for i in 0 .. 12 { iv[i + 4] = nonce[i] }
 				os.write_file_array(work + '/cipher', envelope[192..256])!
-				result := os.exec(['openssl', 'enc', '-chacha20', '-K', hex.encode(recovery[..32]), '-iv', hex.encode(iv), '-in', work + '/cipher', '-out', work + '/key'])
+				result := os.exec([volume_recovery_openssl(), 'enc', '-chacha20', '-K', hex.encode(recovery[..32]), '-iv', hex.encode(iv), '-in', work + '/cipher', '-out', work + '/key'])
 				assert result.exit_code == 0, result.output
 				assert os.read_bytes(work + '/key')! == request.key[..]
 				mut observed := DiskKey{}; mut opened := EncryptedRequest{}

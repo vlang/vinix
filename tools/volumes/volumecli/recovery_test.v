@@ -6,6 +6,14 @@ import encoding.hex
 import crypto.hmac
 import crypto.sha256
 
+// OpenSSL 3 for ChaCha20: macOS's LibreSSL `openssl` has no `enc -chacha20`.
+fn recovery_openssl() string {
+	if tool := os.getenv_opt('VINIX_OPENSSL') { return tool }
+	homebrew := '/opt/homebrew/opt/openssl@3/bin/openssl'
+	return if os.exists(homebrew) { homebrew } else { 'openssl' }
+}
+
+
 fn test_recovery_chacha_rfc8439_block_and_openssl_oracle() {
 	// RFC 8439 section 2.3.2 (https://www.rfc-editor.org/rfc/rfc8439).
 	mut key := [32]u8{}; mut nonce := [12]u8{}; mut block := [64]u8{}
@@ -23,7 +31,7 @@ fn test_recovery_chacha_rfc8439_block_and_openssl_oracle() {
 		for i in 0 .. 12 { nonce[i] = u8(i * 11 + variant * 7); iv[i + 4] = nonce[i] }
 		for i in 0 .. 64 { data[i] = u8(i * 13 + variant); block[i] = data[i] }
 		os.write_file_array(work + '/in', data)!
-		result := os.exec(['openssl', 'enc', '-chacha20', '-K', hex.encode(key[..]),
+		result := os.exec([recovery_openssl(), 'enc', '-chacha20', '-K', hex.encode(key[..]),
 			'-iv', hex.encode(iv), '-in', work + '/in', '-out', work + '/out'])
 		assert result.exit_code == 0, result.output
 		recovery_chacha(&key[0], &nonce[0], &block[0])
@@ -102,7 +110,12 @@ fn test_recovery_envelope_all_corruption_and_wrong_key_preserve_output() {
 	assert !encode_recovery(&equal[0], &recovery[0], &nonce[0], &envelope[0])
 	assert !encode_recovery(&key[0], &equal[0], &nonce[0], &envelope[0])
 	// Even an authenticated envelope must contain a valid, independent XTS key.
-	for candidate in [equal, recovery] {
+	// Filled element by element: a literal of fixed arrays compiles to a C
+	// temporary that is read after its scope ends (ASan stack-use-after-scope).
+	mut candidates := [2][64]u8{}
+	candidates[0] = equal
+	candidates[1] = recovery
+	for candidate in candidates {
 		mut corrupt := envelope; mut tag := [32]u8{}
 		for i in 0 .. 64 { corrupt[i + 64] = candidate[i] }
 		recovery_chacha(&recovery[0], &corrupt[24], &corrupt[64])

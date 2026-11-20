@@ -10,7 +10,7 @@ fn backup_test_time(path string, mode u32) {
 	assert C.fchmod(fd, mode) == 0 && C.futimens(fd, &times[0]) == 0 && C.close(fd) == 0
 }
 fn backup_test_bytes(size int) []u8 { return []u8{len: size, init: u8(index * 17 + index / 65536)} }
-fn backup_test_clean(work string) { assert os.ls(work)!.all(!it.starts_with('.vinix-backup-')) }
+fn backup_test_clean(work string) { entries := os.ls(work) or { panic(err) }; assert entries.all(!it.starts_with('.vinix-backup-')) }
 fn backup_test_put(mut bytes []u8, at int, width int, value u64) { for i in 0 .. width { bytes[at + i] = u8(value >> (i * 8)) } }
 fn backup_test_checksum(mut bytes []u8) { sum := sha256.sum(bytes[..224]); for i in 0 .. 32 { bytes[224 + i] = sum[i] } }
 
