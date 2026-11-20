@@ -195,9 +195,8 @@ fn synchronous_test() {
 		mut mask := u64(1) << (signo - 1)
 		mut zero := C.timespec{}
 		check(C.syscall(C.SYS_rt_sigtimedwait, &mask, voidptr(1), &zero, 8) == -1 && C.errno == C.EFAULT, 145, c'syscall(SYS_rt_sigtimedwait, &mask, (void *)1, &zero, 8) == -1 && errno == EFAULT')
-		check(C.syscall(C.SYS_rt_sigtimedwait, &mask, &si, &zero, 8) == signo, 146, c'syscall(SYS_rt_sigtimedwait, &mask, &si, &zero, 8) == signo')
-		check(si.si_code == C.SI_TIMER && si.si_value.sival_int == 0x7788, 147, c'si.si_code == SI_TIMER && si.si_value.sival_int == 0x7788')
-		check(C.syscall(C.SYS_rt_sigtimedwait, &mask, &si, &zero, 8) == -1 && C.errno == C.EAGAIN, 148, c'syscall(SYS_rt_sigtimedwait, &mask, &si, &zero, 8) == -1 && errno == EAGAIN')
+		// As on Linux, the faulting copy consumed the one-shot timer's signal.
+		check(C.syscall(C.SYS_rt_sigtimedwait, &mask, &si, &zero, 8) == -1 && C.errno == C.EAGAIN, 146, c'syscall(SYS_rt_sigtimedwait, &mask, &si, &zero, 8) == -1 && errno == EAGAIN')
 		check(C.timer_delete(timer) == 0, 149, c'timer_delete(timer) == 0')
 		check(C.timer_create(C.CLOCK_MONOTONIC, &ev, &timer) == 0, 152, c'timer_create(CLOCK_MONOTONIC, &ev, &timer) == 0')
 		setting.it_interval.tv_nsec = 10000000
