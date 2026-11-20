@@ -14,6 +14,8 @@ import proc
 import resource
 import usercopy
 
+fn C.vinix_stack_alloc(size u64) voidptr
+
 // mremap(2) flags.
 pub const mremap_maymove = 1
 
@@ -218,9 +220,12 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		destination_offset = source_offset
 	}
 
-	mut destination_serial := u64(0)
 	// mmap only writes this synchronous stack output while publishing its VMA.
-	source_options.created_serial = unsafe { &destination_serial }
+	// A stack slot of its own: V moved the local whose address this took to
+	// the heap and never freed it, 16 bytes leaked by every moving mremap.
+	destination_slot := unsafe { &u64(C.vinix_stack_alloc(sizeof(u64))) }
+	unsafe { *destination_slot = 0 }
+	source_options.created_serial = destination_slot
 	destination := mmap_with_credit(pagemap, destination_hint, new_length, prot, destination_flags, source_resource, destination_offset, source_handle, source_handle_ref, source_handle_unref, old_length, source_options) or {
 		return errno.err, errno.get()
 	}
@@ -228,16 +233,16 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	// its child what the range was kept from children for.
 	if inheritance.dont_fork || inheritance.wipe_on_fork {
 		pagemap.l.acquire()
-		if !remap_span_unlocked(pagemap, u64(destination), new_length, destination_serial, true) {
+		if !remap_span_unlocked(pagemap, u64(destination), new_length, *destination_slot, true) {
 			failure := errno.get()
 			pagemap.l.release()
-			unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+			unmap_created_range(mut pagemap, u64(destination), new_length, *destination_slot)
 			return errno.err, failure
 		}
 		set_inheritance_unlocked(mut pagemap, u64(destination), new_length, inheritance) or {
 			failure := errno.get()
 			pagemap.l.release()
-			unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+			unmap_created_range(mut pagemap, u64(destination), new_length, *destination_slot)
 			return errno.err, failure
 		}
 		pagemap.l.release()
@@ -249,25 +254,25 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	if anonymous || map_flags & map_shared == 0 {
 		carried := if old_length < new_length { old_length } else { new_length }
 		if !copy_between_mappings(mut pagemap, u64(destination), old_address, carried,
-			source_options.credit_serial, destination_serial, source_file_page) {
+			source_options.credit_serial, *destination_slot, source_file_page) {
 			failure := errno.get()
-			unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+			unmap_created_range(mut pagemap, u64(destination), new_length, *destination_slot)
 			return errno.err, failure
 		}
 	}
 
 	pagemap.l.acquire()
 	if !remap_span_unlocked(pagemap, old_address, old_length, source_options.credit_serial, true)
-		|| !remap_span_unlocked(pagemap, u64(destination), new_length, destination_serial, false) {
+		|| !remap_span_unlocked(pagemap, u64(destination), new_length, *destination_slot, false) {
 		failure := errno.get()
 		pagemap.l.release()
-		unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+		unmap_created_range(mut pagemap, u64(destination), new_length, *destination_slot)
 		return errno.err, failure
 	}
 	munmap_unlocked(mut pagemap, voidptr(old_address), old_length) or {
 		failure := errno.get()
 		pagemap.l.release()
-		unmap_created_range(mut pagemap, u64(destination), new_length, destination_serial)
+		unmap_created_range(mut pagemap, u64(destination), new_length, *destination_slot)
 		return errno.err, failure
 	}
 	pagemap.l.release()
