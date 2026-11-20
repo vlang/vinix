@@ -707,19 +707,42 @@ pub fn (mut this Cache) prefetch(context voidptr, load IO, store IO, loc u64, co
 pub fn (mut this Cache) discard(loc u64, count u64) {
 	this.l.acquire()
 	defer { this.l.release() }
-	if !valid_range(loc, count, this.size) { return }
+	if count == 0 || !valid_range(loc, count, this.size) { return }
 	end := loc + count
+	// A short range, such as one freed filesystem block, is looked up page by
+	// page: walking the whole LRU for each of them, under this spinning lock,
+	// made deleting a large file cost a pass over every resident page per
+	// block.
+	first := loc / page_bytes
+	last := (end - 1) / page_bytes
+	if last - first < discard_lookup_pages {
+		for index := first; index <= last; index++ {
+			mut victim := this.resident_page(index)
+			if victim != unsafe { nil } && discardable(victim, loc, end) {
+				this.withdraw(mut victim)
+				free_page(victim)
+			}
+		}
+		return
+	}
 	mut page := this.lru_first
 	for page != unsafe { nil } {
 		mut victim := page
 		page = page.lru_next
-		start := victim.index * page_bytes
-		if !victim.dirty && !victim.writeback && start >= loc
-			&& start + victim.valid <= end {
+		if discardable(victim, loc, end) {
 			this.withdraw(mut victim)
 			free_page(victim)
 		}
 	}
+}
+
+// Up to this many pages, discard() looks each one up instead of walking the LRU.
+const discard_lookup_pages = u64(64)
+
+// A clean page, not in flight, lying wholly inside [loc, end).
+fn discardable(page &Page, loc u64, end u64) bool {
+	start := page.index * page_bytes
+	return !page.dirty && !page.writeback && start >= loc && start + page.valid <= end
 }
 
 // A journal has already made this complete page durable. Refresh existing
