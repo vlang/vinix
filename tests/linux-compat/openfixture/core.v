@@ -285,6 +285,34 @@ fn invalid_directory_creation() bool {
 	}
 }
 
+// RESOLVE_IN_ROOT: the descriptor is the root of the walk. An absolute path,
+// `..` and an absolute link stay inside it; a magic link may lead anywhere
+// and is refused (EXDEV), as Linux refuses it in a scoped lookup.
+fn in_root() bool {
+	unsafe {
+		root := C.open(c'/tmp/linux-open-dir', C.O_PATH | C.O_DIRECTORY)
+		slash := C.open(c'/', C.O_PATH | C.O_DIRECTORY)
+		inside := C.open(c'/tmp/linux-open-dir/in-root-file', C.O_CREAT | C.O_WRONLY, u32(0o600))
+		outside := C.open(c'/tmp/linux-open-in-root-outside', C.O_CREAT | C.O_WRONLY, u32(0o600))
+		if root < 0 || slash < 0 || inside < 0 || outside < 0 { return false }
+		C.close(inside)
+		C.close(outside)
+		defer {
+			C.close(root)
+			C.close(slash)
+		}
+		how := How{resolve: 0x10}
+		return open_at_result(root, c'/in-root-file', &how, 24, 0)
+			&& open_at_result(root, c'../../../in-root-file', &how, 24, 0)
+			&& open_at_result(root, c'../linux-open-in-root-outside', &how, 24, C.ENOENT)
+			&& open_at_result(root, c'/tmp/linux-open-in-root-outside', &how, 24, C.ENOENT)
+			&& open_at_result(root, c'link/linux-open-in-root-outside', &how, 24, C.ENOENT)
+			&& open_at_result(root, c'outside', &how, 24, C.ENOENT)
+			&& open_at_result(slash, c'tmp/linux-open-in-root-outside', &how, 24, 0)
+			&& open_at_result(slash, c'proc/self/exe', &how, 24, C.EXDEV)
+	}
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
@@ -326,10 +354,12 @@ pub fn run() i32 {
 		if !open_result(c'/tmp/linux-open-target', &how, 24, C.EINVAL) { return 1 }
 		how.resolve = 0x18
 		if !open_result(c'/tmp/linux-open-target', &how, 24, C.EINVAL) { return 1 }
-		for constraint in [u64(8), 16, 32, 9, 10, 20, 38]! {
+		// RESOLVE_BENEATH and RESOLVE_CACHED are not enforced, so refused.
+		for constraint in [u64(8), 32, 9, 10, 12, 38]! {
 			how.resolve = constraint
 			if !open_result(c'/tmp/linux-open-dir/link/linux-open-target', &how, 24, C.EOPNOTSUPP) { return 1 }
 		}
+		if !in_root() { return 1 }
 		C.puts(c'LINUX OPEN: PASS'); C.fflush(nil)
 		for { C.pause() }
 	}

@@ -26,6 +26,11 @@ pub mut:
 	user_stack   u64
 	syscall_num  u64
 	// Movable members
+	// During an openat2(RESOLVE_IN_ROOT) by this thread: the directory its
+	// walk treats as the root, and that directory's mount context (on the
+	// syscall's stack). Nil otherwise. See fs.syscall_openat_resolved.
+	resolve_root       voidptr
+	resolve_root_mount voidptr
 	// Linux task-local, sticky across clone/fork/exec. Atomic for procfs readers.
 	no_new_privs u32
 	// Linux task-local securebits, including the KEEP_CAPS behavior/lock pair.

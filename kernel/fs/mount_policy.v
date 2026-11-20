@@ -302,6 +302,12 @@ fn starting_mount(node &VFSNode, identity &lib.MountContext) bool {
 // Absolute paths use a single root/node snapshot, including when cwd names
 // the same inode through another alias after chroot.
 fn root_with_context(identity &lib.MountContext) ?&VFSNode {
+	// openat2(RESOLVE_IN_ROOT): the descriptor's directory is the root.
+	task := proc.current_thread()
+	if task != unsafe { nil } && task.resolve_root != unsafe { nil } {
+		lib.copy_mount_context(identity, unsafe { &lib.MountContext(task.resolve_root_mount) })
+		return unsafe { &VFSNode(task.resolve_root) }
+	}
 	root := proc.snapshot_root_directory(calling_process(), identity)
 	namespace_directory_context(identity)
 	node := if root == unsafe { nil } { vfs_root } else { unsafe { &VFSNode(root) } }

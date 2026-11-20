@@ -213,10 +213,11 @@ fn syscall_linux_openat2(gpr_state voidptr, dirfd int, path charptr, how_ptr u64
 		return errno.err, errno.einval
 	}
 	// Link constraints apply throughout the actual VFS walk and creation
-	// retry; mount constraints check the actual alias route. Containment and
-	// cache-only lookup still lack enforcement, so combinations requesting
-	// either of those are refused.
-	if how.resolve & ~u64(fs.resolve_no_xdev | fs.resolve_no_symlinks | fs.resolve_no_magiclinks) != 0 {
+	// retry; mount constraints check the actual alias route; RESOLVE_IN_ROOT
+	// walks with the descriptor as the root. RESOLVE_BENEATH and cache-only
+	// lookup still lack enforcement, so combinations requesting either of
+	// those are refused.
+	if how.resolve & ~u64(fs.resolve_no_xdev | fs.resolve_no_symlinks | fs.resolve_no_magiclinks | fs.resolve_in_root) != 0 {
 		return errno.err, errno.eopnotsupp
 	}
 	return fs.syscall_openat_resolved(gpr_state, dirfd, path, int(how.flags), u32(how.mode), how.resolve)

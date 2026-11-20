@@ -133,6 +133,11 @@ pub fn process_root(process &proc.Process) &VFSNode {
 }
 
 fn calling_root() &VFSNode {
+	// openat2(RESOLVE_IN_ROOT): `..` stops at the descriptor's directory too.
+	task := proc.current_thread()
+	if task != unsafe { nil } && task.resolve_root != unsafe { nil } {
+		return unsafe { &VFSNode(task.resolve_root) }
+	}
 	return process_root(calling_process())
 }
 

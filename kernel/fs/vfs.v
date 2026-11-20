@@ -29,6 +29,8 @@ pub const seek_hole = 4
 pub const resolve_no_xdev = u64(0x01)
 pub const resolve_no_magiclinks = u64(0x02)
 pub const resolve_no_symlinks = u64(0x04)
+// Resolve as if the descriptor's directory were the root (openat2).
+pub const resolve_in_root = u64(0x10)
 
 pub interface FileSystem {
 mut:
@@ -224,6 +226,12 @@ fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effectiv
 			errno.set(errno.eloop)
 			return unsafe { nil }
 		}
+		// A magic link can lead anywhere: a lookup scoped to a root refuses it
+		// (Linux returns EXDEV).
+		if resolve & resolve_in_root != 0 {
+			errno.set(errno.exdev)
+			return unsafe { nil }
+		}
 		target := magic_link_mount(node, identity)
 		if target == unsafe { nil } { return unsafe { nil } }
 		if !resolve_mount_allowed(resolve, previous_mount, identity) { return unsafe { nil } }
@@ -250,6 +258,10 @@ fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effectiv
 	if follow_symlinks && is_anonymous_descriptor_link(node) {
 		if resolve & resolve_no_magiclinks != 0 {
 			errno.set(errno.eloop)
+			return unsafe { nil }
+		}
+		if resolve & resolve_in_root != 0 {
+			errno.set(errno.exdev)
 			return unsafe { nil }
 		}
 		return unsafe { node }
@@ -1158,7 +1170,7 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 	if flags & (resource.o_creat | resource.o_directory) == (resource.o_creat | resource.o_directory) {
 		return errno.err, errno.einval
 	}
-	if resolve & ~(resolve_no_xdev | resolve_no_magiclinks | resolve_no_symlinks) != 0 {
+	if resolve & ~(resolve_no_xdev | resolve_no_magiclinks | resolve_no_symlinks | resolve_in_root) != 0 {
 		return errno.err, errno.eopnotsupp
 	}
 	mut current_thread := proc.current_thread()
@@ -1178,6 +1190,23 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 
 	if path.len == 0 {
 		return errno.err, errno.enoent
+	}
+
+	// RESOLVE_IN_ROOT: for this walk the calling thread sees the descriptor's
+	// directory as its root, as if chrooted there: an absolute path or link
+	// starts from it and `..` stops at it (root_with_context, calling_root).
+	defer {
+		current_thread.resolve_root = unsafe { nil }
+		current_thread.resolve_root_mount = unsafe { nil }
+	}
+	if resolve & resolve_in_root != 0 {
+		root_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+		root := parent_and_mount_for(dirfd, '.', root_mount) or { return errno.err, errno.get() }
+		if root.resource == unsafe { nil } || !stat.isdir(root.resource.stat.mode) {
+			return errno.err, errno.enotdir
+		}
+		current_thread.resolve_root = voidptr(root)
+		current_thread.resolve_root_mount = voidptr(root_mount)
 	}
 
 	open_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
