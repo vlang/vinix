@@ -54,6 +54,8 @@ fn C.read(i32, voidptr, usize) isize
 fn C.close(i32) i32
 fn C.strcmp(&char, &char) i32
 fn C.memset(voidptr, i32, usize) voidptr
+// Heap-moved locals would need memdup, which this freestanding build lacks.
+fn C.__builtin_alloca(usize) voidptr
 fn C.strtok(&char, &char) &char
 fn C.sscanf(&char, &char, ...) i32
 fn C.printf(&char, ...) i32
@@ -202,15 +204,17 @@ fn measurement() i32 {
 	unsafe {
 		for _ in 0 .. 30 { if !check(operation() == 0, 71) { return -1 } }
 		if !check(pause_ns(6100000000) == 0, 72) { return -1 }
-		mut a := C.stat_guest_snapshot{}
-		mut b := C.stat_guest_snapshot{}
-		if !check(snapshot(&a) == 0, 73) { return -1 }
+		a := &C.stat_guest_snapshot(C.__builtin_alloca(sizeof(C.stat_guest_snapshot)))
+		b := &C.stat_guest_snapshot(C.__builtin_alloca(sizeof(C.stat_guest_snapshot)))
+		if !check(snapshot(a) == 0, 73) { return -1 }
 		for cohort := i32(1); cohort <= 3; cohort++ {
-			if !check(read_proc(c'/proc/allocstart') == 0 && snapshot(&a) == 0, 75) { return -1 }
+			if !check(read_proc(c'/proc/allocstart') == 0 && snapshot(a) == 0, 75) { return -1 }
 			for _ in 0 .. 300 { if !check(operation() == 0, 76) { return -1 } }
-			if !check(pause_ns(6100000000) == 0 && snapshot(&b) == 0 && report(c'stat', cohort, 300, &a, &b) == 0, 77) { return -1 }
+			if !check(pause_ns(6100000000) == 0 && snapshot(b) == 0 && report(c'stat', cohort, 300, a, b) == 0, 77) { return -1 }
 			for i := u32(0); i < a.count; i++ {
-				if !check(a.live[i] == b.live[i] && a.pages[i] == b.pages[i], 79) { return -1 }
+				// Each class keeps up to one empty spare page in the global list and in
+				// each of its eight per-CPU shards (kernel/memory/slab_shards.v).
+				if !check(a.live[i] == b.live[i] && b.pages[i] <= a.pages[i] + 9, 79) { return -1 }
 			}
 			if !check(a.large == b.large && a.uaf == b.uaf, 80) { return -1 }
 		}

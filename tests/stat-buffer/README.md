@@ -3,8 +3,10 @@
 This native guest checks fstat and newfstatat output fields, AT_EMPTY_PATH,
 EBADF, ENOENT, bad input pointers and bad output pointers. After warming the
 same calls, each of three windows performs 300 iterations of eight raw system
-calls. Every live heap class and its slab pages, the large-page count and
-written-after-free counter must remain unchanged. Class-count guards cover all 18 ARM and 14 x86
+calls. Every live heap class, the large-page count and
+written-after-free counter must remain unchanged; a class may hold up to nine
+more slab pages, the empty spares of its global list and eight per-CPU shards.
+Class-count guards cover all 18 ARM and 14 x86
 classes. A monotonic 6.1-second grace cannot be shortened by an interrupted
 sleep. Allocation-site output is included when the kernel has ALLOC_TRACK=1.
 
