@@ -448,9 +448,11 @@ pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
 		parent = ensure_devtmpfs_dir(devtmpfs_root, 'dri')
 	}
 	primary_leaf.parent = unsafe { parent }
+	primary_leaf.filesystem = parent.filesystem
 	init_devtmpfs_node(mut primary_leaf, card, true)
 	if render_leaf != unsafe { nil } {
 		render_leaf.parent = unsafe { parent }
+		render_leaf.filesystem = parent.filesystem
 		init_devtmpfs_node(mut render_leaf, render, true)
 		// Directory readers see the pair when the map lock is released.
 		children_lock.acquire()
@@ -489,9 +491,12 @@ fn prepare_dri_leaf(name string) ?&VFSNode {
 	return node
 }
 
-// Caller holds vfs_lock. The node takes ownership of leaf.
+// Caller holds vfs_lock. The node takes ownership of leaf. A leaf belongs to
+// its directory's mount, as ensure_devtmpfs_dir's directories do: each mount
+// instantiates its own filesystem, and link(2) and rename(2) refuse to cross
+// from one to another.
 fn publish_devtmpfs_device(device &resource.Resource, parent &VFSNode, leaf string, seat bool) {
-	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, leaf, false)
+	mut new_node := create_node(parent.filesystem, parent, leaf, false)
 	init_devtmpfs_node(mut new_node, device, seat)
 	publish_child(parent, new_node.name, new_node)
 }
