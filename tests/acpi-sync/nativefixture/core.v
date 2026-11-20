@@ -9,6 +9,8 @@ struct C.pthread_t {}
 @[typedef]
 struct C.vacpi_ull {}
 fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memset(voidptr, i32, usize) voidptr
+fn C.__builtin_alloca(usize) voidptr
 type WorkerCallback = fn (voidptr) voidptr
 fn C.pthread_create(voidptr, voidptr, WorkerCallback, voidptr) i32
 fn C.pthread_join(C.pthread_t, voidptr) i32
@@ -167,20 +169,23 @@ pub fn delayed_signal(argument voidptr) voidptr {
 pub fn native_test() i32 {
 	unsafe {
 		if !check(counter_and_timeouts() == 0, 140) { return -1 }
-		mut shared := Workers{}
+		// A stack slot the worker threads share: V moves a local whose address
+		// is taken to the heap, and this fixture has no allocator for it.
+		mut shared := &Workers(C.__builtin_alloca(sizeof(Workers)))
+		C.memset(shared, 0, sizeof(Workers))
 		mut workers := [4]Worker{}
 		mut threads := [4]C.pthread_t{}
 		shared.mutex = C.vinix_acpi_sync_create(true)
 		shared.event = C.vinix_acpi_sync_create(false)
 		if !check(shared.mutex != nil && shared.event != nil, 146) { return -1 }
 		if !check(C.vinix_acpi_sync_wait(shared.mutex, 0) == 0, 147) { return -1 }
-		if !check(C.pthread_create(&threads[0], nil, C.vinix_acpi_fixture_wrong_owner, &shared) == 0, 148) { return -1 }
+		if !check(C.pthread_create(&threads[0], nil, C.vinix_acpi_fixture_wrong_owner, shared) == 0, 148) { return -1 }
 		if !check(C.pthread_join(threads[0], nil) == 0, 149) { return -1 }
 		if !check(shared.failures == 0, 150) { return -1 }
 		if !check(C.vinix_acpi_sync_wait(shared.mutex, 0) == 18, 151) { return -1 }
 		if !check(C.vinix_acpi_sync_signal(shared.mutex), 152) { return -1 }
 		for i in 0 .. 4 {
-			workers[i].shared = &shared
+			workers[i].shared = shared
 			workers[i].index = u32(i)
 			if !check(C.pthread_create(&threads[i], nil, C.vinix_acpi_fixture_mutex_worker, &workers[i]) == 0, 156) { return -1 }
 		}
