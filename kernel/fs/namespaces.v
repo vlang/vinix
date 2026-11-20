@@ -272,18 +272,17 @@ pub fn create_namespaces(mut process proc.Process, flags u64, for_child bool) {
 	if flags & proc.clone_newipc != 0 {
 		process.ns.ipc = replace_namespace(process, mut process.ns.ipc)
 	}
-	proc.unlock_table()
-	if flags & proc.clone_newns != 0 {
-		process.ns.mnt = replace_namespace(process, mut process.ns.mnt)
-	}
+	// The other swaps too, as setns makes them: two threads unsharing at once
+	// must not both drop the reference to the same old namespace. Only the
+	// mount table, whose copy takes the VFS locks, is replaced outside.
 	if flags & proc.clone_newuts != 0 {
 		process.ns.uts = replace_namespace(process, mut process.ns.uts)
 	}
-	if flags & proc.clone_newnet != 0 {
-		process.ns.net = replace_namespace(process, mut process.ns.net)
-	}
 	if flags & proc.clone_newcgroup != 0 {
 		process.ns.cgroup = replace_namespace(process, mut process.ns.cgroup)
+	}
+	if flags & proc.clone_newnet != 0 {
+		process.ns.net = replace_namespace(process, mut process.ns.net)
 	}
 	if flags & proc.clone_newtime != 0 {
 		process.ns.time = replace_namespace(process, mut process.ns.time)
@@ -302,6 +301,10 @@ pub fn create_namespaces(mut process proc.Process, flags u64, for_child bool) {
 			release_namespace(mut process.ns.pid)
 			process.ns.pid = proc.get_namespace(mut fresh)
 		}
+	}
+	proc.unlock_table()
+	if flags & proc.clone_newns != 0 {
+		process.ns.mnt = replace_namespace(process, mut process.ns.mnt)
 	}
 }
 
@@ -420,7 +423,21 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 	if ns.kind & proc.unsupported_setns_flags != 0 {
 		return errno.err, errno.einval
 	}
-	if !proc.current_has_capability(proc.cap_sys_admin) {
+	// Linux checks each kind (ns->ops->install): CAP_SYS_ADMIN in the
+	// caller's own user namespace and over the target's owner. So a sandbox
+	// root may rejoin a UTS, IPC or cgroup namespace its own user namespace
+	// owns. Mount and PID namespaces still need the initial user namespace's
+	// capability: joining one changes what the caller's root or pids mean.
+	// Network, time and user namespaces were refused above.
+	owned_kinds := proc.clone_newuts | proc.clone_newipc | proc.clone_newcgroup
+	allowed := if ns.kind & owned_kinds != 0 {
+		owner := if ns.kind == proc.clone_newipc { ns.ipc_user_ns } else { ns.owner_user }
+		proc.has_own_capability(process, proc.cap_sys_admin)
+			&& proc.has_namespace_capability(process, proc.cap_sys_admin, owner)
+	} else {
+		proc.current_has_capability(proc.cap_sys_admin)
+	}
+	if !allowed {
 		return errno.err, errno.eperm
 	}
 	match ns.kind {
@@ -457,15 +474,22 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 			proc.set_current_fs(mut process, voidptr(node), identity)
 		}
 		proc.clone_newuts {
+			// Swapped under the table lock, like IPC and create_namespaces:
+			// concurrent swaps must not release the same old namespace twice.
+			proc.lock_table()
 			mut old := process.ns.uts
-			process.ns.uts = proc.get_namespace(mut ns)
+			if !proc.try_get_namespace(mut ns) {
+				proc.unlock_table()
+				return errno.err, errno.enoent
+			}
+			process.ns.uts = ns
+			proc.unlock_table()
 			release_namespace(mut old)
 		}
 		proc.clone_newipc {
 			proc.lock_table()
-			if !proc.has_capability(process, proc.cap_sys_admin)
-				|| (!proc.is_initial_namespace(process.ns.user)
-					&& process.ns.user.id != ns.ipc_user_ns) {
+			// Rechecked under the lock that orders it with unshare and clone.
+			if !proc.has_namespace_capability(process, proc.cap_sys_admin, ns.ipc_user_ns) {
 				proc.unlock_table()
 				return errno.err, errno.eperm
 			}
@@ -489,8 +513,14 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 			release_namespace(mut old)
 		}
 		proc.clone_newcgroup {
+			proc.lock_table()
 			mut old := process.ns.cgroup
-			process.ns.cgroup = proc.get_namespace(mut ns)
+			if !proc.try_get_namespace(mut ns) {
+				proc.unlock_table()
+				return errno.err, errno.enoent
+			}
+			process.ns.cgroup = ns
+			proc.unlock_table()
 			release_namespace(mut old)
 		}
 		proc.clone_newuser {
