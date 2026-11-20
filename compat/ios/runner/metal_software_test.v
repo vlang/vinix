@@ -7235,6 +7235,175 @@ define void @image_air_half_clamp(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1
  ret void }
 
 ')
+
+	names << 'image_air_half_vector_unary'
+	source.write_string('declare <2 x half> @air.fabs.v2f16(<2 x half>) #0
+declare <2 x half> @air.floor.v2f16(<2 x half>) #0
+declare <2 x half> @air.ceil.v2f16(<2 x half>) #0
+declare <2 x half> @air.trunc.v2f16(<2 x half>) #0
+declare <2 x half> @air.sqrt.v2f16(<2 x half>) #0
+declare <2 x half> @air.round.v2f16(<2 x half>) #0
+declare <2 x half> @air.rint.v2f16(<2 x half>) #0
+define void @image_air_half_vector_unary(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1) %out) {
+ %x = extractelement <3 x i32> %gid,i32 0
+ %y = extractelement <3 x i32> %gid,i32 1
+ %w = extractelement <3 x i32> %grid,i32 0
+ %h = extractelement <3 x i32> %grid,i32 1
+ %which = and i32 %x,3
+ %sign_raw = and i32 %x,4
+ %sign0 = shl i32 %sign_raw,13
+ %sign1 = xor i32 %sign0,32768
+ %sign1_hi = shl i32 %sign1,16
+ %signs = or i32 %sign0,%sign1_hi
+ %negative = icmp ne i32 %sign0,0
+ %s0 = icmp eq i32 %which,0
+ %s1 = icmp eq i32 %which,1
+ %s2 = icmp eq i32 %which,2
+ %u_mag2 = select i1 %s2,i32 15872,i32 31745
+ %u_mag1 = select i1 %s1,i32 15616,i32 %u_mag2
+ %u_mag = select i1 %s0,i32 1,i32 %u_mag1
+ %u_mag_hi = shl i32 %u_mag,16
+ %u_pair = or i32 %u_mag,%u_mag_hi
+ %u_word = or i32 %u_pair,%signs
+ %u = bitcast i32 %u_word to <2 x half>
+ %t_mag2 = select i1 %s2,i32 16640,i32 17152
+ %t_mag1 = select i1 %s1,i32 15872,i32 %t_mag2
+ %t_mag = select i1 %s0,i32 14336,i32 %t_mag1
+ %t_mag_hi = shl i32 %t_mag,16
+ %t_pair = or i32 %t_mag,%t_mag_hi
+ %t_word = or i32 %t_pair,%signs
+ %t = bitcast i32 %t_word to <2 x half>
+ %q_mag2 = select i1 %s2,i32 0,i32 31745
+ %q_mag1 = select i1 %s1,i32 18560,i32 %q_mag2
+ %q_mag = select i1 %s0,i32 17408,i32 %q_mag1
+ %q_mag_hi = shl i32 %q_mag,16
+ %q_pair = or i32 %q_mag,%q_mag_hi
+ %q_word = or i32 %q_pair,%signs
+ %q = bitcast i32 %q_word to <2 x half>
+ %fabs = call <2 x half> @air.fabs.v2f16(<2 x half> %u)
+ %fabs_bits = bitcast <2 x half> %fabs to i32
+ %fabs_ok = icmp eq i32 %fabs_bits,%u_pair
+ %floor_p2 = select i1 %s2,i32 15360,i32 32256
+ %floor_p1 = select i1 %s1,i32 15360,i32 %floor_p2
+ %floor_p = select i1 %s0,i32 0,i32 %floor_p1
+ %floor_n2 = select i1 %s2,i32 49152,i32 32256
+ %floor_n1 = select i1 %s1,i32 49152,i32 %floor_n2
+ %floor_n = select i1 %s0,i32 48128,i32 %floor_n1
+ %floor_lane0 = select i1 %negative,i32 %floor_n,i32 %floor_p
+ %floor_lane1 = select i1 %negative,i32 %floor_p,i32 %floor_n
+ %floor_hi = shl i32 %floor_lane1,16
+ %floor_expected = or i32 %floor_lane0,%floor_hi
+ %floor = call <2 x half> @air.floor.v2f16(<2 x half> %u)
+ %floor_bits = bitcast <2 x half> %floor to i32
+ %floor_ok = icmp eq i32 %floor_bits,%floor_expected
+ %ceil_p2 = select i1 %s2,i32 16384,i32 32256
+ %ceil_p1 = select i1 %s1,i32 16384,i32 %ceil_p2
+ %ceil_p = select i1 %s0,i32 15360,i32 %ceil_p1
+ %ceil_n2 = select i1 %s2,i32 48128,i32 32256
+ %ceil_n1 = select i1 %s1,i32 48128,i32 %ceil_n2
+ %ceil_n = select i1 %s0,i32 32768,i32 %ceil_n1
+ %ceil_lane0 = select i1 %negative,i32 %ceil_n,i32 %ceil_p
+ %ceil_lane1 = select i1 %negative,i32 %ceil_p,i32 %ceil_n
+ %ceil_hi = shl i32 %ceil_lane1,16
+ %ceil_expected = or i32 %ceil_lane0,%ceil_hi
+ %ceil = call <2 x half> @air.ceil.v2f16(<2 x half> %u)
+ %ceil_bits = bitcast <2 x half> %ceil to i32
+ %ceil_ok = icmp eq i32 %ceil_bits,%ceil_expected
+ %trunc_p2 = select i1 %s2,i32 15360,i32 32256
+ %trunc_p1 = select i1 %s1,i32 15360,i32 %trunc_p2
+ %trunc_p = select i1 %s0,i32 0,i32 %trunc_p1
+ %trunc_n2 = select i1 %s2,i32 48128,i32 32256
+ %trunc_n1 = select i1 %s1,i32 48128,i32 %trunc_n2
+ %trunc_n = select i1 %s0,i32 32768,i32 %trunc_n1
+ %trunc_lane0 = select i1 %negative,i32 %trunc_n,i32 %trunc_p
+ %trunc_lane1 = select i1 %negative,i32 %trunc_p,i32 %trunc_n
+ %trunc_hi = shl i32 %trunc_lane1,16
+ %trunc_expected = or i32 %trunc_lane0,%trunc_hi
+ %trunc = call <2 x half> @air.trunc.v2f16(<2 x half> %u)
+ %trunc_bits = bitcast <2 x half> %trunc to i32
+ %trunc_ok = icmp eq i32 %trunc_bits,%trunc_expected
+ %sqrt_p2 = select i1 %s2,i32 0,i32 32256
+ %sqrt_p1 = select i1 %s1,i32 16896,i32 %sqrt_p2
+ %sqrt_p = select i1 %s0,i32 16384,i32 %sqrt_p1
+ %sqrt_n2 = select i1 %s2,i32 32768,i32 32256
+ %sqrt_n1 = select i1 %s1,i32 32256,i32 %sqrt_n2
+ %sqrt_n = select i1 %s0,i32 32256,i32 %sqrt_n1
+ %sqrt_lane0 = select i1 %negative,i32 %sqrt_n,i32 %sqrt_p
+ %sqrt_lane1 = select i1 %negative,i32 %sqrt_p,i32 %sqrt_n
+ %sqrt_hi = shl i32 %sqrt_lane1,16
+ %sqrt_expected = or i32 %sqrt_lane0,%sqrt_hi
+ %sqrt = call <2 x half> @air.sqrt.v2f16(<2 x half> %q)
+ %sqrt_bits = bitcast <2 x half> %sqrt to i32
+ %sqrt_ok = icmp eq i32 %sqrt_bits,%sqrt_expected
+ %round_m2 = select i1 %s2,i32 16896,i32 17408
+ %round_m1 = select i1 %s1,i32 16384,i32 %round_m2
+ %round_m = select i1 %s0,i32 15360,i32 %round_m1
+ %round_m_hi = shl i32 %round_m,16
+ %round_pair = or i32 %round_m,%round_m_hi
+ %round_expected = or i32 %round_pair,%signs
+ %round = call <2 x half> @air.round.v2f16(<2 x half> %t)
+ %round_bits = bitcast <2 x half> %round to i32
+ %round_ok = icmp eq i32 %round_bits,%round_expected
+ %rint_m2 = select i1 %s2,i32 16384,i32 17408
+ %rint_m1 = select i1 %s1,i32 16384,i32 %rint_m2
+ %rint_m = select i1 %s0,i32 0,i32 %rint_m1
+ %rint_m_hi = shl i32 %rint_m,16
+ %rint_pair = or i32 %rint_m,%rint_m_hi
+ %rint_expected = or i32 %rint_pair,%signs
+ %rint = call <2 x half> @air.rint.v2f16(<2 x half> %t)
+ %rint_bits = bitcast <2 x half> %rint to i32
+ %rint_ok = icmp eq i32 %rint_bits,%rint_expected
+ %u0 = extractelement <2 x half> %u,i32 0
+ %lane_poison = call half @air.clamp.f16(half %u0,half 1.0,half -1.0)
+ %partial = insertelement <2 x half> %u,half %lane_poison,i32 1
+ %partial_floor = call <2 x half> @air.floor.v2f16(<2 x half> %partial)
+ %kept = extractelement <2 x half> %partial_floor,i32 0
+ %kept_bits = bitcast half %kept to i16
+ %floor_low = trunc i32 %floor_bits to i16
+ %kept_ok = icmp eq i16 %kept_bits,%floor_low
+ %lost = extractelement <2 x half> %partial_floor,i32 1
+ %frozen = freeze half %lost
+ %frozen_bits = bitcast half %frozen to i16
+ %frozen_ok = icmp eq i16 %frozen_bits,0
+ %ok0 = and i1 %fabs_ok,%floor_ok
+ %ok1 = and i1 %ceil_ok,%trunc_ok
+ %ok2 = and i1 %sqrt_ok,%round_ok
+ %ok3 = and i1 %rint_ok,%kept_ok
+ %ok4 = and i1 %ok0,%ok1
+ %ok5 = and i1 %ok2,%ok3
+ %ok6 = and i1 %ok4,%ok5
+ %ok = and i1 %ok6,%frozen_ok
+ %f0 = xor i32 %fabs_bits,%floor_bits
+ %f1 = xor i32 %ceil_bits,%trunc_bits
+ %f2 = xor i32 %sqrt_bits,%round_bits
+ %f3 = xor i32 %f0,%f1
+ %f4 = xor i32 %f2,%rint_bits
+ %f = xor i32 %f3,%f4
+ %f_hi = lshr i32 %f,16
+ %f16 = xor i32 %f,%f_hi
+ %f_byte = lshr i32 %f16,8
+ %folded = xor i32 %f16,%f_byte
+ %color = select i1 %ok,i32 %folded,i32 poison
+ %row = shl i32 %y,6
+ %index = add i32 %row,%x
+ %p = getelementptr i32,ptr addrspace(1) %out,i32 %index
+ %red = mul i32 %x,3
+ %mixed = xor i32 %red,%color
+ %redbyte = and i32 %mixed,255
+ %gg = mul i32 %y,5
+ %g0 = and i32 %gg,255
+ %g = shl i32 %g0,8
+ %wh = add i32 %w,%h
+ %bb = mul i32 %wh,7
+ %b0 = and i32 %bb,255
+ %blue = shl i32 %b0,16
+ %rg = or i32 %redbyte,%g
+ %rgb = or i32 %rg,%blue
+ %rgba = or i32 %rgb,4278190080
+ store i32 %rgba,ptr addrspace(1) %p,align 4
+ ret void }
+
+')
 	source.write_string('!air.kernel = !{'); for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 20}') }; source.write_string('}\n')
 	for i, name in names {
 		n := i * 20
@@ -7248,7 +7417,7 @@ define void @image_air_half_clamp(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1
 			source.write_string('!${n + 8} = !{i32 5, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
 		} else {
 			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
-			if i == 2 || name in ['image_air_half_clamp', 'image_air_half_extrema', 'image_air_half_fma', 'image_air_half_math', 'image_air_half_unary', 'image_air_zero_count64', 'image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast', 'image_saturating_cast', 'image_scalar_vector_bitcast', 'image_scalar_bitcast_index', 'image_bit_permutation', 'image_clmul', 'image_reduction', 'image_reduction_index', 'image_float_reduction', 'image_sequential_reduction', 'image_number_reduction', 'image_modern_number_reduction', 'image_vector_phi', 'image_canonicalize', 'image_air_extrema', 'image_air_clamp', 'image_mulh', 'image_reverse', 'image_splice', 'image_interleave', 'image_stepvector', 'image_active_mask', 'image_subvector', 'image_subinsert'] {
+			if i == 2 || name in ['image_air_half_vector_unary', 'image_air_half_clamp', 'image_air_half_extrema', 'image_air_half_fma', 'image_air_half_math', 'image_air_half_unary', 'image_air_zero_count64', 'image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast', 'image_saturating_cast', 'image_scalar_vector_bitcast', 'image_scalar_bitcast_index', 'image_bit_permutation', 'image_clmul', 'image_reduction', 'image_reduction_index', 'image_float_reduction', 'image_sequential_reduction', 'image_number_reduction', 'image_modern_number_reduction', 'image_vector_phi', 'image_canonicalize', 'image_air_extrema', 'image_air_clamp', 'image_mulh', 'image_reverse', 'image_splice', 'image_interleave', 'image_stepvector', 'image_active_mask', 'image_subvector', 'image_subinsert'] {
 				source.write_string('!${n + 3} = !{i32 0, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.threads_per_grid"}\n')
 			} else if i < 3 + bad.len * 3 {
 				semantic := semantics[2 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
@@ -7282,7 +7451,7 @@ define void @image_air_half_clamp(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1
 		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
 		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'size library')
 		queue := sm_send(device, c'newCommandQueue')
-		for name in names[3..names.len - 35] {
+		for name in names[3..names.len - 36] {
 			mut error_slot := u64(0)
 			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
 			sm_grid_check(sm_send(error_slot, c'code') == 3, 'size pipeline diagnostic'); rejected++
@@ -7334,7 +7503,7 @@ define void @image_air_half_clamp(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1
 			objc_release(pipeline)
 		}
 		objc_release(output)
-		for image_name in [names[2], names[names.len - 35], names[names.len - 34], names[names.len - 33], names[names.len - 32], names[names.len - 31], names[names.len - 30], names[names.len - 29], names[names.len - 28], names[names.len - 27], names[names.len - 26], names[names.len - 25], names[names.len - 24], names[names.len - 23], names[names.len - 22], names[names.len - 21], names[names.len - 20], names[names.len - 19], names[names.len - 18], names[names.len - 17], names[names.len - 16], names[names.len - 15], names[names.len - 14], names[names.len - 13], names[names.len - 12], names[names.len - 11], names[names.len - 10], names[names.len - 9], names[names.len - 8], names[names.len - 7], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
+		for image_name in [names[2], names[names.len - 36], names[names.len - 35], names[names.len - 34], names[names.len - 33], names[names.len - 32], names[names.len - 31], names[names.len - 30], names[names.len - 29], names[names.len - 28], names[names.len - 27], names[names.len - 26], names[names.len - 25], names[names.len - 24], names[names.len - 23], names[names.len - 22], names[names.len - 21], names[names.len - 20], names[names.len - 19], names[names.len - 18], names[names.len - 17], names[names.len - 16], names[names.len - 15], names[names.len - 14], names[names.len - 13], names[names.len - 12], names[names.len - 11], names[names.len - 10], names[names.len - 9], names[names.len - 8], names[names.len - 7], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
 		mut image_error := u64(0)
 		pipeline := sm_test_compute_pipeline(device, library, image_name, &image_error)
 		if pipeline == 0 { panic('software Metal image ${image_name}: ' + string_text(sm_send(image_error, c'localizedDescription'))) }
@@ -7396,7 +7565,7 @@ define void @image_air_half_clamp(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1
 					match x % 16 { 0 { signed = 0; unsigned = 0 } 1 { signed = 127; unsigned = 255 } 2 { signed = -128; unsigned = 0 } else {} }
 					cast_bits = u8(signed) ^ u8(unsigned)
 				}
-				color := [if image_name == 'image_air_half_clamp' { sm_test_air_half_clamp_red(x) } else if image_name == 'image_air_half_extrema' { sm_test_air_half_extrema_red(x) } else if image_name == 'image_air_half_fma' { sm_test_air_half_fma_red(x) } else if image_name == 'image_air_half_math' { sm_test_air_half_math_red(x) } else if image_name == 'image_air_half_unary' { sm_test_air_half_unary_red(x) } else if image_name == 'image_subinsert' { u8(x * 3) ^ u8((x & 15) + if (x & 15) >= 4 && (x & 15) < 8 { 8 } else { 0 }) ^ u8(12 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_subvector' { u8(x * 3) ^ u8(8 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_active_mask' { u8(x * 3) ^ u8(x + (x & 15) < 17) ^ u8(1) } else if image_name == 'image_stepvector' { u8(x * 3) ^ u8((x & 15) ^ 2) } else if image_name in ['image_reverse','image_splice','image_interleave'] { u8(x * 3) ^ u8(x | 1) ^ u8(x) ^ u8((x | 1) << 1) ^ u8(48) } else if image_name == 'image_mulh' { u8(x * 3) ^ u8(if x == 0 { u64(0) } else { u64(255) }) ^ u8(x + 127) ^ u8(if x == 0 { u64(0) } else { x - 1 }) } else if image_name in ['image_air_zero_count64', 'image_canonicalize', 'image_air_extrema', 'image_air_clamp'] { u8(x * 3) ^ u8(x) ^ u8(63) } else if image_name == 'image_vector_phi' { u8(x * 3) ^ u8(x + y + if x % 2 != 0 { 3 } else { 7 }) ^ u8(if x % 2 != 0 { 5 } else { 11 }) } else if image_name == 'image_modern_number_reduction' { u8(x * 3) ^ u8(if x > y { x - y } else { y - x }) } else if image_name == 'image_number_reduction' { u8(x * 3) ^ u8(x + y) } else if image_name == 'image_sequential_reduction' { u8(x * 3) ^ u8(1 + x + y) } else if image_name == 'image_float_reduction' { u8(x * 3) ^ u8(if x > y {x} else {y}) } else if image_name in ['image_reduction', 'image_reduction_index'] { u8(x * 3) ^ u8(x + y + shape.width + shape.height) } else if image_name == 'image_clmul' { u8(x * 3) ^ u8(x ^ (x << 1)) } else if image_name == 'image_bit_permutation' { u8(x * 3) ^ u8((x & 1) | ((x >> 1) & 2) | ((x >> 2) & 4) | ((x >> 3) & 8)) } else if image_name == 'image_scalar_bitcast_index' { u8(x * 3) } else if image_name == 'image_scalar_vector_bitcast' { u8(x * 3) ^ u8((u32(x) | u32(2143289344)) >> (u32(x % 4) * 8)) ^ u8(127) } else if image_name == 'image_saturating_cast' { u8(x * 3) ^ cast_bits } else if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) ^ population }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
+				color := [if image_name == 'image_air_half_vector_unary' { sm_test_air_half_vector_unary_red(x) } else if image_name == 'image_air_half_clamp' { sm_test_air_half_clamp_red(x) } else if image_name == 'image_air_half_extrema' { sm_test_air_half_extrema_red(x) } else if image_name == 'image_air_half_fma' { sm_test_air_half_fma_red(x) } else if image_name == 'image_air_half_math' { sm_test_air_half_math_red(x) } else if image_name == 'image_air_half_unary' { sm_test_air_half_unary_red(x) } else if image_name == 'image_subinsert' { u8(x * 3) ^ u8((x & 15) + if (x & 15) >= 4 && (x & 15) < 8 { 8 } else { 0 }) ^ u8(12 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_subvector' { u8(x * 3) ^ u8(8 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_active_mask' { u8(x * 3) ^ u8(x + (x & 15) < 17) ^ u8(1) } else if image_name == 'image_stepvector' { u8(x * 3) ^ u8((x & 15) ^ 2) } else if image_name in ['image_reverse','image_splice','image_interleave'] { u8(x * 3) ^ u8(x | 1) ^ u8(x) ^ u8((x | 1) << 1) ^ u8(48) } else if image_name == 'image_mulh' { u8(x * 3) ^ u8(if x == 0 { u64(0) } else { u64(255) }) ^ u8(x + 127) ^ u8(if x == 0 { u64(0) } else { x - 1 }) } else if image_name in ['image_air_zero_count64', 'image_canonicalize', 'image_air_extrema', 'image_air_clamp'] { u8(x * 3) ^ u8(x) ^ u8(63) } else if image_name == 'image_vector_phi' { u8(x * 3) ^ u8(x + y + if x % 2 != 0 { 3 } else { 7 }) ^ u8(if x % 2 != 0 { 5 } else { 11 }) } else if image_name == 'image_modern_number_reduction' { u8(x * 3) ^ u8(if x > y { x - y } else { y - x }) } else if image_name == 'image_number_reduction' { u8(x * 3) ^ u8(x + y) } else if image_name == 'image_sequential_reduction' { u8(x * 3) ^ u8(1 + x + y) } else if image_name == 'image_float_reduction' { u8(x * 3) ^ u8(if x > y {x} else {y}) } else if image_name in ['image_reduction', 'image_reduction_index'] { u8(x * 3) ^ u8(x + y + shape.width + shape.height) } else if image_name == 'image_clmul' { u8(x * 3) ^ u8(x ^ (x << 1)) } else if image_name == 'image_bit_permutation' { u8(x * 3) ^ u8((x & 1) | ((x >> 1) & 2) | ((x >> 2) & 4) | ((x >> 3) & 8)) } else if image_name == 'image_scalar_bitcast_index' { u8(x * 3) } else if image_name == 'image_scalar_vector_bitcast' { u8(x * 3) ^ u8((u32(x) | u32(2143289344)) >> (u32(x % 4) * 8)) ^ u8(127) } else if image_name == 'image_saturating_cast' { u8(x * 3) ^ cast_bits } else if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) ^ population }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
 				for lane in 0 .. 4 {
 					sm_grid_check(pixels[int((y * shape.width + x) * 4) + lane] == color[lane], 'RGBA8 texture readback')
 					expected[int(256 + y * 256 + x * 4) + lane] = color[lane]
@@ -7864,4 +8033,19 @@ fn sm_test_air_half_clamp_red(x u64) u8 {
  words:=[u16(0),0x8000,0xbc00,0x3800,0x3c00,1,0x7c00,0x7e00]!
  value:=words[int(x&7)]
  return u8(x*3)^u8(value)^u8(value>>8)
+}
+
+fn sm_test_air_half_vector_unary_red(x u64) u8 {
+ // Expected [positive, negative] lane bits for subnormal, 1.25, 1.5 and signaling NaN
+ // inputs (sqrt: 4, 9, 0, NaN; round/rint: 0.5, 1.5, 2.5, 3.5). Lanes carry both signs.
+ fabs := [u16(1),1,0x3d00,0x3d00,0x3e00,0x3e00,0x7c01,0x7c01]!
+ floors := [u16(0),0xbc00,0x3c00,0xc000,0x3c00,0xc000,0x7e00,0x7e00]!
+ ceilings := [u16(0x3c00),0x8000,0x4000,0xbc00,0x4000,0xbc00,0x7e00,0x7e00]!
+ truncations := [u16(0),0x8000,0x3c00,0xbc00,0x3c00,0xbc00,0x7e00,0x7e00]!
+ roots := [u16(0x4000),0x7e00,0x4200,0x7e00,0,0x8000,0x7e00,0x7e00]!
+ rounds := [u16(0x3c00),0xbc00,0x4000,0xc000,0x4200,0xc200,0x4400,0xc400]!
+ rints := [u16(0),0x8000,0x4000,0xc000,0x4000,0xc000,0x4400,0xc400]!
+ mut folded := u16(0)
+ for i in [int(x & 3) * 2, int(x & 3) * 2 + 1]! { folded ^= fabs[i] ^ floors[i] ^ ceilings[i] ^ truncations[i] ^ roots[i] ^ rounds[i] ^ rints[i] }
+ return u8(x * 3) ^ u8(folded) ^ u8(folded >> 8)
 }

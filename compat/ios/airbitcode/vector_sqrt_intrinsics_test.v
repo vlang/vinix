@@ -44,7 +44,7 @@ fn test_vector_sqrt_float_patterns_states_and_names() {
 			input.undef = u16(1) << u32(target); if _ := sqrt_intrinsic_vector(input, bits, count) { assert false, 'undef' }; checks++
 		}
 	} }; for slot in seen { assert slot }
-	for name in ['llvm.sqrt.f16', 'llvm.sqrt.v0f32', 'llvm.sqrt.v01f16', 'llvm.sqrt.v17f32', 'llvm.sqrt.v999999999999999999f16', 'llvm.sqrt.v2f64', 'llvm.sqrt.v2bf16', 'llvm.sqrt.v2i16', 'llvm.sqrt.v2f016', 'llvm.sqrt.v2f32.spoof', 'llvm.sqrt.nxv2f32', 'air.sqrt.v2f16'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
+	for name in ['llvm.sqrt.f16', 'llvm.sqrt.v0f32', 'llvm.sqrt.v01f16', 'llvm.sqrt.v17f32', 'llvm.sqrt.v999999999999999999f16', 'llvm.sqrt.v2f64', 'llvm.sqrt.v2bf16', 'llvm.sqrt.v2i16', 'llvm.sqrt.v2f016', 'llvm.sqrt.v2f32.spoof', 'llvm.sqrt.nxv2f32', 'air.fast_sqrt.v2f16', 'air.sqrt.v2f64'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
 	for width in [u32(0), 1, 64]! { if _ := sqrt_intrinsic_vector(ScalarVectorValue{}, width, 1) { assert false, 'width' } }; for count in [0, 17] { if _ := sqrt_intrinsic_vector(ScalarVectorValue{}, 16, count) { assert false, 'count' } }
 	for tag in [IntegerValue{aggregate: true}, IntegerValue{vector: true}] { mut input := ScalarVectorValue{}; input.lanes[0] = tag; if _ := sqrt_intrinsic_vector(input, 32, 1) { assert false, 'lane tag' } }
 	for offset in [-1, 999] { if _, _ := vector_float_overload('llvm.sqrt.v2f16', offset) { assert false, 'offset' } }

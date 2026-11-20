@@ -4,6 +4,9 @@ module airbitcode
 // AIR and LLVM calls share evaluators, but keep distinct declaration identities.
 const vector_air_unary_cache_base = vector_subinsert_cache_base + 8976
 
+// Half identities append after all existing float32 and integer AIR families.
+const vector_air_half_unary_cache_base = vector_air_integer_cache_base + 448
+
 fn air_vector_unary_index(id ScalarIntrinsic) !int {
 	return match id { .fabs { 0 } .floor { 1 } .ceil { 2 } .trunc { 3 } .sqrt { 4 } .round { 5 } .rint { 6 } else { return error('AIR vector unary: unsupported family') } }
 }
@@ -20,11 +23,11 @@ fn air_vector_unary_name(name string) !(ScalarIntrinsic, int, u32) {
 	else if name.starts_with('air.rint.v') { id = .rint }
 	else { return error('AIR vector unary: unsupported name') }
 	count, bits := vector_float_overload(name, offset)!
-	if bits != 32 { return error('AIR vector unary: float32 required') }
 	return id, count, bits
 }
 
 fn air_vector_unary_key(id ScalarIntrinsic, count int, bits u32) !int {
-	if count < 1 || count > 16 || bits != 32 { return error('AIR vector unary: cache shape') }
-	return vector_air_unary_cache_base + air_vector_unary_index(id)! * 16 + count - 1
+	if count < 1 || count > 16 || bits !in [u32(16), 32]! { return error('AIR vector unary: cache shape') }
+	base := if bits == 16 { vector_air_half_unary_cache_base } else { vector_air_unary_cache_base }
+	return base + air_vector_unary_index(id)! * 16 + count - 1
 }

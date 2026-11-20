@@ -1,31 +1,45 @@
 # Bounded memory execution
 
+Fixed 1..16-lane half vectors accept unary `air.fabs.vNf16`,
+`air.floor.vNf16`, `air.ceil.vNf16`, `air.trunc.vNf16`, `air.sqrt.vNf16`,
+`air.round.vNf16` and `air.rint.vNf16` through the existing binary16 lane
+evaluators. Fabs clears only the sign bit and keeps NaN payloads; arithmetic
+NaNs use positive canonical 0x7e00. Round takes half ties away from zero and
+rint/sqrt round to nearest with ties to even, independently of the host mode.
+Signed zeros and subnormals are preserved. Poison stays local to its lane; any
+unfrozen undef source lane refuses. Keys 62228..62339 append 112 identities
+after every earlier AIR/LLVM key, for 62,340 vector entries; the scalar cache
+remains 2,204. Exact vector signatures, ordinary pure calls, duplicate checks,
+state/freezes, prewrite validation and existing budgets remain required.
+Other half AIR vector families, fast overloads and floating-dependent addresses
+remain excluded.
+
 Ternary `air.clamp.f16` accepts matching half operands/results and composes
 AIR fmin(fmax(x, low), high). Ordered low > high produces poison; NaN bounds
 do not trigger this domain error. Numeric ties retain the first operand,
 including signed zeros, and all-NaN results use positive canonical 0x7e00.
 Key 2203 appends one identity without moving earlier scalar/vector keys.
-The scalar cache has 2,204 entries and vector entries remain 62,228. Exact
+The scalar cache has 2,204 entries and vector entries remain 62,340. Exact
 signatures, all three operand types, pure declarations, ordinary calls,
 state/freezes, prewrite validation and existing budgets remain required.
-Half AIR vectors, fast overloads and floating-dependent addresses remain excluded.
+Half AIR vector clamp, fast overloads and floating-dependent addresses remain excluded.
 
 Binary `air.fmin.f16` and `air.fmax.f16` accept matching half operands/results.
 They prefer a numeric operand to a NaN and preserve the first argument on a
 numeric tie, including opposite signed zeros. Two NaNs produce positive
 canonical 0x7e00; numeric subnormals retain their bits. Keys 2201..2202 append
 two identities without moving earlier AIR/LLVM keys. The scalar cache has
-2,204 entries and vector entries remain 62,228. Exact names and signatures,
+2,204 entries and vector entries remain 62,340. Exact names and signatures,
 both operand types, pure declarations, ordinary calls and existing state,
 prewrite and budget rules apply. Matching half clamp is also admitted above.
-Half AIR vectors and floating-dependent addresses remain excluded.
+Half AIR vector extrema and floating-dependent addresses remain excluded.
 
 Ternary `air.fma.f16` accepts three matching half operands and a half result.
 The existing exact evaluator combines product and addend before one nearest
 rounding with ties to even. Signed zeros, subnormals, infinities, canonical NaNs
 and poison/undef/freezes retain the existing FMA rules. Key 2200 appends one
 identity without moving earlier AIR/LLVM keys; the scalar cache has 2,204
-entries and vector entries remain 62,228. Exact signatures, each operand type,
+entries and vector entries remain 62,340. Exact signatures, each operand type,
 pure declarations, ordinary calls, prewrite validation and budgets remain
 required. Additional half extrema forms are listed above. Floating-dependent
 addresses remain excluded.
@@ -37,7 +51,7 @@ takes half ties to even. Results preserve signed zeros; arithmetic NaNs use
 positive canonical 0x7e00. Negative nonzero square-root inputs produce that NaN.
 The software uses these fixed policies independently of the host rounding mode.
 Keys 2197..2199 append three identities without moving earlier AIR/LLVM keys;
-the scalar cache has 2,204 entries and vector entries remain 62,228. Existing
+the scalar cache has 2,204 entries and vector entries remain 62,340. Existing
 exact-signature, pure-call, state, budget and prewrite validation rules apply.
 
 Scalar `air.fabs.f16`, `air.floor.f16`, `air.ceil.f16` and `air.trunc.f16`
@@ -45,7 +59,7 @@ accept exact half operands/results through the existing binary16 evaluators.
 Absolute value clears only the sign bit, preserving NaN payload/signaling bits;
 rounding uses positive canonical NaN 0x7e00 and preserves signed zeros.
 Keys 2193..2196 append four identities without moving earlier AIR/LLVM keys;
-the scalar cache has 2,204 entries and vector entries remain 62,228. Existing
+the scalar cache has 2,204 entries and vector entries remain 62,340. Existing
 pure-call, type, poison/undef/freeze, prewrite validation and budget rules apply.
 Additional half math forms are listed above. Floating-dependent addresses remain excluded.
 
@@ -121,7 +135,8 @@ remain required, including after cache hits. Keys 61604..61715 append 112 AIR
 identities, separate from LLVM, for 61,764 vector entries. Scalar entries stay
 2,204. One call uses one existing result slot/step and the established vector
 source/result work charges. The admitted AIR vector families are these unary
-operations, FMA and float min/max. Half, scalable and fast overloads remain
+operations, FMA and float min/max; half unary vectors are listed above. Other
+half, scalable and fast overloads remain
 excluded; floating address projections reject. Existing owners and cleanup
 paths are reused. Invalid profiles reject before writes; runtime state
 failures retain earlier stores.
