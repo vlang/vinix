@@ -43,7 +43,7 @@ power-loss atomicity for allocator metadata.
 Run host codec, malformed-format, COW, and publication-error tests:
 
 ```sh
-V=/Users/alex/code/v/v python3 tests/ext2-xattr/host.py
+V=/path/to/v tests/ext2-xattr/host
 ```
 
 Build ARM and run the native permission, inheritance, chmod, capability,
@@ -51,8 +51,8 @@ read-only/immutable, concurrency, malformed-disk, rollback, allocation, and
 actual reboot checks:
 
 ```sh
-VEXE=/Users/alex/code/v/v make -C kernel -j4 CC=clang V=/Users/alex/code/v/v ARCH=aarch64 LIMINE_MP=1
-VEXE=/Users/alex/code/v/v V=/Users/alex/code/v/v python3 tests/ext2-xattr/run.py \
+make -C kernel -j4 CC=clang V=/path/to/v ARCH=aarch64 LIMINE_MP=1
+V=/path/to/v tests/ext2-xattr/run --arch aarch64 --kernel-dir kernel \
   --source tests/posix-acl/test.c --acl-fixture --state-dir /tmp/vinix-acl-fresh
 ```
 

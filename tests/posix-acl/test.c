@@ -118,7 +118,7 @@ static int permission_cases(const char *directory)
  }
  CHECK(waitpid(pid,&status,0)==pid && WIFEXITED(status) && WEXITSTATUS(status)==0);
  struct acl invalid=acl; invalid.version=1;
- ERROR(fsetxattr(fd,ACCESS,&invalid,sizeof(invalid),0),EINVAL);
+ ERROR(fsetxattr(fd,ACCESS,&invalid,sizeof(invalid),0),EOPNOTSUPP); /* an unsupported version, as Linux */
  invalid=acl; invalid.entries[1].id=UNDEFINED;
  ERROR(fsetxattr(fd,ACCESS,&invalid,sizeof(invalid),0),EINVAL);
  invalid=acl; invalid.entries[5].perm=8;
