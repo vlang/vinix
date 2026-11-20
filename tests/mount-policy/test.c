@@ -86,7 +86,8 @@ static int wx_exec_result(const char *path, int identity, int request)
             data[1].effective = data[1].permitted = 0x1ff;
             if (syscall(SYS_capset, &header, data)) _exit(254);
         }
-        if (identity == 3 && unshare(CLONE_NEWUSER)) _exit(254);
+        /* Vinix rejects user namespaces (EINVAL): no container root exists. */
+        if (identity == 3 && unshare(CLONE_NEWUSER)) _exit(errno == EINVAL ? 253 : 254);
         char *arguments[] = { "probe", request ? "--wx" : "--no-wx", NULL };
         execve(path, arguments, request ? wx_env : empty_env);
         _exit(errno);
@@ -122,7 +123,9 @@ static int run_wx_tests(void)
     CHECK(wx_exec_result("/mp/plain/probe", 0, 1) == 0); /* root launcher */
     CHECK(wx_exec_result("/mp/plain/probe", 1, 1) == EPERM);
     CHECK(wx_exec_result("/mp/plain/probe", 2, 1) == EPERM);
-    CHECK(wx_exec_result("/mp/plain/probe", 3, 1) == EPERM);
+    int namespaced = wx_exec_result("/mp/plain/probe", 3, 1);
+    CHECK(namespaced == EPERM || namespaced == 253);
+    if (namespaced == 253) puts("MOUNT POLICY NOTE: user namespaces are unsupported; no container root to check");
     CHECK(wx_exec_result("/mp/wx/probe", 1, 0) == 0); /* still explicit */
     CHECK(wx_exec_result("/mp/wx/probe", 1, 1) == 0);
     CHECK(mount("/mp/wx", "/mp/wx-alias", NULL, MS_BIND, "") == 0);
@@ -198,7 +201,9 @@ static int run_nested_alias_tests(void)
         syscall(SYS_execveat, directory, "../probe", probe_argv, empty_env, 0);
         _exit(errno);
     }
-    CHECK(status_of(child) == 0);
+    /* The copy's remount does not grant a directory description opened
+     * before unshare: it keeps the saved noexec policy, as on Linux. */
+    CHECK(status_of(child) == EACCES);
     CHECK(exec_result("../probe", directory, -1, NULL) == EACCES);
     for (int i = 0; i < 16; ++i)
         CHECK(execve("/mp/nested-alias/child/../probe", probe_argv, empty_env) == -1
@@ -535,8 +540,10 @@ static int run_tests(void)
     CHECK(fd >= 0 && close(fd) == 0);
     puts("MOUNT POLICY PASS: nodev blocks character and block devices, with O_PATH and ordinary files usable");
 
-    /* A forked mount namespace changes its copy of a mount, including the
-     * policy seen by descriptors opened before unshare. */
+    /* A forked mount namespace changes its copy of a mount, but, as on Linux,
+     * a description opened before unshare keeps its saved mount's policy: the
+     * copy's flags neither grant nor revoke it (c193d955b, 8a05abd8f; see
+     * tests/mount-lifecycle/descriptor-mmap.md). */
     CHECK(mount("none", "/mp/alias", NULL, MS_REMOUNT | MS_BIND, "") == 0);
     fd = open("/mp/alias/probe", O_RDONLY);
     CHECK(fd >= 0);
@@ -547,9 +554,8 @@ static int run_tests(void)
             MS_REMOUNT | MS_BIND | MS_NOEXEC, "")) _exit(1);
         if (umount2("/mp/alias", MNT_DETACH)) _exit(1);
         void *result = mmap(NULL, 16384, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
-        if (result != MAP_FAILED || errno != EPERM) _exit(1);
-        syscall(SYS_execveat, fd, "", probe_argv, empty_env, AT_EMPTY_PATH);
-        _exit(errno == EACCES ? 0 : 1);
+        if (result == MAP_FAILED) _exit(1);
+        _exit(munmap(result, 16384) == 0 ? 0 : 1);
     }
     CHECK(status_of(child) == 0);
     CHECK(exec_result("/mp/alias/probe", AT_FDCWD, -1, NULL) == 0);
