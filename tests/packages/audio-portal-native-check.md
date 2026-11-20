@@ -251,6 +251,10 @@ portal:
 
 - QEMU no longer finalizes the WAV header, and on AArch64 records no silence
   between streams, so the one-second gap and quiet checks cannot hold.
-- On AArch64 the payload's own `AUDIO PAYLOAD` lines do not reach the
-  console (they do on x86_64); the guest's marker files still prove each step.
+- On AArch64 the payload's own `AUDIO PAYLOAD` lines never reach the serial
+  log. The guest writes to `/dev/console`, a seat device, and the payload runs
+  in its own isolated login, which does not hold the seat, so the kernel refuses
+  its writes as designed. AArch64 has no serial node outside the seat; x86_64
+  writes to `/dev/com1`, which is not one. The guest's marker files still prove
+  each step.
 - The runs are unsealed, so there is no qualification receipt to admit.
