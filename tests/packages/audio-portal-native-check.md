@@ -223,16 +223,34 @@ refuses the same C), `VINIX_AARCH64_SYSROOT` the musl-cross sysroot, and
 `VINIX_AUDIO_BACKEND_CC` its GCC.
 
 On AArch64 every program now builds and links, the guests boot, and setup
-(accounts, authd, signed `update` and `install`) passes after fixing a double
-free in generation admission (`57fd667fd`). Remaining failures:
+(accounts, authd, signed `update` and `install`) passes. Getting there took
+fixing strings freed after an array push or by `[]string.free()` while the
+array only borrowed them (`6efe4d0c8`, `1d4785f41`, `8ae9a5865`, `e024ff011`;
+see `tests/push-ownership`), and a V fix for `os.Process` under a program's
+own `waitpid` declaration (vlang/v#32595, needed until it is in the compiler
+used).
 
-- basic: `vinix-session run --isolated alex /sbin/init isolated-forgery`
-  exits with SIGSEGV.
-- lifecycle and seat: the tone client never writes `client.ready` /
-  `seat.ready`.
+On 2026-11-20 all three scenarios passed on both architectures against
+kernels built from `9a5ab3a60`, with `CC_AARCH64` a small front that drops
+clang-only flags before calling the musl GCC (the `build/` adapters named
+above are gone). Recordings, measured by zero crossings and peak per second
+(AArch64) or per audible run (x86_64):
 
-Likely cause, not yet confirmed: the current V compiler does not clone a string
-appended to an array (`a << s`), while V1 did, and much of `tools/packages`
-was written assuming it does (see the comments that say so). Each such site
-that later frees `s` is a use-after-free under the current compiler.
-Real playback remains unqualified.
+| Scenario | AArch64 (HVF) | x86_64 (TCG) |
+| --- | --- | --- |
+| basic | 440, 660, 880 Hz, 1.00 s each, both channels, peak 12000 | 440 Hz clean; 660 Hz cut at 0.46 s; third run not 880 Hz |
+| lifecycle | 440, 660, 880, 440 Hz, 1.00 s each | 440 Hz, then a 2 s mixed run, then 440 Hz |
+| seat | 440, 880 Hz, 1.00 s each | 440, 880 Hz, 1.00 s each |
+
+Real playback is therefore shown on AArch64. On x86_64 the guest still sees
+the exact PCM sequence pass through the portal, so the dropouts are likely
+device or driver timing under emulation; this is not yet traced.
+
+`audio-portal-retain` still refuses these runs, for three reasons outside the
+portal:
+
+- QEMU no longer finalizes the WAV header, and on AArch64 records no silence
+  between streams, so the one-second gap and quiet checks cannot hold.
+- On AArch64 the payload's own `AUDIO PAYLOAD` lines do not reach the
+  console (they do on x86_64); the guest's marker files still prove each step.
+- The runs are unsealed, so there is no qualification receipt to admit.
