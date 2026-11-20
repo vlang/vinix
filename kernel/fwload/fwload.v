@@ -137,20 +137,24 @@ fn find_held(name string) &Image {
 
 // Read the image called `name` from the first directory that has it. The
 // errno says why not: ENOENT, EFBIG, ENOMEM, EIO.
+fn C.vinix_stack_alloc(size u64) voidptr
+
 fn read_image(name string) ?&Image {
-	mut path := [name_limit + 32]u8{}
+	// A stack slot: V moved a fixed-array path, whose address is taken, to
+	// the heap and nothing freed it, 160 bytes for every image read.
+	path := unsafe { &u8(C.vinix_stack_alloc(u64(name_limit + 32))) }
 	for directory in directories {
 		mut length := 0
 		for i in 0 .. directory.len {
-			path[length] = directory[i]
+			unsafe { path[length] = directory[i] }
 			length++
 		}
 		for i in 0 .. name.len {
-			path[length] = name[i]
+			unsafe { path[length] = name[i] }
 			length++
 		}
-		path[length] = 0
-		node := fs.get_node(vfs_root, unsafe { tos(&path[0], length) }, true) or { continue }
+		unsafe { path[length] = 0 }
+		node := fs.get_node(vfs_root, unsafe { tos(path, length) }, true) or { continue }
 		if node.resource == unsafe { nil } {
 			continue
 		}
