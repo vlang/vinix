@@ -783,7 +783,7 @@ fn first_run_install_command(request string) string {
 	}
 	unsafe { words.free() }
 	if packages.len == 0 {
-		unsafe { packages.free() }
+		unsafe { (&array(&packages)).free() }
 		return ''
 	}
 	names := packages.join(' ')
@@ -803,7 +803,8 @@ fn first_run_install_command(request string) string {
 	defer {
 		unsafe {
 			names.free()
-			packages.free()
+			// packages borrows the catalogue's names; free only its buffer.
+			(&array(&packages)).free()
 			checks.free()
 			presence.free()
 		}

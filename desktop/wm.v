@@ -2195,7 +2195,8 @@ fn (d &Desktop) taskbar_entries() []TaskbarEntry {
 			status:       status
 		}
 	}
-	unsafe { seen.free() }
+	// seen borrows the windows' titles; free only its buffer.
+	unsafe { (&array(&seen)).free() }
 	return out
 }
 
