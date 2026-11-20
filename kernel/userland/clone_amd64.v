@@ -87,12 +87,10 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	// Namespace creation is authorized before cgroup lookup. NEWUSER changes
-	// the child's capability domain and must use its own admission path.
-	if args.flags & proc.clone_newuser == 0
-		&& args.flags & proc.clone_namespace_flags != 0
-		&& !proc.current_has_capability(proc.cap_sys_admin) {
-		return errno.err, errno.eperm
+	// Namespace creation is authorized before cgroup lookup.
+	creation_failure := fs.namespace_creation_failure(proc.current_thread().process, args.flags)
+	if creation_failure != 0 {
+		return errno.err, creation_failure
 	}
 
 	ipc_failure := clone_ipc_failure(args.flags)
@@ -136,9 +134,9 @@ fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64
 		if flags & clone_thread != 0 {
 			return errno.err, errno.einval
 		}
-		if flags & proc.clone_namespace_flags & ~proc.clone_newuser != 0
-			&& !proc.current_has_capability(proc.cap_sys_admin) {
-			return errno.err, errno.eperm
+		creation_failure := fs.namespace_creation_failure(proc.current_thread().process, flags)
+		if creation_failure != 0 {
+			return errno.err, creation_failure
 		}
 	}
 	// pids.max counts threads and processes alike.

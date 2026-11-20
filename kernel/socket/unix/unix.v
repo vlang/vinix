@@ -45,6 +45,9 @@ pub mut:
 struct AbstractSocketEntry {
 mut:
 	in_use   bool
+	// The network namespace the name was bound in: Linux scopes the abstract
+	// namespace to it, so a sandbox cannot reach the host's abstract sockets.
+	netns    u64
 	name_len u32
 	name     [108]u8
 	socket   &UnixSocket = unsafe { nil }
@@ -926,7 +929,8 @@ fn lookup_bound(_addr voidptr, addrlen u32) ?&UnixSocket {
 			abstract_sockets_lock.release()
 		}
 		for i in 0 .. 64 {
-			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len {
+			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len
+				&& abstract_sockets[i].netns == current_network_namespace() {
 				if unsafe { C.memcmp(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) } == 0 {
 					mut target := abstract_sockets[i].socket
 					katomic.inc(mut &target.refcount)
@@ -1503,7 +1507,8 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 		}
 		// Check for duplicate
 		for i in 0 .. 64 {
-			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len {
+			if abstract_sockets[i].in_use && abstract_sockets[i].name_len == name_len
+				&& abstract_sockets[i].netns == current_network_namespace() {
 				if unsafe { C.memcmp(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) } == 0 {
 					errno.set(errno.eaddrinuse)
 					return none
@@ -1514,6 +1519,7 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 		for i in 0 .. 64 {
 			if !abstract_sockets[i].in_use {
 				abstract_sockets[i].in_use = true
+				abstract_sockets[i].netns = current_network_namespace()
 				abstract_sockets[i].name_len = name_len
 				unsafe { C.memcpy(&abstract_sockets[i].name[0], &addr.sun_path[0], name_len) }
 				abstract_sockets[i].socket = unsafe { this }
@@ -1989,4 +1995,13 @@ fn (mut this UnixSocket) ensure_queue_capacity(records int, rights int) ? {
 	this.pending_fd_groups.ensure_cap(capacity)
 	kbudget.shrink(mut this.kernel_charge, u64(this.queue_capacity) * unit)
 	this.queue_capacity = capacity
+}
+
+fn current_network_namespace() u64 {
+	task := proc.current_thread()
+	if task == unsafe { nil } || task.process == unsafe { nil }
+		|| task.process.ns.net == unsafe { nil } {
+		return 0
+	}
+	return task.process.ns.net.id
 }

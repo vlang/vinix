@@ -9,11 +9,16 @@
 // (kept by fs), and the pid namespace remembers its init so that its members
 // can be killed together when that init dies, as Linux does.
 // System V message queues have separate IPC registries; existing semaphores
-// and shared-memory segments still use global registries. Network, cgroup
-// and time namespace identities do not alone separate their subsystems.
+// and shared-memory segments still use global registries. A network
+// namespace other than the initial one has only loopback and no IP sockets
+// (socket/socket.v); abstract Unix socket names are per network namespace.
+// A user namespace gives its creator capabilities that act only on the
+// namespaces it owns (has_namespace_capability). Cgroup and time namespace
+// identities do not alone separate their subsystems.
 @[has_globals]
 module proc
 
+import errno
 import katomic
 import klock
 import lib
@@ -32,7 +37,12 @@ pub const clone_namespace_flags = clone_newtime | clone_newns | clone_newcgroup 
 
 // An identity without isolated state is not a namespace implementation.
 // Refuse these requests before clone/unshare changes any process state.
-pub const unsupported_namespace_flags = clone_newuser | clone_newnet | clone_newtime
+pub const unsupported_namespace_flags = clone_newtime
+
+// setns(2) may not join these: entering a user namespace would need the
+// credential rules Linux applies there, which Vinix does not implement, and
+// a network namespace keeps state (IP sockets, abstract names) per process.
+pub const unsupported_setns_flags = unsupported_namespace_flags | clone_newuser | clone_newnet
 
 @[heap]
 pub struct Namespace {
@@ -59,6 +69,18 @@ pub mut:
 	ids     &map[int]int = unsafe { nil }
 	next_id int = 1
 	lock    klock.Lock
+	// The user namespace that owns this one: the creator's, or the user
+	// namespace created in the same clone/unshare call. Capabilities held in
+	// a user namespace act only on the namespaces it owns.
+	owner_user u64 = initial_user_namespace_id
+	// User namespaces: the parent, nesting depth, and the identity id maps
+	// written to /proc/<pid>/uid_map and gid_map (-1 until written). Only a
+	// single identity extent is supported: the creator's own id.
+	parent_user    u64
+	user_depth     int
+	uid_map_id     i64 = -1
+	gid_map_id     i64 = -1
+	setgroups_deny bool
 	// The nsfs file /proc/<pid>/ns/<kind> leads to. One per namespace, so that
 	// comparing two of them by inode tells whether they are the same one.
 	node voidptr
@@ -123,7 +145,21 @@ __global (
 	namespace_id_counter = u64(4026532000)
 	initial_namespaces   NamespaceSet
 	ipc_namespace_release_hook voidptr
+	user_namespaces_made u64
 )
+
+// User namespaces are never freed (fs.release_namespace drops references
+// only), so this bounds how many any user can make after boot, and the
+// memory they keep. Linux's user.max_user_namespaces bounds live ones.
+pub const max_user_namespaces = u64(256)
+
+pub fn count_user_namespace() {
+	katomic.inc(mut &user_namespaces_made)
+}
+
+pub fn user_namespaces_exhausted() bool {
+	return katomic.load(&user_namespaces_made) >= max_user_namespaces
+}
 
 type IPCNamespaceReleaseHook = fn (u64)
 
@@ -344,11 +380,44 @@ pub fn full_capabilities() Capabilities {
 	}
 }
 
+// A capability over the whole system. Capabilities a process holds inside a
+// user namespace it created are namespace-local (Linux ns_capable) and never
+// satisfy this: they act only through has_namespace_capability.
 pub fn has_capability(process &Process, cap int) bool {
 	if unsafe { process == nil } {
 		return true
 	}
+	return is_initial_namespace(process.ns.user) && process.caps.effective & (u64(1) << cap) != 0
+}
+
+// A capability over a namespace owned by user namespace `owner`. A process in
+// the initial user namespace holds it over every namespace; one in a child
+// user namespace only over those its own user namespace owns.
+pub fn has_namespace_capability(process &Process, cap int, owner u64) bool {
+	if unsafe { process == nil } {
+		return true
+	}
+	if process.caps.effective & (u64(1) << cap) == 0 {
+		return false
+	}
+	return is_initial_namespace(process.ns.user) || process.ns.user.id == owner
+}
+
+// A capability over the process's own state in its own user namespace:
+// dropping capabilities, installing seccomp filters, creating namespaces
+// that its user namespace will own.
+pub fn has_own_capability(process &Process, cap int) bool {
+	if unsafe { process == nil } {
+		return true
+	}
 	return process.caps.effective & (u64(1) << cap) != 0
+}
+
+pub fn user_namespace_of(process &Process) u64 {
+	if unsafe { process == nil } || process.ns.user == unsafe { nil } {
+		return initial_user_namespace_id
+	}
+	return process.ns.user.id
 }
 
 pub fn current_has_capability(cap int) bool {
@@ -453,14 +522,98 @@ pub fn set_process_oom_score_adj(pid int, value int) {
 
 // The identity id map a process starts a user namespace with: everything maps
 // to itself, since Vinix does not renumber ids across a user namespace.
-pub fn id_map_text(pid int, _group bool) string {
+pub fn id_map_text(pid int, group bool) string {
 	lock_table()
 	defer { unlock_table() }
 	process := process_at(pid)
 	if process == unsafe { nil } || is_initial_namespace(process.ns.user) {
 		return '         0          0 4294967295\n'
 	}
-	return '         0          0 4294967295\n'
+	id := if group { process.ns.user.gid_map_id } else { process.ns.user.uid_map_id }
+	if id < 0 {
+		return ''
+	}
+	// Linux's format: three right-aligned ten-wide fields.
+	// On the stack: a plain local builder would be moved to the heap.
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(40) }
+	fields := [id, id, i64(1)]!
+	for i in 0 .. 3 {
+		value := unsafe { fields[i] }
+		mut digits := 1
+		for rest := value / 10; rest > 0; rest /= 10 { digits++ }
+		for pad := digits; pad < 10; pad++ { text.add_byte(` `) }
+		text.add_decimal(value)
+		text.add_byte(if i == 2 { `\n` } else { ` ` })
+	}
+	return text.str()
+}
+
+pub fn setgroups_text(pid int) string {
+	lock_table()
+	defer { unlock_table() }
+	process := process_at(pid)
+	if process != unsafe { nil } && !is_initial_namespace(process.ns.user)
+		&& process.ns.user.setgroups_deny {
+		return 'deny\n'
+	}
+	return 'allow\n'
+}
+
+// The user namespace of `pid` that the caller may configure, holding
+// `cap` there and living in it or its parent (Linux's rules for the id map
+// files). Called with the table lock held.
+fn configurable_user_namespace(pid int, cap int) ?&Namespace {
+	writer := current_thread().process
+	target := process_at(pid)
+	if target == unsafe { nil } {
+		errno.set(errno.esrch)
+		return none
+	}
+	mut user := target.ns.user
+	writer_ns := user_namespace_of(writer)
+	if is_initial_namespace(user) || (writer_ns != user.id && writer_ns != user.parent_user)
+		|| !has_namespace_capability(writer, cap, user.id) {
+		errno.set(errno.eperm)
+		return none
+	}
+	return user
+}
+
+// Write /proc/<pid>/uid_map or gid_map. Only the unprivileged form Linux
+// always allows is supported, as an identity: one id, the writer's own
+// effective uid or gid, mapped to itself. Ids therefore never need
+// translating; any other map is refused rather than silently ignored.
+pub fn write_id_map(pid int, group bool, inside i64, outside i64, count i64) ? {
+	lock_table()
+	defer { unlock_table() }
+	mut user := configurable_user_namespace(pid, if group { cap_setgid } else { cap_setuid })?
+	writer := current_thread().process
+	own := if group { i64(writer.egid) } else { i64(writer.euid) }
+	current := if group { user.gid_map_id } else { user.uid_map_id }
+	if current >= 0 || count != 1 || inside != outside || outside != own
+		|| (group && !user.setgroups_deny) {
+		errno.set(errno.eperm)
+		return none
+	}
+	if group {
+		user.gid_map_id = outside
+	} else {
+		user.uid_map_id = outside
+	}
+}
+
+// Write /proc/<pid>/setgroups: "deny" must precede an unprivileged gid map
+// and is permanent; nothing may change it once the gid map is written.
+pub fn write_setgroups(pid int, deny bool) ? {
+	lock_table()
+	defer { unlock_table() }
+	mut user := configurable_user_namespace(pid, cap_sys_admin)?
+	if user.gid_map_id >= 0 || (user.setgroups_deny && !deny) {
+		errno.set(errno.eperm)
+		return none
+	}
+	user.setgroups_deny = deny
 }
 
 // Every live process whose pid namespace is `ns`, other than its init.

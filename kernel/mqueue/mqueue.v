@@ -178,8 +178,12 @@ fn leave_namespace(ns &proc.Namespace) {
 	}
 }
 
+// A permission override on a queue. Linux grants it from a child user
+// namespace only for a queue whose owner is mapped there; Vinix maps one id,
+// the creator's, who owns such a queue anyway, so only the initial user
+// namespace overrides.
 fn has_capability(process &proc.Process, cap int) bool {
-	return process.caps.effective & (u64(1) << cap) != 0
+	return proc.has_capability(process, cap)
 }
 
 // capable(): the capability in the initial user namespace.

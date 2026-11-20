@@ -254,7 +254,7 @@ fn valid_clone_pid_namespace(flags u64) bool {
 fn clone_ipc_failure(flags u64) u64 {
 	pair := proc.clone_newipc | u64(0x00040000)
 	if flags & pair != pair || flags & proc.clone_newuser != 0 { return 0 }
-	if !proc.current_has_capability(proc.cap_sys_admin) { return errno.eperm }
+	if !proc.has_own_capability(proc.current_thread().process, proc.cap_sys_admin) { return errno.eperm }
 	return errno.einval
 }
 

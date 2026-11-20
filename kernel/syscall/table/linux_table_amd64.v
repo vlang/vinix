@@ -636,6 +636,7 @@ pub fn init_syscall_table() {
 	syscall_table[167] = voidptr(fs.syscall_swapon) // swapon
 	syscall_table[168] = voidptr(fs.syscall_swapoff) // swapoff
 	syscall_table[166] = voidptr(fs.syscall_umount) // umount2
+	syscall_table[442] = voidptr(fs.syscall_mount_setattr) // mount_setattr
 	syscall_table[272] = voidptr(fs.syscall_unshare) // unshare
 	syscall_table[308] = voidptr(fs.syscall_setns) // setns
 	syscall_table[321] = voidptr(syscall_linux_bpf) // bpf

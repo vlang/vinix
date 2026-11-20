@@ -48,17 +48,26 @@ fn permitted_now(selector string) bool {
 	// Namespace-local capabilities do not authorize changes to host state.
 	// Private mount and UTS namespaces retain their existing controls.
 	if !proc.is_initial_namespace(process.ns.user) {
+		// Only these selectors act on a namespace; every other one (clock,
+		// reboot, securelevel, seat, and any added later) is host-wide.
 		host_operation := match selector {
-			system_securelevel_set, system_reboot, system_seat_set { true }
 			system_hostname_set, system_domainname_set {
 				proc.is_initial_namespace(process.ns.uts)
 			}
 			filesystem_mount, filesystem_unmount {
 				proc.is_initial_namespace(proc.mount_namespace_of(process))
 			}
-			else { false }
+			else { true }
 		}
 		if host_operation { return false }
+		// The namespace this changes must belong to the caller's user
+		// namespace, where its capabilities are real (Linux ns_capable). A
+		// child user namespace keeps the creator's uid, so no euid test.
+		owner := match selector {
+			system_hostname_set, system_domainname_set { process.ns.uts.owner_user }
+			else { proc.mount_namespace_of(process).owner_user }
+		}
+		return proc.has_namespace_capability(process, capability, owner)
 	}
 	return process.euid == 0 && proc.has_capability(process, capability)
 }

@@ -433,6 +433,12 @@ fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) bool {
 		} else if is_get {
 			// A lookup that is not answered would leave its caller waiting.
 			put_ack(mut reply, seq, pid, -eopnotsupp, req, u64(msg_len))
+		} else if (msg_type == rtm_newaddr || msg_type == rtm_newlink) && isolated_loopback_request(req, u64(msg_len)) {
+			// Bringing up the loopback of a network namespace of its own, as
+			// bubblewrap does: it is up with 127.0.0.1/8 already.
+			if msg_flags & nlm_f_ack != 0 {
+				put_ack(mut reply, seq, pid, 0, req, u64(msg_len))
+			}
 		} else {
 			// Failed requests always receive NLMSG_ERROR, even without NLM_F_ACK.
 			// No mutable interface/route API exists yet; never report a change
@@ -741,4 +747,19 @@ pub fn (mut this NetlinkSocket) queue_kernel_datagram(data voidptr, length int) 
 	this.status |= file.pollin
 	event.trigger(mut this.event, false)
 	return true
+}
+
+// A change to interface 1 (ifaddrmsg and ifinfomsg both keep the index at
+// byte 4 of their header) from a caller in a network namespace its own user
+// namespace owns, holding CAP_NET_ADMIN there. Such a namespace has only a
+// loopback, which is already configured, so the change is a no-op.
+fn isolated_loopback_request(req voidptr, length u64) bool {
+	if inet.in_initial_network_namespace() || length < 24 {
+		return false
+	}
+	process := proc.current_thread().process
+	if !proc.has_namespace_capability(process, proc.cap_net_admin, process.ns.net.owner_user) {
+		return false
+	}
+	return read_u32(req, 20) == 1
 }

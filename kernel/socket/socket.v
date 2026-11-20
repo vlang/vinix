@@ -228,6 +228,13 @@ fn socket_create(domain int, @type int, protocol int) ?&resource.Resource {
 			return ret.boxed()
 		}
 		sock_pub.af_inet, sock_pub.af_inet6 {
+			// A network namespace of its own has no IP stack: Vinix shares one lwIP
+			// instance, so its loopback would be the host's. Refuse rather than
+			// let a sandbox reach host services (a web process needs none).
+			if !sock_inet.in_initial_network_namespace() {
+				errno.set(errno.eafnosupport)
+				return none
+			}
 			ret := sock_inet.create_family(@type, protocol, domain)?
 			return ret.box
 		}

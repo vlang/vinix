@@ -428,3 +428,19 @@ fn magic_link_mount(node &VFSNode, identity &lib.MountContext) &VFSNode {
 	if !starting_mount(node.magic_target, identity) { return unsafe { nil } }
 	return node.magic_target
 }
+
+// What a descriptor names, of any type, with its mount: AT_EMPTY_PATH.
+// AT_FDCWD is the working directory.
+fn empty_path_node(dirfd int, identity &lib.MountContext) ?&VFSNode {
+	if is_fdcwd(dirfd) {
+		return parent_and_mount_for(dirfd, '', identity)
+	}
+	mut fd := file.fd_from_fdnum(unsafe { nil }, int(i32(dirfd))) or { return none }
+	defer { fd.unref() }
+	if fd.handle.node == unsafe { nil } {
+		errno.set(errno.einval)
+		return none
+	}
+	lib.copy_mount_context(identity, &fd.handle.mount)
+	return unsafe { &VFSNode(fd.handle.node) }
+}

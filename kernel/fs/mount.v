@@ -79,6 +79,12 @@ pub mut:
 	// checking the backend. Lazy detach leaves retained routes writable.
 	unmount_closed bool
 	options string
+	// Inherited by a mount namespace an unprivileged user namespace owns, as
+	// Linux MNT_LOCKED: it cannot be unmounted or moved by itself, which would
+	// reveal what it covers. locked_flags are restrictions (read-only,
+	// nosuid, nodev, noexec) a remount there may not clear.
+	locked       bool
+	locked_flags u64
 }
 
 @[heap]
@@ -232,6 +238,15 @@ fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source st
 
 // The mount table a new mount namespace starts with: a copy of its parent's.
 pub fn copy_mount_table(parent &MountTable) &MountTable {
+	return copy_mount_table_for(parent, false)
+}
+
+const ms_lockable = ms_rdonly | ms_nosuid | ms_nodev | ms_noexec
+
+// `unprivileged`: the copy is for a mount namespace owned by a user namespace
+// other than the initial one. Every inherited mount but the namespace root
+// (a self mount) is then locked, and every one keeps its restrictive flags.
+pub fn copy_mount_table_for(parent &MountTable, unprivileged bool) &MountTable {
 	mut table := &MountTable{}
 	table.mounts.flags |= .noslices
 	mut source := unsafe { parent }
@@ -252,6 +267,8 @@ pub fn copy_mount_table(parent &MountTable) &MountTable {
 			fstype:  entry.fstype
 			flags:   entry.flags
 			options: entry.options
+			locked:  entry.locked || (unprivileged && voidptr(entry.covered) != voidptr(entry.root))
+			locked_flags: entry.locked_flags | if unprivileged { entry.flags & ms_lockable } else { u64(0) }
 		}
 		original.lock.release()
 	}
@@ -407,7 +424,13 @@ pub fn syscall_mount(_ voidptr, src charptr, tgt charptr, fs_type charptr, mount
 	// kernel dereference. The source is required, as the smoke test expects. The
 	// type may be NULL, as it is for a remount, bind, move or propagation change.
 	// The mount table keeps copies of what it shows in /proc/mounts.
-	source := usercopy.copy_cstring_from_user(u64(src), 4096) or { return errno.err, errno.get() }
+	// Linux ignores the source of a remount or a propagation change, which
+	// callers such as bubblewrap pass as NULL.
+	source := if src == unsafe { nil } && mountflags & (ms_remount | ms_propagation) != 0 {
+		''
+	} else {
+		usercopy.copy_cstring_from_user(u64(src), 4096) or { return errno.err, errno.get() }
+	}
 	defer { unsafe { source.free() } }
 	target := usercopy.copy_cstring_from_user(u64(tgt), 4096) or { return errno.err, errno.get() }
 	defer { unsafe { target.free() } }
@@ -444,6 +467,9 @@ fn mount_request(parent &VFSNode, source string, target string, fstype string, _
 	flags := (_flags & ~ms_wxallowed) | if mount_option_present(options, 'wxallowed') {
 		ms_wxallowed
 	} else { u64(0) }
+	if !proc.is_initial_namespace(calling_process().ns.user) {
+		user_namespace_mount_allowed(fstype, flags, options)?
+	}
 	if flags & ms_remount != 0 {
 		return remount(parent, target, flags, options)
 	}
@@ -665,6 +691,13 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		mount_node.create_dotentries(parent_of_tgt_node)
 	}
 	if kind == 'tmpfs' {
+		// As on Linux, a new tmpfs belongs to whoever mounted it: a sandbox
+		// mounting one in its own user namespace has to populate it.
+		mounter := calling_process()
+		if mounter != unsafe { nil } && mount_node.resource != unsafe { nil } {
+			mount_node.resource.stat.uid = mounter.fsuid
+			mount_node.resource.stat.gid = mounter.fsgid
+		}
 		apply_tmpfs_options(mut mount_node, options)
 	}
 
@@ -773,10 +806,14 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 	source_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	source_node := get_node_and_mount(parent, source, true, source_mount)?
 	mut table := table_of(calling_process())
-	if attached_namespace_mount(mut table, lib.mount_context_top(source_mount)) == unsafe { nil } {
+	source_entry := attached_namespace_mount(mut table, lib.mount_context_top(source_mount))
+	if source_entry == unsafe { nil } {
 		errno.set(errno.einval)
 		return none
 	}
+	// A bind keeps the restrictions locked on its source (Linux clone_mnt
+	// copies MNT_LOCK_*), so a copy cannot be remounted writable.
+	source_locked_flags := source_entry.locked_flags
 	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if !starting_mount(parent, target_mount) { return none }
 	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, target_mount)
@@ -815,8 +852,9 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 		}
 	}
 	table.lock.release()
-	record_mount(mut table, target_node, source_node, origin, fstype,
+	mut bound := record_mount(mut table, target_node, source_node, origin, fstype,
 		mount_flags(source_mount) | flags, 'bind', target_mount)
+	bound.locked_flags = source_locked_flags
 	unsafe { origin.free() }
 }
 
@@ -1055,7 +1093,7 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	source_root := get_node_and_mount(parent, source, true, source_mount)?
 	mut table := table_of(calling_process())
 	mut entry := attached_namespace_mount(mut table, lib.mount_context_top(source_mount))
-	if entry == unsafe { nil } || entry.detached || voidptr(entry.root) != voidptr(source_root) {
+	if entry == unsafe { nil } || entry.detached || voidptr(entry.root) != voidptr(source_root) || entry.locked {
 		errno.set(errno.einval)
 		return none
 	}
@@ -1105,6 +1143,10 @@ fn remount(parent &VFSNode, target string, flags u64, options string) ? {
 	}
 	entry.lock.acquire()
 	defer { entry.lock.release() }
+	if entry.locked_flags & ~flags != 0 {
+		errno.set(errno.eperm)
+		return none
+	}
 	if flags & ms_rdonly != 0 && entry.flags & ms_rdonly == 0 && entry.writers != 0 {
 		errno.set(errno.ebusy)
 		return none
@@ -1150,7 +1192,7 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 	node := get_node_and_mount(parent, target, flags & umount_nofollow == 0, identity)?
 	mut table := table_of(calling_process())
 	mut entry := attached_namespace_mount(mut table, lib.mount_context_top(identity))
-	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) {
+	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) || entry.locked {
 		errno.set(errno.einval)
 		return none
 	}
@@ -1166,8 +1208,12 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 			mut candidate := table.mounts[i]
 			remove := !candidate.detached && mount_descends_locked(table, candidate, entry)
 			if remove { candidate.detached = true }
+			// A locked mount goes with the tree but stays on what it covers (Linux
+			// disconnect_mount keeps MNT_LOCKED children connected): a walk from a
+			// descriptor held in the detached tree must not find what it hid.
+			uncover := remove && !(candidate.locked && candidate.id != entry.id)
 			table.lock.release()
-			if remove && voidptr(candidate.covered) != voidptr(candidate.root) {
+			if uncover && voidptr(candidate.covered) != voidptr(candidate.root) {
 				mut covered := candidate.covered
 				detach_mount(mut table, mut covered)
 			}
@@ -1287,6 +1333,11 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 	if new_entry.id == old_entry.id || put_entry.id == old_entry.id {
 		return errno.err, errno.ebusy
 	}
+	// A locked mount cannot become the root: that would move it away from
+	// what it covers (Linux refuses an MNT_LOCKED new_root).
+	if new_entry.locked {
+		return errno.err, errno.einval
+	}
 	if voidptr(old_entry.root) != voidptr(old_top) || voidptr(new_entry.root) != voidptr(new_root)
 		|| !mount_path_beneath(mut table, put_old, put_entry, new_root, new_entry)
 		|| !mount_path_beneath(mut table, new_root, new_entry, old_top, old_entry) {
@@ -1297,6 +1348,15 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 		return errno.err, errno.get()
 	}
 	publish_pivot(mut table, old_entry, new_entry, put_old, new_mount, put_mount)
+	// The lock moves with the root, as on Linux: the new root now covers what
+	// the old one did, and the old root may be detached. This is how a
+	// sandbox drops the tree it was given.
+	if old_entry.locked {
+		mut new_locked := unsafe { new_entry }
+		new_locked.locked = true
+		mut old_locked := unsafe { old_entry }
+		old_locked.locked = false
+	}
 
 	table.lock.acquire()
 	table.root_hint = new_root
@@ -1578,4 +1638,303 @@ pub fn record_root_switch(root &VFSNode, fstype string) {
 // comparing the key of a loop over a node's children in place is miscompiled.
 fn is_dot_name(name string) bool {
 	return name == '.' || name == '..'
+}
+
+// What a process in a child user namespace may ask of mount(2) beyond the
+// namespace-ownership check in security.permitted: per-mount remounts only
+// (a filesystem remount changes the superblock every namespace shares), binds,
+// moves, propagation changes, and new instances of the filesystems Linux lets
+// a user namespace mount for itself (FS_USERNS_MOUNT), which expose nothing
+// the caller could not already reach. Device-backed and host-wide filesystems
+// stay with the initial user namespace.
+fn user_namespace_mount_allowed(fstype string, flags u64, options string) ? {
+	// Exceptions to W^X are the administrator's to grant (wx_policy.v).
+	if flags & ms_wxallowed != 0 {
+		errno.set(errno.eperm)
+		return none
+	}
+	// Mount entries are never freed (see record_mount), so every namespace an
+	// unprivileged user makes may hold only so many. Linux has fs.mount-max.
+	if flags & (ms_remount | ms_propagation) == 0 {
+		table := table_of(calling_process())
+		table.lock.acquire()
+		count := table.mounts.len
+		table.lock.release()
+		if count >= max_user_namespace_mounts {
+			errno.set(errno.enospc)
+			return none
+		}
+	}
+	if flags & ms_remount != 0 {
+		if flags & ms_bind == 0 {
+			errno.set(errno.eperm)
+			return none
+		}
+		return
+	}
+	if flags & (ms_bind | ms_move | ms_propagation) != 0 {
+		return
+	}
+	match fstype {
+		'proc' {
+			return user_namespace_proc_allowed(flags)
+		}
+		'tmpfs', 'mqueue', 'ramfs' {
+			// Its root may be given only an owner the namespace maps.
+			if !owner_options_mapped(options) {
+				errno.set(errno.einval)
+				return none
+			}
+		}
+		'devpts' {}
+		else {
+			errno.set(errno.eperm)
+			return none
+		}
+	}
+}
+
+// The most mounts a mount namespace owned by a child user namespace keeps,
+// inherited ones included. A WebKit sandbox makes about fifty.
+const max_user_namespace_mounts = 128
+
+// A proc mount shows the caller's pid namespace, so its user namespace must
+// own that (Linux: CAP_SYS_ADMIN over the pid namespace's owner). And a new
+// proc must not uncover what a runtime masked, so the namespace must already
+// show one proc in full, as Linux mnt_already_visible() asks: a proc mount no
+// locked mount covers anything in, whose locked restrictions the new mount
+// keeps.
+fn user_namespace_proc_allowed(flags u64) ? {
+	process := calling_process()
+	if process == unsafe { nil } || process.ns.pid == unsafe { nil }
+		|| !proc.has_namespace_capability(process, proc.cap_sys_admin, process.ns.pid.owner_user) {
+		errno.set(errno.eperm)
+		return none
+	}
+	mut table := table_of(process)
+	// Candidates first: is_procfs_root takes procfs_lock, never under the
+	// table lock. Entries are never freed, so the pointers stay valid.
+	mut candidates := [16]u64{}
+	mut count := 0
+	table.lock.acquire()
+	for visible in table.mounts {
+		if count < candidates.len && !visible.detached && visible.fstype == 'proc'
+			&& visible.locked_flags & ms_lockable & ~flags == 0 {
+			candidates[count] = u64(voidptr(visible))
+			count++
+		}
+	}
+	table.lock.release()
+	for index in 0 .. count {
+		visible := unsafe { &Mount(voidptr(candidates[index])) }
+		if !is_procfs_root(visible.root) {
+			continue
+		}
+		table.lock.acquire()
+		mut masked := false
+		for child in table.mounts {
+			if !child.detached && child.locked && child.id != visible.id
+				&& is_beneath(child.covered, visible.root) {
+				masked = true
+				break
+			}
+		}
+		table.lock.release()
+		if !masked {
+			return
+		}
+	}
+	errno.set(errno.eperm)
+	return none
+}
+
+// Whether every uid= and gid= in a tmpfs option string names the id the
+// caller's user namespace maps: Vinix maps only its creator's own.
+fn owner_options_mapped(options string) bool {
+	process := calling_process()
+	if process == unsafe { nil } || process.ns.user == unsafe { nil } {
+		return false
+	}
+	// Views into `options`: split() and slicing would copy.
+	mut start := 0
+	for start <= options.len {
+		mut end := start
+		for end < options.len && options[end] != `,` {
+			end++
+		}
+		option := unsafe { tos(options.str + start, end - start) }
+		start = end + 1
+		user := option.starts_with('uid=')
+		if !user && !option.starts_with('gid=') {
+			continue
+		}
+		mapped := if user { process.ns.user.uid_map_id } else { process.ns.user.gid_map_id }
+		value := unsafe { tos(option.str + 4, option.len - 4) }
+		if mapped < 0 || value.len == 0 || value.i64() != mapped {
+			return false
+		}
+	}
+	return true
+}
+
+// ── mount_setattr(2) ─────────────────────────────────────────────────────────
+
+struct MountAttr {
+	attr_set    u64
+	attr_clr    u64
+	propagation u64
+	userns_fd   u64
+}
+
+const mount_attr_rdonly = u64(0x1)
+const mount_attr_nosuid = u64(0x2)
+const mount_attr_nodev = u64(0x4)
+const mount_attr_noexec = u64(0x8)
+const mount_attr_atime = u64(0x70) // the atime field: relatime (0), noatime, strictatime
+const mount_attr_noatime = u64(0x10)
+const mount_attr_strictatime = u64(0x20)
+const mount_attr_nodiratime = u64(0x80)
+const at_recursive = u32(0x8000)
+const at_no_automount = u32(0x800)
+
+// The per-mount flags an attribute word names. The atime field always maps
+// to every atime flag when cleared, and to the one mode it holds when set.
+fn mount_attr_flags(attr u64, setting bool) u64 {
+	mut flags := u64(0)
+	if attr & mount_attr_rdonly != 0 { flags |= ms_rdonly }
+	if attr & mount_attr_nosuid != 0 { flags |= ms_nosuid }
+	if attr & mount_attr_nodev != 0 { flags |= ms_nodev }
+	if attr & mount_attr_noexec != 0 { flags |= ms_noexec }
+	if attr & mount_attr_nodiratime != 0 { flags |= ms_nodiratime }
+	if !setting {
+		if attr & mount_attr_atime != 0 { flags |= ms_noatime | ms_strictatime | ms_relatime }
+	}
+	return flags
+}
+
+// mount_setattr(2): change the per-mount flags of the mount `path` names,
+// and with AT_RECURSIVE of every mount below it, all or none. bubblewrap
+// 0.13 makes its bind mounts read-only, nosuid and nodev this way, and the
+// builds Vinix ships have no fallback to remounting. ID-mapped mounts and
+// nosymfollow are not supported (EINVAL); propagation is accepted as by
+// mount(2), which does not model it.
+pub fn syscall_mount_setattr(_ voidptr, dirfd int, _path charptr, flags u32, attr_ptr u64, size u64) (u64, u64) {
+	if !security.permitted(security.filesystem_mount) {
+		return errno.err, errno.eperm
+	}
+	if !policy_may_change_mounts() {
+		return errno.err, errno.get()
+	}
+	if flags & ~(u32(at_empty_path) | at_recursive | u32(at_symlink_nofollow) | at_no_automount) != 0 {
+		return errno.err, errno.einval
+	}
+	// MOUNT_ATTR_SIZE_VER0; a larger structure only with zeros beyond it.
+	if size < sizeof(MountAttr) {
+		return errno.err, errno.einval
+	}
+	if size > 4096 {
+		return errno.err, errno.e2big
+	}
+	mut attr := MountAttr{}
+	if !usercopy.copy_from_user(voidptr(&attr), attr_ptr, sizeof(MountAttr)) {
+		return errno.err, errno.efault
+	}
+	mut offset := u64(sizeof(MountAttr))
+	for offset < size {
+		mut extra := u8(0)
+		if !usercopy.copy_from_user(voidptr(&extra), attr_ptr + offset, 1) {
+			return errno.err, errno.efault
+		}
+		if extra != 0 {
+			return errno.err, errno.e2big
+		}
+		offset++
+	}
+	known := mount_attr_rdonly | mount_attr_nosuid | mount_attr_nodev | mount_attr_noexec
+		| mount_attr_atime | mount_attr_nodiratime
+	if (attr.attr_set | attr.attr_clr) & ~known != 0 || attr.userns_fd != 0 {
+		return errno.err, errno.einval
+	}
+	// Setting an atime mode must clear the whole field, and name one mode.
+	atime := attr.attr_set & mount_attr_atime
+	if (atime != 0 && attr.attr_clr & mount_attr_atime != mount_attr_atime)
+		|| (atime != 0 && atime != mount_attr_noatime && atime != mount_attr_strictatime) {
+		return errno.err, errno.einval
+	}
+	match attr.propagation {
+		0, ms_private, ms_slave, ms_shared, ms_unbindable {}
+		else { return errno.err, errno.einval }
+	}
+	mut set := mount_attr_flags(attr.attr_set, true)
+	if attr.attr_clr & mount_attr_atime == mount_attr_atime {
+		set |= match atime {
+			mount_attr_noatime { ms_noatime }
+			mount_attr_strictatime { ms_strictatime }
+			else { ms_relatime }
+		}
+	}
+	clear := mount_attr_flags(attr.attr_clr, false)
+	path := if _path == unsafe { nil } { '' } else {
+		usercopy.copy_cstring_from_user(u64(_path), 4096) or { return errno.err, errno.get() }
+	}
+	defer { unsafe { path.free() } }
+	if path.len == 0 && flags & u32(at_empty_path) == 0 {
+		return errno.err, errno.enoent
+	}
+	change_mount_flags(dirfd, path, flags & u32(at_symlink_nofollow) == 0,
+		flags & at_recursive != 0, set, clear) or { return errno.err, errno.get() }
+	return 0, 0
+}
+
+fn change_mount_flags(dirfd int, path string, follow bool, recursive bool, set u64, clear u64) ? {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	node := if path.len == 0 {
+		empty_path_node(dirfd, identity)?
+	} else {
+		parent := parent_and_mount_for(dirfd, path, identity)?
+		get_node_resolved(parent, path, follow, identity, 0)?
+	}
+	mut table := table_of(calling_process())
+	entry := attached_namespace_mount(mut table, lib.mount_context_top(identity))
+	// Linux: the path must be the root of a mount.
+	if entry == unsafe { nil } || voidptr(entry.root) != voidptr(node) {
+		errno.set(errno.einval)
+		return none
+	}
+	table.lock.acquire()
+	defer { table.lock.release() }
+	// All or none: check every mount before changing any.
+	for pass in 0 .. 2 {
+		for candidate in table.mounts {
+			if candidate.detached || (candidate.id != entry.id
+				&& (!recursive || !mount_descends_locked(table, candidate, entry))) {
+				continue
+			}
+			mut target := unsafe { candidate }
+			target.lock.acquire()
+			updated := (target.flags & ~clear) | set
+			if pass == 0 {
+				// Restrictions locked by an unprivileged user namespace's copy
+				// stay (see copy_mount_table_for), as for a remount.
+				refused := if target.locked_flags & ms_lockable & ~updated != 0 {
+					errno.eperm
+				} else if updated & ms_rdonly != 0 && target.flags & ms_rdonly == 0
+					&& target.writers != 0 {
+					errno.ebusy
+				} else {
+					0
+				}
+				target.lock.release()
+				if refused != 0 {
+					errno.set(u64(refused))
+					return none
+				}
+				continue
+			}
+			target.flags = updated & ms_per_mount
+			target.lock.release()
+		}
+	}
 }

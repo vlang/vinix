@@ -25,6 +25,11 @@ fn credential_in_group(process &proc.Process, gid u32, effective bool) bool {
 // Whether the caller holds `cap`. access(2) asks with the real credentials,
 // for which Linux counts a real uid of zero as holding the permitted set.
 fn holds_capability(process &proc.Process, cap int, effective bool) bool {
+	// Files belong to the initial user namespace; capabilities held in a child
+	// one never override their modes (Linux capable_wrt_inode_uidgid).
+	if !proc.is_initial_namespace(process.ns.user) {
+		return false
+	}
 	caps := if effective {
 		process.caps.effective
 	} else if process.uid == 0 {

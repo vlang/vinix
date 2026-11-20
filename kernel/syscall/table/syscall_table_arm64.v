@@ -439,6 +439,7 @@ pub fn init_syscall_table() {
 	syscall_table[437] = voidptr(syscall_linux_openat2) // __NR_openat2
 	syscall_table[439] = voidptr(syscall_linux_faccessat2) // __NR_faccessat2
 	syscall_table[441] = voidptr(file.syscall_epoll_pwait2) // __NR_epoll_pwait2
+	syscall_table[442] = voidptr(fs.syscall_mount_setattr) // __NR_mount_setattr
 
 	// Process control
 	syscall_table[93] = voidptr(userland.syscall_exit) // __NR_exit

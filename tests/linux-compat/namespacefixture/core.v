@@ -76,7 +76,9 @@ pub fn run() int {
    sizes[index] = C.readlink(names[index], &char(&original[index][0]), 64)
    if !check(sizes[index] > 0, c'read original namespace') { return 1 }
   }
-  for flag in [u64(0x10000000), 0x40000000, 0x80]! {
+  // User and network namespaces are implemented (see usernsfixture); the
+  // time namespace still has no isolated state.
+  for flag in [u64(0x80)]! {
    for request in [flag, flag | u64(0x04000000)]! {
     if !check(C.syscall(isize(C.SYS_unshare), request) == -1
      && *C.__errno_location() == C.EINVAL, c'unsupported unshare') { return 1 }
@@ -84,10 +86,6 @@ pub fn run() int {
    args := CloneArgs{flags: flag | u64(0x04000000), exit_signal: u64(C.SIGCHLD)}
    if !check(C.syscall(isize(C.SYS_clone3), &args, usize(sizeof(CloneArgs))) == -1
     && *C.__errno_location() == C.EINVAL, c'unsupported clone3') { return 1 }
-   if flag != u64(0x80) {
-    if !check(C.syscall(isize(C.SYS_clone), flag | u64(C.SIGCHLD), voidptr(nil), voidptr(nil), voidptr(nil), voidptr(nil)) == -1
-     && *C.__errno_location() == C.EINVAL, c'unsupported clone') { return 1 }
-   }
    for index in 0 .. names.len {
     mut current := [64]u8{}
     size := C.readlink(names[index], &char(&current[0]), 64)

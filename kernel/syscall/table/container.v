@@ -147,7 +147,7 @@ fn syscall_linux_capset(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 	if inheritable & ~(caps.inheritable | caps.bounding) != 0 {
 		return errno.err, errno.eperm
 	}
-	if !proc.has_capability(process, proc.cap_setpcap)
+	if !proc.has_own_capability(process, proc.cap_setpcap)
 		&& inheritable & ~(caps.inheritable | caps.permitted) != 0 {
 		return errno.err, errno.eperm
 	}
@@ -238,7 +238,8 @@ fn seccomp_install(prog u64, flags u32) (u64, u64) {
 	}
 	// Linux reads the header and validates its length before authorization;
 	// only authorized tasks may reach instruction copying and verification.
-	if proc.no_new_privs_state(proc.current_thread()) == 0 && !proc.current_has_capability(proc.cap_sys_admin) {
+	if proc.no_new_privs_state(proc.current_thread()) == 0
+		&& !proc.has_own_capability(proc.current_thread().process, proc.cap_sys_admin) {
 		return errno.err, errno.eacces
 	}
 	// A user-requested buffer must not use V's panic-on-OOM constructor.
@@ -323,7 +324,7 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 			return if process.caps.bounding & (u64(1) << arg2) != 0 { u64(1) } else { u64(0) }, 0
 		}
 		pr_capbset_drop {
-			if !proc.has_capability(process, proc.cap_setpcap) {
+			if !proc.has_own_capability(process, proc.cap_setpcap) {
 				return errno.err, errno.eperm
 			}
 			if arg2 > u64(proc.cap_last_cap) {

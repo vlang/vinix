@@ -524,7 +524,16 @@ fn add_procfs_file(mut parent VFSNode, name string, kind ProcFSKind) &VFSNode {
 // are writable by definition; oom_score_adj is 0644 as on Linux.
 fn add_process_writable(mut parent VFSNode, name string, kind ProcFSKind, pid int) {
 	mut node := create_node(parent.filesystem, parent, name, false)
-	node.resource = new_procfs_resource(kind, stat.ifreg | 0o644, pid, 0).box
+	// Vinix keeps per-process files root's, where Linux gives them to the
+	// process. The id map and setgroups files authorize each write
+	// themselves (proc.write_id_map: the target's user namespace capability,
+	// from it or its parent), so the mode must not stop a process configuring
+	// its own new user namespace.
+	mode := match kind {
+		.uid_map, .gid_map, .setgroups { u32(0o666) }
+		else { u32(0o644) }
+	}
+	node.resource = new_procfs_resource(kind, stat.ifreg | mode, pid, 0).box
 	unsafe {
 		parent.children[name] = node
 	}
@@ -812,7 +821,7 @@ fn (this &ProcFSResource) contents() string {
 			return text.str()
 		}
 		.setgroups {
-			return 'allow\n'
+			return proc.setgroups_text(this.pid)
 		}
 		.uid_map {
 			return proc.id_map_text(this.pid, false)
@@ -1014,9 +1023,60 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			security.set_securelevel(value) or { return none }
 			return i64(count)
 		}
-		.uid_map, .gid_map, .setgroups {
-			errno.set(errno.eperm)
-			return none
+		.uid_map, .gid_map {
+			// One "inside outside count" line; proc.write_id_map decides.
+			if count == 0 || count > 64 {
+				errno.set(errno.einval)
+				return none
+			}
+			written := unsafe { tos(&u8(buf), int(count)) }
+			mut values := [3]i64{}
+			mut fields := 0
+			mut value := i64(-1)
+			for c in written {
+				if c >= `0` && c <= `9` {
+					value = if value < 0 { i64(c - `0`) } else { value * 10 + i64(c - `0`) }
+					if value > 4294967295 { errno.set(errno.einval); return none }
+				} else if c == ` ` || c == `\t` || c == `\n` {
+					if value >= 0 {
+						if fields == 3 { errno.set(errno.einval); return none }
+						values[fields] = value
+						fields++
+						value = -1
+					}
+				} else {
+					errno.set(errno.einval)
+					return none
+				}
+			}
+			if value >= 0 {
+				if fields == 3 { errno.set(errno.einval); return none }
+				values[fields] = value
+				fields++
+			}
+			if fields != 3 {
+				errno.set(errno.einval)
+				return none
+			}
+			proc.write_id_map(this.pid, this.kind == .gid_map, values[0], values[1], values[2])?
+			return i64(count)
+		}
+		.setgroups {
+			if count == 0 || count > 16 {
+				errno.set(errno.einval)
+				return none
+			}
+			written := unsafe { tos(&u8(buf), int(count)) }
+			word := written.trim_space()
+			deny := word == 'deny'
+			allow := word == 'allow'
+			unsafe { word.free() }
+			if !deny && !allow {
+				errno.set(errno.einval)
+				return none
+			}
+			proc.write_setgroups(this.pid, deny)?
+			return i64(count)
 		}
 		.security_events {
 			// A trusted service reporting a decision of its own:
@@ -2382,4 +2442,24 @@ fn drop_procfs_directory(mut parent VFSNode, child &VFSNode) {
 		node.directory_resource = true
 		orphan_node(mut node, node_resource.stat.mode)
 	}
+}
+
+// Whether `node` is the root of a procfs tree (the initial one or a pid
+// namespace's), not a directory inside one: a bind of /proc/sys is not a
+// whole proc. Takes procfs_lock.
+fn is_procfs_root(node &VFSNode) bool {
+	if node == unsafe { nil } {
+		return false
+	}
+	procfs_lock.acquire()
+	defer { procfs_lock.release() }
+	if voidptr(node) == voidptr(procfs_root) {
+		return true
+	}
+	for view in procfs_views {
+		if voidptr(view.root) == voidptr(node) {
+			return true
+		}
+	}
+	return false
 }

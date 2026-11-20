@@ -3,6 +3,7 @@
 module inet
 
 import errno
+import proc
 import usercopy
 
 // The network interfaces, as rtnetlink and the SIOCGIF* ioctls describe them:
@@ -83,6 +84,11 @@ pub fn interfaces() []Interface {
 		mtu:     65536
 		address: 0x0100007f
 		netmask: 0x000000ff
+	}
+	// A network namespace other than the initial one has only its loopback:
+	// the host interface, its addresses and routes are not part of it.
+	if !in_initial_network_namespace() {
+		return list
 	}
 	mut mac := [6]u8{}
 	mut mtu := u32(0)
@@ -313,4 +319,14 @@ pub fn interface_ioctl(request u64, argp voidptr) ?int {
 		return none
 	}
 	return 0
+}
+
+// Whether the caller uses the host's network stack. Vinix gives a network
+// namespace of its own nothing but loopback; see socket.socket_create.
+pub fn in_initial_network_namespace() bool {
+	task := proc.current_thread()
+	if task == unsafe { nil } || task.process == unsafe { nil } {
+		return true
+	}
+	return proc.is_initial_namespace(task.process.ns.net)
 }

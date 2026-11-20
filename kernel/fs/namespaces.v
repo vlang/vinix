@@ -203,12 +203,24 @@ fn refresh_ns_directory(mut dir VFSNode, pid int) {
 // reference to `old` dropped.
 fn replace_namespace(process &proc.Process, mut old proc.Namespace) &proc.Namespace {
 	mut ns := proc.copy_namespace(old)
+	// Owned by the caller's user namespace, which create_namespaces has
+	// already replaced when the same call asked for a new one.
+	ns.owner_user = proc.user_namespace_of(process)
 	match old.kind {
+		proc.clone_newuser {
+			proc.count_user_namespace()
+			ns.parent_user = if proc.is_initial_namespace(old) { proc.user_namespace_of(unsafe { nil }) } else { old.id }
+			ns.owner_user = ns.parent_user
+			ns.user_depth = if proc.is_initial_namespace(old) { 1 } else { old.user_depth + 1 }
+		}
 		proc.clone_newipc {
 			ns.ipc_user_ns = if process.ns.user == unsafe { nil } { u64(4026531837) } else { process.ns.user.id }
 		}
 		proc.clone_newns {
-			ns.data = voidptr(copy_mount_table(table_of(process)))
+			// A mount namespace owned by an unprivileged user namespace may
+			// rearrange its view but not reveal or loosen what it inherited.
+			ns.data = voidptr(copy_mount_table_for(table_of(process),
+				!proc.is_initial_namespace(process.ns.user)))
 		}
 		proc.clone_newcgroup {
 			ns.data = cgroup_namespace_data(process)
@@ -246,6 +258,9 @@ pub fn create_namespaces(mut process proc.Process, flags u64, for_child bool) {
 	proc.lock_table()
 	if flags & proc.clone_newuser != 0 {
 		process.ns.user = replace_namespace(process, mut process.ns.user)
+		// The creator holds every capability in its new user namespace. They
+		// are namespace-local: has_capability() still refuses them.
+		process.caps = proc.full_capabilities()
 	}
 	if flags & proc.clone_newipc != 0 {
 		process.ns.ipc = replace_namespace(process, mut process.ns.ipc)
@@ -270,6 +285,10 @@ pub fn create_namespaces(mut process proc.Process, flags u64, for_child bool) {
 		// unshare(CLONE_NEWPID) moves only the caller's future children; a
 		// clone(CLONE_NEWPID) child is itself the first member.
 		mut fresh := proc.copy_namespace(process.ns.pid_for_children)
+		// Owned like the others by the caller's user namespace, already replaced
+		// when the same call asked for a new one: that decides who may mount
+		// a proc showing it.
+		fresh.owner_user = proc.user_namespace_of(process)
 		release_namespace(mut process.ns.pid_for_children)
 		process.ns.pid_for_children = fresh
 		if for_child {
@@ -322,11 +341,16 @@ pub fn syscall_unshare(_ voidptr, flags u64) (u64, u64) {
 	if flags & proc.unsupported_namespace_flags != 0 {
 		return errno.err, errno.einval
 	}
-	if flags & proc.clone_namespace_flags & ~proc.clone_newuser != 0
-		&& !proc.current_has_capability(proc.cap_sys_admin) {
-		return errno.err, errno.eperm
-	}
 	mut process := proc.current_thread().process
+	// A user namespace changes the credentials of every thread sharing them;
+	// Linux takes it only from a single-threaded caller.
+	if flags & proc.clone_newuser != 0 && process.threads.len > 1 {
+		return errno.err, errno.einval
+	}
+	failure := namespace_creation_failure(process, flags)
+	if failure != 0 {
+		return errno.err, failure
+	}
 	mut ns_flags := flags & proc.clone_namespace_flags
 	// Root, working directory and mounts are per process until a thread of a
 	// multithreaded one asks to stop sharing them (CLONE_NEWNS implies
@@ -386,7 +410,7 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 	if nstype != 0 && u64(nstype) != ns.kind {
 		return errno.err, errno.einval
 	}
-	if ns.kind & proc.unsupported_namespace_flags != 0 {
+	if ns.kind & proc.unsupported_setns_flags != 0 {
 		return errno.err, errno.einval
 	}
 	if !proc.current_has_capability(proc.cap_sys_admin) {
@@ -493,4 +517,71 @@ pub fn uts_hostname() ?string {
 		return none
 	}
 	return ns.hostname
+}
+
+// Whether `process` sees a root other than its mount namespace's root, as
+// chroot(2) leaves it. Linux refuses such a process a new user namespace: the
+// capabilities it would get there include pivot_root, which could escape.
+pub fn chrooted(process &proc.Process) bool {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	// Both roots are compared as path resolution sees them (root_with_context):
+	// the boot root is a covered sentinel, and after a switch_root (MS_MOVE
+	// onto /, then chroot to it) the mount on top is the root without the
+	// process being chrooted, as Linux current_chrooted() follows it.
+	own := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	directory := proc.snapshot_root_directory(process, own)
+	namespace_directory_context(own)
+	root := if directory == unsafe { nil } { vfs_root } else { unsafe { &VFSNode(directory) } }
+	if own.depth == 0 && !native_context(root, own) { return true }
+	effective := reduce_node_on_mount(root, false, 0, true, own)
+	base := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	lib.copy_mount_context(base, unsafe { nil })
+	mut table := table_of(process)
+	table.lock.acquire()
+	mut namespace_root := vfs_root
+	if !table.initial && table.root_hint != unsafe { nil } {
+		namespace_root = table.root_hint
+		lib.copy_mount_context(base, &table.root_hint_mount)
+	}
+	table.lock.release()
+	namespace_directory_context(base)
+	if base.depth == 0 && !native_context(namespace_root, base) { return true }
+	top := reduce_node_on_mount(namespace_root, false, 0, true, base)
+	// A root that cannot be resolved is treated as a jail: refusing a user
+	// namespace is the safe answer.
+	return effective == unsafe { nil } || voidptr(effective) != voidptr(top)
+}
+
+// Linux's limit on nested user namespaces.
+const max_user_namespace_depth = 32
+
+// Whether the calling process may create the namespaces `flags` name, or the
+// errno refusing them. A new user namespace needs no privilege: its creator
+// holds every capability in it, and it owns the other namespaces created in
+// the same call. Without one, they need CAP_SYS_ADMIN in the caller's own user
+// namespace, which owns them.
+pub fn namespace_creation_failure(process &proc.Process, flags u64) u64 {
+	requested := flags & proc.clone_namespace_flags
+	if requested == 0 {
+		return 0
+	}
+	if requested & proc.clone_newuser != 0 {
+		user := process.ns.user
+		if user != unsafe { nil } && user.user_depth >= max_user_namespace_depth {
+			return errno.eusers
+		}
+		// Unprivileged callers only: the limit is against exhausting memory.
+		if proc.user_namespaces_exhausted() && !proc.has_capability(process, proc.cap_sys_admin) {
+			return errno.enospc
+		}
+		if chrooted(process) {
+			return errno.eperm
+		}
+		return 0
+	}
+	if !proc.has_own_capability(process, proc.cap_sys_admin) {
+		return errno.eperm
+	}
+	return 0
 }

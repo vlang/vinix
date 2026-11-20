@@ -21,7 +21,7 @@ pub fn securebits_state(task &Thread) u32 {
 
 // Only the owning task changes these flags; there is no cross-task setter.
 pub fn set_securebits(value u64) bool {
-	if value & ~u64(secure_all) != 0 || !current_has_capability(cap_setpcap) { return false }
+	if value & ~u64(secure_all) != 0 || !has_own_capability(current_thread().process, cap_setpcap) { return false }
 	mut task := current_thread()
 	old := securebits_state(task)
 	locks := old & secure_locks
