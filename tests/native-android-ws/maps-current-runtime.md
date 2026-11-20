@@ -13,7 +13,11 @@ WebView members and one framework linkage error, all fixed (0e9f40e95,
 b069cd085, da2adf461), and r122 on a 5-s account query deadline, now 30 s
 (b03749d2f). Check-in passed in 4 of 8 runs; it finishes about 7 s too late
 when it fails. Google's sign-in page also needs a WebView JavaScript bridge
-(`mm`) that neither the framework nor the engine has. No account has
+(`mm`); that bridge now exists (c17cfe704, 406b0a98a). r127 reached the
+sign-in page load, where the engine aborted: WebKit's bubblewrap sandbox needs
+user and network namespaces, which the Vinix kernel does not implement, and
+the runtime lacks compiled GSettings schemas. Loading the page needs kernel
+namespaces or a decision to run WebKit unsandboxed. No account has
 authenticated.
 
 Earlier continuation, 2026-11-15: the [GNSS metadata adapter](maps-gnss-hardware-20261115.md)

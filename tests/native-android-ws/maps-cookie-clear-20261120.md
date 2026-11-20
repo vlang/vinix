@@ -143,3 +143,64 @@ falling back to Java. JIT is enabled. Check-in passed in 4 of 8 runs today.
 
 Each is under `maps-current-20261120-rNNN-account/private/`. All guests are
 stopped; no credentials were entered and no account authenticated.
+
+## r124–r127: JavaScript bridge, then the WebKit sandbox
+
+Google's sign-in page calls GMS through `addJavascriptInterface(..., "mm")`
+and uses return values synchronously, so the WebView now has a real bridge:
+
+- c17cfe704: three browser operations (`js_interfaces`, `js_call`,
+  `js_reply`) and the engine side. A document-start script defines each
+  interface; its methods call `window.prompt` with a per-engine marker, and the
+  `script-dialog` handler holds the prompt open until Android answers. Values
+  are tagged text counted in UTF-16 units. Host tests run the generated script
+  in JavaScriptCore against a fake Java side.
+- 406b0a98a: the framework keeps interface objects, publishes their
+  `@JavascriptInterface` methods and answers calls by reflection
+  (`androidtools/java/android/webkit/VinixJavascriptBridge.java`, compiled with
+  javac and D8 into the framework, with a host JVM check); the native client
+  dispatches each call and always replies. The framework gains the
+  `JavascriptInterface` annotation.
+- c319e28ac: six platform members the MinuteMaid classes call
+  (`Settings.System.getConfiguration` stopped r124).
+- 9d61c2dc9 and 2385836aa: `setCookie`/`getCookie` no longer throw when the
+  engine refuses a cookie (stopped r126), and bare-host cookie URLs are
+  normalized to `http://host/` like Android's `WebAddress`.
+
+r126 and r127 ran with 8 vCPUs; check-in passed in both. Earlier failures
+correlate with the guest's load: passing check-ins took 2.6–6 s at 158–173 s
+of uptime, the slow ones 10–22 s, two of them at 465–531 s after a lost tap.
+
+r127 reached the sign-in page load and showed "Something went wrong — Please
+go back and try again". The engine aborted (status 134). Its retained
+`webview/last-failure.log` shows why no page has ever loaded in a guest:
+
+- `bwrap: Creating new namespace failed, likely because the kernel does not
+  support user namespaces`, then WebKit's `readPIDFromPeer` error. Running
+  bwrap by hand in the guest, even `--unshare-user` alone fails. The Vinix
+  kernel, on master too, rejects `CLONE_NEWUSER` and `CLONE_NEWNET`
+  (`proc.unsupported_namespace_flags`); seccomp filters already exist. The
+  engine runs under the app's unprivileged UID and refuses
+  `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS`, so WebKit cannot start a web
+  process.
+- `GLib-GIO-ERROR: No GSettings schemas are installed`. The browser runtime
+  ships the schema XML and glib-networking's GNOME proxy module but no
+  compiled `gschemas.compiled`; `tests/android-browser-deployment/build.v`
+  should compile it (or the launcher should select GLib's dummy proxy
+  resolver).
+
+Loading the sign-in page therefore needs either user and network namespaces
+in the kernel or an explicit decision to run WebKit's web process without
+its sandbox; that is a security policy choice, not taken here. The bridge
+is built and unit-tested but not yet exercised by a loaded page.
+
+| Run | Private broker.log SHA256 |
+| --- | --- |
+| r124 | 5f999272994207d8d94f0df2207396b9130a1c89cab4dded5acc6561cd957e5e |
+| r126 | 5736ecfdf2ff43751b5936fef1b672bfa1f9e31b60588a364991afb66dd6efff |
+| r127 | ad72125e529952dd42b94705a1a887517425a0f77b980cb79116d024d5b8ea4f (also webview-last-failure.log) |
+
+Current candidate inputs: framework `framework-signin-platform-20261120-r1`,
+native `bridge-native-20261120-r4`, browser client
+`bridge-browser-client-20261120-r1`, engine `bridge-engine-20261120-r1`
+(API audit: 111 symbols present in the deployed libraries).
