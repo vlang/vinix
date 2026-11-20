@@ -47,7 +47,8 @@ const brk_arena_size = u64(0xf000000000)
 // address in every process is one an exploit needs no leak to find.
 const brk_aslr_span = u64(0x10000000)
 
-fn random_brk_start() u64 {
+fn random_brk_start(randomize bool) u64 {
+	if !randomize { return brk_arena_base }
 	mut random := u64(0)
 	if !krandom.fill(voidptr(&random), sizeof(random), true) {
 		return brk_arena_base
@@ -645,7 +646,7 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 		mmap(pagemap, voidptr(brk_arena_base), brk_arena_size, prot_none, map_anonymous | map_private | map_fixed_noreplace | map_brk_reservation, unsafe { nil }, 0, unsafe { nil }, unsafe { nil }, unsafe { nil }) or {
 			return 0, 0
 		}
-		start := random_brk_start()
+		start := random_brk_start(!process.layout_fixed)
 		pagemap.l.acquire()
 		katomic.store(mut &pagemap.brk_base, start)
 		katomic.store(mut &pagemap.brk_current, start)

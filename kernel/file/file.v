@@ -1753,7 +1753,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 
 	mut resource_ := &resource.Resource(unsafe { nil })
 	mut fd := &FD(unsafe { nil })
-	prot := int((prot_and_flags >> 32) & 0xffffffff)
+	mut prot := int((prot_and_flags >> 32) & 0xffffffff)
 	flags := int(prot_and_flags & 0xffffffff)
 	file_backed := flags & mmap.map_anonymous == 0
 
@@ -1819,6 +1819,12 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	mut mapping_handle := voidptr(0)
 	if file_backed {
 		mapping_handle = voidptr(fd.handle)
+	}
+	// personality(READ_IMPLIES_EXEC): readable memory that may be executable is
+	// mapped executable as well, as on Linux; not a file on a noexec mount.
+	if prot & mmap.prot_read != 0 && map_flags & mmap.map_no_exec == 0
+		&& proc.current_personality() & proc.read_implies_exec != 0 {
+		prot |= mmap.prot_exec
 	}
 	ret := mmap.mmap(process.pagemap, addr, length, prot, map_flags, resource_, offset, mapping_handle, retain_mmap_handle, release_mmap_handle) or {
 		return errno.err, errno.get()

@@ -331,6 +331,55 @@ fn linux_writev_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) 
 
 // uname(buf): struct utsname, six 65-byte fields. `version` and `machine`
 // are the architecture's own.
+// personality(UNAME26) reports a 2.6 release, made as Linux makes one from its
+// own: 2.6.(60 + minor), then whatever follows the version numbers, within
+// the field's 64 characters. `field` is the 65-byte release field.
+fn uname26_release(field voidptr) {
+	unsafe {
+		mut release := &u8(field)
+		// Digits and dots, up to the third dot, are the version numbers.
+		mut rest := 0
+		mut dots := 0
+		mut minor := 0
+		for rest < 64 && release[rest] != 0 {
+			c := release[rest]
+			if c == `.` {
+				dots++
+				if dots >= 3 { break }
+			} else if c >= `0` && c <= `9` {
+				if dots == 1 { minor = minor * 10 + int(c - `0`) }
+			} else {
+				break
+			}
+			rest++
+		}
+		mut length := rest
+		for length < 64 && release[length] != 0 { length++ }
+		value := minor + 60
+		mut digits := 1
+		for scale := 10; value >= scale; scale *= 10 { digits++ }
+		prefix := 4 + digits
+		mut suffix := length - rest
+		if prefix + suffix > 64 { suffix = 64 - prefix }
+		// Move what follows the numbers to its new place, then write them.
+		if prefix > rest {
+			for i := suffix - 1; i >= 0; i-- { release[prefix + i] = release[rest + i] }
+		} else {
+			for i := 0; i < suffix; i++ { release[prefix + i] = release[rest + i] }
+		}
+		release[prefix + suffix] = 0
+		release[0] = `2`
+		release[1] = `.`
+		release[2] = `6`
+		release[3] = `.`
+		mut v := value
+		for i := prefix - 1; i >= 4; i-- {
+			release[i] = u8(`0` + v % 10)
+			v /= 10
+		}
+	}
+}
+
 fn linux_uname(buf u64, version charptr, machine charptr) (u64, u64) {
 	mut uts := [390]u8{}
 	// A container is a Linux system to what runs in it, and /proc there says
@@ -353,7 +402,14 @@ fn linux_uname(buf u64, version charptr, machine charptr) (u64, u64) {
 		C.strcpy(charptr(&uts[65]), c'vinix')
 		C.strcpy(charptr(&uts[130]), release)
 		C.strcpy(charptr(&uts[195]), version)
-		C.strcpy(charptr(&uts[260]), machine)
+		// personality(PER_LINUX32), which only x86-64 accepts, reports the
+		// 32-bit machine.
+		C.strcpy(charptr(&uts[260]), if proc.current_personality() & proc.per_mask == proc.per_linux32 {
+			c'i686'
+		} else {
+			machine
+		})
+		if proc.current_personality() & proc.uname26 != 0 { uname26_release(voidptr(&uts[130])) }
 	}
 	net.copy_hostname(u64(&uts[65]))
 	net.copy_domainname(u64(&uts[325]))

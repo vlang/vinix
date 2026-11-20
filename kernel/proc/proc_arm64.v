@@ -137,6 +137,8 @@ pub mut:
 	// context keeps, and whether this thread has such a context. See ioprio.v.
 	ioprio_value   u16
 	ioprio_context bool
+	// personality(2), inherited by new threads and processes. See personality.v.
+	personality u32
 	// Scheduling policy, priority and, under SCHED_DEADLINE, the budget left
 	// in this period. Inherited by fork and by every thread a process clones,
 	// and kept across exec, so `chrt -f 50 ./program` gives the program the

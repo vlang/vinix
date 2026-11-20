@@ -2611,6 +2611,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   KCMP_IO. The same probe ELF passes 45 + 63 + 13 checks on Vinix and Linux
   6.12 on both architectures. See [the ioprio receipts](docs/linux-ioprio.md).
 
+- [x] Implement personality with Linux 6.12's value handling, per-thread
+  inheritance and exec rules, fixed exec layouts under ADDR_NO_RANDOMIZE,
+  READ_IMPLIES_EXEC protections and UNAME26/PER_LINUX32 uname answers. The
+  same probe ELF passes 39 AArch64 / 40 x86-64 checks on Vinix and Linux 6.12.
+  See [the personality receipts](docs/linux-personality.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -395,6 +395,8 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 	path string, argv []string, envp []string, stdin_path string, stdout_path string,
 	stderr_path string, allow_wx bool) ?&proc.Process {
 	mut prog := prog_node.resource
+	// personality(ADDR_NO_RANDOMIZE) in the exec'ing thread fixes the new layout.
+	randomize := proc.exec_randomizes()
 	// Made after the shebang check: a script never used it, and lost it.
 	mut new_pagemap := memory.new_user_pagemap(proc.kernel_owner())?
  mut map_transferred := false
@@ -406,7 +408,7 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
   }
  }
 
-	loaded_auxval, loaded_path := elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
+	loaded_auxval, loaded_path := elf.load_layout(new_pagemap, prog, 0, randomize) or { return exec_format_error(err) }
 	mut auxval := unsafe { &elf.Auxval(C.vinix_stack_alloc(sizeof(elf.Auxval))) }
 	unsafe { *auxval = loaded_auxval }
 	mut ld_path := loaded_path
@@ -440,7 +442,7 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 		}
 		ld := ld_node.resource
 
-		ld_auxval, interp := elf.load(new_pagemap, ld, elf.interpreter_load_base()) or {
+		ld_auxval, interp := elf.load(new_pagemap, ld, elf.interpreter_load_base(randomize)) or {
 			return exec_format_error(err)
 		}
 
@@ -623,8 +625,9 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 			abort_exec(mut process, mut t)
 		}
 
-		process.thread_stack_top = elf.initial_stack_top()
-		process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
+		process.thread_stack_top = elf.initial_stack_top(randomize)
+		process.mmap_anon_non_fixed_base = elf.initial_mmap_base(randomize)
+		process.layout_fixed = !randomize
 		// The old program's break went with its page map; the new one
 		// reserves its own arena on its first brk().
 		complete_vfork(mut process)
@@ -660,6 +663,7 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 		proc.set_thread_sched_params_with_util(new_thread.tid, inherited_sched, true)
 		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
 		proc.carry_io_context(mut new_thread, t)
+		new_thread.personality = proc.exec_personality(t)
 
 		// execve keeps the signal mask and what was ignored; only handlers,
 		// which pointed into the old program, go back to the default.

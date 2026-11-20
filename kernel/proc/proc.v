@@ -329,6 +329,10 @@ pub mut:
 	// no undo lists (semop refuses SEM_UNDO), but kcmp(KCMP_SYSVSEM) reports
 	// whether one would exist. A fork child starts without one.
 	sysvsem_undo bool
+	// Whether the program this process runs was given a fixed layout: exec
+	// decides it from ADDR_NO_RANDOMIZE in the exec'ing thread's personality,
+	// and fork keeps it. Later mmap hints and the first break follow it.
+	layout_fixed bool
 	// A parent may no longer change its child's process group after exec.
 	did_exec u32
 	stack_policy_mode u32

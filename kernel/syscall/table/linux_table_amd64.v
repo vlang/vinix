@@ -407,6 +407,7 @@ pub fn init_syscall_table() {
 	syscall_table[217] = voidptr(syscall_linux_getdents64) // getdents64
 	syscall_table[221] = voidptr(file.syscall_fadvise64) // fadvise64
 	syscall_table[235] = voidptr(syscall_linux_utimes) // utimes
+	syscall_table[135] = voidptr(proc.syscall_personality) // personality
 	syscall_table[251] = voidptr(proc.syscall_ioprio_set) // ioprio_set
 	syscall_table[252] = voidptr(proc.syscall_ioprio_get) // ioprio_get
 	syscall_table[253] = voidptr(syscall_linux_inotify_init) // inotify_init

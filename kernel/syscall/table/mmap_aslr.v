@@ -19,6 +19,10 @@ fn randomized_mmap_hint(length u64) voidptr {
 	if process == unsafe { nil } {
 		return unsafe { nil }
 	}
+	// personality(ADDR_NO_RANDOMIZE) at exec leaves placement to the hole finder.
+	if process.layout_fixed {
+		return unsafe { nil }
+	}
 	anchor := process.mmap_anon_non_fixed_base
 	limit := memory.user_address_limit()
 	if anchor == 0 || anchor >= limit || length >= limit - anchor {

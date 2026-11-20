@@ -377,6 +377,7 @@ pub fn init_syscall_table() {
 	syscall_table[29] = voidptr(fs.syscall_ioctl) // __NR_ioctl
 	syscall_table[30] = voidptr(proc.syscall_ioprio_set) // __NR_ioprio_set
 	syscall_table[31] = voidptr(proc.syscall_ioprio_get) // __NR_ioprio_get
+	syscall_table[92] = voidptr(proc.syscall_personality) // __NR_personality
 	syscall_table[34] = voidptr(fs.syscall_mkdirat) // __NR_mkdirat
 	syscall_table[35] = voidptr(fs.syscall_unlinkat) // __NR_unlinkat
 	syscall_table[36] = voidptr(fs.syscall_symlinkat) // __NR_symlinkat

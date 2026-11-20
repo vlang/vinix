@@ -1715,7 +1715,18 @@ pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64
 	if u64(addr) % page_size != 0 {
 		return errno.err, errno.einval
 	}
-	mprotect(mut process.pagemap, addr, length, prot) or { return errno.err, errno.get() }
+	// personality(READ_IMPLIES_EXEC) adds PROT_EXEC to readable memory, unless
+	// part of the range may never be executable (Linux decides per mapping).
+	mut effective := prot
+	rounded := lib.align_up(length, page_size)
+	if prot & prot_read != 0 && length != 0 && rounded >= length
+		&& current_thread.personality & proc.read_implies_exec != 0 {
+		process.pagemap.l.acquire()
+		blocked := no_exec_overlap_unlocked(process.pagemap, u64(addr), rounded)
+		process.pagemap.l.release()
+		if !blocked { effective |= prot_exec }
+	}
+	mprotect(mut process.pagemap, addr, length, effective) or { return errno.err, errno.get() }
 
 	return 0, 0
 }

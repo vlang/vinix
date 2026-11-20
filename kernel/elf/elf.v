@@ -63,16 +63,21 @@ fn random_offset(span u64, alignment u64) u64 {
 	return (value % slots) * alignment
 }
 
-pub fn interpreter_load_base() u64 {
-	return interpreter_base + random_offset(image_aslr_span, image_alignment)
+// Each layout helper takes whether the program's layout is randomized; one
+// run under personality(ADDR_NO_RANDOMIZE) gets the bases themselves.
+pub fn interpreter_load_base(randomize bool) u64 {
+	offset := if randomize { random_offset(image_aslr_span, image_alignment) } else { u64(0) }
+	return interpreter_base + offset
 }
 
-pub fn initial_stack_top() u64 {
-	return stack_base - random_offset(arena_aslr_span, page_size)
+pub fn initial_stack_top(randomize bool) u64 {
+	offset := if randomize { random_offset(arena_aslr_span, page_size) } else { u64(0) }
+	return stack_base - offset
 }
 
-pub fn initial_mmap_base() u64 {
-	return mmap_base + random_offset(arena_aslr_span, page_size)
+pub fn initial_mmap_base(randomize bool) u64 {
+	offset := if randomize { random_offset(arena_aslr_span, page_size) } else { u64(0) }
+	return mmap_base + offset
 }
 
 pub const abi_sysv = 0x00
@@ -272,17 +277,22 @@ fn release_loader_string(value string) {
 }
 
 pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxval, string) {
-	return load_impl(_pagemap, _res, _base, false, '')
+	return load_impl(_pagemap, _res, _base, false, '', true)
+}
+
+// load(), with a PIE placed at its fixed base unless `randomize`.
+pub fn load_layout(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, randomize bool) !(Auxval, string) {
+	return load_impl(_pagemap, _res, _base, false, '', randomize)
 }
 
 // Verbose production-visible loader diagnostics for the one hardware desktop
 // exec under investigation. Keeping this as a separate entry point avoids
 // flooding every normal program launch.
-pub fn load_traced(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, image string) !(Auxval, string) {
-	return load_impl(_pagemap, _res, _base, true, image)
+pub fn load_traced(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, image string, randomize bool) !(Auxval, string) {
+	return load_impl(_pagemap, _res, _base, true, image, randomize)
 }
 
-fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace bool, image string) !(Auxval, string) {
+fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace bool, image string, randomize bool) !(Auxval, string) {
 	mut res := unsafe { _res }
 	mut pagemap := unsafe { _pagemap }
 	mut base := _base
@@ -322,7 +332,7 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	if base == 0 && header.@type == u16(et_dyn) {
 		exec_trace(trace, image, 'choosing PIE load base')
 		extent := load_extent(mut res, *header)!
-		base = pie_load_base(extent)
+		base = if randomize { pie_load_base(extent) } else { pie_base }
 	}
 	if trace {
 		C.kprintf(c'exec[gpu]/elf %.*s: effective load base=0x%llx\n', i32(image.len), image.str,

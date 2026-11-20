@@ -271,13 +271,14 @@ const sigreturn_page_base = u64(0x70000000000)
 const sigreturn_page_span = u64(0x40000000)
 const linux_sa_restorer = 0x04000000
 
-fn sigreturn_page_address() u64 {
+fn sigreturn_page_address(randomize bool) u64 {
+	if !randomize { return sigreturn_page_base }
 	mut random := u64(0)
 	krandom.fill(voidptr(&random), sizeof(random), true)
 	return sigreturn_page_base + (random % (sigreturn_page_span / page_size)) * page_size
 }
 
-fn install_sigreturn_page(mut pagemap memory.Pagemap) ?u64 {
+fn install_sigreturn_page(mut pagemap memory.Pagemap, randomize bool) ?u64 {
 	page := memory.pmm_alloc(1)
 	if page == unsafe { nil } {
 		errno.set(errno.enomem)
@@ -289,7 +290,7 @@ fn install_sigreturn_page(mut pagemap memory.Pagemap) ?u64 {
 		code[1] = u32(0xd4000001)
 	}
 	cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
-	address := sigreturn_page_address()
+	address := sigreturn_page_address(randomize)
 	mmap.map_range(mut pagemap, address, u64(page), page_size, mmap.prot_read | mmap.prot_exec,
 		mmap.map_private) or {
 		memory.pmm_free(page, 1)
@@ -1113,6 +1114,8 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 	path string, argv []string, envp []string, stdin_path string, stdout_path string,
 	stderr_path string, allow_wx bool) ?&proc.Process {
 	trace_gpu := execve && path == gpu_desktop_executable
+	// personality(ADDR_NO_RANDOMIZE) in the exec'ing thread fixes the new layout.
+	randomize := proc.exec_randomizes()
 	root := fs.process_root(proc.current_thread().process)
 	mut prog := prog_node.resource
 	// QEMU's -E preload belongs to the emulated x86 process. Its children may
@@ -1170,11 +1173,11 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 	mut ld_path := ''
  defer { free_exec_text(ld_path) }
 	if trace_gpu {
-		loaded_auxval, ld_path = elf.load_traced(new_pagemap, prog, 0, 'program') or {
+		loaded_auxval, ld_path = elf.load_traced(new_pagemap, prog, 0, 'program', randomize) or {
 			return exec_format_error(err)
 		}
 	} else {
-		loaded_auxval, ld_path = elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
+		loaded_auxval, ld_path = elf.load_layout(new_pagemap, prog, 0, randomize) or { return exec_format_error(err) }
 	}
 	mut auxval := unsafe { &elf.Auxval(C.vinix_stack_alloc(sizeof(elf.Auxval))) }
 	unsafe { *auxval = loaded_auxval }
@@ -1209,13 +1212,13 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 		ld := ld_node.resource
 
 		gpu_exec_trace(trace_gpu, 'choosing ELF interpreter load base')
-		interpreter_base := elf.interpreter_load_base()
+		interpreter_base := elf.interpreter_load_base(randomize)
 		gpu_exec_trace(trace_gpu, 'loading ELF interpreter segments')
 		mut ld_auxval := elf.Auxval{}
 		mut interp := ''
 		if trace_gpu {
 			ld_auxval, interp = elf.load_traced(new_pagemap, ld, interpreter_base,
-				'interpreter') or {
+				'interpreter', randomize) or {
 				return exec_format_error(err)
 			}
 		} else {
@@ -1238,7 +1241,7 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 
 
 	}
-	sigreturn_page := install_sigreturn_page(mut new_pagemap) or { return none }
+	sigreturn_page := install_sigreturn_page(mut new_pagemap, randomize) or { return none }
 
 	// Successful exec never returns through its defers. The interpreter
 	// pathname is no longer needed once both images have loaded.
@@ -1427,8 +1430,9 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 		}
 		gpu_exec_trace(trace_gpu, 'old process page map deleted')
 
-		curr_process.thread_stack_top = elf.initial_stack_top()
-		curr_process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
+		curr_process.thread_stack_top = elf.initial_stack_top(randomize)
+		curr_process.mmap_anon_non_fixed_base = elf.initial_mmap_base(randomize)
+		curr_process.layout_fixed = !randomize
 		// The new program has no break yet; its first brk() reserves the arena
 		// in the address space it now has.
 		complete_vfork(mut curr_process)
@@ -1470,6 +1474,7 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 		proc.set_thread_sched_params_with_util(new_thread.tid, inherited_sched, true)
 		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
 		proc.carry_io_context(mut new_thread, t)
+		new_thread.personality = proc.exec_personality(t)
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
 		// exec keeps blocked and ignored signals, as the x86 handoff does.
 		new_thread.masked_signals = t.masked_signals

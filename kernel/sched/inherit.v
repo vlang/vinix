@@ -142,6 +142,7 @@ pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, a
 		new_proc.rlimits = old_process.rlimits
 		proc.set_cpu_limit(mut new_proc, new_proc.rlimits[proc.rlimit_cpu])
 		new_proc.allow_wx = old_process.allow_wx
+		new_proc.layout_fixed = old_process.layout_fixed
 		new_proc.dumpable = proc.dumpability(old_process)
 		new_proc.sigreturn_page = old_process.sigreturn_page
 		// A NUMA memory policy is process state, like the rlimits, so
@@ -185,8 +186,8 @@ pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, a
    }
    new_proc.pagemap.l.release()
   }
-		new_proc.thread_stack_top = elf.initial_stack_top()
-		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
+		new_proc.thread_stack_top = elf.initial_stack_top(true)
+		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base(true)
 		new_proc.current_directory = voidptr(vfs_root)
 		new_proc.rlimits = proc.default_rlimits()
 		proc.inherit_container_state(mut new_proc, unsafe { nil })
