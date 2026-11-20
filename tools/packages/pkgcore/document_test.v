@@ -5,7 +5,11 @@ import net.unix
 import os
 import time
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 fn test_document_grants_require_regular_targets_in_every_launch_mode() {
 	work := os.real_path(os.temp_dir()) + '/vdoc-' + os.getpid().str() + '-' + time.now().unix_micro().str()
@@ -23,11 +27,15 @@ fn test_document_grants_require_regular_targets_in_every_launch_mode() {
 	for architecture in ['aarch64', 'x86_64'] {
 		key := 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'
 		config := Config{ architecture: architecture, repositories: [Repository{ id: 'fixture', url: 'https://example.invalid', public_key: key }] }
-		app := Package{ id: 'app', version: '1.0.0', architecture: architecture, name: 'App', license: 'MIT', kind: 'native', entrypoint: 'bin/app',
-			files: [Payload{ path: 'bin/app', bytes: 1, sha256: key, executable: true }], window_protocol: 1, permissions: ['display', 'files'] }
-		state := State{ generation: 1, architecture: architecture, requested: ['app'], packages: [Installed{ package: app, repository: 'fixture', public_key: key, sequence: 1 }] }
 		for input in [LaunchInput{}, LaunchInput{ terminal: true }, LaunchInput{ window: true },
 			LaunchInput{ command: true, arguments: ['literal'] }, LaunchInput{ command: true, terminal: true, arguments: ['literal'] }] {
+			// A window launch needs the display permission. Outside a window that
+			// permission means hosted X11, whose private-display checks have their
+			// own test (x11_launch_test.v), so those launches use a windowless app.
+			permissions := if input.window { ['display', 'files'] } else { ['files'] }
+			app := Package{ id: 'app', version: '1.0.0', architecture: architecture, name: 'App', license: 'MIT', kind: 'native', entrypoint: 'bin/app',
+				files: [Payload{ path: 'bin/app', bytes: 1, sha256: key, executable: true }], window_protocol: if input.window { 1 } else { 0 }, permissions: permissions }
+			state := State{ generation: 1, architecture: architecture, requested: ['app'], packages: [Installed{ package: app, repository: 'fixture', public_key: key, sequence: 1 }] }
 			for name in ['regular with spaces', 'alias'] {
 				path := work + '/' + name
 				launch := application_launch_plan(config, '/var/lib/vinix-packages', state, 'app', '/home/user/data', 1000, 1000,
