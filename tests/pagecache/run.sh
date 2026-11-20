@@ -14,6 +14,12 @@ cp "$root/kernel/pagecache/"*.v "$tmp/modules/pagecache/"
 cp "$root/tests/pagecache/pagecache_test.v" "$tmp/modules/pagecache/"
 cp "$root/tests/pagecache/registry_test.v" "$tmp/modules/pagecache/"
 cp "$root/tests/pagecache/group_test.v" "$tmp/modules/pagecache/"
+# The block fence holds writers across a sleep; the host never sleeps.
+mkdir -p "$tmp/modules/block/fence"
+cat > "$tmp/modules/block/fence/fence.v" <<'VEOF'
+module fence
+pub fn wait_open() {}
+VEOF
 cat > "$tmp/v.mod" <<'MOD'
 Module { name: 'pagecache_host_tests' }
 MOD
