@@ -12,9 +12,11 @@ import os
 
 const guest_root = '/opt/vinix-google-browser'
 const bundle_path = 'usr/lib/webkitgtk-6.0/injected-bundle/libwebkitgtkinjectedbundle.so'
+// Fixed host paths: WebKit and the launcher name these at their compiled
+// locations. The web process loads the injected bundle from /usr/lib.
 const helpers = ['lib/ld-musl-aarch64.so.1', 'usr/bin/xkbcomp', 'usr/bin/bwrap',
 	'usr/libexec/webkitgtk-6.0/WebKitWebProcess', 'usr/libexec/webkitgtk-6.0/WebKitNetworkProcess',
-	'usr/libexec/webkitgtk-6.0/WebKitGPUProcess']
+	'usr/libexec/webkitgtk-6.0/WebKitGPUProcess', bundle_path]
 const trust = 'etc/ssl/certs/ca-certificates.crt'
 const library_directories = ['usr/lib', 'lib', 'usr/lib/libproxy']
 
