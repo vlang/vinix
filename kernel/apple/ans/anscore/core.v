@@ -4,6 +4,11 @@ module anscore
 #include "apple_ans.h"
 #include "apple_platform_io.h"
 #include "apple_ans_ext2.h"
+#include "stack_slots.h"
+
+// Scratch on the caller's stack: a local whose address is taken, or whose
+// fixed array is passed on, is otherwise moved to the heap and never freed.
+fn C.vinix_stack_alloc(size u64) voidptr
 
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -1569,7 +1574,8 @@ pub fn a_gpt_header(ns &Ans_namespace, p &u8, lba u64, out &Ans_gpt) i32 {
 		if actual != expected {
 			return -ans_gpt
 		}
-		h := Ans_gpt{}
+		h := &Ans_gpt(C.vinix_stack_alloc(sizeof(Ans_gpt)))
+		*h = Ans_gpt{}
 
 		h.first = a_le64(p + 40)
 		h.last = a_le64(p + 48)
@@ -1632,7 +1638,7 @@ pub fn a_gpt_header(ns &Ans_namespace, p &u8, lba u64, out &Ans_gpt) i32 {
 		} else if h.table <= h.last || h.table >= lba || table_blocks > lba - h.table {
 			return -ans_gpt
 		}
-		*out = h
+		*out = *h
 		return 0
 	}
 }
@@ -2016,8 +2022,9 @@ pub fn a_start(a &Ans) i32 {
 @[export: 'vinix_ans_boot_flags']
 pub fn vinix_ans_boot_flags(s &char, n uint) i32 {
 	unsafe {
-		p := Ans_policy{}
-		return if a_parse_policy(s, n, &p) { -ans_config } else { i32(p.flags) }
+		p := &Ans_policy(C.vinix_stack_alloc(sizeof(Ans_policy)))
+		*p = Ans_policy{}
+		return if a_parse_policy(s, n, p) { -ans_config } else { i32(p.flags) }
 	}
 }
 
@@ -2337,9 +2344,10 @@ pub fn vinix_ans_read(i u32, buf voidptr, offset u64, count uint) i32 {
 @[export: 'vinix_ans_apply_policy']
 pub fn vinix_ans_apply_policy(s &char, n uint) i32 {
 	unsafe {
-		p := Ans_policy{}
-		rc := a_parse_policy(s, n, &p)
-		return if rc { rc } else { a_apply_policy(&ans_controller, &p) }
+		p := &Ans_policy(C.vinix_stack_alloc(sizeof(Ans_policy)))
+		*p = Ans_policy{}
+		rc := a_parse_policy(s, n, p)
+		return if rc { rc } else { a_apply_policy(&ans_controller, p) }
 	}
 }
 

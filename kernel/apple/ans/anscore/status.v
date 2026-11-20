@@ -2,6 +2,9 @@
 @[has_globals]
 module anscore
 
+// Declared here too, so the module builds on its own (tests/apple-ans).
+fn C.memset(voidptr, i32, uint) voidptr
+
 // Boot-lived, scalar counters protected by the caller's ANS operation lock.
 // Physical commands include native filesystem I/O and RMW boundary reads.
 pub struct NamespaceMetrics {
@@ -34,17 +37,20 @@ pub fn reset_namespace_metrics() {
 
 fn a_count_transfer(a &Ans, index u32, bytes u64, writing bool) {
 	if a != unsafe { &ans_controller } || index >= 8 || bytes == 0 { return }
-	if writing {
-		namespace_metrics[index].writes++
-		namespace_metrics[index].write_bytes += bytes
-	} else {
-		namespace_metrics[index].reads++
-		namespace_metrics[index].read_bytes += bytes
+	// The index was checked above; unchecked as in the rest of anscore.
+	unsafe {
+		if writing {
+			namespace_metrics[index].writes++
+			namespace_metrics[index].write_bytes += bytes
+		} else {
+			namespace_metrics[index].reads++
+			namespace_metrics[index].read_bytes += bytes
+		}
 	}
 }
 
 fn a_count_flush(a &Ans, index u32) {
-	if a == unsafe { &ans_controller } && index < 8 { namespace_metrics[index].flushes++ }
+	if a == unsafe { &ans_controller } && index < 8 { unsafe { namespace_metrics[index].flushes++ } }
 }
 
 // Publishing the namespace precedes its partitions and retains the physical

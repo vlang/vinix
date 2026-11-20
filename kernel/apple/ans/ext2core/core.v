@@ -4,6 +4,11 @@
 module ext2core
 
 #include "apple_ans_ext2.h"
+#include "stack_slots.h"
+
+// Scratch on the caller's stack: a local whose address is taken, or whose
+// fixed array is passed on, is otherwise moved to the heap and never freed.
+fn C.vinix_stack_alloc(size u64) voidptr
 
 pub type Vinix_ext2_reader = fn (voidptr, voidptr, u64, uint) i32
 pub type Vinix_ext2_writer = fn (voidptr, voidptr, u64, uint) i32
@@ -179,7 +184,8 @@ pub fn e2_inode_get(fs &E2_fs, ino u32, out &E2_inode) i32 {
 		if e2_disk(fs, voidptr(&raw[0]), u64(table) * u64(fs.block_size) + u64(slot) * u64(fs.inode_size), sizeof([128]u8)) {
 			return -5
 		}
-		v := E2_inode{}
+		v := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*v = E2_inode{}
 
 		v.mode = u32(e2_u16(&raw[0]))
 		v.links = u32(e2_u16(&raw[0] + 26))
@@ -224,7 +230,7 @@ pub fn e2_inode_get(fs &E2_fs, ino u32, out &E2_inode) i32 {
 		} else {
 			u32(0)
 		})
-		*out = v
+		*out = *v
 		return 0
 	}
 }
@@ -381,8 +387,9 @@ pub fn e2_open(context voidptr, size uint, read Vinix_ext2_reader, write Vinix_e
 		fs.writable = u32(write != (voidptr(0)))
 		fs.filetype = incompat & u32(2)
 		fs.largefile = rocompat & u32(2)
-		root := E2_inode{}
-		rc := e2_inode_get(&fs, u32(2), &root)
+		root := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*root = E2_inode{}
+		rc := e2_inode_get(&fs, u32(2), root)
 		if rc || (root.mode & 61440) != 16384 || !root.size {
 			return if rc { rc } else { (-22) }
 		}
@@ -456,8 +463,9 @@ pub fn vinix_ext2_stat(context voidptr, ino u32, fields &u64) i32 {
 			return -22
 		}
 		fs := &E2_fs(context)
-		in_ := E2_inode{}
-		rc := e2_inode_get(fs, ino, &in_)
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
+		rc := e2_inode_get(fs, ino, in_)
 		if rc {
 			return rc
 		}
@@ -478,13 +486,14 @@ pub fn vinix_ext2_stat(context voidptr, ino u32, fields &u64) i32 {
 @[export: 'vinix_ext2_read']
 pub fn vinix_ext2_read(context voidptr, ino u32, buffer voidptr, offset u64, n uint) i64 {
 	unsafe {
-		in_ := E2_inode{}
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
 		fs := &E2_fs(context)
-		rc := e2_inode_get(fs, ino, &in_)
+		rc := e2_inode_get(fs, ino, in_)
 		if rc {
 			return i64(rc)
 		}
-		return e2_read_inode(fs, &in_, voidptr(buffer), offset, n)
+		return e2_read_inode(fs, in_, voidptr(buffer), offset, n)
 	}
 }
 
@@ -495,8 +504,9 @@ pub fn vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, 
 			return -22
 		}
 		fs := &E2_fs(context)
-		in_ := E2_inode{}
-		rc := e2_inode_get(fs, directory, &in_)
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
+		rc := e2_inode_get(fs, directory, in_)
 		if rc {
 			return rc
 		}
@@ -509,7 +519,7 @@ pub fn vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, 
 		pos := (*offset)
 		for pos < in_.size {
 			h := [8]u8{}
-			if e2_read_inode(fs, &in_, voidptr(&h[0]), pos, uint(8)) != i64(8) {
+			if e2_read_inode(fs, in_, voidptr(&h[0]), pos, uint(8)) != i64(8) {
 				return -5
 			}
 			rec := u32(e2_u16(&h[0] + 4))
@@ -526,7 +536,7 @@ pub fn vinix_ext2_next(context voidptr, directory u32, offset &u64, inode &u32, 
 			if !len || (fs.filetype && i32(h[7]) > 7) {
 				return -22
 			}
-			if e2_read_inode(fs, &in_, voidptr(name), pos + u64(8), uint(len)) != i64(len) {
+			if e2_read_inode(fs, in_, voidptr(name), pos + u64(8), uint(len)) != i64(len) {
 				return -5
 			}
 			for i := u32(0); i < len; i++ {
@@ -1022,14 +1032,15 @@ pub fn e2_zero_range(fs &E2_fs, in_ &E2_inode, start u64, end u64) i32 {
 pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 	unsafe {
 		fs := &E2_fs(context)
-		in_ := E2_inode{}
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
 		if (uint(fs) == 0) || !fs.active {
 			return -30
 		}
 		if size > e2_write_limit(fs) {
 			return -27
 		}
-		rc := e2_inode_get(fs, ino, &in_)
+		rc := e2_inode_get(fs, ino, in_)
 		if rc {
 			return rc
 		}
@@ -1040,7 +1051,7 @@ pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 			return -27
 		}
 		if size < in_.size {
-			rc = e2_zero_tail(fs, &in_, size)
+			rc = e2_zero_tail(fs, in_, size)
 			if rc {
 				return rc
 			}
@@ -1049,7 +1060,7 @@ pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 			per := fs.block_size / u32(4)
 			for logical := first_free; logical < old_blocks; logical++ {
 				block := u32(0)
-				rc = e2_map_write(fs, &in_, logical, 0, &block)
+				rc = e2_map_write(fs, in_, logical, 0, &block)
 				if rc {
 					return rc
 				}
@@ -1098,7 +1109,7 @@ pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 			}
 		}
 		in_.size = size
-		return e2_inode_put(fs, ino, &in_)
+		return e2_inode_put(fs, ino, in_)
 	}
 }
 
@@ -1106,14 +1117,15 @@ pub fn vinix_ext2_truncate(context voidptr, ino u32, size u64) i32 {
 pub fn vinix_ext2_write(context voidptr, ino u32, buffer voidptr, offset u64, count uint) i64 {
 	unsafe {
 		fs := &E2_fs(context)
-		in_ := E2_inode{}
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
 		if (uint(fs) == 0) || !fs.active || ((uint(buffer) == 0) && count) {
 			return i64((-30))
 		}
 		if offset > e2_write_limit(fs) || u64(count) > e2_write_limit(fs) - offset {
 			return i64((-27))
 		}
-		rc := e2_inode_get(fs, ino, &in_)
+		rc := e2_inode_get(fs, ino, in_)
 		if rc {
 			return i64(rc)
 		}
@@ -1124,7 +1136,7 @@ pub fn vinix_ext2_write(context voidptr, ino u32, buffer voidptr, offset u64, co
 			return i64((-95))
 		}
 		if offset > in_.size {
-			rc = e2_zero_range(fs, &in_, in_.size, offset)
+			rc = e2_zero_range(fs, in_, in_.size, offset)
 			if rc {
 				return i64(rc)
 			}
@@ -1140,7 +1152,7 @@ pub fn vinix_ext2_write(context voidptr, ino u32, buffer voidptr, offset u64, co
 			if n > count - done {
 				n = count - done
 			}
-			rc = e2_map_write(fs, &in_, pos / u64(fs.block_size), 1, &block)
+			rc = e2_map_write(fs, in_, pos / u64(fs.block_size), 1, &block)
 			if rc {
 				return i64(rc)
 			}
@@ -1153,7 +1165,7 @@ pub fn vinix_ext2_write(context voidptr, ino u32, buffer voidptr, offset u64, co
 		if offset + u64(done) > in_.size {
 			in_.size = offset + u64(done)
 		}
-		rc = e2_inode_put(fs, ino, &in_)
+		rc = e2_inode_put(fs, ino, in_)
 		return if rc { i64(rc) } else { i64(done) }
 	}
 }
@@ -1214,8 +1226,9 @@ pub fn e2_lookup(fs &E2_fs, dir u32, name &char, n uint, ino &u32, type_ &u8) i3
 					*ino = child
 				}
 				if type_ {
-					in_ := E2_inode{}
-					rc = e2_inode_get(fs, child, &in_)
+					in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+					*in_ = E2_inode{}
+					rc = e2_inode_get(fs, child, in_)
 					if rc {
 						return rc
 					}
@@ -1248,8 +1261,9 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n uint, child u32, type_ u8) i
 		if rc != -2 {
 			return rc
 		}
-		in_ := E2_inode{}
-		rc = e2_inode_get(fs, dir, &in_)
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
+		rc = e2_inode_get(fs, dir, in_)
 		if rc {
 			return rc
 		}
@@ -1261,7 +1275,7 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n uint, child u32, type_ u8) i
 		blocks := in_.size / u64(fs.block_size)
 		for logical := u64(0); logical < blocks; logical++ {
 			block := u32(0)
-			rc = e2_map(fs, &in_, logical, &block)
+			rc = e2_map(fs, in_, logical, &block)
 			if rc || !block {
 				return if rc { rc } else { (-22) }
 			}
@@ -1294,7 +1308,7 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n uint, child u32, type_ u8) i
 			return -27
 		}
 		block := u32(0)
-		rc = e2_map_write(fs, &in_, blocks, 1, &block)
+		rc = e2_map_write(fs, in_, blocks, 1, &block)
 		if rc {
 			return rc
 		}
@@ -1309,15 +1323,16 @@ pub fn e2_dir_add(fs &E2_fs, dir u32, name &char, n uint, child u32, type_ u8) i
 			return rc
 		}
 		in_.size += u64(fs.block_size)
-		return e2_inode_put(fs, dir, &in_)
+		return e2_inode_put(fs, dir, in_)
 	}
 }
 
 @[export: 'e2_dir_remove']
 pub fn e2_dir_remove(fs &E2_fs, dir u32, name &char, n uint, removed &u32) i32 {
 	unsafe {
-		in_ := E2_inode{}
-		rc := e2_inode_get(fs, dir, &in_)
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
+		rc := e2_inode_get(fs, dir, in_)
 		if rc {
 			return rc
 		}
@@ -1328,7 +1343,7 @@ pub fn e2_dir_remove(fs &E2_fs, dir u32, name &char, n uint, removed &u32) i32 {
 		blocks := in_.size / u64(fs.block_size)
 		for logical := u64(0); logical < blocks; logical++ {
 			block := u32(0)
-			rc = e2_map(fs, &in_, logical, &block)
+			rc = e2_map(fs, in_, logical, &block)
 			if rc || !block {
 				return if rc { rc } else { (-22) }
 			}
@@ -1453,13 +1468,14 @@ pub fn vinix_ext2_create(context voidptr, parent u32, name &char, name_length ui
 		if rc {
 			return rc
 		}
-		in_ := E2_inode{}
-		e2_zero(voidptr(&in_), sizeof(in_))
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
+		e2_zero(voidptr(in_), sizeof(E2_inode))
 		in_.mode = mode
 		in_.links = u32(if kind == 16384 { 2 } else { 1 })
 		if kind == 16384 {
 			block := u32(0)
-			rc = e2_map_write(fs, &in_, u64(0), 1, &block)
+			rc = e2_map_write(fs, in_, u64(0), 1, &block)
 			if rc {
 				return rc
 			}
@@ -1482,7 +1498,7 @@ pub fn vinix_ext2_create(context voidptr, parent u32, name &char, name_length ui
 			}
 			in_.size = u64(fs.block_size)
 		}
-		rc = e2_inode_put(fs, ino, &in_)
+		rc = e2_inode_put(fs, ino, in_)
 		if rc {
 			return rc
 		}
@@ -1491,13 +1507,14 @@ pub fn vinix_ext2_create(context voidptr, parent u32, name &char, name_length ui
 			return rc
 		}
 		if kind == 16384 {
-			p := E2_inode{}
-			rc = e2_inode_get(fs, parent, &p)
+			p := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+			*p = E2_inode{}
+			rc = e2_inode_get(fs, parent, p)
 			if rc {
 				return rc
 			}
 			p.links++
-			rc = e2_inode_put(fs, parent, &p)
+			rc = e2_inode_put(fs, parent, p)
 			if rc {
 				return rc
 			}
@@ -1549,13 +1566,14 @@ pub fn vinix_ext2_symlink(context voidptr, parent u32, name &char, name_length u
 		if rc {
 			return rc
 		}
-		in_ := E2_inode{}
-		e2_zero(voidptr(&in_), sizeof(in_))
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
+		e2_zero(voidptr(in_), sizeof(E2_inode))
 		in_.mode = 40960 | u32(511)
 		in_.links = u32(1)
 		in_.size = u64(target_length)
 		e2_copy(in_.ptr, voidptr(target), target_length)
-		rc = e2_inode_put(fs, ino, &in_)
+		rc = e2_inode_put(fs, ino, in_)
 		if rc {
 			return rc
 		}
@@ -1572,11 +1590,12 @@ pub fn vinix_ext2_symlink(context voidptr, parent u32, name &char, name_length u
 pub fn vinix_ext2_link(context voidptr, parent u32, name &char, name_length uint, ino u32) i32 {
 	unsafe {
 		fs := &E2_fs(context)
-		in_ := E2_inode{}
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
 		if (uint(fs) == 0) || !fs.active {
 			return -30
 		}
-		rc := e2_inode_get(fs, ino, &in_)
+		rc := e2_inode_get(fs, ino, in_)
 		if rc {
 			return rc
 		}
@@ -1584,7 +1603,7 @@ pub fn vinix_ext2_link(context voidptr, parent u32, name &char, name_length uint
 			return -95
 		}
 		in_.links++
-		rc = e2_inode_put(fs, ino, &in_)
+		rc = e2_inode_put(fs, ino, in_)
 		if rc {
 			return rc
 		}
@@ -1595,7 +1614,7 @@ pub fn vinix_ext2_link(context voidptr, parent u32, name &char, name_length uint
 		}))
 		if rc {
 			in_.links--
-			e2_inode_put(fs, ino, &in_)
+			e2_inode_put(fs, ino, in_)
 		}
 		return rc
 	}
@@ -1605,11 +1624,12 @@ pub fn vinix_ext2_link(context voidptr, parent u32, name &char, name_length uint
 pub fn vinix_ext2_drop_link(context voidptr, ino u32) i32 {
 	unsafe {
 		fs := &E2_fs(context)
-		in_ := E2_inode{}
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
 		if (uint(fs) == 0) || !fs.active {
 			return -30
 		}
-		rc := e2_inode_get(fs, ino, &in_)
+		rc := e2_inode_get(fs, ino, in_)
 		if rc {
 			return rc
 		}
@@ -1618,9 +1638,9 @@ pub fn vinix_ext2_drop_link(context voidptr, ino u32) i32 {
 		}
 		if in_.links > u32(1) {
 			in_.links--
-			return e2_inode_put(fs, ino, &in_)
+			return e2_inode_put(fs, ino, in_)
 		}
-		return e2_release_inode(fs, ino, &in_)
+		return e2_release_inode(fs, ino, in_)
 	}
 }
 
@@ -1658,21 +1678,23 @@ pub fn vinix_ext2_unlink(context voidptr, parent u32, name &char, name_length ui
 		if rc {
 			return rc
 		}
-		in_ := E2_inode{}
-		rc = e2_inode_get(fs, removed, &in_)
+		in_ := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+		*in_ = E2_inode{}
+		rc = e2_inode_get(fs, removed, in_)
 		if rc {
 			return rc
 		}
 		if directory {
-			p := E2_inode{}
-			rc = e2_inode_get(fs, parent, &p)
+			p := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+			*p = E2_inode{}
+			rc = e2_inode_get(fs, parent, p)
 			if rc {
 				return rc
 			}
 			if p.links {
 				p.links--
 			}
-			rc = e2_inode_put(fs, parent, &p)
+			rc = e2_inode_put(fs, parent, p)
 			if rc {
 				return rc
 			}
@@ -1691,7 +1713,7 @@ pub fn vinix_ext2_unlink(context voidptr, parent u32, name &char, name_length ui
 			if rc {
 				return rc
 			}
-			return e2_release_inode(fs, removed, &in_)
+			return e2_release_inode(fs, removed, in_)
 		}
 		return vinix_ext2_drop_link(voidptr(fs), removed)
 	}
@@ -1737,8 +1759,9 @@ pub fn vinix_ext2_rename(context voidptr, old_parent u32, old_name &char, old_le
 			if !replace {
 				return -17
 			}
-			target := E2_inode{}
-			rc = e2_inode_get(fs, destination, &target)
+			target := &E2_inode(C.vinix_stack_alloc(sizeof(E2_inode)))
+			*target = E2_inode{}
+			rc = e2_inode_get(fs, destination, target)
 			if rc {
 				return rc
 			}
