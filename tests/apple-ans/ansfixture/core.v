@@ -49,6 +49,10 @@ fn C.malloc(usize) voidptr
 fn C.aligned_alloc(usize,usize) voidptr
 fn C.free(voidptr)
 fn C.memset(voidptr,i32,usize) voidptr
+// Stack slots: V moves a local whose address is taken to the heap, and this
+// fixture has no allocator for that.
+#include <alloca.h>
+fn C.alloca(usize) voidptr
 fn C.memcpy(voidptr,voidptr,usize) voidptr
 fn C.memcmp(voidptr,voidptr,usize) i32
 fn C.strlen(&char) usize
@@ -267,16 +271,16 @@ fn t_mdts() { unsafe {
  f:=new_fake(4096); f.mdts=1; C.assert(C.a_start(&f.a)==0); C.assert(f.a.max_transfer==8192); mut out:=[20000]u8{}; reads:=f.reads; C.assert(C.a_read_bytes(&f.a,0,&out[0],100*4096+1,sizeof(out))==0); C.assert(f.reads-reads==3); C.assert(C.memcmp(&out[0],f.disk+100*4096+1,sizeof(out))==0); free_fake(f)
 } }
 fn t_namespace_validation() { unsafe {
- f:=new_fake(512); mut p:=[4096]u8{}; mut ns:=C.ans_namespace{}; ns_id(f,&p[0]); C.assert(C.a_parse_namespace(&ns,1,&p[0])==0)
- for kind:=u32(0); kind<8; kind++ { ns_id(f,&p[0]); if kind==0 { C.a_put64(&p[0],0) }; if kind==1 { C.a_put64(&p[8],f.blocks+1) }; if kind==2 { p[26]=1 }; if kind==3 { p[26]=0x10 }; if kind==4 { p[29]=1 }; if kind==5 { C.a_put16(&p[128],8) }; if kind==6 { p[130]=31 }; if kind==7 { C.a_put64(&p[0],~u64(0)) }; C.assert(C.a_parse_namespace(&ns,1,&p[0]) == -i32(C.ANS_NAMESPACE)) }; free_fake(f)
+ f:=new_fake(512); mut p:=[4096]u8{}; mut ns:=&C.ans_namespace(C.alloca(sizeof(C.ans_namespace))); *ns=C.ans_namespace{}; ns_id(f,&p[0]); C.assert(C.a_parse_namespace(ns,1,&p[0])==0)
+ for kind:=u32(0); kind<8; kind++ { ns_id(f,&p[0]); if kind==0 { C.a_put64(&p[0],0) }; if kind==1 { C.a_put64(&p[8],f.blocks+1) }; if kind==2 { p[26]=1 }; if kind==3 { p[26]=0x10 }; if kind==4 { p[29]=1 }; if kind==5 { C.a_put16(&p[128],8) }; if kind==6 { p[130]=31 }; if kind==7 { C.a_put64(&p[0],~u64(0)) }; C.assert(C.a_parse_namespace(ns,1,&p[0]) == -i32(C.ANS_NAMESPACE)) }; free_fake(f)
 } }
 fn t_gpt_backup_and_corruption() { unsafe {
  for kind:=u32(0); kind<5; kind++ { f:=new_fake(512); if kind==0 { f.disk[512+16]^=1 }; if kind==1 { f.disk[1024+100]^=1 }; if kind==2 { f.disk[512+16]^=1; f.disk[(f.blocks-1)*512+16]^=1 }; if kind==3 { h:=f.disk+(f.blocks-1)*512; h[56]^=1; seal_header(h) }; if kind==4 { f.disk[510]=0 }; C.assert(C.a_start(&f.a)==0 && f.a.live!=0); C.assert(f.a.ns[0].nparts==if kind<2 { u32(2) } else { u32(0) }); free_fake(f) }
 } }
 fn t_gpt_extents() { unsafe {
- f:=new_fake(512); mut ns:=C.ans_namespace{sector:512,blocks:2048}; mut h:=C.ans_gpt{}; mut header:=[512]u8{}; mut table:=[16384]u8{}; C.memcpy(&header[0],f.disk+512,512); C.assert(C.a_gpt_header(&ns,&header[0],1,&h)==0)
- for kind:=u32(0); kind<4; kind++ { C.memcpy(&table[0],f.disk+1024,sizeof(table)); if kind==0 { C.a_put64(&table[32],0) }; if kind==1 { C.a_put64(&table[40],~u64(0)) }; if kind==2 { C.a_put64(&table[288],255) }; if kind==3 { C.memcpy(&table[272],&table[16],16) }; h.table_crc=C.a_crc32(&table[0],sizeof(table)); ns.nparts=0; C.assert(C.a_gpt_entries(&ns,&h,&table[0]) == -i32(C.ANS_GPT) && ns.nparts==0) }
- for kind:=u32(0); kind<4; kind++ { C.memcpy(&header[0],f.disk+512,512); if kind==0 { C.a_put32(&header[80],~u32(0)) }; if kind==1 { C.a_put32(&header[84],~u32(0)) }; if kind==2 { C.a_put64(&header[72],~u64(0)) }; if kind==3 { C.a_put64(&header[72],34) }; seal_header(&header[0]); C.assert(C.a_gpt_header(&ns,&header[0],1,&h) == -i32(C.ANS_GPT)) }; free_fake(f)
+ f:=new_fake(512); mut ns:=&C.ans_namespace(C.alloca(sizeof(C.ans_namespace))); *ns=C.ans_namespace{sector:512,blocks:2048}; mut h:=&C.ans_gpt(C.alloca(sizeof(C.ans_gpt))); *h=C.ans_gpt{}; mut header:=[512]u8{}; mut table:=[16384]u8{}; C.memcpy(&header[0],f.disk+512,512); C.assert(C.a_gpt_header(ns,&header[0],1,h)==0)
+ for kind:=u32(0); kind<4; kind++ { C.memcpy(&table[0],f.disk+1024,sizeof(table)); if kind==0 { C.a_put64(&table[32],0) }; if kind==1 { C.a_put64(&table[40],~u64(0)) }; if kind==2 { C.a_put64(&table[288],255) }; if kind==3 { C.memcpy(&table[272],&table[16],16) }; h.table_crc=C.a_crc32(&table[0],sizeof(table)); ns.nparts=0; C.assert(C.a_gpt_entries(ns,h,&table[0]) == -i32(C.ANS_GPT) && ns.nparts==0) }
+ for kind:=u32(0); kind<4; kind++ { C.memcpy(&header[0],f.disk+512,512); if kind==0 { C.a_put32(&header[80],~u32(0)) }; if kind==1 { C.a_put32(&header[84],~u32(0)) }; if kind==2 { C.a_put64(&header[72],~u64(0)) }; if kind==3 { C.a_put64(&header[72],34) }; seal_header(&header[0]); C.assert(C.a_gpt_header(ns,&header[0],1,h) == -i32(C.ANS_GPT)) }; free_fake(f)
 } }
 fn request(text &char,length usize) i32 { return C.vinix_ans_requested(text,length) }
 fn t_cmdline() { unsafe {
@@ -285,14 +289,14 @@ fn t_cmdline() { unsafe {
 __global rng=u32(0xa4523817)
 fn random32() u32 { rng^=rng<<13; rng^=rng>>17; rng^=rng<<5; return rng }
 fn t_mutation() { unsafe {
- f:=new_fake(512); mut p:=[4096]u8{}; mut header:=[512]u8{}; mut ns:=C.ans_namespace{sector:512,blocks:2048}; mut h:=C.ans_gpt{}
- for i:=u32(0); i<10000; i++ { ns_id(f,&p[0]); for j:=u32(0); j<8; j++ { position:=random32()%192; p[position]^=u8(random32()) }; if C.a_parse_namespace(&ns,1,&p[0])==0 { C.assert(ns.sector==512 || ns.sector==4096); C.assert(ns.blocks!=0 && ns.blocks<=u64(0x7fffffffffffffff)/ns.sector) }; ns.sector=512; ns.blocks=2048; C.memcpy(&header[0],f.disk+512,512); for j:=u32(0); j<6; j++ { position:=random32()%92; header[position]^=u8(random32()) }; if (i&1)!=0 { C.a_put32(&header[12],92); seal_header(&header[0]) }; if C.a_gpt_header(&ns,&header[0],1,&h)==0 { C.assert(h.entries<=128 && h.entry_size<=1024); C.assert(h.table<h.first && h.last<ns.blocks-1) } }; free_fake(f)
+ f:=new_fake(512); mut p:=[4096]u8{}; mut header:=[512]u8{}; mut ns:=&C.ans_namespace(C.alloca(sizeof(C.ans_namespace))); *ns=C.ans_namespace{sector:512,blocks:2048}; mut h:=&C.ans_gpt(C.alloca(sizeof(C.ans_gpt))); *h=C.ans_gpt{}
+ for i:=u32(0); i<10000; i++ { ns_id(f,&p[0]); for j:=u32(0); j<8; j++ { position:=random32()%192; p[position]^=u8(random32()) }; if C.a_parse_namespace(ns,1,&p[0])==0 { C.assert(ns.sector==512 || ns.sector==4096); C.assert(ns.blocks!=0 && ns.blocks<=u64(0x7fffffffffffffff)/ns.sector) }; ns.sector=512; ns.blocks=2048; C.memcpy(&header[0],f.disk+512,512); for j:=u32(0); j<6; j++ { position:=random32()%92; header[position]^=u8(random32()) }; if (i&1)!=0 { C.a_put32(&header[12],92); seal_header(&header[0]) }; if C.a_gpt_header(ns,&header[0],1,h)==0 { C.assert(h.entries<=128 && h.entry_size<=1024); C.assert(h.table<h.first && h.last<ns.blocks-1) } }; free_fake(f)
 } }
 fn run(test fn(),name &char) { unsafe { test(); groups++; C.printf(c'ok %u - %s\n',groups,name) } }
 fn t_root_partition_bridge() { unsafe {
  for sector:=u32(512); sector<=4096; sector*=8 { f:=new_fake(sector); rw_gpt(f); entry:=f.disk+2*sector; C.a_put64(entry+40,767); C.memset(entry+256,0,128); table_bytes:=u32(128*128); backup:=f.blocks-1-table_bytes/sector; C.memcpy(f.disk+usize(backup)*sector,entry,table_bytes)
   for i:=u32(0); i<2; i++ { h:=f.disk+usize(if i!=0 { f.blocks-1 } else { u32(1) })*sector; C.a_put32(h+88,C.a_crc32(entry,table_bytes)); seal_header(h) }
-  mut im:=C.image{}; C.ext2_fixture_setup(&im,1024,128); C.assert(im.bytes<=(768-64)*sector); C.memcpy(f.disk+64*sector,im.data,im.bytes); C.assert(C.a_start(&f.a)==0); text:=&char(c'vinix.apple_ans=1 vinix.root=PARTUUID=00000001-0000-0000-0000-000000000000 vinix.rootfstype=ext2 vinix.rootmode=ro'); mut policy:=C.ans_policy{}; C.assert(C.a_parse_policy(text,C.strlen(text),&policy)==0); C.assert(C.a_apply_policy(&f.a,&policy)==0); mut fs:=C.e2_fs{}; C.assert(C.a_open_root(&f.a,&fs,sizeof(fs))==0); mut fields:=[10]u64{}; C.assert(C.vinix_ext2_stat(&fs,12,&fields[0])==0 && fields[0]==3072); mut data:=[3072]u8{}; C.assert(C.vinix_ext2_read(&fs,12,&data[0],0,sizeof(data))==3072)
+  mut im:=C.image{}; C.ext2_fixture_setup(&im,1024,128); C.assert(im.bytes<=(768-64)*sector); C.memcpy(f.disk+64*sector,im.data,im.bytes); C.assert(C.a_start(&f.a)==0); text:=&char(c'vinix.apple_ans=1 vinix.root=PARTUUID=00000001-0000-0000-0000-000000000000 vinix.rootfstype=ext2 vinix.rootmode=ro'); mut policy:=&C.ans_policy(C.alloca(sizeof(C.ans_policy))); *policy=C.ans_policy{}; C.assert(C.a_parse_policy(text,C.strlen(text),policy)==0); C.assert(C.a_apply_policy(&f.a,policy)==0); mut fs:=C.e2_fs{}; C.assert(C.a_open_root(&f.a,&fs,sizeof(fs))==0); mut fields:=[10]u64{}; C.assert(C.vinix_ext2_stat(&fs,12,&fields[0])==0 && fields[0]==3072); mut data:=[3072]u8{}; C.assert(C.vinix_ext2_read(&fs,12,&data[0],0,sizeof(data))==3072)
   for i:=u32(0); i<sizeof(data); i++ { C.assert(data[i]==if i<1024 { u8(0x31) } else if i<2048 { u8(0) } else { u8(0x72) }) }; commands:=f.commands; C.assert(C.a_root_disk(&f.a,&data[0],u64(768-64)*sector-1,2) == -i32(C.ANS_RANGE)); C.assert(f.commands==commands && f.media_writes==0 && f.a.write_enabled==0); f.fail_opcode=2; f.fail_on_queue=1; f.fail_after=0; C.assert(C.vinix_ext2_read(&fs,12,&data[0],0,sizeof(data))==i64(C.E2_IO)); C.ext2_fixture_destroy(&im); free_fake(f)
  }
 } }

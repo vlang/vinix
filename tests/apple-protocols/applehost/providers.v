@@ -229,6 +229,16 @@ pub fn copy_provider(root string, destination string, family string, ans bool, h
 			}
 			mkdir(append_path(destination, 'anscore'), false)!
 			fixturehost.write(append_path(destination, 'anscore/core.v'), copied)!
+			// The module's other files (I/O counters, health) are used by core.v
+			// and touch no hardware; copy them unchanged.
+			mut companions := []json2.Any{}
+			for name in os.ls(append_path(root, 'kernel/apple/ans/anscore'))!.sorted() {
+				if name == 'core.v' || !name.ends_with('.v') || name.ends_with('_test.v') { continue }
+				text := fixturehost.read(append_path(root, 'kernel/apple/ans/anscore/' + name))!
+				fixturehost.write(append_path(destination, 'anscore/' + name), text)!
+				companions << json2.Any(name)
+			}
+			receipt['ans_companion_sources'] = companions
 			receipt['excluded_functions'] = excluded
 			receipt['ans_source'] = 'kernel/apple/ans/anscore/core.v'
 			receipt['ans_source_sha256'] = sha256.hexhash(original)

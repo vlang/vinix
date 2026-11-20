@@ -4,8 +4,8 @@ fn rw_gpt(f &Fake) { unsafe {
  mut kind:=[16]u8{}; C.assert(C.a_guid_parse(c'0fc63daf-8483-4772-8e79-3d69d8477de4',36,&kind[0])!=0); table:=f.disk+2*f.sector; C.memcpy(table,&kind[0],16); C.memcpy(table+256,&kind[0],16); bytes:=u32(128*128); backup:=f.blocks-1-bytes/f.sector; C.memcpy(f.disk+usize(backup)*f.sector,table,bytes)
  for i:=u32(0); i<2; i++ { h:=f.disk+usize(if i!=0 { f.blocks-1 } else { u32(1) })*f.sector; C.a_put32(h+88,C.a_crc32(table,bytes)); seal_header(h) }
 } }
-fn rw_policy() C.ans_policy { unsafe { mut policy:=C.ans_policy{flags:u32(C.VINIX_ANS_ENABLE)|u32(C.VINIX_ANS_WRITE)}; C.assert(C.a_guid_parse(c'00000001-0000-0000-0000-000000000000',36,&policy.write_guid[0])!=0); return policy } }
-fn rw_new(sector u32) &Fake { unsafe { f:=new_fake(sector); rw_gpt(f); C.assert(C.a_start(&f.a)==0); mut policy:=rw_policy(); C.assert(C.a_apply_policy(&f.a,&policy)==0); return f } }
+fn rw_policy() C.ans_policy { unsafe { mut policy:=&C.ans_policy(C.alloca(sizeof(C.ans_policy))); *policy=C.ans_policy{flags:u32(C.VINIX_ANS_ENABLE)|u32(C.VINIX_ANS_WRITE)}; C.assert(C.a_guid_parse(c'00000001-0000-0000-0000-000000000000',36,&policy.write_guid[0])!=0); return *policy } }
+fn rw_new(sector u32) &Fake { unsafe { f:=new_fake(sector); rw_gpt(f); C.assert(C.a_start(&f.a)==0); mut policy:=&C.ans_policy(C.alloca(sizeof(C.ans_policy))); *policy=rw_policy(); C.assert(C.a_apply_policy(&f.a,policy)==0); return f } }
 fn t_policy() { unsafe {
  mut guid:=[16]u8{}; mut text:=[37]char{}; known:=&char(c'01234567-89ab-cdef-8123-456789abcdef'); C.assert(C.a_guid_parse(known,36,&guid[0])!=0); C.a_guid_format(&guid[0],&text[0]); C.assert(C.strcmp(known,&text[0])==0 && guid[0]==0x67 && guid[7]==0xcd); C.assert(C.a_guid_parse(c'00000000-0000-0000-0000-000000000000',36,&guid[0])==0); C.assert(C.a_guid_parse(known,35,&guid[0])==0)
  mut line:=[512]char{}; C.snprintf(&line[0],sizeof(line),c'vinix.apple_ans=1 vinix.ans_rw=PARTUUID=%s',c'00000001-0000-0000-0000-000000000000'); C.assert(C.vinix_ans_boot_flags(&line[0],C.strlen(&line[0]))==i32(u32(C.VINIX_ANS_ENABLE)|u32(C.VINIX_ANS_WRITE)))
@@ -14,8 +14,8 @@ fn t_policy() { unsafe {
  for item in bad { C.assert(C.vinix_ans_boot_flags(item,C.strlen(item))<0) }; C.assert(C.vinix_ans_boot_flags(nil,0)==0 && C.vinix_ans_boot_flags(nil,1)<0); C.assert(C.vinix_ans_boot_flags(c'vinix.apple_ans=1\x00hidden',23)<0)
 } }
 fn t_policy_media() { unsafe {
- for fault:=u32(0); fault<6; fault++ { f:=new_fake(512); rw_gpt(f); C.assert(C.a_start(&f.a)==0); if fault==0 { f.a.ns[0].gpt_complete=0 }; if fault==1 { f.a.ns[0].gpt_hybrid=1 }; if fault==2 { f.a.ns[0].parts[0].attributes=u64(1)<<60 }; if fault==3 { f.a.ns[0].parts[0].type_guid[0]=0 }; if fault==4 { f.a.ns[0].parts[0].guid[0]=3 }; if fault==5 { C.memcpy(&f.a.ns[0].parts[1].guid[0],&f.a.ns[0].parts[0].guid[0],16) }; mut policy:=rw_policy(); count:=f.commands; C.assert(C.a_apply_policy(&f.a,&policy)<0 && f.a.write_enabled==0 && f.commands==count); free_fake(f) }
- f:=rw_new(512); mut policy:=rw_policy(); C.assert(C.a_apply_policy(&f.a,&policy)<0); free_fake(f)
+ for fault:=u32(0); fault<6; fault++ { f:=new_fake(512); rw_gpt(f); C.assert(C.a_start(&f.a)==0); if fault==0 { f.a.ns[0].gpt_complete=0 }; if fault==1 { f.a.ns[0].gpt_hybrid=1 }; if fault==2 { f.a.ns[0].parts[0].attributes=u64(1)<<60 }; if fault==3 { f.a.ns[0].parts[0].type_guid[0]=0 }; if fault==4 { f.a.ns[0].parts[0].guid[0]=3 }; if fault==5 { C.memcpy(&f.a.ns[0].parts[1].guid[0],&f.a.ns[0].parts[0].guid[0],16) }; mut policy:=&C.ans_policy(C.alloca(sizeof(C.ans_policy))); *policy=rw_policy(); count:=f.commands; C.assert(C.a_apply_policy(&f.a,policy)<0 && f.a.write_enabled==0 && f.commands==count); free_fake(f) }
+ f:=rw_new(512); mut policy:=&C.ans_policy(C.alloca(sizeof(C.ans_policy))); *policy=rw_policy(); C.assert(C.a_apply_policy(&f.a,policy)<0); free_fake(f)
 } }
 fn t_write_bytes() { unsafe {
  for sector:=u32(512); sector<=4096; sector*=8 { f:=rw_new(sector); size:=usize(f.blocks)*sector; expected:=&u8(C.malloc(size)); data:=&u8(C.malloc(70000)); C.assert(expected!=nil && data!=nil); C.memcpy(expected,f.disk,size); for i:=u32(0); i<70000; i++ { data[i]=u8(i*11+7) }; sizes:=[u32(1),511,512,4096,8192,8193,65000,70000]!
@@ -38,8 +38,8 @@ fn t_shutdown_failures() { unsafe {
  for fault:=u32(0); fault<6; fault++ { f:=rw_new(512); before:=u32(f.a.sart_owned); if fault==0 { f.fail_opcode=0; f.fail_on_queue=1; f.fail_after=0 }; if fault==1 { f.fail_opcode=0; f.fail_on_queue=0; f.fail_after=0 }; if fault==2 { f.shutdown_stall=1 }; if fault==3 { f.disable_stall=1 }; if fault==4 { f.power_stall=1 }; if fault==5 { f.shutdown_stall=1; f.frozen_clock=1 }; C.assert(C.a_shutdown(&f.a)<0 && f.a.dead!=0 && f.a.stopping!=0); C.assert(f.a.stopped==0 && f.cpu==u32(C.ASC_RUN) && f.a.sart_owned==before); C.assert(f.a.dma!=nil && f.sart[0]==0xff001234); free_fake(f) }
 } }
 fn t_redundant_gpt() { unsafe {
- mut f:=new_fake(512); rw_gpt(f); back:=f.blocks-1-32; f.disk[usize(back)*512+120]^=1; C.assert(C.a_start(&f.a)==0 && f.a.ns[0].nparts==2 && f.a.ns[0].gpt_complete==0); mut policy:=rw_policy(); C.assert(C.a_apply_policy(&f.a,&policy)<0); free_fake(f)
- f=new_fake(512); rw_gpt(f); f.disk[446+16+4]=0x83; C.assert(C.a_start(&f.a)==0 && f.a.ns[0].gpt_hybrid!=0); C.assert(C.a_apply_policy(&f.a,&policy)<0); free_fake(f)
+ mut f:=new_fake(512); rw_gpt(f); back:=f.blocks-1-32; f.disk[usize(back)*512+120]^=1; C.assert(C.a_start(&f.a)==0 && f.a.ns[0].nparts==2 && f.a.ns[0].gpt_complete==0); mut policy:=&C.ans_policy(C.alloca(sizeof(C.ans_policy))); *policy=rw_policy(); C.assert(C.a_apply_policy(&f.a,policy)<0); free_fake(f)
+ f=new_fake(512); rw_gpt(f); f.disk[446+16+4]=0x83; C.assert(C.a_start(&f.a)==0 && f.a.ns[0].gpt_hybrid!=0); C.assert(C.a_apply_policy(&f.a,policy)<0); free_fake(f)
 } }
 fn run_rw_tests() {
  run(t_policy,c'strict PARTUUID boot policy and GUID endian conversion')
