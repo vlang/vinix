@@ -144,6 +144,8 @@ write. This qualifies feature discovery and refusal, not user/network/time
 isolation. Applications that require these kinds need an implementation or
 an explicit maintained port before sandbox qualification. Earlier tests that
 created identity-only user namespaces do not establish working remapping.
+Superseded for user and network namespaces on 2026-11-20: see
+[Unprivileged user and network namespaces](#unprivileged-user-and-network-namespaces).
 
 The additional wide-offset/time64 fixture passes on both native architectures
 and both translated x86 paths. It seeks past 8 GiB, verifies current and negative
@@ -7906,7 +7908,9 @@ No fresh post-reboot production compilation is claimed. See the
 and [interrupted input pins](../tests/linux-compat/results/2026-10-15/waituid-interrupted-inputs.json).
 
 New user namespaces are explicitly unsupported by the current kernel, so
-UID mapping/overflow between user namespaces remains unqualified. Concurrent
+UID mapping/overflow between user namespaces remains unqualified. (User
+namespaces exist since 2026-11-20, with one mapped id; this waitid result was
+not rerun in one.) Concurrent
 credential changes, successful-event siginfo padding, exact rusage accounting,
 consuming copyout faults, P_PIDFD, __W flags, ptrace/cross-thread waits,
 interrupted/restarted waits, GNU libc and translated/ELF32 paths remain outside
@@ -11573,3 +11577,48 @@ production builds and all eleven maintained suites pass. The report records
 the two-write generated C scope review, complete selected evidence,
 source/kernel hashes and actual page sizes. Inherited/split mappings, races,
 IPC namespaces and GNU/foreign/32-bit paths remain unqualified.
+
+## Unprivileged user and network namespaces
+
+2026-11-20, source revision c1346a7b7. WebKit sandboxes its web process with
+bubblewrap 0.13, run by an unprivileged app: clone into new user, mount,
+pid, IPC, UTS and network namespaces, map the caller to root, rearrange the
+inherited mounts read-only, pivot into a tmpfs root, mount its own /proc and
+devpts, bring up the loopback, then map back to the real id in a nested user
+namespace. Vinix now supports that sequence.
+
+- Any process outside a chroot may create a user namespace (32 levels;
+  unprivileged callers 256 per boot, because namespaces are not freed yet).
+  Its creator holds every capability there, effective only on namespaces
+  that user namespace owns; host files, devices, the clock, the audit log and
+  every other host operation still need initial-namespace capabilities.
+- uid_map and gid_map take the one-line map any Linux user may write: an
+  inside id for the writer's own effective id, named through the parent's
+  map. getuid and related calls report namespace ids, unmapped ids as 65534.
+  Nested namespaces inherit setgroups "deny".
+- Mount namespaces copied for such a user namespace lock every inherited
+  mount and its restrictive flags (Linux MNT_LOCKED), also across lazy
+  unmounts; pivot_root moves the lock. Only tmpfs, devpts, mqueue, ramfs and
+  proc (own pid namespace, when a full proc is visible) may be mounted there,
+  at most 128 mounts. mount_setattr(2) and openat2 RESOLVE_IN_ROOT, which
+  bubblewrap requires, are implemented; RESOLVE_BENEATH is still refused.
+- A new network namespace has only its loopback, no IP sockets
+  (EAFNOSUPPORT: one lwIP stack is shared) and its own abstract Unix names.
+- /sys/block and /dev/random exist, as bubblewrap's arguments assume.
+
+The `userns` case runs the whole sequence unprivileged and each refusal:
+SUMMARY 15, SANDBOX 56, CHILD 6, JAIL 2 and MASK 3 checks pass on aarch64 and
+x86_64, and the same ELF passes on the Linux 6.12 reference (SANDBOX 54;
+Vinix-only checks skipped). It also checks that a user and network namespace
+keep nothing allocated beyond their two namespace objects after 100
+sandboxes. `open` checks RESOLVE_IN_ROOT, matching Linux. Related cases
+(namespace, capset, capbset, securebits, seccomp, clone*, procns, mqueue,
+semns, fsuid, nnp, keepcaps, ambient, cappid, capabi, sysrq, runtime,
+procself, execnames, readlinkabi, procpid) pass on aarch64. Receipts are
+outside Git in the author's ~/.cache/vinix-userns/ (compat-r30 to r33,
+compat-x3, ref-r12).
+
+Not supported: several map extents, id translation in stat, credentials
+passed over sockets and /proc status, setns into a user or network
+namespace, IP networking inside a network namespace, idmapped mounts, and
+freeing namespaces and mount trees, which Vinix does not do yet.
