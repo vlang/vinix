@@ -33,8 +33,8 @@ The checks cover:
   `/proc` child-fault fields agree with `RUSAGE_CHILDREN`.
 - Executing a replacement program retains process RSS history and both
   process and calling-thread event/CPU histories.
-- Invalid selectors and output pointers fail. A failed `wait4` output copy
-  preserves the wait event for a subsequent successful call.
+- Invalid selectors and output pointers fail. As on Linux, a `wait4` whose
+  output copy faults has already reaped the child; the retry gets `ECHILD`.
 - A warmed loop of 3,000 accounting syscalls and 1,000 proc reads checks
   retained slab memory, with 16 KiB allowed for bounded cache variation.
 

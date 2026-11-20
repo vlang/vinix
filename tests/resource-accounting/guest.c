@@ -400,7 +400,9 @@ static void errors_and_retention(void)
     if (!child) _exit(0);
     int status;
     errno = 0; CHECK(syscall(SYS_wait4, child, &status, 0, (void *)128) == -1 && errno == EFAULT);
-    (void)reap(child); /* EFAULT must preserve the child's wait event. */
+    /* As on Linux, the child was reaped before the rusage copy faulted, so
+     * its wait event is consumed and nothing is left to retry. */
+    errno = 0; CHECK(wait4(child, &status, WNOHANG, NULL) == -1 && errno == ECHILD);
     retention();
     puts("ACCOUNTING PASS: pointer errors, wait-event retry and bounded syscall scratch");
 }
