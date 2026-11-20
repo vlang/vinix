@@ -53,8 +53,10 @@ pub mut:
 	init_pid int
 	// A pid namespace other than the initial one numbers its members itself:
 	// `ids` maps each number it has handed out to the kernel's id for that
-	// process or thread. Changed with pid_lock held.
-	ids     map[int]int
+	// process or thread. Changed with pid_lock held. Made on first use: as a
+	// map value it was allocated, and never freed, for every namespace of
+	// every kind that unshare or clone created.
+	ids     &map[int]int = unsafe { nil }
 	next_id int = 1
 	lock    klock.Lock
 	// The nsfs file /proc/<pid>/ns/<kind> leads to. One per namespace, so that

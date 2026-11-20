@@ -42,20 +42,23 @@ fn local_group_alive(ns &Namespace, id int) bool {
 // Hand out the next free number in `ns` to the kernel id `id`, cycling as the
 // kernel's own ids do. Called with pid_lock held; 0 if every number is taken.
 fn allocate_local_id(mut ns Namespace, id int) int {
+	if ns.ids == unsafe { nil } {
+		ns.ids = &map[int]int{}
+	}
 	for n := 0; n < max_pid - 1; n++ {
 		candidate := (ns.next_id - 1 + n) % (max_pid - 1) + 1
 		if candidate in ns.ids || local_group_alive(ns, candidate) {
 			continue
 		}
 		ns.next_id = if candidate + 1 >= max_pid { 1 } else { candidate + 1 }
-		ns.ids[candidate] = id
+		unsafe { (*ns.ids)[candidate] = id }
 		return candidate
 	}
 	return 0
 }
 
 fn release_local_id(mut ns Namespace, local int) {
-	if local > 0 {
+	if local > 0 && ns.ids != unsafe { nil } {
 		ns.ids.delete(local)
 	}
 }
@@ -183,10 +186,10 @@ fn global_id_in(viewer &Namespace, local int) int {
 	if !numbers_own(viewer) {
 		return local
 	}
-	if local <= 0 {
+	if local <= 0 || viewer.ids == unsafe { nil } {
 		return 0
 	}
-	return viewer.ids[local] or { 0 }
+	return unsafe { (*viewer.ids)[local] or { 0 } }
 }
 
 // Linux find_vpid() recognizes any allocated PID number, regardless of the
