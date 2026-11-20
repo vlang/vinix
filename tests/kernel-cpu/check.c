@@ -74,7 +74,16 @@ static void native_guard(void) {
         sig_atomic_t previous = virtual_count;
         if (setitimer(ITIMER_VIRTUAL, &timer, NULL) ||
             syscall(246, (uintptr_t)native_unexpected_entry)) _exit(2);
-        for (unsigned i = 0; i < 20000000; i++) computation += i;
+        // Run well past the 20 ms of user time. A fixed loop count ended first
+        // on fast hosts; any syscall here would itself be a delivery point,
+        // so time it with the EL0-readable virtual counter instead.
+        uint64_t frequency, started, now;
+        __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(frequency));
+        __asm__ volatile("isb; mrs %0, cntvct_el0" : "=r"(started));
+        do {
+            for (unsigned i = 0; i < 100000; i++) computation += i;
+            __asm__ volatile("isb; mrs %0, cntvct_el0" : "=r"(now));
+        } while (now - started < frequency / 5);
         int deferred = virtual_count == previous;
         // Changing back to the Linux frame ABI at a syscall boundary allows
         // its pending handler to run with the complete SIMD frame.
