@@ -50,7 +50,8 @@ fn installed_deployment_plan(current State, names []string) !Plan {
 	mut pending := []string{cap: current.packages.len}
 	mut selected := []Installed{cap: current.packages.len}
 	unsafe { pending.flags |= .noslices }
-	defer { unsafe { positions.free(); reached.free(); pending.free() } }
+	// pending borrows its IDs; []string.free() would free them, so free only the buffer.
+	defer { unsafe { positions.free(); reached.free(); (&array(&pending)).free() } }
 	defer { if !accepted { unsafe { (&array(&selected)).free() } } }
 	for index, installed in current.packages { positions[installed.package.id] = index }
 	for index, id in roots {

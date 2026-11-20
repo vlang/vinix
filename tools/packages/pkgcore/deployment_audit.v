@@ -6,7 +6,8 @@ import tools.packages.pkgprotocol
 fn compare_deployment(expected DeploymentLock, installed DeploymentLock, generation u64, digest string) !pkgprotocol.DeploymentAudit {
 	mut targets := map[string]int{}; mut actual := map[string]int{}
 	mut ids := []string{cap: expected.locked.len + installed.locked.len}
-	defer { unsafe { targets.free(); actual.free(); ids.free() } }
+	// ids borrows the records' IDs; free only its buffer.
+	defer { unsafe { targets.free(); actual.free(); (&array(&ids)).free() } }
 	for i, pin in expected.locked { targets[pin.id] = i; ids << pin.id }
 	for root in expected.packages { if root !in targets { return error('deployment audit root is absent from its locked records: ${root}') } }
 	for i, pin in installed.locked { actual[pin.id] = i; if pin.id !in targets { ids << pin.id } }

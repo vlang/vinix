@@ -205,7 +205,8 @@ fn write_wine_profile(mut plan WineProfilePlan, roots map[string]int, target str
 		defer { if !transferred { close_decoded_package(p) } }
 		mut notices := []string{cap: recipe.entries.len}
 		for entry in recipe.entries { if entry.path.starts_with('licenses/') { notices << entry.path } }
-		defer { unsafe { notices.free() } }
+		// notices borrows the recipe's paths; free only its buffer.
+		defer { unsafe { (&array(&notices)).free() } }
 		profile_file_inventory(recipe, p, notices)!
 		objects := C.open(object_path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 		if objects < 0 { return error('cannot inspect Wine profile inventory') }
