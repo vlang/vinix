@@ -1080,6 +1080,11 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 		return 0
 	}
 
+	// A freed block's cached page is dead. Drop it while the block is still
+	// marked used, so it cannot already belong to someone else; discard()
+	// takes only clean pages the block wholly covers.
+	filesystem.cache.discard(u64(block) * filesystem.block_size, filesystem.block_size)
+
 	lib.bitreset(bitmap, bitmap_index)
 
 	filesystem.raw_device_write(bitmap, bgd.block_addr_bitmap * filesystem.block_size, filesystem.block_size) or {
