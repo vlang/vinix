@@ -13,6 +13,11 @@ const webview_client_started_two = 'invoke-virtual {v0, p0, p2}, Landroid/webkit
 // do not have (postUrl, back/forward lists, hit testing, saved state) are left
 // absent so a caller fails visibly instead of silently misbehaving.
 //
+// No added virtual method may name a class the framework lacks: ART checks
+// every app override against it and fails to link the subclass (r120:
+// GMS's onReceivedSslError override and the absent SslErrorHandler). So the
+// SslError, WebResourceError and ConsoleMessage callbacks stay absent.
+//
 // Page-start dispatch now uses the public onPageStarted(WebView, String,
 // Bitmap); its existing default still forwards to the two-argument form.
 pub fn framework_webview_client_webview(original string) !string {
@@ -106,9 +111,8 @@ pub fn framework_webview_client_client(original string) !string {
 		|| original.count('.method public shouldOverrideUrlLoading(Landroid/webkit/WebView;Ljava/lang/String;)Z\n') != 1 {
 		return error('canonical WebViewClient input required')
 	}
-	for member in ['onLoadResource(', 'onPageCommitVisible(', 'onReceivedHttpError(', 'onReceivedSslError(',
+	for member in ['onLoadResource(', 'onPageCommitVisible(', 'onReceivedHttpError(',
 		'shouldInterceptRequest(', 'onFormResubmission(',
-		'onReceivedError(Landroid/webkit/WebView;Landroid/webkit/WebResourceRequest;',
 		'shouldOverrideUrlLoading(Landroid/webkit/WebView;Landroid/webkit/WebResourceRequest;)'] {
 		if original.contains(member) {
 			return error('WebViewClient member already exists')
@@ -123,15 +127,7 @@ return-void
 .locals 0
 return-void
 .end method
-.method public onReceivedError(Landroid/webkit/WebView;Landroid/webkit/WebResourceRequest;Landroid/webkit/WebResourceError;)V
-.locals 0
-return-void
-.end method
 .method public onReceivedHttpError(Landroid/webkit/WebView;Landroid/webkit/WebResourceRequest;Landroid/webkit/WebResourceResponse;)V
-.locals 0
-return-void
-.end method
-.method public onReceivedSslError(Landroid/webkit/WebView;Landroid/webkit/SslErrorHandler;Landroid/net/http/SslError;)V
 .locals 0
 return-void
 .end method
@@ -162,7 +158,7 @@ pub fn framework_webview_client_chrome(original string) !string {
 	if original.count('.class public Landroid/webkit/WebChromeClient;\n') != 1 {
 		return error('canonical WebChromeClient input required')
 	}
-	for member in ['onProgressChanged(', 'onReceivedTitle(', 'onConsoleMessage('] {
+	for member in ['onProgressChanged(', 'onReceivedTitle('] {
 		if original.contains(member) {
 			return error('WebChromeClient member already exists')
 		}
@@ -175,11 +171,6 @@ return-void
 .method public onReceivedTitle(Landroid/webkit/WebView;Ljava/lang/String;)V
 .locals 0
 return-void
-.end method
-.method public onConsoleMessage(Landroid/webkit/ConsoleMessage;)Z
-.locals 1
-const/4 v0, 0x0
-return v0
 .end method
 '
 }

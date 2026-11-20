@@ -27,6 +27,23 @@ fn main() {
 		}
 		changed[name] = output
 	}
+	// ART links every app override against these methods, so each class a
+	// new signature names must exist (r120 failed on SslErrorHandler).
+	for name, output in changed {
+		original := os.read_file(base + '/smali/android/webkit/' + name + '.smali')!
+		for line in output[original.len..].split_into_lines() {
+			if !line.starts_with('.method ') {
+				continue
+			}
+			for part in line.all_after('(').split(';') {
+				type_name := part.all_after('L')
+				if !part.contains('L') || type_name.starts_with('java/') {
+					continue
+				}
+				assert os.is_file(base + '/smali/' + type_name + '.smali'), line
+			}
+		}
+	}
 	webview := changed['WebView']
 	assert webview.contains('.method internalLoadChanged(ILjava/lang/String;)V\n    .registers 5\n')
 	assert webview.contains('Landroid/webkit/WebViewClient;->onPageStarted(Landroid/webkit/WebView;Ljava/lang/String;Landroid/graphics/Bitmap;)V')
@@ -54,7 +71,7 @@ fn main() {
 		'WebView':             'reload()V'
 		'WebSettings':         'setDisabledActionModeMenuItems(I)V'
 		'WebViewClient':       'shouldOverrideUrlLoading(Landroid/webkit/WebView;Landroid/webkit/WebResourceRequest;)Z'
-		'WebChromeClient':     'onConsoleMessage(Landroid/webkit/ConsoleMessage;)Z'
+		'WebChromeClient':     'onReceivedTitle(Landroid/webkit/WebView;Ljava/lang/String;)V'
 		'URLUtil':             'static isValidUrl(Ljava/lang/String;)Z'
 		'WebResourceResponse': 'getStatusCode()I'
 	} {
