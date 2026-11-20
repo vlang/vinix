@@ -354,11 +354,15 @@ static void global_quotas(void) {
 
     int queue = queue_new();
     complete = queue >= 0;
-    for (int i = 0; i < 8192 && complete; i++) {
-        if (msgsnd(queue, &message, 0, IPC_NOWAIT)) complete = 0;
+    // Queued messages are also IPC objects, which the kernel resource budget
+    // bounds at 4096 system-wide (docs/kernel-resources.md), below the 8192
+    // message quota. Either limit must stop zero-byte headers with ENOMEM.
+    int headers = 0, refused = 0;
+    for (; headers <= 8192 && complete; headers++) {
+        errno = 0;
+        if (msgsnd(queue, &message, 0, IPC_NOWAIT)) { refused = errno == ENOMEM; break; }
     }
-    errno = 0;
-    check(complete && msgsnd(queue, &message, 0, IPC_NOWAIT) == -1 && errno == ENOMEM,
+    check(complete && refused && headers >= 3072 && headers <= 8192,
           "global message quota bounds zero-byte headers");
     msgctl(queue, IPC_RMID, NULL);
     queue = queue_new();
