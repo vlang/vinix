@@ -19,13 +19,20 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
+        id: uses_checkout_v6
         with:
           persist-credentials: false
       - name: Install build tools
+        id: install_build_tools
+        if: ${{ success() && !cancelled() && steps.uses_checkout_v6.outcome == 'success' }}
         run: sudo apt-get update && sudo apt-get install -y clang lld gcc make git curl
       - name: Bootstrap pinned V compiler
+        id: bootstrap_pinned_v_compiler
+        if: ${{ success() && !cancelled() && steps.install_build_tools.outcome == 'success' }}
         run: sh tools/m1-wifi/get-v.sh /tmp/vinix-wifi-v
       - name: Compile native packaging and verification tools
+        id: compile_native_packaging_and_verification_tools
+        if: ${{ success() && !cancelled() && steps.bootstrap_pinned_v_compiler.outcome == 'success' }}
         shell: bash
         env:
           V_C_ERROR_BUG_REPORT_DISABLED: '1'
@@ -37,6 +44,8 @@ jobs:
           /tmp/vinix-wifi-v/v -nocache -cc clang -o tests/m1-wifi/out/native-tools/verify-build tests/m1-wifi/verify-build.v
           /tmp/vinix-wifi-v/v -nocache -cc clang -o tests/m1-wifi/out/native-tools/verify-test tests/m1-wifi/verify-test.v
       - name: Driver sanitizer and optimized tests
+        id: driver_sanitizer_and_optimized_tests
+        if: ${{ success() && !cancelled() && steps.compile_native_packaging_and_verification_tools.outcome == 'success' }}
         shell: bash
         env:
           V: /tmp/vinix-wifi-v/v
@@ -48,8 +57,12 @@ jobs:
           CC=clang sh tests/apple-spi-keyboard/run.sh | tee tests/m1-wifi/out/keyboard.log
           clang -std=c11 -O2 -Wall -Wextra -Werror -iquote kernel/c tools/m1-wifi/wifi-ctl.c -o tests/m1-wifi/out/wifi-ctl-host
       - name: Fetch pinned kernel dependencies
+        id: fetch_pinned_kernel_dependencies
+        if: ${{ success() && !cancelled() && steps.driver_sanitizer_and_optimized_tests.outcome == 'success' }}
         run: cd kernel && ./get-deps
       - name: Clean debug and production ARM64 links
+        id: clean_debug_and_production_arm64_links
+        if: ${{ success() && !cancelled() && steps.fetch_pinned_kernel_dependencies.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
