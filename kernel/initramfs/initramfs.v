@@ -475,12 +475,18 @@ fn (archive Archive) release() {
 @[manualfree]
 fn module_archive(module_index u64) Archive {
 	archive_module := unsafe { module_req.response.modules[module_index] }
-	if archive_module == unsafe { nil } || archive_module.size < 512 {
+	if archive_module == unsafe { nil } {
 		panic('Invalid initramfs module')
 	}
 	data := &u8(archive_module.address)
 	size := archive_module.size
 	if !is_gzip(data, size) {
+		// A tar archive is at least one 512-byte header. A compressed one can
+		// be far smaller (an image of empty directories gzips to a few hundred
+		// bytes); its inflated size is checked below instead.
+		if size < 512 {
+			panic('Invalid initramfs module')
+		}
 		return Archive{
 			address: archive_module.address
 			size:    size
