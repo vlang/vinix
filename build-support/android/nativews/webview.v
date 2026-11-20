@@ -664,7 +664,29 @@ fn ws_web_cookie(e voidptr, url voidptr, value voidptr, setting bool) voidptr {
 		cookie := if setting { ws_utf(e, value) } else { &char(nil) }
 		if setting && (cookie == nil || pending(e)) { return nil }
 		defer { if setting { ws_release(e, value, cookie) } }
-		uri_length := C.strlen(uri)
+		// Android normalizes cookie URLs with WebAddress, a classic WebView quirk
+		// Chromium keeps: GMS passes a bare host, which means http://host/.
+		mut target := uri
+		mut fixed := &char(nil)
+		if C.strstr(uri, &char(c'://')) == nil {
+			host_length := C.strlen(uri)
+			fixed = &char(C.malloc(host_length + 9))
+			if fixed == nil {
+				throw(e, c'java/lang/OutOfMemoryError', c'WebView cookie URL')
+				return nil
+			}
+			C.memcpy(fixed, &char(c'http://'), 7)
+			C.memcpy(&fixed[7], uri, host_length)
+			if C.strchr(uri, i32(`/`)) == nil {
+				fixed[7 + host_length] = `/`
+				fixed[8 + host_length] = 0
+			} else {
+				fixed[7 + host_length] = 0
+			}
+			target = fixed
+		}
+		defer { C.free(fixed) }
+		uri_length := C.strlen(target)
 		cookie_length := if setting { C.strlen(cookie) } else { usize(0) }
 		if uri_length == 0 || uri_length > 65536 || (setting && (cookie_length == 0 || cookie_length > 65536)) {
 			throw(e, c'java/lang/IllegalArgumentException', c'Invalid WebView cookie input')
@@ -678,7 +700,7 @@ fn ws_web_cookie(e voidptr, url voidptr, value voidptr, setting bool) voidptr {
 		}
 		defer { C.free(wire) }
 		ws_web_put32(wire, u32(uri_length))
-		C.memcpy(&wire[4], uri, uri_length)
+		C.memcpy(&wire[4], target, uri_length)
 		if setting {
 			ws_web_put32(&wire[4 + uri_length], u32(cookie_length))
 			C.memcpy(&wire[8 + uri_length], cookie, cookie_length)
