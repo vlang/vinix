@@ -80,9 +80,13 @@ pub fn syscall_sethostname(_ voidptr, name charptr, len u64) (u64, u64) {
 		ns.hostname = text
 		return 0, 0
 	}
+	// The initial namespace keeps the bytes, not the string: free the copy,
+	// as setdomainname does. (A namespace's replaced name is still kept:
+	// lockless readers may be copying it, and it changes rarely.)
 	unsafe {
 		C.memset(&hostname[0], 0, uts_name_len)
 		C.memcpy(&hostname[0], text.str, text.len)
+		text.free()
 	}
 	return 0, 0
 }
@@ -112,18 +116,24 @@ pub fn syscall_setdomainname(_ voidptr, name charptr, len u64) (u64, u64) {
 	return 0, 0
 }
 
+// Straight from the global bytes outside a namespace: hostname_text()
+// allocates there, and uname(2) left that copy behind on every call.
 pub fn copy_hostname(destination u64) {
-	text := hostname_text()
-	unsafe {
-		C.memset(voidptr(destination), 0, uts_name_len)
-		C.memcpy(voidptr(destination), text.str, text.len)
+	unsafe { C.memset(voidptr(destination), 0, uts_name_len) }
+	if uts_namespace() != unsafe { nil } || hostname[0] == 0 {
+		text := hostname_text()
+		unsafe { C.memcpy(voidptr(destination), text.str, text.len) }
+		return
 	}
+	unsafe { C.memcpy(voidptr(destination), &hostname[0], C.strlen(charptr(&hostname[0]))) }
 }
 
 pub fn copy_domainname(destination u64) {
-	text := domainname_text()
-	unsafe {
-		C.memset(voidptr(destination), 0, uts_name_len)
-		C.memcpy(voidptr(destination), text.str, text.len)
+	unsafe { C.memset(voidptr(destination), 0, uts_name_len) }
+	if uts_namespace() != unsafe { nil } {
+		text := domainname_text()
+		unsafe { C.memcpy(voidptr(destination), text.str, text.len) }
+		return
 	}
+	unsafe { C.memcpy(voidptr(destination), &domainname[0], C.strlen(charptr(&domainname[0]))) }
 }
