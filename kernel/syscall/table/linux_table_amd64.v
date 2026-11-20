@@ -593,6 +593,7 @@ pub fn init_syscall_table() {
 	syscall_table[435] = voidptr(userland.syscall_clone3) // clone3
 	syscall_table[424] = voidptr(userland.syscall_pidfd_send_signal)
 	syscall_table[434] = voidptr(userland.syscall_pidfd_open)
+	syscall_table[438] = voidptr(userland.syscall_pidfd_getfd)
 
 	// Sockets
 	syscall_table[41] = voidptr(socket.syscall_socket) // socket

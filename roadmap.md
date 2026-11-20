@@ -2617,6 +2617,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   same probe ELF passes 39 AArch64 / 40 x86-64 checks on Vinix and Linux 6.12.
   See [the personality receipts](docs/linux-personality.md).
 
+- [x] Implement pidfd_getfd: close-on-exec copies of another process's
+  descriptor with Linux's argument words and error order, exited-process
+  ESRCH, ptrace-style permission and EMFILE. The same probe ELF passes
+  20 + 3 checks on Vinix and Linux 6.12 on both architectures. See
+  [the pidfd_getfd receipts](docs/linux-pidfd-getfd.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

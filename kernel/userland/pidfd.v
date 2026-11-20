@@ -70,3 +70,54 @@ pub fn syscall_pidfd_send_signal(_ voidptr, fdnum i32, signal i32, info u64, fla
 	// An unreaped zombie still has this identity, even with no thread left.
 	return 0, 0
 }
+
+// pidfd_getfd(pidfd, targetfd, flags): a close-on-exec duplicate of another
+// process's descriptor, sharing its open-file description. Linux requires
+// ptrace's ATTACH_REALCREDS access, which without Yama is the credential and
+// dumpability check READ_REALCREDS makes (kcmp's). Errors follow Linux:
+// EINVAL for flags, EBADF for anything but a pidfd, ESRCH for a gone process,
+// EPERM, ESRCH for an exiting one, then EBADF for the target and EMFILE.
+pub fn syscall_pidfd_getfd(_ voidptr, pidfd_word u64, target_word u64, flags_word u64) (u64, u64) {
+	if u32(flags_word) != 0 { return errno.err, errno.einval }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, int(i32(u32(pidfd_word)))) or {
+		return errno.err, errno.ebadf
+	}
+	defer { fd.unref() }
+	mut res := fd.handle.resource
+	mut record := &proc.PidFile(unsafe { nil })
+	if mut res is proc.PidFile { record = res } else { return errno.err, errno.ebadf }
+	// A negative descriptor is a huge unsigned one, which no table has.
+	target_fd := u32(target_word)
+	for attempt := 0; attempt < kcmp_attempts; attempt++ {
+		if attempt > 0 { kcmp_relax() }
+		proc.lock_table()
+		target := proc.pidfd_target_locked(record)
+		if target == unsafe { nil } {
+			proc.unlock_table()
+			return errno.err, errno.esrch
+		}
+		// Linux checks access first, then reports a task whose descriptors are
+		// gone, as an exiting one's are, as ESRCH.
+		if !proc.may_inspect_realcreds_locked(target) {
+			proc.unlock_table()
+			return errno.err, errno.eperm
+		}
+		if target.exiting {
+			proc.unlock_table()
+			return errno.err, errno.esrch
+		}
+		mut taken, busy := kcmp_try_take(target, target_fd)
+		proc.unlock_table()
+		if busy { continue }
+		if taken == unsafe { nil } { return errno.err, errno.ebadf }
+		received := file.fdnum_receive(taken) or {
+			// The last reference's release may set errno itself.
+			code := errno.get()
+			taken.unref()
+			return errno.err, code
+		}
+		taken.unref()
+		return u64(received), 0
+	}
+	return errno.err, errno.eagain
+}

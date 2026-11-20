@@ -12,6 +12,12 @@ must pass; bad pointers, errno, compiler failure, panic, timeout and late failur
 remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
 stay in the required fresh artifact directory, including on failure.
 
+`--cases pidfdgetfd` checks pidfd_getfd copies, close-on-exec, shared
+descriptions, every error and its order, EMFILE, a child's pipe, exited
+children and unprivileged access; the same ELF runs on Linux through
+`syscall-reference.v --case pidfdgetfd`. See
+[semantics and receipts](../../docs/linux-pidfd-getfd.md).
+
 `--cases personality` checks personality(2) values, the 32-bit domain, UNAME26,
 per-thread, fork and exec inheritance, fixed and randomized layouts after exec
 and READ_IMPLIES_EXEC protections; the same ELF runs on Linux through

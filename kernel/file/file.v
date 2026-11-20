@@ -1121,6 +1121,26 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 	return new_fdnum
 }
 
+// A new close-on-exec descriptor in the calling process for the open-file
+// description behind `source`, on which the caller holds a reference:
+// pidfd_getfd(2) receives another process's descriptor this way.
+pub fn fdnum_receive(source &FD) ?int {
+	process := proc.current_thread().process
+	charge := proc.reserve_kernel_for(process.kernel_owner, .descriptor, 128)?
+	mut new_fd := unsafe { &FD(malloc(sizeof(FD))) }
+	unsafe { C.memcpy(new_fd, source, sizeof(FD)) }
+	new_fd.kernel_charge = charge
+	new_fd.refcount = 1
+	mut handle := source.handle
+	katomic.inc(mut &handle.refcount)
+	new_fd.flags = resource.o_cloexec
+	new_fdnum := fdnum_create_from_fd(process, new_fd, 0, false) or {
+		new_fd.unref()
+		return none
+	}
+	return new_fdnum
+}
+
 pub fn syscall_dup3(_ voidptr, oldfdnum int, newfdnum int, flags int) (u64, u64) {
 	mut t := proc.current_thread()
 	mut process := t.process
