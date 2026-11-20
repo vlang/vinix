@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Unprivileged user namespaces as bubblewrap uses them for WebKit's sandbox:
-// one clone into new user, mount, pid, IPC, UTS and network namespaces, the
-// identity id maps, a private tmpfs root reached by pivot_root, /proc and the
-// loopback; and what the capabilities held there must still not do on the
-// host: read root's files, make devices, set the clock, loosen or unmount
-// inherited mounts (lazily either), mount device filesystems, mount a proc
-// over a masked one, give a tmpfs an owner it does not map, reach the host's
+// one clone into new user, mount, pid, IPC, UTS and network namespaces, its
+// id mapped to root, a private tmpfs root reached by pivot_root, /proc, the
+// loopback, and a nested user namespace mapping back to the real id; and
+// what the capabilities held there must still not do on the host: read
+// root's files, make devices, set the clock, loosen or unmount inherited
+// mounts (lazily either), mount device filesystems, mount a proc over a
+// masked one, give a tmpfs an owner it does not map, reach the host's
 // abstract sockets, or start from a chroot.
 // The same ELF runs as Vinix's init and, given --reference, under Linux.
-// Vinix maps only the creator's own id, gives a network namespace of its own
-// no IP sockets and has a wxallowed mount option; those three checks are
-// skipped under --reference. So is
-// the check that a user and a network namespace keep nothing allocated beyond
-// themselves once their sandbox exits, which reads Vinix's /proc/slabinfo.
+// Vinix gives a network namespace of its own no IP sockets and has a
+// wxallowed mount option; those two checks are skipped under --reference. So
+// is the check that a user and a network namespace keep nothing allocated
+// beyond themselves once their sandbox exits, which reads /proc/slabinfo.
 module usernsfixture
 
 #include <alloca.h>
@@ -65,6 +65,8 @@ fn C.sethostname(&char, usize) i32
 fn C.gethostname(&char, usize) i32
 fn C.getpid() i32
 fn C.getuid() u32
+fn C.geteuid() u32
+fn C.getgid() u32
 fn C.settimeofday(voidptr, voidptr) i32
 fn C.socket(i32, i32, i32) i32
 fn C.bind(i32, voidptr, u32) i32
@@ -223,20 +225,19 @@ fn sandboxed(reference bool) i32 {
 		check(mut s, c'first in its pid namespace', C.getpid() == 1, i64(C.getpid()))
 		check(mut s, c'no uid map yet', file_is(c'/proc/self/uid_map', c''), 0)
 		check(mut s, c'setgroups allowed initially', file_is(c'/proc/self/setgroups', c'allow\n'), 0)
-		denied := write_file(c'/proc/self/gid_map', c'1000 1000 1')
+		denied := write_file(c'/proc/self/gid_map', c'0 1000 1')
 		check(mut s, c'gid map needs setgroups deny', denied == -C.EPERM, denied)
-		if !reference {
-			other := write_file(c'/proc/self/uid_map', c'0 1000 1')
-			check(mut s, c'only the identity map', other == -C.EPERM, other)
-		}
-		check(mut s, c'own uid map', write_file(c'/proc/self/uid_map', c'1000 1000 1') > 0, 0)
-		again := write_file(c'/proc/self/uid_map', c'1000 1000 1')
+		other := write_file(c'/proc/self/uid_map', c'0 0 1')
+		check(mut s, c'only its own id', other == -C.EPERM, other)
+		// bubblewrap maps itself to root first, to mount devpts.
+		check(mut s, c'own uid map', write_file(c'/proc/self/uid_map', c'0 1000 1') > 0, 0)
+		again := write_file(c'/proc/self/uid_map', c'0 1000 1')
 		check(mut s, c'uid map written once', again == -C.EPERM, again)
 		check(mut s, c'setgroups deny', write_file(c'/proc/self/setgroups', c'deny') > 0, 0)
-		check(mut s, c'own gid map', write_file(c'/proc/self/gid_map', c'1000 1000 1') > 0, 0)
-		check(mut s, c'uid map text', file_is(c'/proc/self/uid_map', c'      1000       1000          1\n'), 0)
+		check(mut s, c'own gid map', write_file(c'/proc/self/gid_map', c'0 1000 1') > 0, 0)
+		check(mut s, c'uid map text', file_is(c'/proc/self/uid_map', c'         0       1000          1\n'), 0)
 		check(mut s, c'setgroups now deny', file_is(c'/proc/self/setgroups', c'deny\n'), 0)
-		check(mut s, c'uid kept', C.getuid() == 1000, i64(C.getuid()))
+		check(mut s, c'root in its namespace', C.getuid() == 0 && C.geteuid() == 0 && C.getgid() == 0, i64(C.getuid()))
 		check(mut s, c'namespace CAP_SYS_ADMIN', capability_effective_has(21), 0)
 		// Namespace capabilities give nothing over the host.
 		secret := failure(i64(C.open(c'/tmp/ns/secret', C.O_RDONLY)))
@@ -266,7 +267,7 @@ fn sandboxed(reference bool) i32 {
 			u64(C.MS_NOSUID | C.MS_NODEV), nil) == 0, 0)
 		// A tmpfs root may belong only to an id the namespace maps.
 		C.mkdir(c'/tmp/ns/open/owner', 0o755)
-		foreign := failure(i64(C.mount(c'tmpfs', c'/tmp/ns/open/owner', c'tmpfs', 0, c'uid=0')))
+		foreign := failure(i64(C.mount(c'tmpfs', c'/tmp/ns/open/owner', c'tmpfs', 0, c'uid=1000'))) // unmapped inside
 		check(mut s, c'no unmapped tmpfs owner', foreign == -C.EINVAL, foreign)
 		if !reference {
 			// W^X exceptions are the administrator's (a Vinix mount option).
@@ -274,7 +275,7 @@ fn sandboxed(reference bool) i32 {
 			check(mut s, c'no W^X exception', wx == -C.EPERM, wx)
 		}
 		check(mut s, c'mapped tmpfs owner', C.mount(c'tmpfs', c'/tmp/ns/open/owner', c'tmpfs', 0,
-			c'uid=1000,gid=1000') == 0, 0)
+			c'uid=0,gid=0') == 0, 0)
 		C.mkdir(c'/tmp/ns/open/bound', 0o755)
 		check(mut s, c'bind', C.mount(c'/tmp/ns/ro', c'/tmp/ns/open/bound', nil,
 			u64(C.MS_BIND | C.MS_REC), nil) == 0, 0)
@@ -338,6 +339,14 @@ fn sandboxed(reference bool) i32 {
 			ip := failure(i64(C.socket(C.AF_INET, C.SOCK_STREAM, 0)))
 			check(mut s, c'no IP stack', ip == -C.EAFNOSUPPORT, ip)
 		}
+		// bubblewrap then maps back to the real id in a nested user namespace,
+		// which inherits setgroups "deny": it writes the gid map without it.
+		check(mut s, c'nested user namespace', C.syscall(isize(C.SYS_unshare), u64(0x10000000)) == 0, 0)
+		check(mut s, c'nested setgroups inherited', file_is(c'/proc/self/setgroups', c'deny\n'), 0)
+		check(mut s, c'nested uid map', write_file(c'/proc/self/uid_map', c'1000 0 1') > 0, 0)
+		check(mut s, c'nested gid map', write_file(c'/proc/self/gid_map', c'1000 0 1') > 0, 0)
+		check(mut s, c'nested map text', file_is(c'/proc/self/uid_map', c'      1000          0          1\n'), 0)
+		check(mut s, c'real ids again', C.getuid() == 1000 && C.getgid() == 1000, i64(C.getuid()))
 		C.printf(c'LINUX USERNS SANDBOX: checks=%d failures=%d\n', s.checks, s.failures)
 		C.fflush(nil)
 		return if s.failures == 0 { 0 } else { 1 }
@@ -561,9 +570,9 @@ fn sandbox_cycle(user bool) bool {
 			}
 			inner := i32(C.syscall(isize(C.SYS_clone), flags | u64(C.SIGCHLD), nil, nil, nil, nil))
 			if inner == 0 {
-				mapped := !user || (write_file(c'/proc/self/uid_map', c'1000 1000 1') > 0
+				mapped := !user || (write_file(c'/proc/self/uid_map', c'0 1000 1') > 0
 					&& write_file(c'/proc/self/setgroups', c'deny') > 0
-					&& write_file(c'/proc/self/gid_map', c'1000 1000 1') > 0)
+					&& write_file(c'/proc/self/gid_map', c'0 1000 1') > 0)
 				ok := mapped && C.mount(c'tmpfs', c'/tmp/ns/open', c'tmpfs', 0, nil) == 0
 					&& C.mkdir(c'/tmp/ns/open/dir', 0o755) == 0
 					&& C.sethostname(c'sandbox', 7) == 0
@@ -613,7 +622,7 @@ fn sandbox_growth(observer i32, user bool, growth &Slabs) bool {
 // What a user and a network namespace cost once their sandbox has exited.
 // Vinix frees no namespace and no mount tree yet (fs.release_namespace drops
 // only references), so a sandbox is not free; but one with a user and a
-// network namespace may keep exactly those two namespace objects (192-byte
+// network namespace may keep exactly those two namespace objects (one slab
 // class) more than the same sandbox made by root without them. Anything else
 // -- id maps, socket names, netlink, credentials -- would grow for good.
 fn retention(mut s State) {
@@ -629,8 +638,18 @@ fn retention(mut s State) {
 		good := sandbox_growth(observer, false, plain) && sandbox_growth(observer, true, sandboxed)
 		check(mut s, c'sandbox cycles', good && plain.rows == sandboxed.rows, 0)
 		mut kept := good && i64(sandboxed.large) - i64(plain.large) <= 1
+		// The two namespace objects (200 per 100 sandboxes) land in whichever
+		// class holds a proc.Namespace; this does not hardcode its size.
+		mut namespaces := -1
 		for index in 0 .. int(plain.rows) {
-			allowed := if plain.sizes[index] == 192 { i64(200) } else { i64(0) }
+			extra := i64(sandboxed.live[index]) - i64(plain.live[index])
+			if extra >= 175 && extra <= 225 && namespaces < 0 {
+				namespaces = index
+			}
+		}
+		kept = kept && namespaces >= 0
+		for index in 0 .. int(plain.rows) {
+			allowed := if index == namespaces { i64(200) } else { i64(0) }
 			// Other work in the guest (procfs nodes of earlier processes going, for
 			// one) moves a class by up to a dozen objects either way; a leak per
 			// sandbox moves it by at least 100.

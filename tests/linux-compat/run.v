@@ -302,7 +302,7 @@ fn added_markers(name string, arch string, marker string) ?[]string {
 		'sigqueue' { [marker, 'LINUX SIGQUEUE SUMMARY: checks=44 failures=0'] }
 		'fsuid' { [marker, 'LINUX FSUID SUMMARY: checks=20 failures=0', 'LINUX FSUID CHILD: checks=22 failures=0'] }
 		'mqueue' { [marker, 'LINUX MQUEUE SUMMARY: checks=191 failures=0', 'LINUX MQUEUE CHILD: checks=16 failures=0'] }
-		'userns' { [marker, 'LINUX USERNS SUMMARY: checks=15 failures=0', 'LINUX USERNS CHILD: checks=6 failures=0', 'LINUX USERNS SANDBOX: checks=50 failures=0', 'LINUX USERNS JAIL: checks=2 failures=0', 'LINUX USERNS MASK: checks=3 failures=0'] }
+		'userns' { [marker, 'LINUX USERNS SUMMARY: checks=15 failures=0', 'LINUX USERNS CHILD: checks=6 failures=0', 'LINUX USERNS SANDBOX: checks=56 failures=0', 'LINUX USERNS JAIL: checks=2 failures=0', 'LINUX USERNS MASK: checks=3 failures=0'] }
 		else { none }
 	}
 }

@@ -212,6 +212,13 @@ fn replace_namespace(process &proc.Process, mut old proc.Namespace) &proc.Namesp
 			ns.parent_user = if proc.is_initial_namespace(old) { proc.user_namespace_of(unsafe { nil }) } else { old.id }
 			ns.owner_user = ns.parent_user
 			ns.user_depth = if proc.is_initial_namespace(old) { 1 } else { old.user_depth + 1 }
+			// Ids map through the parent's extent. A parent that denied setgroups
+			// passes that on (Linux copies the flag), so a nested gid map needs no
+			// second "deny": bubblewrap writes none.
+			if !proc.is_initial_namespace(old) {
+				ns.parent_ns = voidptr(old)
+				ns.setgroups_deny = old.setgroups_deny
+			}
 		}
 		proc.clone_newipc {
 			ns.ipc_user_ns = if process.ns.user == unsafe { nil } { u64(4026531837) } else { process.ns.user.id }

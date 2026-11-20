@@ -73,13 +73,19 @@ pub mut:
 	// namespace created in the same clone/unshare call. Capabilities held in
 	// a user namespace act only on the namespaces it owns.
 	owner_user u64 = initial_user_namespace_id
-	// User namespaces: the parent, nesting depth, and the identity id maps
-	// written to /proc/<pid>/uid_map and gid_map (-1 until written). Only a
-	// single identity extent is supported: the creator's own id.
+	// User namespaces: the parent (nil for a child of the initial one; never
+	// freed, see fs.release_namespace), nesting depth, and the id maps written
+	// to /proc/<pid>/uid_map and gid_map: one extent each, `uid_inside` here
+	// standing for the global uid `uid_global` (-1 until written). Every other
+	// id is unmapped. Credentials stay global; ids are translated where they
+	// cross the system call boundary (visible_id, global_id).
 	parent_user    u64
+	parent_ns      voidptr
 	user_depth     int
-	uid_map_id     i64 = -1
-	gid_map_id     i64 = -1
+	uid_inside     i64 = -1
+	uid_global     i64 = -1
+	gid_inside     i64 = -1
+	gid_global     i64 = -1
 	setgroups_deny bool
 	// The nsfs file /proc/<pid>/ns/<kind> leads to. One per namespace, so that
 	// comparing two of them by inode tells whether they are the same one.
@@ -520,8 +526,45 @@ pub fn set_process_oom_score_adj(pid int, value int) {
 	process.oom_score_adj = clamped
 }
 
-// The identity id map a process starts a user namespace with: everything maps
-// to itself, since Vinix does not renumber ids across a user namespace.
+// Linux's overflow uid and gid: what an id no mapping covers reads as.
+pub const overflow_id = u32(65534)
+
+// The id `global` as a process in user namespace `ns` sees it.
+pub fn visible_id(ns &Namespace, global u32, group bool) u32 {
+	if unsafe { ns == nil } || is_initial_namespace(ns) {
+		return global
+	}
+	inside := if group { ns.gid_inside } else { ns.uid_inside }
+	mapped := if group { ns.gid_global } else { ns.uid_global }
+	if mapped >= 0 && i64(global) == mapped {
+		return u32(inside)
+	}
+	return overflow_id
+}
+
+// The global id that `id`, as user namespace `ns` names it, stands for.
+pub fn global_id(ns &Namespace, id u32, group bool) ?u32 {
+	if unsafe { ns == nil } || is_initial_namespace(ns) {
+		return id
+	}
+	inside := if group { ns.gid_inside } else { ns.uid_inside }
+	mapped := if group { ns.gid_global } else { ns.uid_global }
+	if inside >= 0 && i64(id) == inside {
+		return u32(mapped)
+	}
+	return none
+}
+
+// How the calling process sees one of its own ids (getuid and friends).
+pub fn own_visible_id(process &Process, global u32, group bool) u32 {
+	if unsafe { process == nil } {
+		return global
+	}
+	return visible_id(process.ns.user, global, group)
+}
+
+// /proc/<pid>/uid_map or gid_map: the initial namespace's identity map, or
+// the one extent written, its outside id as the parent namespace names it.
 pub fn id_map_text(pid int, group bool) string {
 	lock_table()
 	defer { unlock_table() }
@@ -529,15 +572,18 @@ pub fn id_map_text(pid int, group bool) string {
 	if process == unsafe { nil } || is_initial_namespace(process.ns.user) {
 		return '         0          0 4294967295\n'
 	}
-	id := if group { process.ns.user.gid_map_id } else { process.ns.user.uid_map_id }
-	if id < 0 {
+	user := process.ns.user
+	inside := if group { user.gid_inside } else { user.uid_inside }
+	mapped := if group { user.gid_global } else { user.uid_global }
+	if inside < 0 {
 		return ''
 	}
+	outside := visible_id(unsafe { &Namespace(user.parent_ns) }, u32(mapped), group)
 	// Linux's format: three right-aligned ten-wide fields.
 	// On the stack: a plain local builder would be moved to the heap.
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(40) }
-	fields := [id, id, i64(1)]!
+	fields := [inside, i64(outside), i64(1)]!
 	for i in 0 .. 3 {
 		value := unsafe { fields[i] }
 		mut digits := 1
@@ -580,26 +626,37 @@ fn configurable_user_namespace(pid int, cap int) ?&Namespace {
 	return user
 }
 
-// Write /proc/<pid>/uid_map or gid_map. Only the unprivileged form Linux
-// always allows is supported, as an identity: one id, the writer's own
-// effective uid or gid, mapped to itself. Ids therefore never need
-// translating; any other map is refused rather than silently ignored.
+// Write /proc/<pid>/uid_map or gid_map: the one-line map Linux lets any user
+// write, "inside outside 1", where `outside` -- named as the parent user
+// namespace names ids, whether the writer is in it or in the target -- is
+// the writer's own effective uid or gid. Written once. A gid map needs
+// setgroups "deny" first. Several extents, or another id, are refused.
 pub fn write_id_map(pid int, group bool, inside i64, outside i64, count i64) ? {
 	lock_table()
 	defer { unlock_table() }
 	mut user := configurable_user_namespace(pid, if group { cap_setgid } else { cap_setuid })?
 	writer := current_thread().process
-	own := if group { i64(writer.egid) } else { i64(writer.euid) }
-	current := if group { user.gid_map_id } else { user.uid_map_id }
-	if current >= 0 || count != 1 || inside != outside || outside != own
-		|| (group && !user.setgroups_deny) {
+	own := if group { writer.egid } else { writer.euid }
+	current := if group { user.gid_inside } else { user.uid_inside }
+	if current >= 0 || count != 1 || inside < 0 || inside >= i64(u32(0xffffffff))
+		|| outside < 0 || outside >= i64(u32(0xffffffff)) || (group && !user.setgroups_deny) {
+		errno.set(errno.eperm)
+		return none
+	}
+	global := global_id(unsafe { &Namespace(user.parent_ns) }, u32(outside), group) or {
+		errno.set(errno.eperm)
+		return none
+	}
+	if global != own {
 		errno.set(errno.eperm)
 		return none
 	}
 	if group {
-		user.gid_map_id = outside
+		user.gid_inside = inside
+		user.gid_global = i64(global)
 	} else {
-		user.uid_map_id = outside
+		user.uid_inside = inside
+		user.uid_global = i64(global)
 	}
 }
 
@@ -609,7 +666,7 @@ pub fn write_setgroups(pid int, deny bool) ? {
 	lock_table()
 	defer { unlock_table() }
 	mut user := configurable_user_namespace(pid, cap_sys_admin)?
-	if user.gid_map_id >= 0 || (user.setgroups_deny && !deny) {
+	if user.gid_inside >= 0 || (user.setgroups_deny && !deny) {
 		errno.set(errno.eperm)
 		return none
 	}

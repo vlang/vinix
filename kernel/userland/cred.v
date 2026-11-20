@@ -33,20 +33,26 @@ fn may_set_gids(process &proc.Process) bool {
 	return proc.has_capability(process, proc.cap_setgid)
 }
 
+// Ids as the caller's user namespace names them (proc.visible_id): a process
+// that mapped itself to 0 in its own namespace is root there.
 pub fn syscall_getuid(_ voidptr) (u64, u64) {
-	return u64(current_process().uid), 0
+	process := current_process()
+	return u64(proc.own_visible_id(process, process.uid, false)), 0
 }
 
 pub fn syscall_geteuid(_ voidptr) (u64, u64) {
-	return u64(current_process().euid), 0
+	process := current_process()
+	return u64(proc.own_visible_id(process, process.euid, false)), 0
 }
 
 pub fn syscall_getgid(_ voidptr) (u64, u64) {
-	return u64(current_process().gid), 0
+	process := current_process()
+	return u64(proc.own_visible_id(process, process.gid, true)), 0
 }
 
 pub fn syscall_getegid(_ voidptr) (u64, u64) {
-	return u64(current_process().egid), 0
+	process := current_process()
+	return u64(proc.own_visible_id(process, process.egid, true)), 0
 }
 
 // setuid(2). Privileged callers set all three ids; everyone else may only move
@@ -271,10 +277,13 @@ pub fn syscall_setresgid(_ voidptr, rgid u32, egid u32, sgid u32) (u64, u64) {
 
 pub fn syscall_getresuid(_ voidptr, ruid u64, euid u64, suid u64) (u64, u64) {
 	process := current_process()
+	real := proc.own_visible_id(process, process.uid, false)
+	effective := proc.own_visible_id(process, process.euid, false)
+	saved := proc.own_visible_id(process, process.suid, false)
 
-	if !usercopy.copy_to_user(ruid, voidptr(&process.uid), sizeof(u32))
-		|| !usercopy.copy_to_user(euid, voidptr(&process.euid), sizeof(u32))
-		|| !usercopy.copy_to_user(suid, voidptr(&process.suid), sizeof(u32)) {
+	if !usercopy.copy_to_user(ruid, unsafe { voidptr(&real) }, sizeof(u32))
+		|| !usercopy.copy_to_user(euid, unsafe { voidptr(&effective) }, sizeof(u32))
+		|| !usercopy.copy_to_user(suid, unsafe { voidptr(&saved) }, sizeof(u32)) {
 		return errno.err, errno.efault
 	}
 
@@ -283,10 +292,13 @@ pub fn syscall_getresuid(_ voidptr, ruid u64, euid u64, suid u64) (u64, u64) {
 
 pub fn syscall_getresgid(_ voidptr, rgid u64, egid u64, sgid u64) (u64, u64) {
 	process := current_process()
+	real := proc.own_visible_id(process, process.gid, true)
+	effective := proc.own_visible_id(process, process.egid, true)
+	saved := proc.own_visible_id(process, process.sgid, true)
 
-	if !usercopy.copy_to_user(rgid, voidptr(&process.gid), sizeof(u32))
-		|| !usercopy.copy_to_user(egid, voidptr(&process.egid), sizeof(u32))
-		|| !usercopy.copy_to_user(sgid, voidptr(&process.sgid), sizeof(u32)) {
+	if !usercopy.copy_to_user(rgid, unsafe { voidptr(&real) }, sizeof(u32))
+		|| !usercopy.copy_to_user(egid, unsafe { voidptr(&effective) }, sizeof(u32))
+		|| !usercopy.copy_to_user(sgid, unsafe { voidptr(&saved) }, sizeof(u32)) {
 		return errno.err, errno.efault
 	}
 

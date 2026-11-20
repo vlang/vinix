@@ -699,6 +699,13 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 			mount_node.resource.stat.gid = mounter.fsgid
 		}
 		apply_tmpfs_options(mut mount_node, options)
+		// In a child user namespace uid= and gid= could only name the mapped id
+		// (owner_options_mapped), which stands for the mounter's own.
+		if mounter != unsafe { nil } && mount_node.resource != unsafe { nil }
+			&& !proc.is_initial_namespace(mounter.ns.user) {
+			mount_node.resource.stat.uid = mounter.fsuid
+			mount_node.resource.stat.gid = mounter.fsgid
+		}
 	}
 
 	attach_mount(mut table, mut target_node, mount_node)
@@ -1749,7 +1756,7 @@ fn user_namespace_proc_allowed(flags u64) ? {
 }
 
 // Whether every uid= and gid= in a tmpfs option string names the id the
-// caller's user namespace maps: Vinix maps only its creator's own.
+// caller's user namespace maps (its one extent's inside id).
 fn owner_options_mapped(options string) bool {
 	process := calling_process()
 	if process == unsafe { nil } || process.ns.user == unsafe { nil } {
@@ -1768,7 +1775,7 @@ fn owner_options_mapped(options string) bool {
 		if !user && !option.starts_with('gid=') {
 			continue
 		}
-		mapped := if user { process.ns.user.uid_map_id } else { process.ns.user.gid_map_id }
+		mapped := if user { process.ns.user.uid_inside } else { process.ns.user.gid_inside }
 		value := unsafe { tos(option.str + 4, option.len - 4) }
 		if mapped < 0 || value.len == 0 || value.i64() != mapped {
 			return false
