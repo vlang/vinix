@@ -1,10 +1,12 @@
 module fs
 
+import event
 import kbudget
 import katomic
 import klock
 import proc
 import resource
+import sched
 import stat
 import time
 
@@ -48,6 +50,9 @@ __global (
 	removed_lock      klock.Lock
 	removed_items     []RetiredItem
 	removed_last_reap u64
+	// Batches with a disk-changing release (see wait_queued_releases) that
+	// reap_removed() has taken off the queue and not yet dealt with.
+	removed_in_flight u32
 )
 
 // orphan_node marks a node that no name leads to any more, and retires it
@@ -141,7 +146,7 @@ fn retire(item RetiredItem) {
 	removed_lock.release()
 }
 
-// Only the writeback worker reaps. Retiring can happen under VFS/resource
+// Only the maintenance thread reaps. Retiring can happen under VFS/resource
 // locks, while a final retained device release can acquire those same locks.
 // Queueing never runs such callbacks synchronously.
 pub fn reap_removed() {
@@ -174,6 +179,11 @@ pub fn reap_removed() {
 		unsafe { C.memcpy(items.data, removed_items.data, uint(due) * sizeof(RetiredItem)) }
 		removed_items.delete_many(0, due)
 	}
+	mut disk_batch := false
+	for i in 0 .. items.len {
+		if release_changes_disk(unsafe { &items[i] }) { disk_batch = true; break }
+	}
+	if disk_batch { removed_in_flight++ }
 	removed_lock.release()
 
 	mut nodes := []voidptr{cap: due} @[freed]
@@ -252,11 +262,90 @@ pub fn reap_removed() {
 		}
 		free_node(node)
 	}
+	if disk_batch {
+		removed_lock.acquire()
+		removed_in_flight--
+		removed_lock.release()
+	}
 	unsafe {
 		items.free()
 		nodes.free()
 		running.free()
 	}
+}
+
+// sync(2) promises that a file removed before it is gone from the disk as
+// well. Its name's reference is dropped only after the grace period
+// (release_resource_after_grace), and on a filesystem without a journal only
+// that release frees the inode and its blocks: a sync and then a power cut
+// left them allocated with no owner. Wait for such releases already queued,
+// and for a batch being dealt with, so the flush that follows writes the
+// result. Only releases that change the disk are waited for: a removed tmpfs
+// file, or one still open, costs sync nothing. A resource release is never
+// requeued, so this waits at most one grace period and a reap interval.
+// A removed directory is released with its node, which cwd/root owners may
+// keep requeueing, so it is not waited for; nor is a file whose final
+// reference belongs to its mapped pages or a transient writeback pin. The
+// caller holds no lock.
+pub fn wait_queued_releases() {
+	start := time.monotonic_ns()
+	for releases_pending(start) {
+		mut timer := time.new_timer(time.TimeSpec{tv_nsec: 50_000_000})
+		// Ordinary signals wait for the syscall to finish, as Linux's sync
+		// does; they must not turn this into a spin. A thread told to exit
+		// stops waiting.
+		mut stopped := false
+		mut early := false
+		_ := event.await_one_masked(mut timer.event, 0) or {
+			stopped = katomic.load(&proc.current_thread().must_exit)
+			early = true
+			u64(0)
+		}
+		timer.disarm()
+		unsafe { free(timer) }
+		if stopped { return }
+		// A full listener array also ends the wait at once.
+		if early { sched.yield(true) }
+	}
+}
+
+fn releases_pending(start u64) bool {
+	removed_lock.acquire()
+	defer { removed_lock.release() }
+	if removed_in_flight != 0 { return true }
+	// Retired in time order: `at` is read under the lock.
+	for i in 0 .. removed_items.len {
+		item := unsafe { &removed_items[i] }
+		if item.at > start { break }
+		if !release_changes_disk(item) { continue }
+		// Pending if only queued references remain: each hard link's name
+		// holds its own. An open description or mapping keeps the file, and
+		// its own final release frees it, outside this wait.
+		mut res := unsafe { item.resource }
+		refs := katomic.load(&res.refcount)
+		if refs <= 1 || refs <= queued_references(item.resource) { return true }
+	}
+	return false
+}
+
+// A queued release that will free its removed file on disk once it is the
+// last reference. The batch flag ignores the count: a close may still make
+// the release final while the batch is being dealt with.
+fn release_changes_disk(item &RetiredItem) bool {
+	if item.node != unsafe { nil } || item.resource == unsafe { nil } { return false }
+	mut res := unsafe { item.resource }
+	return resource.release_changes_disk(mut res)
+}
+
+fn queued_references(res &resource.Resource) int {
+	mut count := 0
+	for i in 0 .. removed_items.len {
+		queued := unsafe { &removed_items[i] }
+		if voidptr(queued.resource) == voidptr(res) && queued.node == unsafe { nil } {
+			count++
+		}
+	}
+	return count
 }
 
 // Called before a cwd/root owner drops its reference, under its own lock.

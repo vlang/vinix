@@ -145,6 +145,26 @@ pub fn backend_is_read_only(mut res Resource) bool {
 	return false
 }
 
+// Dropping the last reference to a removed file is what frees its inode and
+// blocks on a filesystem that keeps no journal; sync(2) waits for that.
+pub interface DiskReleaseResource {
+	release_changes_disk() bool
+}
+
+struct DiskReleaseScratch {
+mut:
+	backend DiskReleaseResource
+}
+
+pub fn release_changes_disk(mut res Resource) bool {
+	if mut res is DiskReleaseResource {
+		mut scratch := unsafe { &DiskReleaseScratch(C.__builtin_alloca(sizeof(DiskReleaseScratch))) }
+		unsafe { scratch.backend = DiskReleaseResource(res) }
+		return scratch.backend.release_changes_disk()
+	}
+	return false
+}
+
 // A record receive retires its selected message even when copying it to the
 // user fails. Keep the optional protocol query borrowed from the existing
 // resource box; ordinary byte streams need no extra callback.

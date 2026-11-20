@@ -8,9 +8,12 @@ module table
 
 import errno
 import file
+import fs
 import proc
 
 fn storage_sync(_ voidptr) (u64, u64) {
+	// What was removed before the call has to be off the disk too.
+	fs.wait_queued_releases()
 	if !storage_flush_everything() { return errno.err, errno.eio }
 	return 0, 0
 }

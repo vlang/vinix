@@ -433,7 +433,10 @@ int main(int argc, char **argv)
     retention();
 #else
     anonymous_rss(); shared_fork_rss(); physical_io(); threads_and_switches(); children(); exec_peak(); errors_and_retention();
-    CHECK(unlink("/root/accounting-data") == 0); sync();
+    /* Each name holds its own reference: sync must still find the file freed
+     * once both are removed, or the power cut leaves its blocks allocated. */
+    CHECK(link("/root/accounting-data", "/root/accounting-link") == 0);
+    CHECK(unlink("/root/accounting-link") == 0 && unlink("/root/accounting-data") == 0); sync();
 #endif
     puts("ACCOUNTING DONE pass ino=0");
     for (;;) pause();

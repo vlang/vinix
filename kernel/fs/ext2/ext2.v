@@ -435,6 +435,12 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 	if cleanup_failed { errno.set(errno.eio); return none }
 }
 
+// A journaled orphan is recorded durably and finished by mount recovery;
+// without a journal the release itself is what frees it on disk.
+fn (this &EXT2Resource) release_changes_disk() bool {
+	return this.stat.nlink == 0 && this.filesystem.journal == unsafe { nil }
+}
+
 fn (mut this EXT2Resource) release_orphan() ? {
 	this.filesystem.l.acquire()
 	defer { this.filesystem.abort_transaction(); this.filesystem.l.release() }
