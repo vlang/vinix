@@ -141,14 +141,14 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 		defer { unsafe { objects.free() } }
 		mut bytes := u64(0)
 		for _, payload in objects { bytes += payload.bytes }
-		mut arm := 0; mut x86 := 0; mut shared := 0; mut proprietary := 0; mut firmware := 0
+		mut arm := 0; mut x86 := 0; mut neutral := 0; mut proprietary := 0; mut firmware := 0
 		for p in repository.index.packages {
-			if p.architecture == 'aarch64' { arm++ } else if p.architecture == 'x86_64' { x86++ } else { shared++ }
+			if p.architecture == 'aarch64' { arm++ } else if p.architecture == 'x86_64' { x86++ } else { neutral++ }
 			if p.proprietary { proprietary++ }; if p.firmware { firmware++ }
 		}
 		row := ImageBundleCheck{ id: repository.id, sequence: repository.index.sequence, expires: repository.index.expires,
 			index_sha256: index_digest(repository.text), packages: repository.index.packages.len,
-			aarch64_packages: arm, x86_64_packages: x86, shared_packages: shared, proprietary_packages: proprietary,
+			aarch64_packages: arm, x86_64_packages: x86, shared_packages: neutral, proprietary_packages: proprietary,
 			firmware_packages: firmware, objects: objects.len, payload_bytes: bytes }
 		pointer := unsafe { &row }
 		unsafe { rows.push_many(pointer, 1) }
