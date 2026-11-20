@@ -18,7 +18,13 @@ import net.unix as _
 #include <fcntl.h>
 struct C.sockaddr_un { mut: sun_len u8 sun_family u16 sun_path [108]char }
 struct C.pollfd { mut: fd i32 events i16 revents i16 }
-fn C.poll(&C.pollfd, usize, i32) i32
+// nfds_t is unsigned int on the BSDs and unsigned long on Linux; the
+// declaration must match the other modules linked into the same tool.
+$if macos || ios || freebsd || openbsd || dragonfly || android || termux {
+	fn C.poll(&C.pollfd, u32, i32) i32
+} $else {
+	fn C.poll(&C.pollfd, uint, i32) i32
+}
 
 struct AgentChannel {
 mut:
