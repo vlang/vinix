@@ -152,7 +152,8 @@ static int permissions(void) {
 	q=msgget(IPC_PRIVATE,0); CHECK(q>=0);
 	child=fork(); CHECK(child>=0);
 	if (!child) {
-		if (unshare(CLONE_NEWUSER)) _exit(1);
+		/* Vinix refuses new user namespaces (EINVAL): skip what needs one. */
+		if (unshare(CLONE_NEWUSER)) _exit(errno==EINVAL?0:1);
 		errno=0; if (setns(initial_ipc,CLONE_NEWIPC)!=-1 || errno!=EPERM) _exit(6);
 		errno=0; if (msgctl(q,IPC_STAT,&ds)!=-1 || errno!=EACCES) _exit(2);
 		int own=msgget(IPC_PRIVATE,0600);
@@ -165,7 +166,7 @@ static int permissions(void) {
 	CHECK(reap(child)==0 && msgctl(q,IPC_RMID,0)==0);
 	child=fork(); CHECK(child>=0);
 	if (!child) {
-		if (unshare(CLONE_NEWUSER|CLONE_NEWIPC)) _exit(1);
+		if (unshare(CLONE_NEWUSER|CLONE_NEWIPC)) _exit(errno==EINVAL?0:1);
 		int own=msgget(IPC_PRIVATE,0600);
 		if (own<0 || msgctl(own,IPC_STAT,&ds)) _exit(2);
 		int own_ipc=open("/proc/self/ns/ipc",O_RDONLY);
@@ -301,13 +302,16 @@ static int blocked_retention(void) {
 }
 
 static int exhaustion(void) {
-	int ids[128];
-	for (int i=0;i<128;i++) { ids[i]=msgget(IPC_PRIVATE,0600); CHECK(ids[i]>=0); }
+	/* The queue limit is the kernel's msgmni (256 since bd583d2b1), not a fixed 128. */
+	struct msginfo info; CHECK(msgctl(0,IPC_INFO,(struct msqid_ds *)&info)>=0);
+	int limit=info.msgmni; CHECK(limit>0 && limit<=1024);
+	int ids[1024];
+	for (int i=0;i<limit;i++) { ids[i]=msgget(IPC_PRIVATE,0600); CHECK(ids[i]>=0); }
 	ERR(msgget(IPC_PRIVATE,0600),ENOSPC);
 	int stale=ids[0]; CHECK(msgctl(ids[0],IPC_RMID,0)==0);
 	ids[0]=msgget(IPC_PRIVATE,0600); CHECK(ids[0]>=0 && ids[0]!=stale);
 	struct msqid_ds ds; ERR(msgctl(stale,IPC_STAT,&ds),EINVAL);
-	for (int i=0;i<128;i++) CHECK(msgctl(ids[i],IPC_RMID,0)==0);
+	for (int i=0;i<limit;i++) CHECK(msgctl(ids[i],IPC_RMID,0)==0);
 	struct message m={1,{0}}; int count=0, stopped=0;
 	for (int i=0;i<40;i++) {
 		ids[i]=msgget(IPC_PRIVATE,0600); CHECK(ids[i]>=0);

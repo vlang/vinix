@@ -20,7 +20,7 @@ describe the compatibility behavior used by these tests.
 
 Each queue defaults to 16 KiB of payload and can be configured up to 1 MiB;
 raising it above 16 KiB needs `CAP_SYS_RESOURCE` in the governing user namespace.
-Messages are limited to 8 KiB. There are 128 queue slots across the system and a
+Messages are limited to 8 KiB. There are 256 queue slots across the system and a
 32 MiB logical budget for message headers and payloads, including blocked
 senders and messages held by an in-progress receive copy. The allocator's size
 classes can round that budget upward, to less than twice its logical size.
