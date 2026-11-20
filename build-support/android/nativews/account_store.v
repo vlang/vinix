@@ -276,7 +276,10 @@ fn ws_store_accounts(e voidptr, manager voidptr, account_type voidptr, target_pa
 		ws_account_free(builder)
 		if client == nil { throw(e,c'java/lang/UnsupportedOperationException',c'account broker connection failed'); return nil }
 		defer { ws_account_close(client) }
-		deadline := ws_millis() + 5000
+		// The broker forwards queries to the owning service, whose main thread
+		// reads them; GMS can be busy there for several seconds during startup
+		// (r122: Maps died on a 5 s expiry). AOSP blocks until system_server answers.
+		deadline := ws_millis() + 30000
 		// Keep transport/protocol rejection distinct from a silent deadline.
 		// These fixed messages expose no account, request or broker payload.
 		mut failure := &char(c'account query deadline expired')
@@ -453,7 +456,8 @@ fn ws_store_invalidate_token(e voidptr, manager voidptr, account_type voidptr, t
 		ws_account_free(builder)
 		if client == nil { throw(e,c'java/lang/UnsupportedOperationException',c'account broker connection failed'); return }
 		defer { ws_account_close(client) }
-		deadline := ws_millis() + 5000
+		// Same service main-thread latency as the account query above.
+		deadline := ws_millis() + 30000
 		for ws_millis() < deadline {
 			mut response_kind := u16(0)
 			mut response_id := u64(0)

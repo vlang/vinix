@@ -48,7 +48,7 @@ fn main() {
 		['response-id', 'if status != 1 || response_id != id { break }', 'if status != 1 { break }'],
 		['response-kind', 'if response_kind == 9 {', 'if response_kind == 3 {'],
 		['wait-not-terminal', 'if response_kind == 5 { continue }', 'if response_kind == 5 { break }'],
-		['deadline', 'deadline := ws_millis() + 5000', 'deadline := ws_millis() + 50000'],
+		['deadline', 'deadline := ws_millis() + 30000', 'deadline := ws_millis() + 300000'],
 		['snapshot-bound', 'if count > 16 {', 'if count > 17 {'],
 		['request-id', 'builder := build(id)', 'builder := build(id + 1)'],
 		['field-order', 'i32(resource_fn(client,i,field))', 'i32(resource_fn(client,i,u16(3) - field))'],
@@ -209,7 +209,7 @@ fn slot(e voidptr, index int) voidptr {
  return match index { 23 { voidptr(drop) } 172 { voidptr(make_array) } 174 { voidptr(set_array) } else { panic("unexpected JNI slot") } }
 }
 fn environment(name &char) &char { assert text(name) == "VINIX_ANDROID_ACCOUNT_SOCKET"; return c"/selected/accounts.sock" }
-fn ws_millis() i64 { now += 1000; assert now <= 7000; return now }
+fn ws_millis() i64 { now += 1000; assert now <= 32000; return now }
 fn request(id u64) voidptr { assert !held && id == 901; builds++; return if build_bad { nilp() } else { voidptr(202) } }
 fn ws_account_submit(builder voidptr, endpoint &char) voidptr {
  assert !held && builder == voidptr(202) && text(endpoint) == "/selected/accounts.sock"

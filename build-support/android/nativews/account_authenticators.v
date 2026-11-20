@@ -88,7 +88,8 @@ fn ws_account_authenticator_types(e voidptr, manager voidptr) voidptr {
 		ws_account_free(builder)
 		if client == nil { throw(e,c'java/lang/UnsupportedOperationException',c'account broker connection failed'); return nil }
 		defer { ws_account_close(client) }
-		deadline := ws_millis() + 5000
+		// The owning service reads this on its main thread; see ws_store_accounts.
+		deadline := ws_millis() + 30000
 		for ws_millis() < deadline {
 			mut response_kind := u16(0)
 			mut response_id := u64(0)
