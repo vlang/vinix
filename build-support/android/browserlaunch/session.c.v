@@ -220,6 +220,10 @@ fn (config Config) browser_environment(session string, profile_path string, disp
 		'FONTCONFIG_PATH': config.root + '/' + os.dir(config.fontconfig)
 		'GDK_BACKEND': 'x11'
 		'GSK_RENDERER': 'cairo'
+		// The runtime ships no compiled GSettings schemas, and glib-networking's
+		// GNOME proxy module aborts the process without them. A web view takes
+		// no system proxy settings, so use GLib's built-in direct resolver.
+		'GIO_USE_PROXY_RESOLVER': 'dummy'
 		'GSETTINGS_BACKEND': 'memory'
 		'LIBGL_ALWAYS_SOFTWARE': '1'
 		'GALLIUM_DRIVER': 'softpipe'

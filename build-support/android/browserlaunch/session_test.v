@@ -54,6 +54,7 @@ fn test_helper_environment_is_constructed_without_art_or_caller_authority() {
 	assert env['LD_LIBRARY_PATH'] == '/opt/browser/lib:/opt/browser/usr/lib'
 	assert env['FONTCONFIG_FILE'] == '/opt/browser/etc/fonts/fonts.conf'
 	assert env['XDG_CACHE_HOME'] == '/app/webview/cache'
+	assert env['GIO_USE_PROXY_RESOLVER'] == 'dummy'
 	for forbidden in ['LD_PRELOAD', 'BIONIC_LD_LIBRARY_PATH', 'VINIX_ANDROID_WEBVIEW_FD',
 		'VINIX_WS_INPUT_FD', 'VINIX_ANDROID_SERVICE_FD', 'DBUS_SESSION_BUS_ADDRESS',
 		'GTK_PATH', 'WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS'] {
