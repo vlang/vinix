@@ -835,6 +835,8 @@ pub fn fdnum_close(_process &proc.Process, fdnum int, do_lock bool) ? {
 	// POSIX record locks are process-owned and closing any descriptor for the
 	// inode releases that process' locks, even when another dup remains open.
 	release_posix_locks(handle.resource, process.pid)
+	mut closed := handle.resource
+	resource.descriptor_closed(mut closed, process.pid)
 	handle.unref()
 	fd.release_descriptor()
 }

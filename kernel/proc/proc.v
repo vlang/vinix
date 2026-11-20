@@ -202,6 +202,11 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 	limits[rlimit_rtprio] = RLimit{}
 	// Nice increases require explicit resource admission or CAP_SYS_NICE.
 	limits[rlimit_nice] = RLimit{}
+	// Linux's MQ_BYTES_MAX: what one user's POSIX message queues may reserve.
+	limits[rlimit_msgqueue] = RLimit{
+		cur: 819200
+		max: 819200
+	}
 	return limits
 }
 

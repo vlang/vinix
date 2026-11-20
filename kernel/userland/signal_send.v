@@ -650,3 +650,26 @@ pub fn syscall_rt_tgsigqueueinfo(_ voidptr, tgid_word u64, tid_word u64, signal_
 	sendsig_from(target, u8(signal), unsafe { &source })
 	return 0, 0
 }
+
+// A POSIX message queue's SIGEV_SIGNAL notification: SI_MESGQ, with the
+// sending process as the registered one numbers it, the sender's real uid and
+// the registration's value. Like Linux it bypasses the permission check, and
+// goes only to the process that registered: `start` tells it from a later
+// process given the same pid.
+pub fn signal_message_queue_owner(pid int, start u64, signal int, value u64) {
+	if pid <= 0 || pid >= proc.max_pid || signal <= 0 || signal > 64 {
+		return
+	}
+	mut target := proc.pin_process_at(pid)
+	if target == unsafe { nil } { return }
+	defer { proc.unpin_process(target) }
+	if target.exiting || target.start_time_ticks != start { return }
+	sender := proc.current_thread().process
+	source := proc.SignalSource{
+		code:  i32(proc.si_mesgq)
+		pid:   i32(proc.pid_in(sender, target.numbered_in))
+		uid:   sender.uid
+		value: value
+	}
+	signal_process_from(mut target, signal, unsafe { &source })
+}

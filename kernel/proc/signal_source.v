@@ -17,4 +17,5 @@ pub mut:
 
 pub const si_user = 0
 pub const si_queue = -1
+pub const si_mesgq = -3
 pub const si_tkill = -6

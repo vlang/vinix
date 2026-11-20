@@ -23,6 +23,12 @@ fixups, file access and new-file owners by filesystem ids, status columns and
 the ids following the setuid family; the same ELF runs on Linux through
 `syscall-reference.v --case fsuid`. See [semantics and receipts](../../docs/linux-fsuid.md).
 
+`--cases mqueue` checks POSIX message queue names, limits, accounting, order,
+errors, timeouts, blocking hand-offs, restarts, status text, poll,
+mq_getsetattr, all mq_notify kinds and when they are dropped, permissions and
+IPC namespaces; the same ELF runs on Linux through `syscall-reference.v --case
+mqueue`. See [semantics and receipts](../../docs/linux-mqueue.md).
+
 `--cases syslog` checks syslog(2) records, sizes, READ/READ_ALL/CLEAR positions,
 console levels, dmesg_restrict refusals and restart_syscall's EINTR; the same
 ELF runs on Linux through `syscall-reference.v --case syslog`. See

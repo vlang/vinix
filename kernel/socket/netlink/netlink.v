@@ -716,3 +716,29 @@ fn (mut this NetlinkSocket) unlink(_handle voidptr) ? {}
 fn (mut this NetlinkSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return 0
 }
+
+// A datagram from the kernel that no request asked for: the cookie a POSIX
+// message queue sends to the socket mq_notify(SIGEV_THREAD) named. musl's and
+// glibc's helper threads wait for it with recv(). False when it does not fit.
+pub fn (mut this NetlinkSocket) queue_kernel_datagram(data voidptr, length int) bool {
+	if length <= 0 {
+		return false
+	}
+	this.l.acquire()
+	defer {
+		this.l.release()
+	}
+	charge := length + 64
+	if charge > this.receive_limit || this.queued_bytes > this.receive_limit - charge {
+		return false
+	}
+	mut datagram := []u8{len: length} @[freed]
+	unsafe { C.memcpy(datagram.data, data, length) }
+	this.queued_bytes += datagram.cap + 64
+	this.rx.flags |= .noslices
+	// Transfer the buffer header, as handle_request does.
+	this.rx.insert(this.rx.len, unsafe { &datagram })
+	this.status |= file.pollin
+	event.trigger(mut this.event, false)
+	return true
+}
