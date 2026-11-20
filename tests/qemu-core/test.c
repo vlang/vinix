@@ -1214,7 +1214,8 @@ static int test_empty_pipe_buffers(void)
 	CHECK(read(pairs[0][0], &observed, 1) == -1 && errno == EAGAIN);
 	CHECK(write(pairs[0][1], &observed, 0) == 0);
 	CHECK(fcntl(pairs[0][0], F_SETPIPE_SZ, 1024 * 1024) == 1024 * 1024);
-	CHECK(fcntl(pairs[1][0], F_SETPIPE_SZ, 4096) == 4096);
+	const long page = sysconf(_SC_PAGESIZE);
+	CHECK(fcntl(pairs[1][0], F_SETPIPE_SZ, (int)page) == page);
 	CHECK(sysinfo(&resized) == 0);
 	CHECK(resized.freeram + 4UL * 1024 * 1024 >= before.freeram);
 
@@ -2122,9 +2123,12 @@ static int test_large_pipe_progress(void)
 	CHECK(pipe(pair) == 0);
 	CHECK(fcntl(pair[0], F_GETPIPE_SZ) >= 64 * 1024);
 	/* Capacity is not the progress mechanism. Force the old one-page size so
-	 * this transfer still has to exercise the blocking wake-up handshake. */
-	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4096) == 4096);
-	CHECK(fcntl(pair[0], F_GETPIPE_SZ) == 4096);
+	 * this transfer still has to exercise the blocking wake-up handshake.
+	 * Sizes round up to whole pages, which are 16 KiB on ARM. */
+	const long page = sysconf(_SC_PAGESIZE);
+	CHECK(page >= PIPE_BUF);
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, (int)page) == page);
+	CHECK(fcntl(pair[0], F_GETPIPE_SZ) == page);
 
 	/* PIPE_BUF is a distinct atomicity threshold. A larger nonblocking write
 	 * may fill the available buffer partially, whereas a PIPE_BUF-sized write
@@ -2133,15 +2137,17 @@ static int test_large_pipe_progress(void)
 	int writer_flags = fcntl(pair[1], F_GETFL);
 	CHECK(writer_flags >= 0);
 	CHECK(fcntl(pair[1], F_SETFL, writer_flags | O_NONBLOCK) == 0);
-	CHECK(write(pair[1], payload, 8192) == 4096);
-	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4097) == 8192);
-	CHECK(read(pair[0], observed, 4096) == 4096);
-	CHECK(memcmp(payload, observed, 4096) == 0);
-	CHECK(fcntl(pair[0], F_SETPIPE_SZ, 4096) == 4096);
-	CHECK(write(pair[1], payload, 1) == 1);
+	CHECK(write(pair[1], payload, 2 * page) == page);
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, (int)page + 1) == 2 * page);
+	CHECK(read(pair[0], observed, page) == page);
+	CHECK(memcmp(payload, observed, page) == 0);
+	CHECK(fcntl(pair[0], F_SETPIPE_SZ, (int)page) == page);
+	/* Leave one byte less than PIPE_BUF of room. */
+	const ssize_t filler = page - PIPE_BUF + 1;
+	CHECK(write(pair[1], payload, filler) == filler);
 	errno = 0;
-	CHECK(write(pair[1], payload, 4096) == -1 && errno == EAGAIN);
-	CHECK(read(pair[0], observed, 1) == 1 && observed[0] == payload[0]);
+	CHECK(write(pair[1], payload, PIPE_BUF) == -1 && errno == EAGAIN);
+	CHECK(read(pair[0], observed, filler) == filler && memcmp(payload, observed, filler) == 0);
 	CHECK(fcntl(pair[1], F_SETFL, writer_flags) == 0);
 
 	pid_t writer = fork();
