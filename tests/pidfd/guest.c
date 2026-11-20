@@ -214,15 +214,14 @@ static int permissions(void) {
  pid_t probe=fork(); CHECK(probe>=0);
  if(!probe) { if(setuid(1234)) _exit(1); if(p_signal(fd,0,0,0)!=-1||errno!=EPERM) _exit(2);
   if(p_signal(fd,SIGCONT,0,0)) _exit(5);
-  // New user namespaces are refused with EINVAL (081bd5dab): skip what needs one.
-  if(unshare(CLONE_NEWUSER)) _exit(errno==EINVAL?0:3);
+  if(unshare(CLONE_NEWUSER)) _exit(3);
   if(p_signal(fd,SIGTERM,0,0)!=-1||errno!=EPERM) _exit(4);
   _exit(0); }
  CHECK(reap(probe)==0);
  probe=fork(); CHECK(probe>=0);
  if(!probe) {
   if(getuid()!=0) _exit(1);
-  if(unshare(CLONE_NEWUSER)) _exit(errno==EINVAL?0:1);
+  if(unshare(CLONE_NEWUSER)) _exit(1);
   if(p_signal(fd,0,0,0)!=-1||errno!=EPERM) _exit(2);
   if(p_signal(fd,SIGTERM,0,0)!=-1||errno!=EPERM) _exit(3);
   if(p_signal(fd,SIGCONT,0,0)) _exit(4);

@@ -110,8 +110,7 @@ static int permission_tests(void)
 	CHECK(child >= 0);
 	if (!child) {
 		char c;
-		/* Vinix refuses new user namespaces (EINVAL): skip what needs one. */
-		if (unshare(CLONE_NEWUSER)) _exit(errno == EINVAL ? 0 : 6);
+		if (unshare(CLONE_NEWUSER)) _exit(6);
 		errno = 0;
 		_exit(read(fd, &c, 1) == -1 && errno == EACCES ? 0 : 7);
 	}

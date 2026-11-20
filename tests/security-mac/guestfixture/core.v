@@ -1274,9 +1274,7 @@ pub fn entry(argc i32, argv &&char) i32 {
 		userns := C.fork()
 		if !require(userns >= 0, 572, c'userns >= 0') { return 1 }
 		if userns == 0 {
-			// New user namespaces are refused with EINVAL (081bd5dab); the
-			// in-namespace denials run once they exist.
-			if C.unshare(C.CLONE_NEWUSER) != 0 { C._exit(if C.errno == C.EINVAL { 0 } else { 2 }) }
+			if C.unshare(C.CLONE_NEWUSER) != 0 { C._exit(2) }
 			C.errno = 0
 			if label(c'/mac-private', c'0') != -1 || C.errno != C.EPERM { C._exit(3) }
 			C.errno = 0

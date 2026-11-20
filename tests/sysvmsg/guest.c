@@ -152,8 +152,7 @@ static int permissions(void) {
 	q=msgget(IPC_PRIVATE,0); CHECK(q>=0);
 	child=fork(); CHECK(child>=0);
 	if (!child) {
-		/* Vinix refuses new user namespaces (EINVAL): skip what needs one. */
-		if (unshare(CLONE_NEWUSER)) _exit(errno==EINVAL?0:1);
+		if (unshare(CLONE_NEWUSER)) _exit(1);
 		errno=0; if (setns(initial_ipc,CLONE_NEWIPC)!=-1 || errno!=EPERM) _exit(6);
 		errno=0; if (msgctl(q,IPC_STAT,&ds)!=-1 || errno!=EACCES) _exit(2);
 		int own=msgget(IPC_PRIVATE,0600);
@@ -166,7 +165,7 @@ static int permissions(void) {
 	CHECK(reap(child)==0 && msgctl(q,IPC_RMID,0)==0);
 	child=fork(); CHECK(child>=0);
 	if (!child) {
-		if (unshare(CLONE_NEWUSER|CLONE_NEWIPC)) _exit(errno==EINVAL?0:1);
+		if (unshare(CLONE_NEWUSER|CLONE_NEWIPC)) _exit(1);
 		int own=msgget(IPC_PRIVATE,0600);
 		if (own<0 || msgctl(own,IPC_STAT,&ds)) _exit(2);
 		int own_ipc=open("/proc/self/ns/ipc",O_RDONLY);

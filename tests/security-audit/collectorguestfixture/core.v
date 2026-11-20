@@ -188,8 +188,7 @@ fn tests() i32 {
 		child = C.fork()
 		if !check(child >= 0, 100) { return 1 }
 		if child == 0 {
-			// Vinix refuses new user namespaces (EINVAL): skip what needs one.
-			if C.unshare(C.CLONE_NEWUSER) != 0 { C._exit(if C.errno == C.EINVAL { 0 } else { 2 }) }
+			if C.unshare(C.CLONE_NEWUSER) != 0 { C._exit(2) }
 			diagnostic := &C.snapshot(C.__builtin_alloca(sizeof(C.snapshot)))
 			if C.vka_read_snapshot(source_path, diagnostic) != 0 { C._exit(4) }
 			accessible_log := C.vka_open_log(path, -1)
