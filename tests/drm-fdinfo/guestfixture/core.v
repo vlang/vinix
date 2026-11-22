@@ -1346,6 +1346,46 @@ fn test_sendfile_pipe_write_errors() bool {
 		&& C.lseek(input, 0, C.SEEK_CUR) == capacity
 }
 
+fn test_sendfile_pipe_admission() bool {
+	mut sockets := [2]i32{}
+	if C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &sockets[0]) != 0 { return false }
+	defer {
+		C.close(sockets[0])
+		C.close(sockets[1])
+	}
+	mut fds := [2]i32{}
+	if C.pipe(&fds[0]) != 0 { return false }
+	mut reader := fds[0]
+	defer {
+		if reader >= 0 { C.close(reader) }
+		C.close(fds[1])
+	}
+	mut chunk := [4096]char{}
+	capacity := C.fcntl(fds[1], C.F_SETPIPE_SZ, i32(chunk.len))
+	if capacity <= 0 || capacity % chunk.len != 0
+		|| C.fcntl(fds[1], C.F_SETFL, C.O_NONBLOCK) != 0
+		|| C.fcntl(sockets[0], C.F_SETFL, C.O_NONBLOCK) != 0 {
+		return false
+	}
+	for _ in 0 .. capacity / chunk.len {
+		if C.write(fds[1], &chunk[0], u64(chunk.len)) != chunk.len { return false }
+	}
+	if C.write(sockets[1], c'keep', 4) != 4
+		|| !sendfile_replies(fds[1], sockets[0], unsafe { nil }, 4, C.EAGAIN)
+		|| !sendfile_replies(fds[1], sockets[0], unsafe { nil }, 0, C.EAGAIN)
+		|| C.read(sockets[0], &chunk[0], 4) != 4 || C.strncmp(&chunk[0], c'keep', 4) != 0
+		|| C.close(reader) != 0 {
+		return false
+	}
+	reader = -1
+	previous := unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+	defer { C.signal(C.SIGPIPE, previous) }
+	return C.write(sockets[1], c'keep', 4) == 4
+		&& sendfile_replies(fds[1], sockets[0], unsafe { nil }, 4, C.EPIPE)
+		&& sendfile_replies(fds[1], sockets[0], unsafe { nil }, 0, C.EPIPE)
+		&& C.read(sockets[0], &chunk[0], 4) == 4 && C.strncmp(&chunk[0], c'keep', 4) == 0
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1468,6 +1508,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM SENDFILE PIPE WRITE: PASS')
 	} else {
 		C.puts(c'DRM SENDFILE PIPE WRITE FAIL: incorrect error, bytes or source position')
+	}
+	if test_sendfile_pipe_admission() {
+		C.puts(c'VINIX DRM SENDFILE PIPE ADMISSION: PASS')
+	} else {
+		C.puts(c'DRM SENDFILE PIPE ADMISSION FAIL: incorrect error or socket data was consumed')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')

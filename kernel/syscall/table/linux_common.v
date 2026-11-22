@@ -17,6 +17,7 @@ import krandom
 import kbudget
 import memory
 import net
+import pipe
 import proc
 import resource
 import sched
@@ -706,6 +707,15 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 		|| stream_input || output_flags & resource.o_append != 0) {
 		return errno.err, errno.einval
 	}
+	mut destination_pipe := pipe.pipe_from_fd(output_fd) or { unsafe { nil } }
+	mut pipe_room := u64(0)
+	if destination_pipe != unsafe { nil } {
+		input_fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
+		output_fd.handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
+		pipe_room = destination_pipe.wait_sendfile_room(output_flags & resource.o_nonblock != 0) or {
+			return errno.err, errno.get()
+		}
+	}
 	if count == 0 {
 		return 0, 0
 	}
@@ -752,6 +762,14 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 		mut chunk := copy_count - total
 		if chunk > page_size {
 			chunk = page_size
+		}
+		if destination_pipe != unsafe { nil } {
+			if total != 0 {
+				pipe_room = destination_pipe.wait_sendfile_room(true) or { break }
+			}
+			if chunk > pipe_room {
+				chunk = pipe_room
+			}
 		}
 
 		got, read_error := if positioned {

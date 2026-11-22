@@ -925,6 +925,28 @@ at `/Users/alex/.local/state/vinix/m1-drm-sendfile-pipe-write-20261122.3aJ4DK/`.
 The `bundle.tar.gz` SHA-256 is
 `544ff8f94319f54ef6620797893d5473cfdc612c1c5aa4c629593af9c7ff5c60`.
 
+#### Sendfile pipe readiness before reading
+
+`sendfile` checks a pipe destination before reading the source, even for
+zero counts. A pipe with no readers returns `EPIPE`. A full nonblocking
+pipe returns `EAGAIN`, and a blocking caller can wait for space. Reads are
+bounded by the room reported by the pipe. The room is a snapshot, so a
+concurrent writer, resize or reader closure can still affect the write.
+[Pinned Linux pipe admission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1354-L1389)
+
+ARM64 and x86-64 QEMU checked zero and positive counts against full
+nonblocking and closed pipes, with socket bytes preserved after rejection.
+The same x86-64 guest probe failed on the preceding kernel. Independent
+review confirmed descriptor ownership and lock release across waits. The
+DRM syncobj host suite passed, and the allocation scan reproduced its
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `1aa5abf934ce4f5d41a2b6183d21e1e9047e019b` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-sendfile-pipe-admission-20261122.qA3sn8/`.
+The `bundle.tar.gz` SHA-256 is
+`c69bdba3220c8d3ee864375975e15d06392ca04398ae31fbe3191489dbf5d2d2`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

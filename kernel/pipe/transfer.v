@@ -7,6 +7,7 @@ module pipe
 // file module because a splice needs a pipe, and pipe already builds on file.
 
 import errno
+import event
 import file
 import proc
 import memory
@@ -40,12 +41,42 @@ fn writable(fd &file.FD) bool {
 }
 
 // The pipe behind a descriptor, or none when it is not one.
-fn pipe_from_fd(fd &file.FD) ?&Pipe {
+pub fn pipe_from_fd(fd &file.FD) ?&Pipe {
 	mut res := fd.handle.resource
 	if mut res is Pipe {
 		return res
 	}
 	return none
+}
+
+// The caller pins the writer for the entire wait and subsequent transfer.
+pub fn (mut sink Pipe) wait_sendfile_room(nonblocking bool) ?u64 {
+	sink.l.acquire()
+	defer {
+		sink.l.release()
+	}
+	for {
+		if sink.readers == 0 {
+			errno.set(errno.epipe)
+			return none
+		}
+		room := sink.room()
+		if room != 0 {
+			return room
+		}
+		if nonblocking {
+			errno.set(errno.eagain)
+			return none
+		}
+		generation := event.generation(mut sink.event)
+		sink.l.release()
+		event.await_one_from_generation(mut sink.event, true, generation) or {
+			sink.l.acquire()
+			errno.set(proc.interrupted_errno)
+			return none
+		}
+		sink.l.acquire()
+	}
 }
 
 // splice(fd_in, off_in, fd_out, off_out, len, flags). At least one side has to
