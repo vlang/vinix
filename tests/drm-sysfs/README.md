@@ -4,6 +4,8 @@
 v run tests/drm-sysfs/run.v --asahi-linux PATH
 tests/kernel-gaps/run-native --source tests/drm-sysfs/guest.c \
   --kernel-dir kernel --arch aarch64 --expect 'VINIX DRM SYSFS: PASS'
+tests/kernel-gaps/run-native --source tests/drm-sysfs/debugfixture/core.v \
+  --kernel-dir kernel --arch aarch64 --expect 'VINIX DRM DEBUGFS MODE: PASS'
 ```
 
 `run.v` builds `kernel/drm/sysfs.v` and the AGX parent's identity from
@@ -29,3 +31,8 @@ and `dev/char` links, `dev`, `uevent` and `subsystem` in the real kernel, and
 that libdrm's node check still rejects devices with no parent, which have no
 debugfs entry either. Without a checkout-local AArch64 sysroot, set
 `VINIX_AARCH64_SYSROOT`.
+
+`debugfixture/core.v` runs on both architectures. It checks that root can
+open `/sys/kernel/debug`, that the directory is owned by root with mode
+`0700`, and that a process running as UID and GID 65534 can still open
+`/sys/kernel` and `/sys/class/drm` but cannot list or traverse debugfs.

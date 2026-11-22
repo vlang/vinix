@@ -94,6 +94,11 @@ fn sysfs_make_root(filesystem &FileSystem) &VFSNode {
 	}
 	mut root := create_node(filesystem, &VFSNode(unsafe { nil }), '', true)
 	root.resource = new_sysfs_resource(.directory, stat.ifdir | 0o555, 0)
+	// Match Linux's default debugfs root permissions. Drivers can publish
+	// under it before /sys is mounted.
+	mut kernel_dir := add_sysfs_directory(mut root, 'kernel')
+	mut debug_dir := add_sysfs_directory(mut kernel_dir, 'debug')
+	debug_dir.resource.stat.mode = stat.ifdir | 0o700
 	sysfs_root = root
 	return root
 }

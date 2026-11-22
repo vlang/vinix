@@ -74,9 +74,29 @@ need only last until then. Adding a file does not synchronize with
 unregistering, so a driver adds its files during its own registration. A
 device with no parent gets no directory, and adding a file to it fails. So
 does a second device whose parent has a name already taken there, as Linux's
-`debugfs_create_dir()` refuses it. Unlike debugfs, these directories can be
-listed by anyone; the files in them are root-only. On the M1 the GPU's file is `asahi_stats`
+`debugfs_create_dir()` refuses it. The debugfs root has Linux's default mode
+`0700`. On the M1 the GPU's file is `asahi_stats`
 ([raw statistics](m1-agx-stats.md#raw-statistics-in-debugfs)).
+
+### Debugfs root permissions
+
+Sysfs creates `/sys/kernel/debug` with owner `0:0` and mode `0700` before
+drivers can publish entries there. The VFS checks that mode when opening
+the directory and when looking up children. [Pinned Linux default mode](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/debugfs/inode.c#L29-L30)
+
+ARM64 and x86-64 kernel builds used `-O1` for C compilation. QEMU guests
+on both architectures verified root access, unprivileged denial and
+continued access to `/sys/kernel` and `/sys/class/drm`. The ARM64 baseline
+lacked the directory with a virtual DRM device, and an x86-64 control
+with mode `0555` failed the permission probe. The ARM64 DRM discovery
+probe and host DRM sysfs sanitizer fixture also passed. The allocation
+scan reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `98517d8b663049da7fbb6c53aaf69d51ae4b8f20` plus the
+archived patches. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-debugfs-mode-20261122.rbAmVm/`.
+The `bundle.tar.gz` SHA-256 is
+`913af439968603d2d1020a7840f79cd818cf5d1b8e631a6cc6cbc79d7153fcc0`.
 
 ## QEMU's VirGL GPU
 

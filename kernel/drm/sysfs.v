@@ -137,10 +137,9 @@ fn remove_sysfs_entry(directory string, name string) {
 // (dev->unique), dri/206400000.gpu on M1, and a link to it per minor, dri/0
 // and dri/128. Linux mounts debugfs at /sys/kernel/debug. Vinix has no
 // debugfs, so the DRM part of it is published in /sys at that path, for the
-// files drivers add with debugfs_add_file(). A device with no parent gets
-// none: Linux names the directory after the parent. Unlike debugfs, whose
-// root only root may enter, these directories can be listed by anyone; the
-// files in them are root-only.
+// files drivers add with debugfs_add_file(). The debugfs root has Linux's
+// default mode 0700. A device with no parent gets no directory because
+// Linux names it after the parent.
 const debugfs_dri = 'kernel/debug/dri'
 
 fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
