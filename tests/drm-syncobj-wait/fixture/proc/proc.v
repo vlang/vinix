@@ -13,6 +13,8 @@ pub struct RLimit { pub mut: cur u64 }
 pub struct Process {
 pub mut:
 	name string = 'fixture'
+	fsuid u32
+	fsgid u32
 	shared_pending_signals u64
 	fds_lock klock.Lock
 	fds []voidptr
@@ -31,6 +33,7 @@ pub mut:
 pub const interrupted_errno = 512
 __global wait_capture_thread = Thread{}
 __global wait_capture_process = Process{}
+__global process_table_lock = klock.Lock{}
 
 pub fn reset() {
 	assert wait_capture_process.fds_reserved == unsafe { nil }
@@ -41,6 +44,8 @@ pub fn reset() {
 }
 
 pub fn current_thread() &Thread { return unsafe { &wait_capture_thread } }
+pub fn lock_table() { process_table_lock.acquire() }
+pub fn unlock_table() { process_table_lock.release() }
 pub fn begin_wait_mask(mut caller Thread, mask u64) { caller.masked_signals = mask }
 pub fn interrupted() bool {
 	task := current_thread()

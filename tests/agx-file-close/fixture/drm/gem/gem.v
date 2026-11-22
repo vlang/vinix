@@ -3,6 +3,8 @@ module gem
 
 import klock
 
+pub const dma_buf_name_capacity = 32
+
 __global live_objects = 0
 __global higher_half = u64(0) // host fixtures address backing directly
 __global page_size = u64(16384)
@@ -33,6 +35,8 @@ pub mut:
 	file_scoped bool
 	advice_dontneed bool
 	prime_fences &PrimeFence = unsafe { nil }
+	prime_name [dma_buf_name_capacity]u8
+	prime_name_len u8
 	creator u64
 	lock klock.Lock
 }

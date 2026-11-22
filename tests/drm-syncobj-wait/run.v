@@ -14,6 +14,8 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/drm-syncobj-wait/fixture', scratch, false)!
+	os.mkdir_all('${scratch}/stat')!
+	os.cp('${repo}/kernel/stat/stat.v', '${scratch}/stat/stat.v')!
 	os.cp_all('${repo}/kernel/drm/syncobj', '${scratch}/drm/syncobj', false)!
 	if capture_source := os.getenv_opt('DRM_TIMELINE_CAPTURE_SOURCE') {
 		os.cp(capture_source, scratch + '/drm/syncobj/timeline_capture.v')!
@@ -68,6 +70,9 @@ fn main() {
 		section(resource_source, 'pub interface PollableResource {', 'struct ReadOnlyScratch {')!)!
 	os.write_file('${scratch}/resource/stat.v', os.read_file('${repo}/kernel/resource/stat.v')!
 		.replace('C.vinix_stack_alloc', 'C.__builtin_alloca'))!
+	cache_source := os.read_file('${repo}/kernel/resource/cache.v')!
+	os.write_file('${scratch}/resource/filesystem_stat.v', 'module resource\n' +
+		section(cache_source, 'pub struct FileSystemStat {', 'pub interface FileSystemStatResource {')!)!
 	vfs := os.read_file('${repo}/kernel/fs/vfs.v')!
 	os.mkdir_all('${scratch}/fs')!
 	os.write_file('${scratch}/fs/seek.v', 'module fs\nimport errno\nimport file\nimport proc\nimport resource\nimport stat\n' +
@@ -78,13 +83,14 @@ fn main() {
 		section(stat_source, 'fn stat_resource(', 'fn stat_path_resource(')! +
 		section(vfs, 'pub fn syscall_fstat(', 'pub fn syscall_linkat(')!)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
-	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport fs\nimport stat\nimport klock\nimport memory\nimport memory.mmap\nimport drm.gem\nimport event.eventstruct\n' +
+	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport fs\nimport stat\nimport time\nimport klock\nimport memory\nimport memory.mmap\nimport drm.gem\nimport event.eventstruct\n' +
 		section(source, 'struct SyncFileResource {', 'fn (mut this SyncFileResource) poll_status(')! +
 		section(source, 'fn (mut this SyncFileResource) poll_status(', '__global (')! +
 		section(source, '__global (\n\tregistered_devices', 'fn decode_ioctl_cmd(')! +
 		section(source, 'fn ioctl_syncobj_create(', 'fn ioctl_syncobj_wait(')! +
 		section(source, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(')!
 	os.write_file('${scratch}/drm/production.v', production)!
+	os.cp('${repo}/kernel/drm/prime_name.v', '${scratch}/drm/prime_name.v')!
 	os.cp('${repo}/kernel/drm/prime_sync.v', '${scratch}/drm/prime_sync.v')!
 	os.cp('${repo}/kernel/drm/syncobj_fd.v', '${scratch}/drm/syncobj_fd.v')!
 	os.cp('${repo}/kernel/drm/syncobj_eventfd.v', '${scratch}/drm/syncobj_eventfd.v')!

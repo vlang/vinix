@@ -170,3 +170,18 @@ errors, stable outputs and recovery of the lowest slot. Three sync-file private
 creation failure expectations now use Linux's EINVAL; opaque construction still
 reports ENOMEM. Native source/C lifetime review covers stack nodes, process
 fork/exit/exec and unlock-before-release; these fixtures do not qualify CPU races.
+
+## PRIME fixture compatibility
+
+The host runner compiles the production PRIME naming code and uses the
+kernel's stat and filesystem stat records. The fixture supplies filesystem
+credentials under its process-table lock and uses its scripted clock for
+export timestamps.
+
+The syncobj ASan/UBSan suite and the AGX file-close suite passed on
+`bc088f95c1a45ade8b06324143e1b02074f184a1` plus the archived fixture patch.
+The unpatched revision failed during compilation. The logs, generated C
+and sanitizer executable are archived at
+`/Users/alex/.local/state/vinix/drm-syncobj-fixture-20261122.SqGEdf/`.
+The `bundle.tar.gz` SHA-256 is
+`399971e5602013a7c264133253d71bfaa601e63695529db3e2d2f00a237a84ac`.
