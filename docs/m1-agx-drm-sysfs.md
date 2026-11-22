@@ -133,6 +133,7 @@ part of it in /sys, at the path where Linux mounts debugfs:
 ```
 /sys/kernel/debug/dri/206400000.gpu/
     name           asahi dev=206400000.gpu unique=206400000.gpu
+    gem_names      empty global GEM name table
     asahi_stats    added by the AGX driver; root-only
 /sys/kernel/debug/dri/0    -> 206400000.gpu
 /sys/kernel/debug/dri/128  -> 206400000.gpu
@@ -174,6 +175,31 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/m1-drm-debugfs-name-20261122.dQB93U/`.
 The `bundle.tar.gz` SHA-256 is
 `64dbb921db254658c8eec3ce7eaf7ba6a09ad7c73c07f47782abd4c45d27d912`.
+
+### Global GEM names
+
+`gem_names` presents the legacy global GEM name table through the DRM
+device directory and both minor links. The table contains only its
+column header because Vinix has no GEM_FLINK namespace. Client-local
+GEM handles and DMA-BUF exports use separate namespaces. [Pinned Linux GEM name listing](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L136-L156)
+
+The DRM sysfs sanitizer fixture checked the header byte for byte through
+the Asahi card and render links and the VirtIO-MMIO render link. It
+verified that the file follows the device directory's ownership and is
+removed on unregister. Three controls caught a missing file, altered
+spacing and publication into a competing directory. Independent lifetime
+review confirmed that sysfs owns the text for the file's lifetime.
+
+Both kernel builds used `-O1` for C compilation. The ARM64 DRM discovery
+and x86-64 class version and debugfs permission probes passed in QEMU
+under TCG. The allocation scan reproduced the 150 baseline findings.
+Native M1 validation remains open.
+
+The tested base was `d1f29ac7377100630b77670090dbe169f7d9234f` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-gem-names-20261122.XWd8qs/`.
+The `bundle.tar.gz` SHA-256 is
+`485dd5826fda99537243a6f51d2c958cfe0ac1969d3a534f6d61060904fcdd38`.
 
 ### Debugfs root permissions
 

@@ -151,6 +151,9 @@ fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
 		name := debugfs_name_text(dev.driver.name, unique)
 		publish_text(directory, 'name', name)
 		unsafe { name.free() }
+		// Legacy GEM names are distinct from handles and DMA-BUF exports.
+		// Vinix has no GEM_FLINK namespace, so the table has no rows.
+		publish_text(directory, 'gem_names', '  name     size handles refcount\n')
 		dev.debugfs_primary_link = publish_debugfs_link(dev.dev_id, unique)
 		if dev.render_node != unsafe { nil } {
 			dev.debugfs_render_link = publish_debugfs_link(128 + dev.dev_id, unique)

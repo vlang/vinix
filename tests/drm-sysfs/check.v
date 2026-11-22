@@ -300,12 +300,15 @@ pub fn run_checks() {
 	assert gpu_device.debugfs_dir == debugfs, gpu_device.debugfs_dir
 	assert fs.published(debugfs)
 	expected_name := 'asahi dev=${unique} unique=${unique}\n'
+	expected_gem_names := '  name     size handles refcount\n'
 	for minor in [u32(1), 129] {
 		assert (readlink('kernel/debug/dri/${minor}') or { '' }) == unique, 'dri/${minor}'
 		assert (resolve('kernel/debug/dri/${minor}') or { '' }) == debugfs
 		assert text_of('kernel/debug/dri/${minor}/name') == expected_name
+		assert text_of('kernel/debug/dri/${minor}/gem_names') == expected_gem_names
 	}
 	assert !debugfs_add_file(&gpu_device, 'name', show_marker, unsafe { nil })
+	assert !debugfs_add_file(&gpu_device, 'gem_names', show_marker, unsafe { nil })
 	// A driver's file in it: root-only, read through its show function, and
 	// reachable through either minor's link.
 	assert debugfs_add_file(&gpu_device, 'asahi_stats', show_marker, voidptr(u64(42)))
@@ -326,6 +329,7 @@ pub fn run_checks() {
 	remove_drm_sysfs(mut twin)
 	assert (read_attribute('kernel/debug/dri/1/asahi_stats') or { '' }) == 'stats of 42\n'
 	assert text_of('${debugfs}/name') == expected_name
+	assert text_of('${debugfs}/gem_names') == expected_gem_names
 
 	competed_name := 'competing.gpu'
 	competed_directory := 'kernel/debug/dri/${competed_name}'
@@ -338,6 +342,7 @@ pub fn run_checks() {
 	remove_drm_sysfs(mut losing_device)
 	assert text_of('${competed_directory}/owner') == 'competing device'
 	assert !fs.published('${competed_directory}/name')
+	assert !fs.published('${competed_directory}/gem_names')
 
 	mut partial_driver := DrmDriver{sysfs_parent: 'devices/platform/partial.gpu'}
 	mut partial_device := DrmDevice{driver: &partial_driver, dev_id: 4, render_node: &node}
@@ -401,6 +406,7 @@ pub fn run_checks() {
 	assert (resolve('class/drm/renderD130/device') or { '' }) == virtio_parent
 	assert virtio.debugfs_dir == 'kernel/debug/dri/virtio31'
 	assert text_of('kernel/debug/dri/130/name') == 'virtio_gpu dev=virtio31 unique=virtio31\n'
+	assert text_of('kernel/debug/dri/130/gem_names') == expected_gem_names
 	remove_drm_sysfs(mut virtio)
 	assert !fs.published('dev/char/226:130') && !fs.published('class/drm/card2')
 
@@ -411,7 +417,7 @@ pub fn run_checks() {
 	for path in ['class/drm/card1', 'class/drm/renderD129', 'dev/char/226:1', 'dev/char/226:129',
 		'${parent}/drm/card1', '${parent}/drm/renderD129', 'class/drm/card0', 'dev/char/226:0',
 		'devices/virtual/drm/card0', 'kernel/debug/dri/1', 'kernel/debug/dri/129', debugfs,
-		'${debugfs}/asahi_stats', '${debugfs}/name'] {
+		'${debugfs}/asahi_stats', '${debugfs}/name', '${debugfs}/gem_names'] {
 		assert !fs.published(path), '${path} survived unregister'
 	}
 	assert fs.published('${parent}/uevent')
