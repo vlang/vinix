@@ -119,12 +119,20 @@ pub fn run_checks() {
 		assert ioctl_buffer_size(&close_layout, 4) == 8
 		assert ioctl_buffer_size(&close_layout, 16) == if close_layout.direction == 0 { u32(8) } else { u32(16) }
 	}
-	for cmd in [ioctl.drm_ioctl_syncobj_create, ioctl.drm_ioctl_syncobj_destroy]! {
+	for cmd, size in {
+		ioctl.drm_ioctl_syncobj_create: u32(8)
+		ioctl.drm_ioctl_syncobj_destroy: 8
+		ioctl.drm_ioctl_syncobj_reset: 16
+		ioctl.drm_ioctl_syncobj_signal: 16
+		ioctl.drm_ioctl_syncobj_query: 24
+		ioctl.drm_ioctl_syncobj_transfer: 32
+		ioctl.drm_ioctl_syncobj_timeline_signal: 24
+	} {
 		for direction := u32(0); direction < 4; direction++ {
-			layout := ioctl_layout(&device, cmd, 4, direction, 0) or { panic('syncobj layout') }
-			assert layout.extensible && layout.direction == direction
-			assert ioctl_buffer_size(&layout, 4) == 8
-			assert ioctl_buffer_size(&layout, 16) == if direction == 0 { u32(8) } else { u32(16) }
+			layout := ioctl_layout(&device, cmd, size - 4, direction, 0) or { panic('syncobj layout') }
+			assert layout.extensible && layout.direction == direction && layout.size == size
+			assert ioctl_buffer_size(&layout, size - 4) == size
+			assert ioctl_buffer_size(&layout, size + 8) == if direction == 0 { size } else { size + 8 }
 		}
 	}
 	if _ := ioctl_layout(&device, 0x41, 16, 3, 1) {

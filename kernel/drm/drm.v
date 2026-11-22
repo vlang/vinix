@@ -411,19 +411,13 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 			}
 		}
 		ioctl.drm_ioctl_syncobj_transfer {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTransfer)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTransfer)), direction: ioctl_write | ioctl_read, extensible: true }
 		}
-		ioctl.drm_ioctl_syncobj_reset {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjArray)), direction: ioctl_write | ioctl_read }
+		ioctl.drm_ioctl_syncobj_reset, ioctl.drm_ioctl_syncobj_signal {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjArray)), direction: ioctl_write | ioctl_read, extensible: true }
 		}
-		ioctl.drm_ioctl_syncobj_signal {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjArray)), direction: ioctl_write | ioctl_read }
-		}
-		ioctl.drm_ioctl_syncobj_query {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTimelineArray)), direction: ioctl_write | ioctl_read }
-		}
-		ioctl.drm_ioctl_syncobj_timeline_signal {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTimelineArray)), direction: ioctl_write | ioctl_read }
+		ioctl.drm_ioctl_syncobj_query, ioctl.drm_ioctl_syncobj_timeline_signal {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTimelineArray)), direction: ioctl_write | ioctl_read, extensible: true }
 		}
 		ioctl.drm_ioctl_syncobj_eventfd {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjEventfd)), direction: ioctl_write | ioctl_read, extensible: true }

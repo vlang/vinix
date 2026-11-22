@@ -409,6 +409,28 @@ at `/Users/alex/.local/state/vinix/m1-drm-syncobj-handle-wire-20261122.6M0Rrz/`.
 The `bundle.tar.gz` SHA-256 is
 `3c56bbd8d50919c7a1518ab49c8e5c4d0904ea4b61563104d6f6848d123f22ba`.
 
+#### Syncobj reset, signal, query and transfer request sizes
+
+`SYNCOBJ_RESET`, `SYNCOBJ_SIGNAL`, `SYNCOBJ_QUERY`, `SYNCOBJ_TRANSFER`
+and `SYNCOBJ_TIMELINE_SIGNAL` use the shared extensible read/write ioctl
+layout. The dispatcher zero-fills missing input fields, intersects the
+direction bits with the registered layout and preserves extra bytes on
+read/write requests. [Pinned Linux ioctl transport](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L874-L916) [Pinned syncobj ioctl definitions](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/drm/drm.h#L1264-L1276)
+
+The sanitizer wire fixture checked all direction combinations and the
+syncobj suite exercised the production handlers. ARM64 and x86-64 QEMU
+verified short SIGNAL, TRANSFER, QUERY and RESET, plus extended
+TIMELINE_SIGNAL and QUERY. The probe checked points 7 and 11 after the
+updates and zero after reset. The preceding ARM64 kernel rejected the
+short SIGNAL. The allocation scan reproduced the 150 baseline findings.
+Native M1 validation remains open.
+
+The tested base was `87924d76b022c8397ea074ff186daa4ba679ee7e` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-syncobj-update-wire-20261122.goLXVz/`.
+The `bundle.tar.gz` SHA-256 is
+`0e5d328de8370c629aa695cfe4b40723ae010d596c3df78e8c57a7549167e307`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

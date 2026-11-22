@@ -579,6 +579,67 @@ fn test_syncobj_handle_transport() bool {
 		&& unsafe { *C.__errno_location() } == C.EINVAL
 }
 
+struct SyncobjArrayRequest {
+	handles u64
+	count u32
+	pad u32
+}
+
+struct SyncobjTransferRequest {
+	source u32
+	destination u32
+	source_point u64
+	destination_point u64
+	flags u32
+	pad u32
+}
+
+struct ExtendedSyncobjTimelineRequest {
+	handles u64
+	points u64
+	count u32
+	flags u32
+	tail u64
+}
+
+fn test_syncobj_update_transport() bool {
+	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	mut source := [u32(0), 0]!
+	mut destination := [u32(0), 0]!
+	if C.ioctl(fd, i32(u32(0xc00864bf)), &source[0]) != 0
+		|| C.ioctl(fd, i32(u32(0xc00864bf)), &destination[0]) != 0 {
+		return false
+	}
+	source_address := u64(unsafe { &source[0] })
+	destination_address := u64(unsafe { &destination[0] })
+	// Short SIGNAL and TRANSFER omit padding and flags. The transfer uses
+	// the signal on the source and publishes it at point 7 on the destination.
+	signal := SyncobjArrayRequest{handles: source_address, count: 1, pad: 99}
+	transfer := SyncobjTransferRequest{source: source[0], destination: destination[0],
+		destination_point: 7, flags: 99, pad: 99}
+	if C.ioctl(fd, i32(u32(0xc00c64c5)), unsafe { &signal }) != 0
+		|| C.ioctl(fd, i32(u32(0xc01864cc)), unsafe { &transfer }) != 0 {
+		return false
+	}
+	mut point := u64(99)
+	mut timeline := ExtendedSyncobjTimelineRequest{handles: destination_address,
+		points: u64(unsafe { &point }), count: 1, tail: 0x12345678}
+	if C.ioctl(fd, i32(u32(0xc01464cb)), unsafe { &timeline }) != 0 || point != 7 {
+		return false
+	}
+	point = 11
+	if C.ioctl(fd, i32(u32(0xc02064cd)), unsafe { &timeline }) != 0 || timeline.tail != 0x12345678
+		|| C.ioctl(fd, i32(u32(0xc01464cb)), unsafe { &timeline }) != 0 || point != 11 {
+		return false
+	}
+	reset := SyncobjArrayRequest{handles: destination_address, count: 1, pad: 99}
+	return C.ioctl(fd, i32(u32(0xc00c64c4)), unsafe { &reset }) == 0
+		&& C.ioctl(fd, i32(u32(0xc02064cb)), unsafe { &timeline }) == 0
+		&& point == 0 && timeline.tail == 0x12345678
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	if test_open_order() {
@@ -608,6 +669,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM SYNCOBJ HANDLE TRANSPORT: PASS')
 		} else {
 			C.puts(c'DRM SYNCOBJ HANDLE TRANSPORT FAIL: unexpected request, reply or handle state')
+		}
+		if test_syncobj_update_transport() {
+			C.puts(c'VINIX DRM SYNCOBJ UPDATE TRANSPORT: PASS')
+		} else {
+			C.puts(c'DRM SYNCOBJ UPDATE TRANSPORT FAIL: unexpected request, reply or timeline point')
 		}
 		if test_debugfs_clients() {
 			C.puts(c'VINIX DRM DEBUGFS CLIENTS: PASS')
