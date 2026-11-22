@@ -99,6 +99,10 @@ fn sysfs_make_root(filesystem &FileSystem) &VFSNode {
 	mut kernel_dir := add_sysfs_directory(mut root, 'kernel')
 	mut debug_dir := add_sysfs_directory(mut kernel_dir, 'debug')
 	debug_dir.resource.stat.mode = stat.ifdir | 0o700
+	// DRM's class version belongs to the class for the life of the kernel.
+	mut class_dir := add_sysfs_directory(mut root, 'class')
+	mut drm_dir := add_sysfs_directory(mut class_dir, 'drm')
+	add_sysfs_text(mut drm_dir, 'version', 'drm 1.1.0 20060810\n')
 	sysfs_root = root
 	return root
 }

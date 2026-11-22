@@ -9,6 +9,27 @@ its Mesa carries a patch that names `/dev/dri/renderD128` directly.
 The DRM core now publishes them when a device registers and removes them when
 it unregisters. Both run with no DRM lock held, since sysfs calls may sleep.
 
+## DRM class version
+
+`/sys/class/drm/version` is a read-only class attribute with the line
+`drm 1.1.0 20060810`, followed by a newline. Sysfs creates it with the
+initial tree, so it remains available when individual devices unregister.
+[Pinned Linux DRM class initialization](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_sysfs.c#L132-L158)
+
+Both kernel builds used `-O1` for C compilation. ARM64 and x86-64 QEMU
+guests under TCG checked the exact bytes and mode `0444` as root and as
+UID and GID 65534. The same ARM64 fixture caught the missing file on the
+baseline kernel. The debugfs permission probes, ARM64 DRM discovery and
+host DRM sysfs sanitizer fixture passed. Independent lifetime review
+confirmed that the static attribute survives minor teardown. The allocation
+scan reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `f20722c0ff1288da132a5e72e7ba117f40af9f32` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-class-version-20261122.HdTE5b/`.
+The `bundle.tar.gz` SHA-256 is
+`b7a4f4c690dc642afd14343ee78af18ac6da976aeaf805efea6e162b04593a04`.
+
 ## What each minor gets
 
 ```

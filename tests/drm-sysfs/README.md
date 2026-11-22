@@ -5,7 +5,8 @@ v run tests/drm-sysfs/run.v --asahi-linux PATH
 tests/kernel-gaps/run-native --source tests/drm-sysfs/guest.c \
   --kernel-dir kernel --arch aarch64 --expect 'VINIX DRM SYSFS: PASS'
 tests/kernel-gaps/run-native --source tests/drm-sysfs/debugfixture/core.v \
-  --kernel-dir kernel --arch aarch64 --expect 'VINIX DRM DEBUGFS MODE: PASS'
+  --kernel-dir kernel --arch aarch64 --expect 'VINIX DRM DEBUGFS MODE: PASS' \
+  --expect 'VINIX DRM CLASS VERSION: PASS'
 ```
 
 `run.v` builds `kernel/drm/sysfs.v` and the AGX parent's identity from
@@ -36,3 +37,5 @@ debugfs entry either. Without a checkout-local AArch64 sysroot, set
 open `/sys/kernel/debug`, that the directory is owned by root with mode
 `0700`, and that a process running as UID and GID 65534 can still open
 `/sys/kernel` and `/sys/class/drm` but cannot list or traverse debugfs.
+Both processes also check that the DRM class version has mode `0444` and
+returns the exact newline-terminated string.
