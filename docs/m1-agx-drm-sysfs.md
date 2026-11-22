@@ -431,6 +431,26 @@ at `/Users/alex/.local/state/vinix/m1-drm-syncobj-update-wire-20261122.goLXVz/`.
 The `bundle.tar.gz` SHA-256 is
 `0e5d328de8370c629aa695cfe4b40723ae010d596c3df78e8c57a7549167e307`.
 
+#### PRIME import and export request sizes
+
+`PRIME_HANDLE_TO_FD` and `PRIME_FD_TO_HANDLE` use the shared extensible
+read/write ioctl layout. The dispatcher zero-fills input omitted from the
+12-byte structure, preserves trailing bytes on extended read/write
+requests and bounds output to the caller's encoded size. [Pinned Linux ioctl transport](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L874-L916) [Pinned PRIME ioctl definitions](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/drm/drm.h#L1144-L1175)
+
+The sanitizer wire and PRIME tests passed. ARM64 and x86-64 QEMU verified
+that a short export reached the missing-handle check. They also verified
+extended export, an 11-byte import with a zero-extended fd, and extended
+reimport returning the same handle. The preceding ARM64 kernel rejected
+the short export at dispatch. The allocation scan reproduced the 150
+baseline findings. Native M1 validation remains open.
+
+The tested base was `c80fbfb379d16b235c05695d4044c77019c2e00f` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-wire-20261122.Y0UHMf/`.
+The `bundle.tar.gz` SHA-256 is
+`792bb421159e426e93d9b554b830653a475213ea2f63221ebbcc754eaf59309b`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

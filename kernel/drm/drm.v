@@ -372,6 +372,7 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmPrimeHandle))
 				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_syncobj_create {

@@ -542,6 +542,56 @@ fn test_gem_close_transport() bool {
 	return true
 }
 
+struct ExtendedPrimeRequest {
+mut:
+	handle u32
+	flags u32
+	fd i32
+	tail u32
+}
+
+fn test_prime_transport() bool {
+	card := c'/dev/dri/card0'
+	exporter := C.open(card, C.O_RDWR)
+	if exporter < 0 { return false }
+	defer { C.close(exporter) }
+	importer := C.open(card, C.O_RDWR)
+	if importer < 0 { return false }
+	defer { C.close(importer) }
+	mut create := DumbCreateRequest{height: 1, width: 1, bpp: 32}
+	if C.ioctl(exporter, i32(u32(0xc02064b2)), &create) != 0 || create.handle == 0 {
+		return false
+	}
+	mut missing := u32(0)
+	if C.ioctl(exporter, i32(u32(0xc004642d)), unsafe { &missing }) != -1
+		|| unsafe { *C.__errno_location() } != C.ENOENT {
+		return false
+	}
+	mut export := ExtendedPrimeRequest{handle: create.handle, flags: u32(C.O_CLOEXEC),
+		fd: -1, tail: 0x12345678}
+	if C.ioctl(exporter, i32(u32(0xc010642d)), unsafe { &export }) != 0 || export.fd < 0 {
+		return false
+	}
+	defer { C.close(export.fd) }
+	if export.handle != create.handle || export.flags != u32(C.O_CLOEXEC)
+		|| export.tail != 0x12345678 || export.fd > 0x00ffffff {
+		return false
+	}
+	// The eleven-byte little-endian request omits the top byte of the fd.
+	// Kernel storage must zero-extend it and leave that user byte alone.
+	short_fd := i32(u32(export.fd) | 0xff000000)
+	mut imported := ExtendedPrimeRequest{fd: short_fd, tail: 0x87654321}
+	if C.ioctl(importer, i32(u32(0xc00b642e)), unsafe { &imported }) != 0 || imported.handle == 0
+		|| imported.fd != short_fd || imported.tail != 0x87654321 {
+		return false
+	}
+	handle := imported.handle
+	imported.handle = 0
+	imported.fd = export.fd
+	return C.ioctl(importer, i32(u32(0xc010642e)), unsafe { &imported }) == 0
+		&& imported.handle == handle && imported.fd == export.fd && imported.tail == 0x87654321
+}
+
 fn test_syncobj_handle_transport() bool {
 	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
 	if fd < 0 { return false }
@@ -664,6 +714,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM GEM CLOSE TRANSPORT: PASS')
 		} else {
 			C.puts(c'DRM GEM CLOSE TRANSPORT FAIL: unexpected framed close or handle state')
+		}
+		if test_prime_transport() {
+			C.puts(c'VINIX DRM PRIME TRANSPORT: PASS')
+		} else {
+			C.puts(c'DRM PRIME TRANSPORT FAIL: unexpected request, reply or imported handle')
 		}
 		if test_syncobj_handle_transport() {
 			C.puts(c'VINIX DRM SYNCOBJ HANDLE TRANSPORT: PASS')
