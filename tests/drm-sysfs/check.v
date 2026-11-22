@@ -18,6 +18,8 @@ pub mut:
 	dev_id       u32
 	render_node  &DrmNode = unsafe { nil }
 	sysfs_parent string
+	primary_sysfs DrmMinorSysfs
+	render_sysfs DrmMinorSysfs
 	debugfs_dir  string
 	debugfs_primary_link bool
 	debugfs_render_link bool
@@ -114,6 +116,41 @@ fn read_attribute(path string) ?string {
 	return lib.finish_text(text)
 }
 
+fn check_minor_sysfs_collisions() {
+	parent := 'devices/platform/occupied.gpu'
+	mut driver := DrmDriver{sysfs_parent: parent}
+	mut node := DrmNode{}
+	mut dev := DrmDevice{driver: &driver, dev_id: 5, render_node: &node}
+	minors := [
+		['${parent}/drm/card5', 'class/drm/card5', 'dev/char/226:5']!,
+		['${parent}/drm/renderD133', 'class/drm/renderD133', 'dev/char/226:133']!,
+	]!
+	for minor_index, paths in minors {
+		sibling := minors[1 - minor_index]
+		for blocked_index, blocked in paths {
+			assert fs.sysfs_text('${blocked}/owner', 'existing directory')
+			publish_drm_sysfs(mut dev)
+			if blocked_index == 0 {
+				assert !fs.published('${blocked}/dev'), 'registration populated the occupied minor directory'
+				assert !fs.published(paths[1]) && !fs.published(paths[2])
+			}
+			for path in sibling {
+				assert fs.published(path)
+			}
+			remove_drm_sysfs(mut dev)
+			assert text_of('${blocked}/owner') == 'existing directory', 'teardown removed the occupied sysfs path'
+			for index, path in paths {
+				assert fs.published(path) == (index == blocked_index)
+			}
+			for path in sibling {
+				assert !fs.published(path)
+			}
+			assert fs.sysfs_remove(blocked)
+		}
+	}
+	println('DRM sysfs: six card and render collisions preserve occupied paths through unregister')
+}
+
 fn show_marker(context voidptr, mut text lib.Text) {
 	text.add('stats of ')
 	text.add_unsigned(u64(context))
@@ -121,6 +158,7 @@ fn show_marker(context voidptr, mut text lib.Text) {
 }
 
 pub fn run_checks() {
+	check_minor_sysfs_collisions()
 	// The base M1 GPU as the AGX driver registers it: card1 and renderD129,
 	// under the directory named after the device-tree node.
 	parent := gpu_sysfs_path(0x206400000)

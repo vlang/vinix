@@ -84,6 +84,8 @@ pub mut:
 mut:
 	registered  bool
 	sysfs_parent string // owned copy, for removal after the driver is gone
+	primary_sysfs DrmMinorSysfs
+	render_sysfs DrmMinorSysfs
 	debugfs_dir  string // owned; empty for a device with no parent
 	debugfs_primary_link bool
 	debugfs_render_link bool

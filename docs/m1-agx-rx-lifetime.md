@@ -540,3 +540,28 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-debugfs-links-20261122.uj7ZJa/`.
 The `bundle.tar.gz` SHA-256 is
 `29908e1c5dd7da82f5d78c81c4881ed76683aec6dbea97172f55fe2d9010813e`.
+
+## DRM sysfs minor ownership
+
+Each DRM minor claims its sysfs directory exclusively. After the claim,
+DRM records creation of the class and character-device links separately.
+Unregister removes the recorded links and directory. Occupied paths and
+their contents survive partial publication and teardown.
+
+The DRM sysfs sanitizer fixture blocked each of the three paths for both
+card and render minors. It verified that the sibling minor stayed available
+through publication and that teardown removed the entries DRM owned. Three
+controls caught reuse of an occupied directory and unconditional removal of
+either link. Independent lifetime review and generated ARM64 code confirmed
+the ownership checks. The allocation scan matched the 150 baseline findings.
+
+Both kernel builds used `-O1` for C compilation. The ARM64 QEMU DRM sysfs
+probe passed with TCG, and the x86-64 descriptor-flags smoke test passed.
+The DRM wire sanitizer fixture, 79 local contracts and 122 pinned-reference
+checks passed. Native M1 validation remains open.
+
+The tested base was `ffd253d20e83089d58b02422d855b5540c4835c5` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-minor-sysfs-20261122.iRMg3j/`.
+The `bundle.tar.gz` SHA-256 is
+`e439641bdaa916b326ccc5397b4ce24f249b66d9ae3294e95978193ea84bca2d`.

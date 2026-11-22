@@ -17,6 +17,12 @@ import lib
 
 const drm_major = 226
 
+struct DrmMinorSysfs {
+	directory bool
+	class_link bool
+	char_link bool
+}
+
 // Called after registration, with no lock held: sysfs calls may sleep.
 fn publish_drm_sysfs(mut dev DrmDevice) {
 	parent := if dev.driver != unsafe { nil } && dev.driver.sysfs_parent.len != 0 {
@@ -28,9 +34,9 @@ fn publish_drm_sysfs(mut dev DrmDevice) {
 	dev.sysfs_parent = parent
 	fs.sysfs_directory('class/drm')
 	fs.sysfs_directory('dev/char')
-	publish_minor_sysfs(parent, 'card', dev.dev_id)
+	dev.primary_sysfs = publish_minor_sysfs(parent, 'card', dev.dev_id)
 	if dev.render_node != unsafe { nil } {
-		publish_minor_sysfs(parent, 'renderD', 128 + dev.dev_id)
+		dev.render_sysfs = publish_minor_sysfs(parent, 'renderD', 128 + dev.dev_id)
 	}
 	if parent != 'devices/virtual' {
 		publish_drm_debugfs(mut dev, parent)
@@ -40,50 +46,52 @@ fn publish_drm_sysfs(mut dev DrmDevice) {
 fn remove_drm_sysfs(mut dev DrmDevice) {
 	if dev.sysfs_parent.len == 0 { return }
 	remove_drm_debugfs(mut dev)
-	remove_minor_sysfs(dev.sysfs_parent, 'card', dev.dev_id)
-	if dev.render_node != unsafe { nil } {
-		remove_minor_sysfs(dev.sysfs_parent, 'renderD', 128 + dev.dev_id)
-	}
+	remove_minor_sysfs(dev.sysfs_parent, 'card', dev.dev_id, dev.primary_sysfs)
+	remove_minor_sysfs(dev.sysfs_parent, 'renderD', 128 + dev.dev_id, dev.render_sysfs)
+	dev.primary_sysfs = DrmMinorSysfs{}
+	dev.render_sysfs = DrmMinorSysfs{}
 	unsafe { dev.sysfs_parent.free() }
 	dev.sysfs_parent = ''
 }
 
-fn publish_minor_sysfs(parent string, prefix string, minor u32) {
+fn publish_minor_sysfs(parent string, prefix string, minor u32) DrmMinorSysfs {
 	name := minor_name(prefix, minor)
 	directory := sysfs_join3(parent, '/drm/', name)
-	if fs.sysfs_directory(directory) {
-		dev_text := minor_dev_text(minor)
-		uevent := minor_uevent_text(name, minor)
-		publish_text(directory, 'dev', dev_text)
-		publish_text(directory, 'uevent', uevent)
-		subsystem := relative_link(directory, 'class/drm')
-		publish_link(directory, 'subsystem', subsystem)
-		if parent != 'devices/virtual' {
-			// card0/device -> ../../../206400000.gpu, as Linux writes it.
-			device := parent_link(parent)
-			publish_link(directory, 'device', device)
-			unsafe { device.free() }
-		}
+	defer {
 		unsafe {
-			dev_text.free()
-			uevent.free()
-			subsystem.free()
+			directory.free()
+			name.free()
 		}
-		class_link := relative_link('class/drm', directory)
-		publish_link('class/drm', name, class_link)
-		char_name := minor_dev_name(minor)
-		char_link := relative_link('dev/char', directory)
-		publish_link('dev/char', char_name, char_link)
-		unsafe {
-			class_link.free()
-			char_name.free()
-			char_link.free()
-		}
+	}
+	if !fs.sysfs_create_directory(directory) { return DrmMinorSysfs{} }
+	dev_text := minor_dev_text(minor)
+	uevent := minor_uevent_text(name, minor)
+	publish_text(directory, 'dev', dev_text)
+	publish_text(directory, 'uevent', uevent)
+	subsystem := relative_link(directory, 'class/drm')
+	publish_link(directory, 'subsystem', subsystem)
+	if parent != 'devices/virtual' {
+		// card0/device -> ../../../206400000.gpu, as Linux writes it.
+		device := parent_link(parent)
+		publish_link(directory, 'device', device)
+		unsafe { device.free() }
 	}
 	unsafe {
-		directory.free()
-		name.free()
+		dev_text.free()
+		uevent.free()
+		subsystem.free()
 	}
+	class_link := relative_link('class/drm', directory)
+	class_added := publish_link('class/drm', name, class_link)
+	char_name := minor_dev_name(minor)
+	char_link := relative_link('dev/char', directory)
+	char_added := publish_link('dev/char', char_name, char_link)
+	unsafe {
+		class_link.free()
+		char_name.free()
+		char_link.free()
+	}
+	return DrmMinorSysfs{directory: true, class_link: class_added, char_link: char_added}
 }
 
 // sysfs copies what it is given; the path made here is freed here.
@@ -100,19 +108,29 @@ fn publish_link(directory string, name string, target string) bool {
 	return added
 }
 
-fn remove_minor_sysfs(parent string, prefix string, minor u32) {
+fn remove_minor_sysfs(parent string, prefix string, minor u32, entries DrmMinorSysfs) {
+	if !entries.directory { return }
 	name := minor_name(prefix, minor)
-	char_name := minor_dev_name(minor)
-	links := [sysfs_join3('class/drm', '/', name), sysfs_join3('dev/char', '/', char_name),
-		sysfs_join3(parent, '/drm/', name)]!
-	for path in links {
-		fs.sysfs_remove(path)
-		unsafe { path.free() }
+	if entries.class_link {
+		remove_sysfs_entry('class/drm', name)
 	}
+	if entries.char_link {
+		char_name := minor_dev_name(minor)
+		remove_sysfs_entry('dev/char', char_name)
+		unsafe { char_name.free() }
+	}
+	directory := sysfs_join3(parent, '/drm/', name)
+	fs.sysfs_remove(directory)
 	unsafe {
+		directory.free()
 		name.free()
-		char_name.free()
 	}
+}
+
+fn remove_sysfs_entry(directory string, name string) {
+	path := sysfs_join3(directory, '/', name)
+	fs.sysfs_remove(path)
+	unsafe { path.free() }
 }
 
 // Linux's DRM debugfs: a directory per device named after its parent device
@@ -167,12 +185,8 @@ fn remove_drm_debugfs(mut dev DrmDevice) {
 
 fn remove_debugfs_link(minor u32) {
 	name := minor_name('', minor)
-	path := sysfs_join3(debugfs_dri, '/', name)
-	fs.sysfs_remove(path)
-	unsafe {
-		path.free()
-		name.free()
-	}
+	remove_sysfs_entry(debugfs_dri, name)
+	unsafe { name.free() }
 }
 
 // Add the read-only file `name` to the device's debugfs directory, read
