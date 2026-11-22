@@ -78,10 +78,13 @@ __global handler_input = u32(0)
 
 fn account_activity(_ &DrmDevice, _ u32) { activity_calls++ }
 
-fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, _ voidptr) int {
+fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, client voidptr) int {
 	return match cmd {
 		ioctl.drm_ioctl_version { ioctl_version(dev, data) }
 		ioctl.drm_ioctl_get_cap { ioctl_get_cap(dev, data) }
+		ioctl.drm_ioctl_mode_create_dumb, ioctl.drm_ioctl_mode_map_dumb, ioctl.drm_ioctl_mode_destroy_dumb {
+			ioctl_dumb_buffer(dev, cmd, client, data)
+		}
 		ioctl.drm_ioctl_syncobj_wait, ioctl.drm_ioctl_syncobj_timeline_wait { handle_wait(cmd, data) }
 		ioctl.drm_ioctl_syncobj_handle_to_fd, ioctl.drm_ioctl_syncobj_fd_to_handle { handle_descriptor(cmd, data) }
 		else { -95 }
@@ -205,12 +208,18 @@ fn check_dumb_node_access() {
 	mut primary := DrmNode{dev: &device}
 	mut request := [32]u8{init: 0xab}
 	for encoded in [u64(0xc02064b2), 0xc01064b3, 0xc00464b4]! {
-		// The mock DRM handler returns EOPNOTSUPP for dumb buffers.
-		expect_error(mut primary, encoded, &request[0], errno.eopnotsupp)
+		expect_error(mut primary, encoded, &request[0], errno.enosys)
 		expect_error(mut render, encoded, &request[0], errno.eacces)
 		assert request[0] == 0xab
 		expect_error(mut render, encoded, unsafe { nil }, errno.efault)
 	}
+	mut create := ioctl.DrmModeCreateDumb{width: 1, height: 2, bpp: 32, handle: 9, pitch: 9, size: 9}
+	expect_error(mut primary, u64(0xc02064b2), unsafe { &create }, errno.enosys)
+	assert create.handle == 0 && create.pitch == 0 && create.size == 0
+	assert create.width == 1 && create.height == 2 && create.bpp == 32
+	mut mapping := ioctl.DrmModeMapDumb{handle: 9, offset: 9}
+	expect_error(mut primary, u64(0xc01064b3), unsafe { &mapping }, errno.enosys)
+	assert mapping.handle == 9 && mapping.offset == 0
 	expect_error(mut render, u64(0x802064b3), unsafe { nil }, errno.efault)
 	expect_error(mut render, u64(0x802064b3), &request[0], errno.eacces)
 	assert request[0] == 0 && request[31] == 0

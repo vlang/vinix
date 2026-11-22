@@ -567,10 +567,35 @@ fn test_render_dumb_permissions(fd i32) bool {
 		&& data[0] == 0 && data[1] == 0 && data[2] == 0 && data[3] == ~u64(0)
 }
 
+fn test_dumb_buffer_error_replies(fd i32, create_errno i32, map_errno i32) bool {
+	mut create := DumbCreateRequest{height: 1, bpp: 32, handle: 77, pitch: 77, size: 77}
+	if C.ioctl(fd, i32(u32(0xc02064b2)), &create) != -1
+		|| unsafe { *C.__errno_location() } != create_errno
+		|| create.height != 1 || create.width != 0 || create.bpp != 32
+		|| create.handle != 0 || create.pitch != 0 || create.size != 0 {
+		return false
+	}
+	mut mapping := ExtendedDumbMapRequest{offset: 77, tail: 0x12345678}
+	return C.ioctl(fd, i32(u32(0xc01864b3)), &mapping) == -1
+		&& unsafe { *C.__errno_location() } == map_errno
+		&& mapping.handle == 0 && mapping.offset == 0 && mapping.tail == 0x12345678
+}
+
+fn test_unsupported_dumb_buffers(card &char) bool {
+	fd := C.open(card, C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	mut handle := u32(0)
+	return test_dumb_buffer_error_replies(fd, C.ENOSYS, C.ENOSYS)
+		&& C.ioctl(fd, i32(u32(0xc00464b4)), unsafe { &handle }) == -1
+		&& unsafe { *C.__errno_location() } == C.ENOSYS
+}
+
 fn test_dumb_buffer_transport() bool {
 	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
 	if fd < 0 { return false }
 	defer { C.close(fd) }
+	if !test_dumb_buffer_error_replies(fd, C.EINVAL, C.ENOENT) { return false }
 	// The short CREATE reply ends after pitch and leaves the caller's size alone.
 	mut create := DumbCreateRequest{height: 1, width: 1, bpp: 32, size: 123}
 	if C.ioctl(fd, i32(u32(0xc01864b2)), &create) != 0 || create.handle == 0
@@ -856,7 +881,11 @@ pub fn run() i32 {
 		}
 	}
 	mut render := C.open(c'/dev/dri/renderD129', C.O_RDWR)
-	if render < 0 { render = C.open(c'/dev/dri/renderD128', C.O_RDWR) }
+	mut render_primary := c'/dev/dri/card1'
+	if render < 0 {
+		render = C.open(c'/dev/dri/renderD128', C.O_RDWR)
+		render_primary = c'/dev/dri/card0'
+	}
 	if render >= 0 {
 		if test_render_capabilities(render) {
 			C.puts(c'VINIX DRM RENDER CAPABILITIES: PASS')
@@ -867,6 +896,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM RENDER DUMB PERMISSIONS: PASS')
 		} else {
 			C.puts(c'DRM RENDER DUMB PERMISSIONS FAIL: wrong permission or copy result')
+		}
+		if test_unsupported_dumb_buffers(render_primary) {
+			C.puts(c'VINIX DRM UNSUPPORTED DUMB BUFFERS: PASS')
+		} else {
+			C.puts(c'DRM UNSUPPORTED DUMB BUFFERS FAIL: wrong primary-node error reply')
 		}
 		C.close(render)
 	}

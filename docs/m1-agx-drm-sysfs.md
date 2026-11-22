@@ -517,6 +517,28 @@ also used the archived software Asahi fixture patch. Evidence is stored at
 The `bundle.tar.gz` SHA-256 is
 `130ec49a413bf3229f8c8c00c639b22de665e26ce643692efbb828134a974a59`.
 
+#### Primary-node dumb-buffer error replies
+
+DRM returns `ENOSYS` when a primary node has no handler for a dumb-buffer
+operation. Failed create requests clear the handle, pitch and size. Failed
+map requests clear the offset. The dispatcher copies the resulting fields
+back within the requested size and preserves the input fields and any
+trailing bytes. [Pinned Linux dumb-buffer handlers](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_dumb_buffers.c#L196-L303)
+
+The wire sanitizer fixture passed. ARM64 QEMU checked `ENOSYS` on the
+software Asahi primary node and `EACCES` on its render node. The x86-64
+QEMU framebuffer fixture checked the cleared error outputs and successful
+create, map and destroy. Both prior kernels failed the new checks with
+byte-identical guest probe executables. The allocation scan reproduced
+the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `e2d849099d527963d05c0bb6672d6b842ee15874` plus the
+archived patch and the simple DRM named-device fixture. The ARM64 build
+also used the archived software Asahi fixture patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-dumb-errors-20261122.BOpfHN/`.
+The `bundle.tar.gz` SHA-256 is
+`035f4d8a840cf09fdda7e3d878dee13fd570e0c05535538199e987f5618809dd`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

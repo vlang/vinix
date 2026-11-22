@@ -1131,6 +1131,33 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 	}
 }
 
+fn ioctl_dumb_buffer(dev &DrmDevice, cmd u32, handle voidptr, data voidptr) int {
+	if data == unsafe { nil } { return -14 }
+	mut result := -int(errno.enosys)
+	for entry in dev.driver.ioctls {
+		if entry.cmd == cmd && entry.handler != unsafe { nil } {
+			result = entry.handler(dev, handle, data)
+			break
+		}
+	}
+	if result < 0 {
+		match cmd {
+			ioctl.drm_ioctl_mode_create_dumb {
+				mut request := unsafe { &ioctl.DrmModeCreateDumb(data) }
+				request.handle = 0
+				request.pitch = 0
+				request.size = 0
+			}
+			ioctl.drm_ioctl_mode_map_dumb {
+				mut request := unsafe { &ioctl.DrmModeMapDumb(data) }
+				request.offset = 0
+			}
+			else {}
+		}
+	}
+	return result
+}
+
 fn ioctl_gem_close(dev &DrmDevice, handle voidptr, data voidptr) int {
 	if data == unsafe { nil } {
 		return -14
@@ -1559,6 +1586,9 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 		}
 		ioctl.drm_ioctl_set_client_name {
 			return ioctl_set_client_name(handle, data)
+		}
+		ioctl.drm_ioctl_mode_create_dumb, ioctl.drm_ioctl_mode_map_dumb, ioctl.drm_ioctl_mode_destroy_dumb {
+			return ioctl_dumb_buffer(dev, cmd, handle, data)
 		}
 		ioctl.drm_ioctl_gem_close {
 			return ioctl_gem_close(dev, handle, data)
