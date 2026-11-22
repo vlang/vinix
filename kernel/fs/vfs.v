@@ -2271,7 +2271,10 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	defer {
 		fd.unref()
 	}
+	return seek_pinned_descriptor(fd, offset, whence)
+}
 
+pub fn seek_pinned_descriptor(fd &file.FD, offset i64, whence int) (u64, u64) {
 	mut handle := fd.handle
 	// O_PATH retains a pathname without granting seek access, including for
 	// otherwise seekable nodes. Refuse it before policy/type/argument checks.

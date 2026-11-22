@@ -743,6 +743,29 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-splice-20261122.ykJR8Z/`.
 The `bundle.tar.gz` SHA-256 is
 `e739530593cff4f03c2a33da22f27b75fd3af892bc12ecb967a08ddf14c35ef7`.
 
+#### PRIME DMA-BUF sendfile
+
+`sendfile` checks the access mode of both open descriptions before accepting
+a zero count. An explicit offset on a PRIME input returns `ESPIPE`. With a
+positive count, Vinix returns `EINVAL` for a PRIME endpoint before consuming
+input. This also rejects a PRIME destination when an ordinary source is
+already at EOF. Both descriptions stay pinned through transfer and any
+short-write rewind.
+[Pinned sendfile admission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1226-L1297)
+
+ARM64 and x86-64 QEMU confirmed pipe data and file position preservation on
+rejection, the PRIME offset and access errors, and successful ordinary
+transfers with and without an explicit offset. The same x86-64 guest probe
+failed on the preceding kernel. The DRM syncobj host suite passed, independent
+review checked reference ownership, and the allocation scan reproduced its
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `8ba53d6822c758729b95e65ef532e42dce06c964` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-20261122.rVaAAS/`.
+The `bundle.tar.gz` SHA-256 is
+`7fa5c34593a95316db9b44f9e4d13bc58f325a620ed18e3b3bdd3ce2cec22413`.
+
 #### GEM metadata reclamation
 
 Final GEM release frees the metadata after unlinking the object and

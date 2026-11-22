@@ -1061,6 +1061,48 @@ fn test_prime_splice(read_write i32, read_only i32) bool {
 		&& C.read(copy, &result[0], 2) == 2 && C.strncmp(&result[0], c'bc', 2) == 0
 }
 
+fn sendfile_replies(output i32, input i32, offset voidptr, count u64, code i32) bool {
+	return C.syscall(C.SYS_sendfile, output, input, offset, count) == -1
+		&& unsafe { *C.__errno_location() } == code
+}
+
+fn test_prime_sendfile(read_write i32, read_only i32) bool {
+	mut fds := [2]i32{}
+	if C.pipe(&fds[0]) != 0 { return false }
+	defer {
+		C.close(fds[0])
+		C.close(fds[1])
+	}
+	if C.fcntl(fds[0], C.F_SETFL, C.O_NONBLOCK) != 0
+		|| C.write(fds[1], c'keep', 4) != 4 { return false }
+	mut result := [5]char{}
+	if !sendfile_replies(read_write, fds[0], unsafe { nil }, 4, C.EINVAL)
+		|| C.read(fds[0], &result[0], 4) != 4 || C.strcmp(&result[0], c'keep') != 0 { return false }
+
+	mut offset := i64(-1)
+	if !sendfile_replies(fds[1], read_only, &offset, 0, C.ESPIPE) || offset != -1
+		|| !sendfile_replies(fds[1], read_only, unsafe { nil }, 4, C.EINVAL)
+		|| !sendfile_replies(read_only, fds[0], unsafe { nil }, 0, C.EBADF)
+		|| C.syscall(C.SYS_sendfile, fds[1], read_only, unsafe { nil }, u64(0)) != 0 {
+		return false
+	}
+
+	ordinary := i32(C.syscall(C.SYS_memfd_create, c'prime-sendfile-control', u32(0)))
+	if ordinary < 0 { return false }
+	defer { C.close(ordinary) }
+	if C.write(ordinary, c'abcd', 4) != 4 || C.lseek(ordinary, 0, C.SEEK_SET) != 0 { return false }
+	if !sendfile_replies(read_write, ordinary, unsafe { nil }, 2, C.EINVAL)
+		|| C.lseek(ordinary, 0, C.SEEK_CUR) != 0 { return false }
+	offset = 1
+	upper := u64(0xfedcfedc00000000)
+	if C.syscall(C.SYS_sendfile, upper | u64(fds[1]), upper | u64(ordinary), &offset, u64(2)) != 2
+		|| offset != 3 || C.lseek(ordinary, 0, C.SEEK_CUR) != 0
+		|| C.read(fds[0], &result[0], 2) != 2 || C.strncmp(&result[0], c'bc', 2) != 0 { return false }
+	return C.syscall(C.SYS_sendfile, fds[1], ordinary, unsafe { nil }, u64(2)) == 2
+		&& C.lseek(ordinary, 0, C.SEEK_CUR) == 2 && C.read(fds[0], &result[0], 2) == 2
+		&& C.strncmp(&result[0], c'ab', 2) == 0
+}
+
 fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
 	stream := C.fopen(c'/proc/self/mountinfo', c'r')
 	if stream == unsafe { nil } { return false }
@@ -1106,6 +1148,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME SPLICE: PASS')
 	} else {
 		C.puts(c'DRM PRIME SPLICE FAIL: incorrect error, queued data or cursor')
+	}
+	if test_prime_sendfile(first, export.fd) {
+		C.puts(c'VINIX DRM PRIME SENDFILE: PASS')
+	} else {
+		C.puts(c'DRM PRIME SENDFILE FAIL: incorrect error, input data or cursor')
 	}
 	return fdinfo_mount_id(export.fd) == internal_id
 		&& check_mountinfo_ids(internal_id, visible_id)

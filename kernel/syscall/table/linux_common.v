@@ -637,33 +637,56 @@ fn syscall_linux_gettid(_ voidptr) (u64, u64) {
 // sendfile(out, in, offset, count).  A page-sized bounce buffer keeps the
 // transfer bounded; an explicit offset leaves the input descriptor position
 // alone, while a null offset consumes it just like read(2).
-fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u64, count u64) (u64, u64) {
+fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, count u64) (u64, u64) {
 	mut input_offset := i64(0)
 	positioned := offset_ptr != 0
 	if positioned {
-		if !usercopy.copy_from_user(voidptr(&input_offset), offset_ptr, sizeof(i64)) {
-			return errno.err, errno.efault
-		}
-		if input_offset < 0 {
-			return errno.err, errno.einval
-		}
-		// Check that the offset is writable before consuming either descriptor.
-		if !usercopy.copy_to_user(offset_ptr, voidptr(&input_offset), sizeof(i64)) {
+		// Verify the offset can be copied back before consuming input.
+		if !usercopy.copy_from_user(unsafe { &input_offset }, offset_ptr, sizeof(i64))
+			|| !usercopy.copy_to_user(offset_ptr, unsafe { &input_offset }, sizeof(i64)) {
 			return errno.err, errno.efault
 		}
 	}
 
-	// Linux validates both descriptors even for a zero-byte transfer.
-	mut input_fd := file.fd_from_fdnum(unsafe { nil }, in_fd) or {
+	// Keep the exact descriptions selected here through all chunks and rewind.
+	mut input_fd := file.fd_from_fdnum(unsafe { nil }, int(i32(in_fd))) or {
 		return errno.err, errno.get()
 	}
-	input_fd.unref()
-	mut output_fd := file.fd_from_fdnum(unsafe { nil }, out_fd) or {
+	defer {
+		input_fd.unref()
+	}
+	input_flags := input_fd.handle.flags
+	input_access := input_flags & resource.o_accmode
+	if input_flags & resource.o_path != 0 || (input_access != resource.o_rdonly
+		&& input_access != resource.o_rdwr) {
+		return errno.err, errno.ebadf
+	}
+	input_without_io := input_fd.handle.resource is resource.NoByteIOResource
+	if positioned {
+		if input_without_io {
+			return errno.err, errno.espipe
+		}
+		if input_offset < 0 || count > u64(0x7fffffffffffffff) - u64(input_offset) {
+			return errno.err, errno.einval
+		}
+	}
+	mut output_fd := file.fd_from_fdnum(unsafe { nil }, int(i32(out_fd))) or {
 		return errno.err, errno.get()
 	}
-	output_fd.unref()
+	defer {
+		output_fd.unref()
+	}
+	output_flags := output_fd.handle.flags
+	output_access := output_flags & resource.o_accmode
+	if output_flags & resource.o_path != 0 || (output_access != resource.o_wronly
+		&& output_access != resource.o_rdwr) {
+		return errno.err, errno.ebadf
+	}
 	if count == 0 {
 		return 0, 0
+	}
+	if input_without_io || output_fd.handle.resource is resource.NoByteIOResource {
+		return errno.err, errno.einval
 	}
 
 	buffer := unsafe { malloc(page_size) }
@@ -683,9 +706,9 @@ fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u
 		}
 
 		got, read_error := if positioned {
-			file.pread_to_kernel(in_fd, buffer, chunk, input_offset)
+			file.pread_pinned_descriptor(mut input_fd, buffer, chunk, input_offset, false)
 		} else {
-			fs.read_to_kernel(in_fd, buffer, chunk)
+			fs.read_pinned_descriptor(mut input_fd, buffer, chunk, false)
 		}
 		if read_error != 0 {
 			if total > 0 {
@@ -697,11 +720,11 @@ fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u
 			break
 		}
 
-		written, write_error := fs.write_from_kernel(out_fd, buffer, got)
+		written, write_error := fs.write_pinned_descriptor(mut output_fd, buffer, got, false)
 		if written < got && !positioned {
 			// read() already advanced the shared input position.  Put back the
 			// suffix the output did not accept.
-			fs.syscall_seek(gpr_state, in_fd, -i64(got - written), 1)
+			fs.seek_pinned_descriptor(input_fd, -i64(got - written), fs.seek_cur)
 		}
 		if write_error != 0 {
 			if total == 0 {
@@ -720,7 +743,7 @@ fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u
 	}
 
 	if positioned
-		&& !usercopy.copy_to_user(offset_ptr, voidptr(&input_offset), sizeof(i64)) {
+		&& !usercopy.copy_to_user(offset_ptr, unsafe { &input_offset }, sizeof(i64)) {
 		return errno.err, errno.efault
 	}
 	return total, 0
