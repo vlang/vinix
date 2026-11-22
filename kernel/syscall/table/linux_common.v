@@ -229,6 +229,7 @@ fn linux_iov_access_error(fd &file.FD, write bool) u64 {
 		&& access != if write { resource.o_wronly } else { resource.o_rdonly }) {
 		return errno.ebadf
 	}
+	if fd.handle.resource is resource.NoByteIOResource { return errno.einval }
 	return 0
 }
 

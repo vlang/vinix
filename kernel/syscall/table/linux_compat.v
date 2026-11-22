@@ -69,7 +69,8 @@ fn linux_positioned_iov(fdnum int, iov_ptr u64, iovcnt int, offset i64, write bo
 	defer { fd.unref() }
 	if fd.handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	mode := fd.handle.resource.stat.mode
-	if stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
+	if fd.handle.resource is resource.NoByteIOResource || stat.isifo(mode)
+		|| stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
 		return errno.err, errno.espipe
 	}
 	access_error := linux_iov_access_error(fd, write)

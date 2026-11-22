@@ -1273,18 +1273,22 @@ pub fn pread_to_kernel(fdnum int, buf voidptr, count u64, offset i64) (u64, u64)
 }
 
 fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64) {
-	if offset < 0 || count > u64(0x7fffffffffffffff) - u64(offset) {
+	if offset < 0 {
 		return errno.err, errno.einval
 	}
-	if to_user && !usercopy.user_range(u64(buf), count) {
-		return errno.err, errno.efault
-	}
-
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
-	}
+	defer { fd.unref() }
+	err := validate_positioned_io(fd, u64(buf), count, u64(offset), to_user)
+	if err != 0 { return errno.err, err }
 	return pread_pinned_descriptor(mut fd, buf, count, offset, to_user)
+}
+
+fn validate_positioned_io(fd &FD, address u64, count u64, offset u64, to_user bool) u64 {
+	if fd.handle.flags & resource.o_path != 0 { return errno.ebadf }
+	if fd.handle.resource is resource.NoByteIOResource { return errno.espipe }
+	if count > u64(0x7fffffffffffffff) - offset { return errno.einval }
+	if to_user && !usercopy.user_range(address, count) { return errno.efault }
+	return 0
 }
 
 // Borrow a descriptor held by the caller for the complete positioned operation.
@@ -1352,17 +1356,13 @@ pub fn pread_pinned_descriptor(mut fd FD, buf voidptr, count u64, offset i64, to
 }
 
 pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
-	if offset < 0 || count > u64(0x7fffffffffffffff) - u64(offset) {
+	if offset < 0 {
 		return errno.err, errno.einval
 	}
-	if !usercopy.user_range(u64(buf), count) {
-		return errno.err, errno.efault
-	}
-
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
-	}
+	defer { fd.unref() }
+	err := validate_positioned_io(fd, u64(buf), count, u64(offset), true)
+	if err != 0 { return errno.err, err }
 	return pwrite_pinned_descriptor(mut fd, buf, count, offset)
 }
 

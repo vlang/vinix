@@ -690,6 +690,34 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-sync-range-20261122.OFaISq/`.
 The `bundle.tar.gz` SHA-256 is
 `5216e9b5ac87b6506efed7c1892c53c7d4d901e54347fe725909710582686d82`.
 
+#### PRIME DMA-BUF byte I/O
+
+Ordinary `read`, `write`, `readv` and `writev` first enforce the
+descriptor's access mode. With access granted, a DMA-BUF returns
+`EINVAL` before the buffer or vector is examined. An explicit
+nonnegative offset in `pread`, `pwrite` or their vector variants
+returns `ESPIPE`. The current-position form of `preadv2` and
+`pwritev2` follows the ordinary vector rules. The DMA-BUF size query
+through `lseek` still works.
+[Pinned DMA-BUF file operations](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L585-L593)
+[Pinned positioned scalar I/O](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L707-L747)
+[Pinned positioned vector I/O](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1056-L1123)
+
+ARM64 and x86-64 QEMU exercised read-only and read-write exports with
+empty requests, invalid pointers, valid buffers and negative offsets.
+They also checked both current-position vector calls. The same x86-64
+guest executable failed the new probe on the preceding kernel. The
+x86-64 scalar and positioned-vector suites passed their 200-cycle
+retention checks. The DRM syncobj host suite passed, and the allocation
+scan reproduced its 150 baseline findings. Native M1 validation remains
+open.
+
+The tested base was `88125f5220a52fb4a3df1c29bd4924563f6c9b4e` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-byte-io-20261122.QyAh14/`.
+The `bundle.tar.gz` SHA-256 is
+`9cea75e2fff5cec51d4c78fced808466edf3d60aa474940cd724c0593c45b470`.
+
 #### GEM metadata reclamation
 
 Final GEM release frees the metadata after unlinking the object and

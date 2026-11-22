@@ -968,6 +968,47 @@ fn test_prime_sync_file_range(writable i32, read_only i32) bool {
 		&& sync_file_range_replies(u64(u32(-1)), -1, -1, 8, C.EBADF)
 }
 
+fn prime_io_replies(call isize, fd i32, buffer voidptr, count u64, offset i64, code i32) bool {
+	return C.syscall(call, fd, buffer, count, offset, u64(0), u64(0)) == -1
+		&& unsafe { *C.__errno_location() } == code
+}
+
+fn test_prime_byte_io(fd i32, writable bool) bool {
+	mut byte := u8(0x5a)
+	mut vector := C.iovec{iov_base: unsafe { &byte }, iov_len: 1}
+	for operation in 0 .. 10 {
+		call := isize(match operation {
+			0 { C.SYS_read }
+			1 { C.SYS_write }
+			2 { C.SYS_pread64 }
+			3 { C.SYS_pwrite64 }
+			4 { C.SYS_readv }
+			5 { C.SYS_writev }
+			6 { C.SYS_preadv }
+			7 { C.SYS_pwritev }
+			8 { C.SYS_preadv2 }
+			else { C.SYS_pwritev2 }
+		})
+		missing_access := operation % 2 != 0 && !writable
+		ordinary_code := if missing_access { C.EBADF } else { C.EINVAL }
+		positioned := operation == 2 || operation == 3 || operation >= 6
+		code := if positioned { C.ESPIPE } else { ordinary_code }
+		buffer := if operation >= 4 { voidptr(&vector) } else { voidptr(&byte) }
+		if !prime_io_replies(call, fd, buffer, 1, 0, code)
+			|| !prime_io_replies(call, fd, unsafe { nil }, 0, 0, code)
+			|| !prime_io_replies(call, fd, voidptr(~u64(0)), 1, 0, code) {
+			return false
+		}
+		if positioned && !prime_io_replies(call, fd, buffer, 1, -2, C.EINVAL) {
+			return false
+		}
+		if operation >= 8 && !prime_io_replies(call, fd, buffer, 1, -1, ordinary_code) {
+			return false
+		}
+	}
+	return byte == 0x5a
+}
+
 fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
 	stream := C.fopen(c'/proc/self/mountinfo', c'r')
 	if stream == unsafe { nil } { return false }
@@ -1003,6 +1044,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME SYNC FILE RANGE: PASS')
 	} else {
 		C.puts(c'DRM PRIME SYNC FILE RANGE FAIL: incorrect descriptor or range admission')
+	}
+	if test_prime_byte_io(first, true) && test_prime_byte_io(export.fd, false) {
+		C.puts(c'VINIX DRM PRIME BYTE IO: PASS')
+	} else {
+		C.puts(c'DRM PRIME BYTE IO FAIL: incorrect scalar or vectored I/O error')
 	}
 	return fdinfo_mount_id(export.fd) == internal_id
 		&& check_mountinfo_ids(internal_id, visible_id)

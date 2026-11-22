@@ -1477,6 +1477,7 @@ pub fn read_pinned_descriptor(mut fd file.FD, buf voidptr, count u64, to_user bo
 	if access != resource.o_rdonly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
+	if fd.handle.resource is resource.NoByteIOResource { return errno.err, errno.einval }
 	ret := if to_user {
 		fd.handle.read_to_user(u64(buf), count) or { return errno.err, errno.get() }
 	} else {
@@ -1522,6 +1523,7 @@ pub fn write_pinned_descriptor(mut fd file.FD, buf voidptr, count u64, from_user
 	if access != resource.o_wronly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
+	if fd.handle.resource is resource.NoByteIOResource { return errno.err, errno.einval }
 	ret := if from_user {
 		fd.handle.write_from_user(u64(buf), count) or { return errno.err, errno.get() }
 	} else {

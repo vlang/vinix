@@ -209,6 +209,8 @@ fn (mut this GemPrimeResource) mapping_can_grow() bool {
 	return false
 }
 
+fn (this &GemPrimeResource) no_byte_io() {}
+
 fn (mut this GemPrimeResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 	errno.set(errno.einval)
 	return none
