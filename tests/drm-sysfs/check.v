@@ -41,7 +41,7 @@ struct GpuManager {
 struct AgxDriver {
 mut:
 	unit_address u64
-	sysfs_entries [5]string
+	sysfs_entries [6]string
 }
 
 // Follow every link in `path`, relative links from the link's own directory,
@@ -190,26 +190,29 @@ fn check_agx_sysfs_ownership() {
 	parent := gpu_sysfs_path(driver.unit_address)
 	other_entry := '${parent}/other/owner'
 	assert fs.sysfs_text(other_entry, 'another owner')
-	files := ['uevent', 'modalias', 'subsystem', 'agx_stats', 'gpu_memory']!
-	for blocked in files {
-		blocked_path := '${parent}/${blocked}'
+	other_bus_entry := 'bus/platform/devices/another-device'
+	assert fs.sysfs_text(other_bus_entry, 'another device')
+	paths := ['${parent}/uevent', '${parent}/modalias', '${parent}/subsystem',
+		'${parent}/agx_stats', '${parent}/gpu_memory', 'bus/platform/devices/${oracle_unit}.${oracle_node}']!
+	for blocked_path in paths {
 		assert fs.sysfs_text(blocked_path, 'occupied')
 		driver.publish_sysfs(&mgr)
 		driver.publish_sysfs(&mgr)
-		for name in files {
-			assert fs.published('${parent}/${name}')
+		for path in paths {
+			assert fs.published(path)
 		}
 		assert text_of(blocked_path) == 'occupied'
 		driver.remove_sysfs()
 		driver.remove_sysfs()
 		assert text_of(blocked_path) == 'occupied', 'AGX teardown removed an occupied path'
 		assert text_of(other_entry) == 'another owner', 'AGX teardown removed an unrelated entry'
-		for name in files {
-			assert fs.published('${parent}/${name}') == (name == blocked)
+		assert text_of(other_bus_entry) == 'another device', 'AGX teardown removed another bus entry'
+		for path in paths {
+			assert fs.published(path) == (path == blocked_path)
 		}
 		assert fs.sysfs_remove(blocked_path)
 	}
-	println('AGX sysfs: five collisions preserve occupied files and unrelated entries through teardown and retry')
+	println('AGX sysfs: six collisions preserve occupied paths and unrelated entries through teardown and retry')
 }
 
 pub fn run_checks() {
@@ -226,6 +229,10 @@ pub fn run_checks() {
 	mut agx := AgxDriver{unit_address: 0x206400000}
 	mgr := GpuManager{hw_config: GpuConfig{gpu_gen: .g13}}
 	agx.publish_sysfs(&mgr)
+	bus_device := 'bus/platform/devices/${oracle_unit}.${oracle_node}'
+	assert (readlink(bus_device) or { '' }) == '../../../${parent}'
+	assert (resolve(bus_device) or { '' }) == parent
+	assert (resolve('${bus_device}/drm/renderD129') or { '' }) == '${parent}/drm/renderD129'
 
 	for minor, name in {
 		u32(1):   'card1'
@@ -377,8 +384,10 @@ pub fn run_checks() {
 		assert !fs.published(path), '${path} survived unregister'
 	}
 	assert fs.published('${parent}/uevent')
+	assert (resolve(bus_device) or { '' }) == parent
 	agx.remove_sysfs()
 	assert fs.published(parent)
+	assert fs.published('bus/platform/devices') && !fs.published(bus_device)
 	assert !fs.published('${parent}/uevent') && !fs.published('${parent}/gpu_memory')
 	assert gpu_device.sysfs_parent == '' && framebuffer.sysfs_parent == ''
 	assert gpu_device.debugfs_dir == ''

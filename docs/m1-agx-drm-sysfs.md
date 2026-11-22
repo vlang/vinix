@@ -52,6 +52,31 @@ subsystem  -> ../../../../bus/platform
 So on M1, libdrm reports the GPU as a platform device with Linux's bus info and
 compatible strings. Vinix's own Mesa still names the render node directly.
 
+### Platform bus discovery
+
+`/sys/bus/platform/devices/206400000.gpu` links to
+`../../../devices/platform/soc/206400000.gpu`. Software walking the
+platform bus can follow that link to the GPU's attributes and DRM minors.
+AGX records it only after successful creation and removes it during
+shutdown. [Pinned Linux bus device publication](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/base/bus.c#L583-L595)
+
+The DRM sysfs sanitizer fixture found `renderD129` through the bus
+link. It tested collisions at six paths and verified that an occupied bus
+entry and a sibling device survived teardown. Two controls caught an
+incorrect relative target and deletion of an occupied entry. Independent
+lifetime review confirmed that AGX releases the temporary target after
+sysfs copies it and retains the successfully published path through teardown.
+
+Both kernel builds used `-O1` for C compilation. The ARM64 DRM discovery
+and x86-64 debugfs permission probes passed in QEMU under TCG. The allocation
+scan reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `69a3ff55b60d148d5995914f6b17a22f82985335` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-agx-platform-bus-20261122.31dFCc/`.
+The `bundle.tar.gz` SHA-256 is
+`ac6e418b19e4d8182c7683df7cc77e96f82a212916f3ba3d13124e81bd1956cb`.
+
 ## DRM debugfs
 
 Linux's DRM core also gives every device a debugfs directory, named after its

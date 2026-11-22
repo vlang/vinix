@@ -11,12 +11,13 @@ import time
 // Linux's device-tree identity of the base M1 GPU node, gpu@206400000 in
 // t8103.dtsi, which libdrm reads from the device's uevent.
 const t8103_compatible = ['apple,agx-t8103', 'apple,agx-g13g']!
+const gpu_sysfs_prefix = 'devices/platform/soc/'
 
 // The directory Linux gives the GPU's platform device, named after its node's
 // unit address: devices/platform/soc/206400000.gpu on M1.
 fn gpu_sysfs_path(unit_address u64) string {
 	mut path := lib.new_text(48)
-	path.add('devices/platform/soc/')
+	path.add(gpu_sysfs_prefix)
 	path.add_radix(unit_address, 16, 0)
 	path.add('.gpu')
 	return lib.finish_text(path)
@@ -24,7 +25,8 @@ fn gpu_sysfs_path(unit_address u64) string {
 
 // The platform device's own files, beside the drm directory the DRM core made
 // for its minors: Linux's uevent, modalias and subsystem link, which libdrm
-// reads to describe the device, and Asahi's agx_stats and gpu_memory.
+// reads to describe the device, and Asahi's agx_stats and gpu_memory. The
+// platform bus also lists the device by name.
 fn (mut driver AgxDriver) publish_sysfs(mgr &gpu.GpuManager) {
 	if mgr.hw_config.gpu_gen != .g13 || driver.unit_address == 0 { return }
 	for path in driver.sysfs_entries {
@@ -45,18 +47,23 @@ fn (mut driver AgxDriver) publish_sysfs(mgr &gpu.GpuManager) {
 	fs.sysfs_directory('bus/platform')
 	stats := sysfs_child(directory, '/', 'agx_stats')
 	memory_path := sysfs_child(directory, '/', 'gpu_memory')
+	platform_name := unsafe { tos(directory.str + gpu_sysfs_prefix.len, directory.len - gpu_sysfs_prefix.len) }
+	bus_device := sysfs_child('bus/platform/devices/', platform_name, '')
+	bus_target := sysfs_child('../../../', directory, '')
 	driver.sysfs_entries = [
 		owned_sysfs_path(uevent_path, fs.sysfs_text(uevent_path, uevent)),
 		owned_sysfs_path(modalias_path, fs.sysfs_text(modalias_path, modalias_line)),
 		owned_sysfs_path(subsystem, fs.sysfs_link(subsystem, '../../../../bus/platform')),
 		owned_sysfs_path(stats, fs.sysfs_attribute(stats, 0o444, show_agx_stats, unsafe { nil }, voidptr(mgr))),
 		owned_sysfs_path(memory_path, fs.sysfs_attribute(memory_path, 0o444, show_gpu_memory, unsafe { nil }, voidptr(mgr))),
+		owned_sysfs_path(bus_device, fs.sysfs_link(bus_device, bus_target)),
 	]!
 	unsafe {
 		directory.free()
 		modalias.free()
 		uevent.free()
 		modalias_line.free()
+		bus_target.free()
 	}
 }
 

@@ -31,7 +31,7 @@ pub mut:
 	detected    bool
 	initialized bool
 	// Paths of the platform entries AGX created. The directory is shared.
-	sysfs_entries [5]string
+	sysfs_entries [6]string
 	// Physical base of the GPU's first register range, the ASC: its device-tree
 	// unit address, which Linux names the platform device after.
 	unit_address u64
@@ -1284,7 +1284,7 @@ pub fn shutdown() {
 	println('agx: Shutting down Apple GPU driver')
 
 	// Remove the DRM minors and debugfs entries before removing AGX's own
-	// files from the shared platform directory.
+	// sysfs entries.
 	if agx_driver_inst.drm_dev != unsafe { nil } {
 		drm.unregister_device(agx_driver_inst.drm_dev)
 		agx_driver_inst.drm_dev = unsafe { nil }
