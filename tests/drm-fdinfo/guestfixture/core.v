@@ -1398,6 +1398,20 @@ fn test_sendfile_pipe_admission() bool {
 		&& C.read(sockets[0], &chunk[0], 4) == 4 && C.strncmp(&chunk[0], c'keep', 4) == 0
 }
 
+fn read_pending_sigpipe(signal_fd i32) bool {
+	mut info := C.signalfd_siginfo{}
+	got := C.read(signal_fd, &info, sizeof(info))
+	if got != sizeof(info)
+		|| info.ssi_signo != u32(C.SIGPIPE) || info.ssi_errno != 0 || info.ssi_code != C.SI_USER
+		|| info.ssi_pid != u32(C.getpid()) || info.ssi_uid != C.getuid() {
+		C.printf(c'DRM pipe signal read %d errno %d number %u code %d pid %u uid %u\n',
+			i32(got), unsafe { *C.__errno_location() }, info.ssi_signo, info.ssi_code,
+			info.ssi_pid, info.ssi_uid)
+		return false
+	}
+	return true
+}
+
 fn check_pending_sendfile_sigpipe(output i32, input i32, mask u64) bool {
 	signal_fd := i32(C.syscall(C.SYS_signalfd4, i64(-1), &mask, u64(sizeof(u64)), C.SFD_NONBLOCK))
 	if signal_fd < 0 {
@@ -1407,16 +1421,8 @@ fn check_pending_sendfile_sigpipe(output i32, input i32, mask u64) bool {
 	defer { C.close(signal_fd) }
 	mut info := C.signalfd_siginfo{}
 	for attempt in 0 .. 2 {
-		if !sendfile_replies(output, input, unsafe { nil }, u64(attempt * 4), C.EPIPE) {
-			return false
-		}
-		got := C.read(signal_fd, &info, sizeof(info))
-		if got != sizeof(info)
-			|| info.ssi_signo != u32(C.SIGPIPE) || info.ssi_errno != 0 || info.ssi_code != C.SI_USER
-			|| info.ssi_pid != u32(C.getpid()) || info.ssi_uid != C.getuid() {
-			C.printf(c'DRM sendfile signal read %d errno %d number %u code %d pid %u uid %u\n',
-				i32(got), unsafe { *C.__errno_location() }, info.ssi_signo, info.ssi_code,
-				info.ssi_pid, info.ssi_uid)
+		if !sendfile_replies(output, input, unsafe { nil }, u64(attempt * 4), C.EPIPE)
+			|| !read_pending_sigpipe(signal_fd) {
 			return false
 		}
 	}
@@ -1461,6 +1467,70 @@ fn test_sendfile_pipe_signal() bool {
 	mut status := i32(0)
 	return C.waitpid(child, &status, 0) == child && C.WIFSIGNALED(status) != 0
 		&& C.WTERMSIG(status) == C.SIGPIPE
+}
+
+fn test_partial_pipe_write_signal(signal_fd i32) bool {
+	mut fds := [2]i32{}
+	if C.pipe(&fds[0]) != 0 { return false }
+	capacity := C.fcntl(fds[1], C.F_SETPIPE_SZ, i32(4096))
+	if capacity <= 0 {
+		C.close(fds[0])
+		C.close(fds[1])
+		return false
+	}
+	length := u64(capacity) * 2
+	data := C.mmap(unsafe { nil }, usize(length), C.PROT_READ | C.PROT_WRITE,
+		C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+	if data == voidptr(C.MAP_FAILED) {
+		C.close(fds[0])
+		C.close(fds[1])
+		return false
+	}
+	defer { C.munmap(data, usize(length)) }
+	child := C.fork()
+	if child == 0 {
+		C.close(fds[0])
+		ok := C.write(fds[1], data, length) == capacity && read_pending_sigpipe(signal_fd)
+		C._exit(if ok { 0 } else { 1 })
+	}
+	C.close(fds[1])
+	mut ready := C.pollfd{fd: fds[0], events: i16(C.POLLIN)}
+	started := child > 0 && C.poll(&ready, 1, 5000) == 1 && ready.revents & C.POLLIN != 0
+	C.close(fds[0])
+	mut status := i32(0)
+	reaped := child > 0 && C.waitpid(child, &status, 0) == child
+	return started && reaped && status == 0
+}
+
+fn test_pipe_write_signal() bool {
+	mask := u64(1) << (C.SIGPIPE - 1)
+	mut previous := u64(0)
+	if C.syscall(C.SYS_rt_sigprocmask, C.SIG_BLOCK, &mask, &previous, u64(sizeof(u64))) != 0 {
+		return false
+	}
+	defer {
+		C.syscall(C.SYS_rt_sigprocmask, C.SIG_SETMASK, &previous, unsafe { nil }, u64(sizeof(u64)))
+	}
+	signal_fd := i32(C.syscall(C.SYS_signalfd4, i64(-1), &mask, u64(sizeof(u64)), C.SFD_NONBLOCK))
+	if signal_fd < 0 { return false }
+	defer { C.close(signal_fd) }
+	mut fds := [2]i32{}
+	if C.pipe(&fds[0]) != 0 { return false }
+	defer { C.close(fds[1]) }
+	if C.close(fds[0]) != 0 { return false }
+	byte := u8(1)
+	empty := C.iovec{}
+	vector := C.iovec{iov_base: unsafe { &byte }, iov_len: 1}
+	mut info := C.signalfd_siginfo{}
+	if C.write(fds[1], &byte, 0) != 0 || C.syscall(C.SYS_writev, fds[1], &empty, i64(1)) != 0
+		|| C.read(signal_fd, &info, sizeof(info)) != -1 || unsafe { *C.__errno_location() } != C.EAGAIN {
+		return false
+	}
+	return C.write(fds[1], &byte, 1) == -1 && unsafe { *C.__errno_location() } == C.EPIPE
+		&& read_pending_sigpipe(signal_fd)
+		&& C.syscall(C.SYS_writev, fds[1], &vector, i64(1)) == -1
+		&& unsafe { *C.__errno_location() } == C.EPIPE && read_pending_sigpipe(signal_fd)
+		&& test_partial_pipe_write_signal(signal_fd)
 }
 
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
@@ -1595,6 +1665,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM SENDFILE SIGPIPE: PASS')
 	} else {
 		C.puts(c'DRM SENDFILE SIGPIPE FAIL: incorrect signal, sender, error or position')
+	}
+	if test_pipe_write_signal() {
+		C.puts(c'VINIX DRM PIPE WRITE SIGPIPE: PASS')
+	} else {
+		C.puts(c'DRM PIPE WRITE SIGPIPE FAIL: incorrect signal, write result or partial count')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')

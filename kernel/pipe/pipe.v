@@ -1,3 +1,4 @@
+@[has_globals]
 module pipe
 
 import kbudget
@@ -50,7 +51,15 @@ pub mut:
 	box &resource.Resource = unsafe { nil }
 }
 
-pub fn initialise() {}
+type BrokenPipeSignalHook = fn ()
+
+__global (
+	broken_pipe_signal_hook voidptr
+)
+
+pub fn initialise(signal_hook voidptr) {
+	broken_pipe_signal_hook = signal_hook
+}
 
 fn (mut this Pipe) poll_status(access int) int {
 	this.l.acquire()
@@ -365,9 +374,16 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 }
 
 fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
+	mut broken := false
 	this.l.acquire()
 	defer {
 		this.l.release()
+		if broken && handle != unsafe { nil } && broken_pipe_signal_hook != unsafe { nil } {
+			saved_error := errno.get()
+			signal := unsafe { BrokenPipeSignalHook(broken_pipe_signal_hook) }
+			signal()
+			errno.set(saved_error)
+		}
 	}
 
 	open_handle := unsafe { &file.Handle(handle) }
@@ -377,6 +393,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 	}
 
 	if this.readers == 0 {
+		broken = true
 		errno.set(errno.epipe)
 		return none
 	}
@@ -403,6 +420,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 		required_room := if atomic_write { _count } else { u64(1) }
 		for this.capacity - katomic.load(&this.used) < required_room {
 			if this.readers == 0 {
+				broken = true
 				if written != 0 {
 					return i64(written)
 				}
@@ -435,6 +453,7 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 		}
 
 		if this.readers == 0 {
+			broken = true
 			if written != 0 {
 				return i64(written)
 			}

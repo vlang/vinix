@@ -971,6 +971,31 @@ at `/Users/alex/.local/state/vinix/m1-drm-sendfile-sigpipe-20261122.w8s9bG/`.
 The `bundle.tar.gz` SHA-256 is
 `5d042079bbc22882b40a4805d38655570db4afe361a7f13ccd7874d6c4400ae6`.
 
+#### Pipe write SIGPIPE delivery
+
+Writes to a pipe queue `SIGPIPE` on the calling thread when the backend
+finds no readers. With no progress, `write` and `writev` return `EPIPE`.
+If the last reader closes during a write, the caller gets the byte count
+already accepted and the signal. Zero-length writes return zero without
+queuing a signal. Delivery runs after the pipe lock is released. Sendfile
+uses this path for write-time failures and signals separately when its
+readiness check detects a broken pipe.
+[Pinned Linux pipe write behavior](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/pipe.c#L548-L601)
+
+ARM64 and x86-64 QEMU checked scalar and vectored writes to a closed
+pipe, zero-length writes, and a blocked writer whose reader closed after
+accepting a prefix. The sendfile signal probes also passed. The preceding
+x86-64 kernel returned `EPIPE` with no pending signal. Independent review
+checked lock release and ownership. The DRM syncobj host suite passed,
+and the allocation scan reproduced its 150 baseline findings. Native M1
+validation remains open.
+
+The tested base was `13993efa5ef1b737c09f364b1db98c1f5a060039` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-pipe-write-sigpipe-20261122.NJrUzZ/`.
+The `bundle.tar.gz` SHA-256 is
+`8789dfc1a38abc2859db9374d2e7d997a2d01b0b29a2bc7da693644cce76e080`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

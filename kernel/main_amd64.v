@@ -108,7 +108,7 @@ fn kmain_thread() {
 	rtl8169.initialise()
 	$if net_carrier_selftest ? { inet.carrier_selftest() }
 	sched.set_device_poll_callback(voidptr(poll_network))
-	pipe.initialise()
+	pipe.initialise(voidptr(userland.signal_broken_pipe))
 	futex.initialise()
 	fs.initialise()
 

@@ -807,9 +807,6 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 			fs.seek_pinned_descriptor(input_fd, -i64(got - accepted), fs.seek_cur)
 		}
 		if write_error != 0 {
-			if destination_pipe != unsafe { nil } && write_error == errno.epipe {
-				userland.signal_broken_pipe()
-			}
 			if total == 0 {
 				return written, write_error
 			}

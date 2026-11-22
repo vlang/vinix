@@ -206,7 +206,7 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	if qemu_platform {
 		virtio_net.initialise(memory.get_hhdm_offset())
 	}
-	pipe.initialise()
+	pipe.initialise(voidptr(userland.signal_broken_pipe))
 	print('kmain_thread: pipe done\n')
 	futex.initialise()
 	print('kmain_thread: futex done\n')
