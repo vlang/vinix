@@ -771,6 +771,31 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-inode-20261122.KUZpR4/`. The
 `bundle.tar.gz` SHA-256 is
 `c32ecb6fccfe82feec937aae45f4d586bd2eeb198ff8a5aff60b113f26045532`.
 
+#### PRIME DMA-BUF inode owner and timestamps
+
+A new PRIME DMA-BUF description records the exporting task's filesystem
+UID and GID. It uses one realtime sample for access, modification and
+change timestamps. The credentials are sampled together under the
+process-table lock before the clock read and descriptor publication.
+Duplicates share the description and its creation metadata. Independent
+exports in Vinix each create an open description.
+[Pinned Linux anonymous inode ownership and timestamps](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/libfs.c#L1584-L1589)
+
+ARM64 and x86-64 QEMU exported a buffer with filesystem IDs
+`1234:2345`, restored those IDs, and closed the original descriptor and
+GEM handle. The duplicate reported the exporter's IDs and equal
+timestamps within the realtime samples bracketing export. The preceding
+x86-64 kernel returned zero IDs and timestamps with the same guest
+executable. The DRM wire sanitizer suite and the PRIME inode, filesystem
+and mapping probes passed. The allocation scan reproduced its 150
+baseline findings. Native M1 validation remains open.
+
+The tested base was `a9aee8161921f878c371b8bbde95527017f5fc75` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-owner-20261122.wZqTFS/`. The
+`bundle.tar.gz` SHA-256 is
+`4d8c78948b5fd8f04bb62582326498d7236179a4cc291178f0cb8140989112aa`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

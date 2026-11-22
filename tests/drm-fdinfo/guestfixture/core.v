@@ -8,6 +8,7 @@ module guestfixture
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/fsuid.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
@@ -17,6 +18,7 @@ module guestfixture
 #include <sys/stat.h>
 #include <sys/statfs.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 fn C.open(&char, i32, ...) i32
@@ -29,6 +31,9 @@ fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
 fn C.mremap(voidptr, usize, usize, i32, ...) voidptr
 fn C.getpagesize() i32
+fn C.setfsuid(u32) i32
+fn C.setfsgid(u32) i32
+fn C.clock_gettime(i32, &C.timespec) i32
 fn C.fstat(i32, &C.stat) i32
 fn C.fstatfs(i32, &C.statfs) i32
 fn C.ftruncate(i32, i64) i32
@@ -68,12 +73,22 @@ struct C.rlimit {
 	rlim_max u64
 }
 
+struct C.timespec {
+	tv_sec i64
+	tv_nsec i64
+}
+
 struct C.stat {
 	st_mode u32
 	st_nlink u64
+	st_uid u32
+	st_gid u32
 	st_size i64
 	st_blksize i64
 	st_blocks i64
+	st_atim C.timespec
+	st_mtim C.timespec
+	st_ctim C.timespec
 }
 
 struct C.statfs {
@@ -789,6 +804,37 @@ fn test_prime_inode_metadata(fd i32, size u64) bool {
 		&& info.st_size == i64(size) && info.st_blocks == i64(size / 512) && truncate_refused
 }
 
+const prime_fixture_uid = u32(1234)
+const prime_fixture_gid = u32(2345)
+
+fn export_with_filesystem_ids(card i32, mut request ExtendedPrimeRequest) bool {
+	old_gid := C.setfsgid(prime_fixture_gid)
+	old_uid := C.setfsuid(prime_fixture_uid)
+	defer {
+		C.setfsuid(u32(old_uid))
+		C.setfsgid(u32(old_gid))
+	}
+	return u32(C.setfsuid(~u32(0))) == prime_fixture_uid
+		&& u32(C.setfsgid(~u32(0))) == prime_fixture_gid
+		&& C.ioctl(card, i32(u32(0xc00c642d)), unsafe { &request }) == 0 && request.fd >= 0
+}
+
+fn time_at_most(left C.timespec, right C.timespec) bool {
+	return left.tv_sec < right.tv_sec || (left.tv_sec == right.tv_sec && left.tv_nsec <= right.tv_nsec)
+}
+
+fn test_prime_inode_owner_times(fd i32, before C.timespec, after C.timespec) bool {
+	mut info := C.stat{}
+	if C.fstat(fd, &info) != 0 { return false }
+	timestamp := info.st_ctim
+	C.printf(c'DRM PRIME inode: uid %u gid %u ctime %ld.%09ld\n',
+		info.st_uid, info.st_gid, timestamp.tv_sec, timestamp.tv_nsec)
+	return info.st_uid == prime_fixture_uid && info.st_gid == prime_fixture_gid
+		&& time_at_most(before, timestamp) && time_at_most(timestamp, after)
+		&& info.st_atim.tv_sec == timestamp.tv_sec && info.st_atim.tv_nsec == timestamp.tv_nsec
+		&& info.st_mtim.tv_sec == timestamp.tv_sec && info.st_mtim.tv_nsec == timestamp.tv_nsec
+}
+
 fn test_prime_filesystem_type() bool {
 	mut info := C.statfs{}
 	card := C.open(c'/dev/dri/card0', C.O_RDWR)
@@ -797,8 +843,12 @@ fn test_prime_filesystem_type() bool {
 	if C.fstatfs(card, &info) != 0 || info.f_type == 0x444d4142 { return false }
 	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
 	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
+	mut before := C.timespec{}
+	mut after := C.timespec{}
+	if C.clock_gettime(C.CLOCK_REALTIME, &before) != 0 { return false }
 	mut export := ExtendedPrimeRequest{handle: create.handle, flags: u32(C.O_RDWR), fd: -1}
-	if C.ioctl(card, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0 { return false }
+	if !export_with_filesystem_ids(card, mut export) { return false }
+	clock_ok := C.clock_gettime(C.CLOCK_REALTIME, &after) == 0
 	duplicate := C.dup(export.fd)
 	C.close(export.fd)
 	if duplicate < 0 { return false }
@@ -808,6 +858,11 @@ fn test_prime_filesystem_type() bool {
 		C.puts(c'VINIX DRM PRIME INODE METADATA: PASS')
 	} else {
 		C.puts(c'DRM PRIME INODE METADATA FAIL: incorrect anonymous inode reply')
+	}
+	if clock_ok && test_prime_inode_owner_times(duplicate, before, after) {
+		C.puts(c'VINIX DRM PRIME INODE OWNER AND TIMES: PASS')
+	} else {
+		C.puts(c'DRM PRIME INODE OWNER AND TIMES FAIL: incorrect creation metadata')
 	}
 	if C.fstatfs(duplicate, &info) != 0 { return false }
 	C.printf(c'DRM PRIME fstatfs: type %#lx block %lu fragment %lu name limit %lu\n',

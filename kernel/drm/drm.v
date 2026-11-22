@@ -19,6 +19,7 @@ import sched
 import proc
 import memory
 import memory.mmap
+import time
 import usercopy
 
 // DRM driver feature flags
@@ -1260,6 +1261,11 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32, reservation &f
 		errno.set(errno.enomem)
 		return none
 	}
+	process := proc.current_thread().process
+	proc.lock_table()
+	uid, gid := process.fsuid, process.fsgid
+	proc.unlock_table()
+	now := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
 	mut wrapper := unsafe { &GemPrimeResource(allocation) }
 	unsafe { *wrapper = GemPrimeResource{
 		stat: stat.Stat{
@@ -1268,9 +1274,14 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32, reservation &f
 			ino: gem.create_mmap_offset(obj) / page_size
 			nlink: 1
 			mode: 0o600 // Linux anonymous inodes have no file type bits.
+			uid: uid
+			gid: gid
 			size: i64(obj.size)
 			blksize: i64(page_size)
 			blocks: i64(obj.size / 512)
+			atim: now
+			mtim: now
+			ctim: now
 		}
 		dev: dev
 		obj: obj
