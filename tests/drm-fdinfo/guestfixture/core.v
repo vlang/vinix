@@ -700,6 +700,19 @@ mut:
 	tail u32
 }
 
+fn test_prime_cpu_access(fd i32) bool {
+	command := i32(0x40086200)
+	mut flags := u64(1) // START | READ
+	if C.ioctl(fd, command, unsafe { &flags }) != 0 { return false }
+	flags = 7 // END | READ | WRITE
+	if C.ioctl(fd, command, unsafe { &flags }) != 0 { return false }
+	flags = 4 // END requires an access direction.
+	return C.ioctl(fd, command, unsafe { &flags }) == -1
+		&& unsafe { *C.__errno_location() } == C.EINVAL
+		&& C.ioctl(fd, command, u64(1)) == -1
+		&& unsafe { *C.__errno_location() } == C.EFAULT
+}
+
 fn test_prime_transport(card &char, foreign i32) bool {
 	exporter := C.open(card, C.O_RDWR)
 	if exporter < 0 { return false }
@@ -722,6 +735,7 @@ fn test_prime_transport(card &char, foreign i32) bool {
 		return false
 	}
 	defer { C.close(export.fd) }
+	if !test_prime_cpu_access(export.fd) { return false }
 	if export.handle != create.handle || export.flags != u32(C.O_CLOEXEC)
 		|| export.tail != 0x12345678 || export.fd > 0x00ffffff {
 		return false

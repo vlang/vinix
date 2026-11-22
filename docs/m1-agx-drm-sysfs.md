@@ -622,6 +622,27 @@ also used the archived software Asahi fixture patch. Evidence is stored at
 The `bundle.tar.gz` SHA-256 is
 `c93965f7f5a474c8826af9e3386e1077193288df52d3012fb8a8a7a3dd73091d`.
 
+#### Framebuffer DMA-BUF CPU access
+
+Framebuffer PRIME descriptors accept `DMA_BUF_IOCTL_SYNC`. The handler
+reads one 64-bit flag word and accepts READ, WRITE or both at START and
+END. It returns `EINVAL` for invalid flags and `EFAULT` for an unreadable
+word. Framebuffer buffers have an empty reservation, so valid CPU access
+requests complete immediately. [Pinned Linux DMA-BUF sync ioctl](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L554-L596)
+
+The sanitizer suite covered all six valid flag combinations, malformed
+commands, copy faults and native PRIME reservation waits. ARM64 and
+x86-64 QEMU verified START, END and the two error replies on exported
+framebuffer buffers. The preceding x86-64 kernel failed the same probe.
+The allocation scan reproduced the 150 baseline findings. Native M1
+validation remains open.
+
+The tested base was `6e09bfdb695ef406410a311467032f60887a7411` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-framebuffer-prime-sync-20261122.TkKFBj/`.
+The `bundle.tar.gz` SHA-256 is
+`46a6cf58f261f1f01125a2f6a9c1a780c8fdf51af674ec025d9fb517254d2a5c`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

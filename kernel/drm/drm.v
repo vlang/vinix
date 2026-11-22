@@ -209,10 +209,15 @@ fn (mut this GemPrimeResource) write(_handle voidptr, _buf voidptr, _loc u64, _c
 }
 
 fn (mut this GemPrimeResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
-	if this.obj == unsafe { nil } || !this.obj.file_scoped {
+	if this.obj == unsafe { nil } {
 		return resource.default_ioctl(handle, request, argp)
 	}
-	result := match u32(request) {
+	cmd := u32(request)
+	if !this.obj.file_scoped && (cmd != ioctl.dma_buf_ioctl_sync
+		|| this.dev.driver.features & driver_dumb_buffer == 0) {
+		return resource.default_ioctl(handle, request, argp)
+	}
+	result := match cmd {
 		ioctl.dma_buf_ioctl_sync { prime_cpu_access(this.obj, u64(argp)) }
 		ioctl.dma_buf_ioctl_export_sync_file { prime_export_sync_file(this.obj, u64(argp)) }
 		ioctl.dma_buf_ioctl_import_sync_file { prime_import_sync_file(this.obj, u64(argp)) }

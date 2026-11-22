@@ -14,8 +14,10 @@ import stat
 import usercopy
 
 const page_size = u64(4096)
+const driver_dumb_buffer = u32(2)
 
 struct DrmDriver {
+	features u32
 	gem_export fn (&DrmDevice, voidptr, u32) ?&gem.GemObject
 	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
 	gem_import fn (&DrmDevice, voidptr, &gem.GemObject) ?u32
@@ -137,10 +139,11 @@ fn check_prime_inode(device &DrmDevice, object &gem.GemObject, number int) {
 	assert ioctl_prime_handle_to_fd(device, voidptr(11), &export) == 0
 	new_metadata := prime_fstat(export.fd)
 	assert new_metadata.dev == first.dev && new_metadata.ino != first.ino && new_metadata.size == first.size
-	mut ordinary := file.fd_from_fdnum(unsafe { nil }, export.fd) or { panic('ordinary PRIME fd') }
-	assert prime_fd_ioctl(mut ordinary, 0x40086200, 0) == -25
-	assert usercopy.reads == 0
-	ordinary.unref()
+	mut replacement_fd := file.fd_from_fdnum(unsafe { nil }, export.fd) or { panic('replacement PRIME fd') }
+	framebuffer := device.driver.features & driver_dumb_buffer != 0
+	assert prime_fd_ioctl(mut replacement_fd, u64(ioctl.dma_buf_ioctl_sync), 0) == if framebuffer { -14 } else { -25 }
+	assert usercopy.reads == if framebuffer { 1 } else { 0 }
+	replacement_fd.unref()
 	file.close(export.fd)
 	assert replacement.references == 1 && object.references == 2
 	assert prime_fstat(number).ino == first.ino
@@ -150,14 +153,16 @@ fn check_prime_inode(device &DrmDevice, object &gem.GemObject, number int) {
 fn check_prime_descriptors() {
 	custom := DrmDriver{gem_export: prime_export, gem_export_put: prime_put, gem_import: prime_import}
 	default_driver := DrmDriver{gem_export: prime_export, gem_import: prime_import}
+	framebuffer := DrmDriver{features: driver_dumb_buffer, gem_export: prime_export, gem_import: prime_import}
 	client := voidptr(11)
 	mut offset := u64(0x10000000)
-	for driver in [custom, default_driver]! {
+	for driver in [custom, default_driver, framebuffer]! {
 		memory.reset()
 		proc.reset()
 		device := DrmDevice{driver: unsafe { &driver }}
 		foreign := DrmDevice{driver: unsafe { &driver }}
-		mut object := gem.GemObject{handle: 7, vm_private_identity: 99, size: 0x10000010000, file_scoped: true,
+		mut object := gem.GemObject{handle: 7, vm_private_identity: 99, size: 0x10000010000,
+			file_scoped: driver.features & driver_dumb_buffer == 0,
 			mmap_offset: offset}
 		offset += 2 * object.size
 		prime_exported = unsafe { &object }
@@ -199,6 +204,10 @@ fn check_prime_descriptors() {
 		mut fd := file.fd_from_fdnum(unsafe { nil }, request.fd) or { panic('installed PRIME fd') }
 		assert fd.flags & resource.o_cloexec != 0 && fd.handle.flags & resource.o_rdwr != 0
 		check_prime_cpu_access(mut fd)
+		if !object.file_scoped {
+			assert prime_fd_ioctl(mut fd, u64(ioctl.dma_buf_ioctl_export_sync_file), 0) == -25
+			assert prime_fd_ioctl(mut fd, u64(ioctl.dma_buf_ioctl_import_sync_file), 0) == -25
+		}
 		check_prime_seek(mut fd, request.fd, object.size)
 		fd.unref()
 		check_prime_inode(&device, &object, request.fd)
