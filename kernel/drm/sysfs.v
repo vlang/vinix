@@ -148,6 +148,9 @@ fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
 	// A name another device already has stays that device's, as Linux's
 	// debugfs_create_dir() refuses it; this device then gets no directory.
 	if fs.sysfs_create_directory(directory) {
+		name := debugfs_name_text(dev.driver.name, unique)
+		publish_text(directory, 'name', name)
+		unsafe { name.free() }
 		dev.debugfs_primary_link = publish_debugfs_link(dev.dev_id, unique)
 		if dev.render_node != unsafe { nil } {
 			dev.debugfs_render_link = publish_debugfs_link(128 + dev.dev_id, unique)
@@ -157,6 +160,18 @@ fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
 		unsafe { directory.free() }
 	}
 	unsafe { unique.free() }
+}
+
+// The parent name is both the device name and the DRM unique identifier.
+fn debugfs_name_text(driver_name string, unique string) string {
+	mut text := lib.new_text(driver_name.len + 2 * unique.len + 14)
+	text.add(driver_name)
+	text.add(' dev=')
+	text.add(unique)
+	text.add(' unique=')
+	text.add(unique)
+	text.add_byte(`\n`)
+	return lib.finish_text(text)
 }
 
 fn publish_debugfs_link(minor u32, unique string) bool {

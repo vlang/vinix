@@ -132,6 +132,7 @@ part of it in /sys, at the path where Linux mounts debugfs:
 
 ```
 /sys/kernel/debug/dri/206400000.gpu/
+    name           asahi dev=206400000.gpu unique=206400000.gpu
     asahi_stats    added by the AGX driver; root-only
 /sys/kernel/debug/dri/0    -> 206400000.gpu
 /sys/kernel/debug/dri/128  -> 206400000.gpu
@@ -146,8 +147,33 @@ unregistering, so a driver adds its files during its own registration. A
 device with no parent gets no directory, and adding a file to it fails. So
 does a second device whose parent has a name already taken there, as Linux's
 `debugfs_create_dir()` refuses it. The debugfs root has Linux's default mode
-`0700`. On the M1 the GPU's file is `asahi_stats`
+`0700`. On the M1 AGX adds `asahi_stats`
 ([raw statistics](m1-agx-stats.md#raw-statistics-in-debugfs)).
+
+### DRM device name
+
+DRM writes the driver's name and the parent device name to the read-only
+`name` file before publishing the numeric links. The parent name supplies
+both `dev=` and `unique=`. Sysfs keeps its own copy of the line and
+removes it when the device's debugfs directory is removed. [Pinned Linux name formatter](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L54-L73)
+
+The DRM sysfs sanitizer fixture checked the exact lines for Asahi and
+VirtIO-MMIO, reads through the card and render links, and removal at
+unregister. It also verified that a competing directory receives no file
+and a driver cannot replace the core file. Two controls caught a missing
+file and publication into a competing directory. Independent lifetime
+review confirmed that sysfs retains the cloned text for open readers.
+
+Both kernel builds used `-O1` for C compilation. The ARM64 DRM discovery
+and x86-64 class version and debugfs permission probes passed in QEMU
+under TCG. The DRM wire sanitizer fixture passed, and the allocation scan
+reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `fee483573fd4e84cb9b50b840157236bbf5233cd` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-debugfs-name-20261122.dQB93U/`.
+The `bundle.tar.gz` SHA-256 is
+`64dbb921db254658c8eec3ce7eaf7ba6a09ad7c73c07f47782abd4c45d27d912`.
 
 ### Debugfs root permissions
 

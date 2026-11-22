@@ -7,6 +7,7 @@ import lib
 // The DRM core types the publisher reads.
 pub struct DrmDriver {
 pub mut:
+	name string
 	sysfs_parent string
 }
 
@@ -240,7 +241,7 @@ pub fn run_checks() {
 	// under the directory named after the device-tree node.
 	parent := gpu_sysfs_path(0x206400000)
 	assert parent == 'devices/platform/soc/${oracle_unit}.${oracle_node}', parent
-	mut driver := DrmDriver{sysfs_parent: parent}
+	mut driver := DrmDriver{name: 'asahi', sysfs_parent: parent}
 	mut node := DrmNode{}
 	mut gpu_device := DrmDevice{driver: &driver, dev_id: 1, render_node: &node}
 	publish_drm_sysfs(mut gpu_device)
@@ -298,10 +299,13 @@ pub fn run_checks() {
 	debugfs := 'kernel/debug/dri/${unique}'
 	assert gpu_device.debugfs_dir == debugfs, gpu_device.debugfs_dir
 	assert fs.published(debugfs)
+	expected_name := 'asahi dev=${unique} unique=${unique}\n'
 	for minor in [u32(1), 129] {
 		assert (readlink('kernel/debug/dri/${minor}') or { '' }) == unique, 'dri/${minor}'
 		assert (resolve('kernel/debug/dri/${minor}') or { '' }) == debugfs
+		assert text_of('kernel/debug/dri/${minor}/name') == expected_name
 	}
+	assert !debugfs_add_file(&gpu_device, 'name', show_marker, unsafe { nil })
 	// A driver's file in it: root-only, read through its show function, and
 	// reachable through either minor's link.
 	assert debugfs_add_file(&gpu_device, 'asahi_stats', show_marker, voidptr(u64(42)))
@@ -313,7 +317,7 @@ pub fn run_checks() {
 	// A second device whose parent has the same name gets no directory, as
 	// Linux's debugfs_create_dir() refuses a taken name, and its removal
 	// leaves the first device's directory alone.
-	mut twin_driver := DrmDriver{sysfs_parent: parent}
+	mut twin_driver := DrmDriver{name: 'second_driver', sysfs_parent: parent}
 	mut twin := DrmDevice{driver: &twin_driver, dev_id: 2, render_node: &node}
 	publish_drm_sysfs(mut twin)
 	assert twin.debugfs_dir == '' && !fs.published('kernel/debug/dri/2')
@@ -321,6 +325,7 @@ pub fn run_checks() {
 	assert !debugfs_add_file(&twin, 'asahi_stats', show_marker, unsafe { nil })
 	remove_drm_sysfs(mut twin)
 	assert (read_attribute('kernel/debug/dri/1/asahi_stats') or { '' }) == 'stats of 42\n'
+	assert text_of('${debugfs}/name') == expected_name
 
 	competed_name := 'competing.gpu'
 	competed_directory := 'kernel/debug/dri/${competed_name}'
@@ -332,6 +337,7 @@ pub fn run_checks() {
 	assert !fs.published('kernel/debug/dri/3') && !fs.published('kernel/debug/dri/131')
 	remove_drm_sysfs(mut losing_device)
 	assert text_of('${competed_directory}/owner') == 'competing device'
+	assert !fs.published('${competed_directory}/name')
 
 	mut partial_driver := DrmDriver{sysfs_parent: 'devices/platform/partial.gpu'}
 	mut partial_device := DrmDevice{driver: &partial_driver, dev_id: 4, render_node: &node}
@@ -370,7 +376,7 @@ pub fn run_checks() {
 	// the virtio_mmio@a003e00 node, with QEMU's vendor ID.
 	virtio_parent := virtio_device_path(0x0a003e00, 31)
 	assert virtio_parent == 'devices/platform/a003e00.virtio_mmio/virtio31', virtio_parent
-	mut virtio_driver := DrmDriver{sysfs_parent: virtio_parent}
+	mut virtio_driver := DrmDriver{name: 'virtio_gpu', sysfs_parent: virtio_parent}
 	mut virtio := DrmDevice{driver: &virtio_driver, dev_id: 2, render_node: &node}
 	publish_drm_sysfs(mut virtio)
 	publish_virtio_sysfs(0x0a003e00, 31, 16, 0x554d4551)
@@ -394,6 +400,7 @@ pub fn run_checks() {
 	assert (device_name(130) or { '' }) == '/dev/dri/renderD130'
 	assert (resolve('class/drm/renderD130/device') or { '' }) == virtio_parent
 	assert virtio.debugfs_dir == 'kernel/debug/dri/virtio31'
+	assert text_of('kernel/debug/dri/130/name') == 'virtio_gpu dev=virtio31 unique=virtio31\n'
 	remove_drm_sysfs(mut virtio)
 	assert !fs.published('dev/char/226:130') && !fs.published('class/drm/card2')
 
@@ -404,7 +411,7 @@ pub fn run_checks() {
 	for path in ['class/drm/card1', 'class/drm/renderD129', 'dev/char/226:1', 'dev/char/226:129',
 		'${parent}/drm/card1', '${parent}/drm/renderD129', 'class/drm/card0', 'dev/char/226:0',
 		'devices/virtual/drm/card0', 'kernel/debug/dri/1', 'kernel/debug/dri/129', debugfs,
-		'${debugfs}/asahi_stats'] {
+		'${debugfs}/asahi_stats', '${debugfs}/name'] {
 		assert !fs.published(path), '${path} survived unregister'
 	}
 	assert fs.published('${parent}/uevent')
