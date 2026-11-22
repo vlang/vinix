@@ -694,6 +694,33 @@ at `/Users/alex/.local/state/vinix/m1-drm-gem-metadata-20261122.Jl3K5l/`. The
 `bundle.tar.gz` SHA-256 is
 `6c683fd619f24f085258af044e7ff9bb22f28340e30e35dbee8b05aea7287320`.
 
+#### PRIME DMA-BUF mapping bounds
+
+PRIME DMA-BUF mappings check the entire page-rounded range against the
+buffer size, including the requested offset. A range beyond the buffer
+returns `EINVAL`. Growing a PRIME mapping with `mremap` returns
+`EFAULT`. File-scoped AGX buffers still require a shared mapping.
+[Pinned DMA-BUF range check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L212-L244)
+[Pinned DRM VMA flags](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L1150-L1183)
+[Pinned mremap growth check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/mm/mremap.c#L1737-L1744)
+
+ARM64 and x86-64 QEMU rejected an oversized length, an offset at the
+end, a subrange crossing the end, and mapping growth. Writes through
+the valid final-page mapping were visible through the full-buffer
+mapping. The preceding x86-64 kernel accepted all four invalid
+operations with the same guest executable.
+
+The AGX CPU cache and DRM wire sanitizer suites passed, along with the
+AArch64 desktop idle, apps and drag scenarios. Both kernel builds used
+`-O1` for C compilation. The allocation scan reproduced its 150 baseline
+findings. Native M1 validation remains open.
+
+The tested base was `131db35b7688ce31f5ac5cdc13936d76c58d7fbd` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-mmap-20261122.uf23Ew/`. The
+`bundle.tar.gz` SHA-256 is
+`9d6b856c182946b00ec5f6d60ad9b9ae814f26a546dcd15c58c290c24f740635`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

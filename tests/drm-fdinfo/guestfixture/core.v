@@ -9,6 +9,7 @@ module guestfixture
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/reboot.h>
 #include <sys/resource.h>
@@ -22,6 +23,10 @@ fn C.read(i32, voidptr, u64) i64
 fn C.lseek(i32, i64, i32) i64
 fn C.write(i32, voidptr, u64) i64
 fn C.ioctl(i32, i32, ...) i32
+fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
+fn C.munmap(voidptr, usize) i32
+fn C.mremap(voidptr, usize, usize, i32, ...) voidptr
+fn C.getpagesize() i32
 fn C.poll(&C.pollfd, u64, i32) i32
 fn C.__errno_location() &i32
 fn C.dup(i32) i32
@@ -752,6 +757,47 @@ fn test_gem_metadata_reclamation() bool {
 	return direct && prime
 }
 
+fn prime_mmap_rejected(fd i32, length usize, offset i64) bool {
+	result := C.mmap(unsafe { nil }, length, C.PROT_READ, C.MAP_SHARED, fd, offset)
+	if result == voidptr(C.MAP_FAILED) { return unsafe { *C.__errno_location() } == C.EINVAL }
+	C.munmap(result, length)
+	return false
+}
+
+fn test_prime_mmap_bounds() bool {
+	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	page := usize(C.getpagesize())
+	mut create := DumbCreateRequest{width: 1, height: u32(page / 2), bpp: 32}
+	if C.ioctl(fd, i32(u32(0xc02064b2)), &create) != 0 || create.size < 2 * page {
+		return false
+	}
+	mut export := ExtendedPrimeRequest{handle: create.handle, flags: u32(C.O_RDWR), fd: -1}
+	if C.ioctl(fd, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0 { return false }
+	defer { C.close(export.fd) }
+	size := usize(create.size)
+	too_long := prime_mmap_rejected(export.fd, size + 1, 0)
+	at_end := prime_mmap_rejected(export.fd, page, i64(size))
+	crosses_end := prime_mmap_rejected(export.fd, page + 1, i64(size - page))
+	prot := C.PROT_READ | C.PROT_WRITE
+	full := C.mmap(unsafe { nil }, size, prot, C.MAP_SHARED, export.fd, 0)
+	if full == voidptr(C.MAP_FAILED) { return false }
+	defer { C.munmap(full, size) }
+	tail := C.mmap(unsafe { nil }, page, prot, C.MAP_SHARED, export.fd, i64(size - page))
+	if tail == voidptr(C.MAP_FAILED) { return false }
+	// Confirm that a valid final page aliases the original buffer.
+	unsafe { *(&u8(tail)) = 0x5a }
+	alias_ok := unsafe { *(&u8(full) + size - page) == 0x5a }
+	grown := C.mremap(tail, page, 2 * page, C.MREMAP_MAYMOVE)
+	fixed_size := grown == voidptr(C.MAP_FAILED) && unsafe { *C.__errno_location() } == C.EFAULT
+	if grown == voidptr(C.MAP_FAILED) { C.munmap(tail, page) }
+	else { C.munmap(grown, 2 * page) }
+	C.printf(c'DRM PRIME mmap: length %d end %d subrange %d alias %d no growth %d\n',
+		i32(too_long), i32(at_end), i32(crosses_end), i32(alias_ok), i32(fixed_size))
+	return too_long && at_end && crosses_end && alias_ok && fixed_size
+}
+
 fn test_prime_cpu_access(fd i32) bool {
 	command := i32(0x40086200)
 	mut flags := u64(1) // START | READ
@@ -1010,6 +1056,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM GEM METADATA RECLAMATION: PASS')
 		} else {
 			C.puts(c'DRM GEM METADATA RECLAMATION FAIL: objects retained after final close')
+		}
+		if test_prime_mmap_bounds() {
+			C.puts(c'VINIX DRM PRIME MMAP BOUNDS: PASS')
+		} else {
+			C.puts(c'DRM PRIME MMAP BOUNDS FAIL: incorrect extent or alias')
 		}
 	}
 	mut render := C.open(c'/dev/dri/renderD129', C.O_RDWR)

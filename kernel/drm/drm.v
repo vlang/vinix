@@ -189,13 +189,13 @@ fn (mut this GemPrimeResource) mapping_attributes(_handle voidptr, _offset u64) 
 }
 
 fn (mut this GemPrimeResource) admit_mapping_range(_handle voidptr, offset u64, length u64, flags int) bool {
-	if this.obj == unsafe { nil } || !this.obj.file_scoped { return true }
-	return flags & mmap.map_shared != 0 && length != 0 && offset <= this.obj.size
-		&& length <= this.obj.size - offset
+	obj := this.obj
+	return obj != unsafe { nil } && length != 0 && offset <= obj.size
+		&& length <= obj.size - offset && (!obj.file_scoped || flags & mmap.map_shared != 0)
 }
 
 fn (mut this GemPrimeResource) mapping_can_grow() bool {
-	return this.obj == unsafe { nil } || !this.obj.file_scoped
+	return false
 }
 
 fn (mut this GemPrimeResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
