@@ -298,22 +298,24 @@ fn (mut this Pipe) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 }
 
 fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
+	handle := unsafe { &file.Handle(_handle) }
+	// Kernel-internal callers can read a named FIFO without an open handle.
+	nonblocking := _handle != unsafe { nil } && handle.flags & resource.o_nonblock != 0
+	return this.read_with_mode(buf, _count, nonblocking)
+}
+
+fn (mut this Pipe) read_with_mode(buf voidptr, requested u64, nonblocking bool) ?i64 {
 	// A zero-byte read neither waits for data nor changes readiness. The
 	// descriptor layer has already checked the access mode and MAC policy.
-	if _count == 0 { return 0 }
-	mut count := _count
+	if requested == 0 { return 0 }
+	mut count := requested
 
 	this.l.acquire()
 	defer {
 		this.l.release()
 	}
 
-	handle := unsafe { &file.Handle(_handle) }
-	// A named FIFO reached through the VFS can be read with no open Handle
-	// (kernel-internal access); treat that as a blocking, read-only handle.
-	handle_flags := if _handle == unsafe { nil } { 0 } else { handle.flags }
-
-	this.wait_readable_locked(handle_flags & resource.o_nonblock != 0)?
+	this.wait_readable_locked(nonblocking)?
 	if this.used == 0 { return 0 }
 
 	if this.used < count {

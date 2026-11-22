@@ -16,9 +16,7 @@ import security
 import stat
 import usercopy
 
-// splice(2)/vmsplice(2)/tee(2) flags. None of them change what happens here —
-// there is no page stealing to ask for and nothing ever blocks on a gift — but
-// an unknown one is still refused.
+// Accepted splice(2), vmsplice(2) and tee(2) flags.
 const splice_f_known = 0xf
 const splice_f_nonblock = 2
 
@@ -339,7 +337,8 @@ fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.
 	mut source_pipe := pipe_from_fd(source) or { unsafe { nil } }
 	mut sink_pipe := pipe_from_fd(sink) or { unsafe { nil } }
 	source_without_io := source_handle.resource is resource.NoByteIOResource
-	nonblocking := flags & splice_f_nonblock != 0 || sink_handle.flags & resource.o_nonblock != 0
+	nonblocking := flags & splice_f_nonblock != 0
+		|| (sink_pipe != unsafe { nil } && sink_handle.flags & resource.o_nonblock != 0)
 		|| (source_pipe != unsafe { nil } && source_handle.flags & resource.o_nonblock != 0)
 
 	mut moved := u64(0)
@@ -375,8 +374,12 @@ fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.
 		} else {
 			u64(source_handle.loc)
 		}
-		got := source_handle.resource.read(voidptr(source_handle), buffer, read_from,
-			chunk) or {
+		read_result := if source_pipe != unsafe { nil } {
+			source_pipe.read_with_mode(buffer, chunk, nonblocking || moved != 0)
+		} else {
+			source_handle.resource.read(voidptr(source_handle), buffer, read_from, chunk)
+		}
+		got := read_result or {
 			unsafe { free(buffer) }
 			security.end_user_device_write(block_token)
 			if moved > 0 {

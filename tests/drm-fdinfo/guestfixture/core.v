@@ -50,6 +50,8 @@ fn C.dup(i32) i32
 fn C.dup2(i32, i32) i32
 fn C.fork() i32
 fn C.signal(i32, voidptr) voidptr
+fn C.sigaction(i32, &C.sigaction, &C.sigaction) i32
+fn C.alarm(u32) u32
 fn C._exit(i32)
 fn C.waitpid(i32, &i32, i32) i32
 fn C.WIFSIGNALED(i32) i32
@@ -80,6 +82,11 @@ fn C.setresuid(u32, u32, u32) i32
 fn C.socketpair(i32, i32, i32, &i32) i32
 fn C.sendmsg(i32, &C.msghdr, i32) i64
 fn C.recvmsg(i32, &C.msghdr, i32) i64
+
+struct C.sigaction {
+	sa_handler fn (i32)
+	sa_flags i32
+}
 
 struct C.rlimit {
 	rlim_cur u64
@@ -1596,6 +1603,55 @@ fn test_pipe_transfer_admission(prime i32) bool {
 		&& read_pending_sigpipe(signal_fd)
 }
 
+fn splice_wait_deadline(_ i32) {}
+
+fn test_splice_pipe_input() bool {
+	sink := i32(C.syscall(C.SYS_memfd_create, c'splice-pipe-input', u32(0)))
+	if sink < 0 { return false }
+	defer { C.close(sink) }
+	mut source := [2]i32{}
+	if C.pipe(&source[0]) != 0 { return false }
+	defer {
+		C.close(source[0])
+		if source[1] >= 0 { C.close(source[1]) }
+	}
+	alias := C.dup(source[0])
+	if alias < 0 { return false }
+	defer { C.close(alias) }
+
+	action := C.sigaction{sa_handler: splice_wait_deadline}
+	mut previous := C.sigaction{}
+	if C.sigaction(C.SIGALRM, &action, &previous) != 0 { return false }
+	defer { C.sigaction(C.SIGALRM, &previous, unsafe { nil }) }
+
+	mut offset := i64(3)
+	C.alarm(2)
+	empty := C.syscall(C.SYS_splice, source[0], unsafe { nil }, sink, &offset, u64(8),
+		u32(C.SPLICE_F_NONBLOCK))
+	empty_error := unsafe { *C.__errno_location() }
+	empty_before_deadline := C.alarm(0) != 0
+	if C.write(source[1], c'data', 4) != 4 { return false }
+	C.alarm(2)
+	moved := C.syscall(C.SYS_splice, source[0], unsafe { nil }, sink, unsafe { nil }, u64(8), u32(0))
+	short_before_deadline := C.alarm(0) != 0
+
+	if empty != -1 || empty_error != C.EAGAIN || !empty_before_deadline || offset != 3
+		|| moved != 4 || !short_before_deadline || C.fcntl(alias, C.F_GETFL) != C.O_RDONLY
+		|| C.lseek(sink, 0, C.SEEK_CUR) != 4 || C.lseek(sink, 0, C.SEEK_SET) != 0 {
+		C.printf(c'DRM SPLICE PIPE INPUT DETAIL: empty=%ld errno=%d early=%d offset=%ld moved=%ld early=%d\n',
+			empty, empty_error, int(empty_before_deadline), offset, moved, int(short_before_deadline))
+		return false
+	}
+	mut data := [5]char{}
+	if C.read(sink, &data[0], u64(data.len)) != 4 || C.strncmp(&data[0], c'data', 4) != 0
+		|| C.close(source[1]) != 0 {
+		return false
+	}
+	source[1] = -1
+	return C.syscall(C.SYS_splice, source[0], unsafe { nil }, sink, &offset, u64(8),
+		u32(C.SPLICE_F_NONBLOCK)) == 0 && offset == 3
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1738,6 +1794,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PIPE TRANSFER ADMISSION: PASS')
 	} else {
 		C.puts(c'DRM PIPE TRANSFER ADMISSION FAIL: incorrect error, signal or source data')
+	}
+	if test_splice_pipe_input() {
+		C.puts(c'VINIX DRM SPLICE PIPE INPUT: PASS')
+	} else {
+		C.puts(c'DRM SPLICE PIPE INPUT FAIL: incorrect wait, transfer or offset')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')

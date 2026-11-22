@@ -1022,6 +1022,28 @@ at `/Users/alex/.local/state/vinix/m1-drm-pipe-transfer-admission-20261122.S0uVK
 The `bundle.tar.gz` SHA-256 is
 `c56be987dcb70cfb33ed3a8ea31761955bd87211f0a04664ffa982cb0e22b592`.
 
+#### Splice reads from a pipe
+
+A pipe-to-file `splice` with `SPLICE_F_NONBLOCK` returns `EAGAIN` on
+an empty pipe with a live writer. Once a transfer moves data, it returns
+the completed byte count if the pipe becomes empty. A pipe with no writers
+returns zero at EOF. The read applies the call's mode under the pipe lock
+and leaves the status flags visible through duplicate descriptors intact.
+[Pinned Linux pipe read loop](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L590-L629)
+
+The preceding ARM64 and x86-64 kernels waited for the alarm both on
+empty input and after moving four bytes. Both updated QEMU kernels
+returned before the alarm and passed the data, EOF, file-offset and
+duplicate-descriptor checks. The PRIME transfer regressions and DRM
+syncobj host suite passed. The allocation scan reproduced its 150
+baseline findings. Native M1 validation remains open.
+
+The tested base was `09d98179ffbc579cbc66d47a7d730fb5c027749c` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-splice-input-20261122.vN1EQU/`. The
+`bundle.tar.gz` SHA-256 is
+`418846b9e78090408e8b91c26fbb298c9d0bd5506ec88b0129bf0259763d2913`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,
