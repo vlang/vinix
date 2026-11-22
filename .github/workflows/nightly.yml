@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang lld llvm make diffutils curl git rsync xorriso xz-utils python3 pkg-config meson ninja-build bison flex
+        run: sudo apt-get update && sudo apt-get install -y clang lld llvm make diffutils curl git rsync xorriso mtools xz-utils python3 pkg-config meson ninja-build bison flex
 
       - name: Build pinned V compiler and ui2
         run: |

@@ -122,15 +122,13 @@ fn kmain_thread() {
 	fs.mount(vfs_root, '', '/proc', 'procfs') or {}
 	hypervisor.initialise()
 
-	// A machine booted from an installer image (vinix.disk=auto) keeps its
-	// system on a disk, so the disk drivers come up before the image is
-	// unpacked, and the image goes onto the disk rather than into RAM when
-	// there is one to take it. See sysdisk. IDE and SATA only: the NVMe
-	// driver is not fit for a release kernel yet.
+	// Bring up IDE and SATA before selecting a root for the installer or
+	// installed system. NVMe remains available only in development builds.
 	verified_root := verity.requested()
 	// A device named to keep an image of memory on is a disk too.
 	image_named := hibernate.device_name().len != 0
-	disk_requested := sysdisk.requested() || verified_root || image_named
+	disk_mode := sysdisk.mode()
+	disk_requested := disk_mode != .none || verified_root || image_named
 	mut outcome := sysdisk.Outcome.in_memory
 	if disk_requested {
 		ata.initialise()
@@ -152,8 +150,10 @@ fn kmain_thread() {
 		image_waiting := hibernate.look_for_images()
 		if verified_root {
 			verity.mount_root()
-		} else if sysdisk.requested() && !image_waiting {
-			outcome = sysdisk.mount_or_install()
+		} else if !image_waiting {
+			outcome = sysdisk.mount_or_install(disk_mode)
+		} else if disk_mode == .installed {
+			panic('sysdisk: an outstanding hibernation image is preventing disk boot')
 		}
 	}
 	if !verified_root {

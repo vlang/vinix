@@ -235,8 +235,8 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	if verified_root { verity.mount_root() }
 	mut disk_root := verified_root || (qemu_platform && virtio_blk.mount_persistent_root())
 	mut unpacked := false
-	if !disk_root && sysdisk.requested() {
-		outcome := sysdisk.mount_or_install()
+	if !disk_root {
+		outcome := sysdisk.mount_or_install(sysdisk.mode())
 		disk_root = outcome != .in_memory
 		unpacked = outcome == .installed || outcome == .updated
 	}

@@ -24,9 +24,9 @@
 #   arm64  "Other/Unknown (ARM 64-bit)", EFI, USB keyboard and tablet on xHCI,
 #          VMSVGA graphics, the ISO on the VirtioSCSI controller
 #
-# The first boot installs Vinix onto the empty system disk and later boots run
-# from it, so the machine keeps its files, users and apps; a newer ISO updates
-# the system and keeps /root. The disk, <name>-system.vdi in VirtualBox's
+# Choose Install Vinix on an empty disk in the boot menu. After the desktop
+# starts, shut down and eject the ISO to boot the installed system. The disk,
+# <name>-system.vdi in VirtualBox's
 # machine folder, outlives the VM: replacing the VM keeps it. Delete it to
 # start over. Vinix has no driver for the disk controllers of an arm64
 # VirtualBox VM, so that one runs from memory.
@@ -188,7 +188,7 @@ if [ "$ARCH" = amd64 ]; then
         --graphicscontroller vmsvga --vram 64 \
         --keyboard ps2 --mouse ps2 \
         --nic1 nat --nictype1 82540EM \
-        --boot1 dvd --boot2 none --boot3 none --boot4 none
+        --boot1 dvd --boot2 disk --boot3 none --boot4 none
     controller="$(vbox showvminfo "$NAME" --machinereadable |
         sed -n 's/^storagecontrollername0="\(.*\)"$/\1/p')"
     controller="${controller:-IDE}"
@@ -217,7 +217,7 @@ if [ -n "$DISK" ]; then
             --format VDI --variant Standard >/dev/null
     fi
     vbox storagectl "$NAME" --name SATA --add sata --controller IntelAhci \
-        --portcount 1 --bootable off
+        --portcount 1 --bootable on
     vbox storageattach "$NAME" --storagectl SATA --port 0 --device 0 \
         --type hdd --medium "$DISK"
 fi

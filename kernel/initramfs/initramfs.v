@@ -430,7 +430,7 @@ fn archive_image_id(address voidptr, archive_size u64) string {
 // root would silently lose them.
 @[manualfree]
 pub fn initialise_overlays() {
-	if module_req.response != unsafe { nil } && module_req.response.module_count < 2 {
+	if module_req.response == unsafe { nil } || module_req.response.module_count < 2 {
 		return
 	}
 	unpack_modules(1)
@@ -447,6 +447,9 @@ fn unpack_modules(first u64) {
 	}
 
 	for module_index := first; module_index < module_req.response.module_count; module_index++ {
+		if is_disk_boot_module(unsafe { module_req.response.modules[module_index] }) {
+			continue
+		}
 		archive := module_archive(module_index)
 		// An inflated archive that tmpfs reads from is kept; one copied onto
 		// a disk is given back.
@@ -456,17 +459,45 @@ fn unpack_modules(first u64) {
 	}
 }
 
+fn is_disk_boot_module(file &limine.LimineFile) bool {
+	return file != unsafe { nil } && file.cmdline != unsafe { nil }
+		&& unsafe { cstring_to_vstring(file.cmdline) } == 'vinix-install-disk'
+}
+
+// The ISO's disk boot files travel as a separate module. Check its size
+// before inflation and leave its lifetime with the installer.
+pub fn disk_boot_archive(expected_size u64) ?Archive {
+	if module_req.response == unsafe { nil } {
+		return none
+	}
+	for index in u64(1) .. module_req.response.module_count {
+		file := unsafe { module_req.response.modules[index] }
+		if !is_disk_boot_module(file) {
+			continue
+		}
+		data := &u8(file.address)
+		member := gzip_member(data, file.size) or { return none }
+		if member.size != expected_size {
+			return none
+		}
+		return module_archive(index)
+	}
+	return none
+}
+
 // A module's tar archive: the bootloader's bytes, or, for a gzip-compressed
 // module (a release ISO's image), the archive inflated into pages of its own,
 // which release() gives back unless tmpfs files still read from it.
-struct Archive {
+pub struct Archive {
+pub:
 	address  voidptr
 	size     u64
+mut:
 	physical voidptr
 	pages    u64
 }
 
-fn (archive Archive) release() {
+pub fn (archive Archive) release() {
 	if archive.pages != 0 {
 		memory.pmm_free(archive.physical, archive.pages)
 	}

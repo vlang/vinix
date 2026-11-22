@@ -109,7 +109,7 @@ file_size() {
 
 # ── What to build ──────────────────────────────────────────────────────────
 
-need git curl clang ld.lld xorriso cc rsync
+need git curl clang ld.lld xorriso cc rsync mformat mmd mcopy
 cd "$SCRIPT_DIR"
 COMMIT="$(git rev-parse --verify "$REF^{commit}")" || die "no such commit: $REF"
 SHORT="$(git rev-parse --short=10 "$COMMIT")"
@@ -367,13 +367,11 @@ describe_boot() {
         esac
     done
     echo
-    echo "Give the VM **at least 4 GB** of memory and an **empty disk of 4 GB or more**"
-    echo "(16 GB leaves room for apps). The first boot installs Vinix onto the disk;"
-    echo "later boots start from it and keep users, files and installed apps. Keep the"
-    echo "ISO attached: it still boots the machine. Booting a newer ISO with the same"
-    echo "disk updates the system and keeps \`/root\`, where the users' homes are. Vinix"
-    echo "only formats a disk that is entirely empty. Without one it runs from memory,"
-    echo "and a restart starts from a clean image."
+    echo "Give the VM **at least 4 GiB** of memory and one **empty disk of 4 GiB or more**"
+    echo "(16 GiB leaves room for apps). Choose **Install Vinix on an empty disk** at"
+    echo "the ISO boot menu. Once the desktop starts, shut down, detach the ISO or"
+    echo "remove the USB stick, and boot the installed disk. Users, files and apps"
+    echo "persist on that disk. **Try Vinix** starts a temporary session in memory."
     echo
     echo "Vinix drives IDE and SATA disks on amd64 and VirtIO block devices on arm64."
     echo

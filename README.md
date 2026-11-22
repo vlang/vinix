@@ -49,16 +49,20 @@ qemu-system-x86_64 -m 2048 -cdrom vinix-amd64.iso
 Click inside the QEMU window to capture the mouse. No USB tablet or custom
 machine options are required. Without a disk, changes are lost on restart.
 
-For installing apps, give the VM at least 4 GiB of memory and an empty disk of 4 GiB or more
-(16 GiB leaves room for apps). The first boot installs Vinix onto the disk;
-from then on the machine starts from it and keeps everything, as a QEMU machine
-started by `scripts/run-desktop-aarch64.sh` does: users, files, installed apps. Keep
-the ISO attached, since it still boots the machine. Booting a newer ISO with
-the same disk updates the system and keeps `/root`, where the users' homes are.
-Vinix only formats a disk that is entirely empty, as a new VM disk is. Without
-one it runs from memory, and a restart starts from a clean image.
+### Install Vinix on a disk
 
-Vinix drives IDE and SATA disks on amd64 and VirtIO block devices on arm64.
+1. Boot the ISO or USB installer with one empty, writable disk of at least
+   4 GiB. Use 16 GiB or more for apps and at least 4 GiB of RAM in a VM.
+2. Select **Install Vinix on an empty disk** in the boot menu. Wait for the
+   desktop to start, then shut down and remove the USB stick or eject the ISO.
+3. Start the machine from the installed disk. Vinix keeps users, settings,
+   files and installed apps across boots.
+
+The installer uses the whole target disk and checks that it is empty. It
+supports disks with 512-byte logical sectors on IDE or SATA in amd64 (BIOS or
+UEFI), and VirtIO block disks in arm64 (UEFI). **Try Vinix** is the default
+and runs a temporary session in memory. For a disk created by an older ISO,
+choose **Boot or update a legacy Vinix disk** and keep the ISO attached.
 
 ```sh
 qemu-img create -f qcow2 vinix-amd64.qcow2 16G
@@ -75,6 +79,9 @@ qemu-system-aarch64 -machine virt -accel hvf -cpu host -m 4096 -smp 4 \
     -device ramfb -device qemu-xhci -device usb-kbd -device usb-tablet \
     -netdev user,id=net0 -device virtio-net-device,netdev=net0
 ```
+
+To boot the installed QEMU systems, rerun the commands with the ISO and its
+virtual CD drive removed.
 
 In VirtualBox, create a VM of type *Other/Unknown (64-bit)* or *Other/Unknown
 (ARM 64-bit)* with 4096 MB of memory, attach the ISO, and set the network
@@ -140,7 +147,7 @@ The following is a distro-agnostic list of packages needed to build Vinix.
 
 Skip to a paragraph for your host distro if there is any.
 
-`GNU make`, `findutils`, `curl`, `git`, `file`, `xz`, `rsync`, `xorriso`,
+`GNU make`, `findutils`, `curl`, `git`, `file`, `xz`, `rsync`, `xorriso`, `mtools`,
 `qemu` to test it, Python 3, Clang/LLVM/LLD, and a current V compiler need to
 be present.
 
@@ -166,21 +173,21 @@ wrapper before it compiles the kernel.
 
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
-sudo apt install -y clang llvm lld make findutils curl git file xz-utils rsync xorriso qemu-system-x86 python3
+sudo apt install -y clang llvm lld make findutils curl git file xz-utils rsync xorriso mtools qemu-system-x86 python3
 ```
 
 ### Build prerequisites for Arch Linux and derivatives
 ```bash
-sudo pacman -S --needed clang llvm lld make findutils curl git file xz rsync xorriso qemu python
+sudo pacman -S --needed clang llvm lld make findutils curl git file xz rsync xorriso mtools qemu python
 ```
 
 ### Build prerequisites for Red Hat Linux and derivatives
 ```bash
-sudo yum install -y clang llvm lld make findutils curl git file xz rsync xorriso qemu python3
+sudo yum install -y clang llvm lld make findutils curl git file xz rsync xorriso mtools qemu python3
 ```
 ### Build prerequisites for Void Linux and derivatives
 ```bash
-sudo xbps-install -Suv clang llvm lld make findutils curl git file xz rsync xorriso qemu python3
+sudo xbps-install -Suv clang llvm lld make findutils curl git file xz rsync xorriso mtools qemu python3
 ```
 ### Building the distro
 
@@ -1199,12 +1206,12 @@ set `VINIX_IOS_RELEASE_RUNTIME` to its local executable,
 `VINIX_IOS_RELEASE_RUNTIME_ORIGIN` to its release download URL. Deployment verifies
 the checksum and static ARM64 ELF headers and records the origin in the notes.
 
-`./scripts/test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same boot tests on any
-image: amd64 through BIOS with VirtualBox's defaults and through UEFI, arm64 with
-virtio and with USB input. A boot passes when the desktop is on screen and
-answers the keyboard and the pointer. The arm64 desktop is assembled from the
-package layers the aarch64 build scripts leave in this checkout, so build those
-first (see *Default software image on aarch64*).
+`./scripts/test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same checks on
+ISOs with the installer. It checks live boots, installation, and boots with the
+ISO detached through amd64 BIOS and UEFI and arm64 UEFI. A boot passes when the
+desktop is on screen and answers the keyboard and the pointer. The arm64 desktop
+is assembled from the package layers the aarch64 build scripts leave in this
+checkout, so build those first (see *Default software image on aarch64*).
 
 ### To test
 

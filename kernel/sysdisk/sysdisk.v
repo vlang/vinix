@@ -6,32 +6,20 @@ import fs
 import fs.ext2
 import hibernate
 import initramfs
-import limine
 import memory
 import pagecache
 import stat
+import devcore
+import sysdisk.disklayout
 
-// A machine booted from an installer image (the release ISOs pass
-// vinix.disk=auto) keeps its system on a disk, as a QEMU machine started by
-// scripts/run-desktop-aarch64.sh does: the whole filesystem survives a restart. Given a
-// disk, the first boot installs the image onto it and runs from there; later
-// boots find it and skip unpacking the image into memory; a newer image is
-// unpacked over the old system, leaving /root as it is. Without a disk it runs
-// from memory as before.
-//
-// Only a disk that is entirely blank at both ends is ever formatted. A disk
-// with anything recognisable on it -- a partition table, a filesystem, data --
-// is left alone unless it is an ext2 volume this installed.
+// The release ISOs can install a bootable GPT disk. Earlier ISOs installed
+// directly on a whole disk and still supplied the kernel on each boot.
 pub enum Outcome {
 	in_memory // no disk used: the image is still to be unpacked into RAM
 	booted // an installed, up-to-date system is the root
 	installed // the image was just unpacked onto a blank disk
 	updated // the image was just unpacked over an older installed one
 }
-
-// Smaller than this and the system, with room for the apps pkg installs, does
-// not fit.
-const min_disk_bytes = u64(4) << 30
 
 // The image's id, on the disk. It reads `pending` while an install or an
 // update is being written, so a boot interrupted halfway is finished by the
@@ -40,20 +28,42 @@ const id_file = '/.vinix-image-id'
 const id_name = '.vinix-image-id'
 const pending_id = 'pending'
 
-pub fn requested() bool {
-	kernel_file := limine.kernel_file()
-	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {
-		return false
-	}
-	return unsafe { cstring_to_vstring(kernel_file.cmdline) }.contains('vinix.disk=auto')
+pub enum Mode {
+	none
+	live
+	install
+	installed
+	legacy
+	auto
 }
 
-pub fn mount_or_install() Outcome {
+pub fn mode() Mode {
+	return match devcore.boot_option('vinix.disk=') or { '' } {
+		'live' { .live }
+		'install' { .install }
+		'installed' { .installed }
+		'legacy' { .legacy }
+		'auto' { .auto }
+		else { .none }
+	}
+}
+
+pub fn mount_or_install(boot Mode) Outcome {
+	return match boot {
+		.install { install_bootable() }
+		.installed { mount_bootable() }
+		.auto, .legacy { mount_legacy(boot == .auto) }
+		else { .in_memory }
+	}
+}
+
+fn mount_legacy(allow_format bool) Outcome {
 	image := initramfs.image_id()
 	if image.len == 0 {
 		println('sysdisk: this image has no id; running from memory')
 		return .in_memory
 	}
+	defer { unsafe { image.free() } }
 	disks := whole_disks()
 	defer {
 		unsafe { disks.free() }
@@ -90,9 +100,13 @@ pub fn mount_or_install() Outcome {
 		commit(image)
 		return .updated
 	}
+	if !allow_format {
+		println('sysdisk: no legacy Vinix disk; running from memory')
+		return .in_memory
+	}
 	// A blank disk to install on.
 	for disk in disks {
-		if u64(disk.resource.stat.size) < min_disk_bytes || !blank(disk) {
+		if u64(disk.resource.stat.size) < disklayout.min_disk_bytes || !blank(disk) {
 			continue
 		}
 		report('sysdisk: installing onto', disk, '')
@@ -194,11 +208,11 @@ fn read_id(root &fs.VFSNode) string {
 
 // Record `id` as the image the root holds. It is padded with spaces over a
 // longer earlier id rather than truncated; readers trim them.
-fn write_id(id string) {
+fn write_id(id string) bool {
 	mut node := fs.get_node(vfs_root, id_file, true) or {
 		fs.create(vfs_root, id_file, stat.ifreg | 0o644) or {
 			println('sysdisk: could not record the image id')
-			return
+			return false
 		}
 	}
 	mut res := node.resource
@@ -206,14 +220,16 @@ fn write_id(id string) {
 	mut text := [256]u8{}
 	length := if u64(id.len) > old_size { u64(id.len) } else { old_size }
 	if length > 256 {
-		return
+		return false
 	}
 	for i in 0 .. length {
 		text[i] = if i < u64(id.len) { id[i] } else { ` ` }
 	}
-	res.write(unsafe { nil }, &text[0], 0, length) or {
+	written := res.write(unsafe { nil }, &text[0], 0, length) or {
 		println('sysdisk: could not record the image id')
+		return false
 	}
+	return u64(written) == length
 }
 
 // Mark the system on the disk as `image`, once all of it is there: the image

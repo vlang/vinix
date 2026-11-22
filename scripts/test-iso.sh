@@ -11,15 +11,15 @@
 #   --timeout=SECONDS  per boot (default: 240, or 900 without acceleration)
 #   --out=DIR          serial logs and screenshots (default: a temporary dir)
 #
-# Each image is booted from a virtual CD with nothing but its own files:
+# Test live CD boots, installation from the boot menu, and disk-only boots:
 #
 #   amd64  QEMU defaults, 2 GiB, no extra devices or CPU options
 #          QEMU, BIOS, i440fx, no HPET, one CPU (what VirtualBox gives a new VM)
 #          QEMU, UEFI, q35, two CPUs, a blank SATA disk
-#          the same again, from the system it installed on the disk
+#          UEFI and BIOS disk boots with the CD detached
 #          VirtualBox, BIOS, a blank SATA disk       (x86 hosts)
-#   arm64  QEMU, UEFI, virt, virtio keyboard and tablet, a blank virtio disk
-#          the same again, from the system it installed on the disk
+#   arm64  QEMU, UEFI, virt, USB keyboard, virtio tablet, a blank virtio disk
+#          UEFI boot from the installed disk with the CD detached
 #          QEMU, UEFI, virt, USB keyboard and tablet on xHCI
 #          VirtualBox, EFI                           (arm64 hosts)
 #
@@ -28,8 +28,7 @@
 # console, and typing and (outside VirtualBox, which cannot script its pointer)
 # moving the pointer both change what is on the screen. A boot with a blank disk
 # passes only if it installed the system there, and the boot after it only if
-# it ran from that system; debugfs (e2fsprogs), where it is installed, checks
-# the disk in between.
+# it ran from that system. Check the on-disk layout in between.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -133,49 +132,16 @@ vm_shoot() {
 # A blank disk for a boot to install onto, as a new VM's is.
 blank_disk() {
     rm -f "$1"
-    truncate -s 8G "$1" 2>/dev/null || mkfile -n 8g "$1"
+    truncate -s 4G "$1" 2>/dev/null || mkfile -n 4g "$1"
 }
 
-find_debugfs() {
-    local candidate
-    for candidate in "$(command -v debugfs 2>/dev/null || true)" /sbin/debugfs \
-        /usr/sbin/debugfs /opt/homebrew/opt/e2fsprogs/sbin/debugfs \
-        /usr/local/opt/e2fsprogs/sbin/debugfs; do
-        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
-            echo "$candidate"
-            return 0
-        fi
-    done
-    return 1
-}
-
-# Fail boot "$1" unless its disk "$2" holds a system installed from an image:
-# /.vinix-image-id names it, and reads "pending" while one is being written.
 require_installed() {
-    local name="$1" disk="$2" debugfs id probe
-    if ! debugfs="$(find_debugfs)"; then
-        echo "    $name: no debugfs here to look at the disk with"
-        return
+    local name="$1" disk="$2"
+    if "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/isoboot/check.v" "$disk"; then
+        return 0
     fi
-    # The system disk is VJFS: ext2 with a journal, whose superblock carries
-    # its own signature (0x4a56) so ordinary ext2 tools leave it alone. Read a
-    # copy that carries the ext2 one; a clone or a sparse copy costs nothing.
-    probe="$disk.probe"
-    rm -f "$probe"
-    cp -c "$disk" "$probe" 2>/dev/null ||
-        cp --reflink=auto --sparse=always "$disk" "$probe" 2>/dev/null ||
-        cp "$disk" "$probe"
-    if [ "$(od -An -tx1 -j $((0x438)) -N2 "$probe" 2>/dev/null | tr -d ' \n')" = 564a ]; then
-        printf '\123\357' | dd of="$probe" bs=1 seek=$((0x438)) conv=notrunc 2>/dev/null
-    fi
-    id="$("$debugfs" -R 'cat /.vinix-image-id' "$probe" 2>/dev/null | tr -d ' \r\n' || true)"
-    rm -f "$probe"
-    if [ -z "$id" ] || [ "$id" = pending ]; then
-        echo "    $name: no system was installed on the disk" >&2
-        FAILED+=("$name (no system installed on its disk)")
-        return
-    fi
-    echo "    $name: installed image $id on the disk"
+    FAILED+=("$name (no complete install on disk)")
+    return 1
 }
 
 # Fail boot "$1" unless its serial log says "$2". Only arm64 kernels print to
@@ -208,12 +174,33 @@ vm_type() {
         local c
         for ((i = 0; i < ${#1}; i++)); do
             c="${1:i:1}"
-            qmp "{\"execute\":\"send-key\",\"arguments\":{\"keys\":[{\"type\":\"qcode\",\"data\":\"$c\"}]}}"
+            qemu_key "$c"
             sleep 0.15
         done
     else
         "$VBOXMANAGE_BIN" controlvm "$VM_NAME" keyboardputstring "$1"
     fi
+}
+
+qemu_key() {
+    qmp "{\"execute\":\"send-key\",\"arguments\":{\"keys\":[{\"type\":\"qcode\",\"data\":\"$1\"}]}}"
+}
+
+select_install() {
+    local serial="$1" pid="$2" deadline=$((SECONDS + 90))
+    while [ "$SECONDS" -lt "$deadline" ] && kill -0 "$pid" 2>/dev/null; do
+        # UEFI serial redirects the menu through cursor escapes between letters.
+        if LC_ALL=C sed -E $'s/\033\\[[0-9;?=]*[[:alpha:]]//g' "$serial" 2>/dev/null |
+            LC_ALL=C grep -a 'Install Vinix on an empty disk' >/dev/null; then
+            qemu_key down || return 1
+            sleep 0.25
+            qemu_key ret
+            return $?
+        fi
+        sleep 0.2
+    done
+    echo '    the installer menu did not appear on serial' >&2
+    return 1
 }
 
 # Move the pointer to the top left quarter: an absolute event for a tablet and
@@ -317,7 +304,12 @@ run_qemu_boot() {
     done
     VM_KIND=qemu
     VM_QMP="$dir/qmp.sock"
-    check_boot "$name" "$dir/serial.log" "$pid" || status=1
+    case "$name" in
+        qemu-amd64-uefi|qemu-arm64-virtio) select_install "$dir/serial.log" "$pid" || status=1 ;;
+    esac
+    if [ "$status" -eq 0 ]; then
+        check_boot "$name" "$dir/serial.log" "$pid" || status=1
+    fi
     # QEMU with HVF can fail to pause a vCPU that keeps taking MMIO exits --
     # the guest polling its virtio devices -- and then waits for it forever on
     # the way out of SIGTERM. That held a release's boot tests up for good.
@@ -363,17 +355,23 @@ qemu_amd64() {
         /usr/share/qemu/OVMF.fd)"; then
         # A disk on q35's SATA controller: the first boot installs onto it,
         # the second runs from what it installed.
-        local disk="$OUT/qemu-amd64-disk.img" name
+        local disk="$OUT/qemu-amd64-disk.img" name=qemu-amd64-uefi boot_timeout
         blank_disk "$disk"
-        for name in qemu-amd64-uefi qemu-amd64-uefi-disk; do
-            install_timeout "$name"
-            run_qemu_boot "$name" "$qemu_bin" "${accel[@]}" \
+        install_timeout "$name"
+        run_qemu_boot "$name" "$qemu_bin" "${accel[@]}" \
+            -machine q35 -m 4096 -smp 2 -vga std -boot order=d \
+            -drive "if=pflash,format=raw,unit=0,readonly=on,file=$ovmf" \
+            -cdrom "$iso" -drive "file=$disk,format=raw" -nic user,model=e1000
+        TIMEOUT=$boot_timeout
+        if require_installed "$name" "$disk"; then
+            run_qemu_boot qemu-amd64-uefi-disk "$qemu_bin" "${accel[@]}" \
                 -machine q35 -m 4096 -smp 2 -vga std \
                 -drive "if=pflash,format=raw,unit=0,readonly=on,file=$ovmf" \
-                -cdrom "$iso" -drive "file=$disk,format=raw" -nic user,model=e1000
-            TIMEOUT=$boot_timeout
-            require_installed "$name" "$disk"
-        done
+                -drive "file=$disk,format=raw" -nic user,model=e1000
+            run_qemu_boot qemu-amd64-bios-disk "$qemu_bin" "${accel[@]}" \
+                -machine pc,hpet=off -m 4096 -smp 1 -vga std \
+                -drive "file=$disk,format=raw" -nic user,model=e1000
+        fi
         rm -f "$disk"
     else
         FAILED+=("qemu-amd64-uefi (no x86_64 UEFI firmware found)")
@@ -400,7 +398,7 @@ qemu_arm64() {
         return
     fi
     template="$(qemu_firmware "$qemu_bin" edk2-arm-vars.fd /usr/share/AAVMF/AAVMF_VARS.fd || true)"
-    local input name vars disk="$OUT/qemu-arm64-disk.img"
+    local input name vars boot_timeout disk="$OUT/qemu-arm64-disk.img"
     blank_disk "$disk"
     # The virtio boot installs onto a blank virtio disk; virtio-disk boots the
     # same machine again, from what it installed.
@@ -415,17 +413,25 @@ qemu_arm64() {
         # The USB boot stands in for VirtualBox: xHCI input and an e1000.
         local devices=(-device virtio-keyboard-device -device virtio-tablet-device
             -netdev user,id=net0 -device virtio-net-device,netdev=net0)
-        if [ "$input" = virtio-disk ]; then
-            input=virtio
+        if [ "$input" = virtio ]; then
+            # The firmware reads USB input. The disk boot also tests Vinix's
+            # VirtIO keyboard driver once firmware input is no longer needed.
+            devices=(-device qemu-xhci -device usb-kbd -device virtio-tablet-device
+                -netdev user,id=net0 -device virtio-net-device,netdev=net0)
         fi
         if [ "$input" = usb ]; then
             devices=(-device qemu-xhci,id=xhci -device usb-kbd,bus=xhci.0
                 -device usb-tablet,bus=xhci.0
                 -netdev user,id=net0 -device e1000,netdev=net0)
         fi
-        local storage=()
-        if [ "$input" = virtio ]; then
-            storage=(-drive "if=none,id=hd0,format=raw,file=$disk"
+        local storage=(-device virtio-scsi-pci,id=scsi0
+            -drive "if=none,id=cd0,media=cdrom,readonly=on,file=$iso"
+            -device scsi-cd,drive=cd0,bus=scsi0.0,bootindex=1)
+        if [ "$input" = virtio-disk ]; then
+            storage=()
+        fi
+        if [ "$input" != usb ]; then
+            storage+=(-drive "if=none,id=hd0,format=raw,file=$disk"
                 -device virtio-blk-device,drive=hd0)
         fi
         install_timeout "$name"
@@ -433,16 +439,13 @@ qemu_arm64() {
             -machine virt -m 4096 -smp 4 \
             -drive "if=pflash,format=raw,readonly=on,file=$code" \
             -drive "if=pflash,format=raw,file=$vars" \
-            -device virtio-scsi-pci,id=scsi0 \
-            -drive "if=none,id=cd0,media=cdrom,readonly=on,file=$iso" \
-            -device scsi-cd,drive=cd0,bus=scsi0.0 \
             ${storage[@]+"${storage[@]}"} \
             -device ramfb "${devices[@]}"
         TIMEOUT=$boot_timeout
         case "$name" in
             qemu-arm64-virtio)
                 require_serial "$name" 'sysdisk: installed'
-                require_installed "$name" "$disk"
+                require_installed "$name" "$disk" || break
                 ;;
             qemu-arm64-virtio-disk)
                 require_serial "$name" 'sysdisk: running from the system'

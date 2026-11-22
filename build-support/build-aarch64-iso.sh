@@ -32,13 +32,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for command_name in curl xorriso mcopy; do
+for command_name in curl xorriso mformat mmd mcopy; do
     command -v "$command_name" >/dev/null 2>&1 || {
         echo "ERROR: required command not found: $command_name" >&2
         exit 1
     }
 done
-for input in "$KERNEL" "$INITRAMFS" "$SCRIPT_DIR/build-support/limine.conf"; do
+for input in "$KERNEL" "$INITRAMFS"; do
     if [ ! -f "$input" ]; then
         echo "ERROR: required ISO input not found: $input" >&2
         exit 1
@@ -70,20 +70,8 @@ MTOOLS_SKIP_CHECK=1 mcopy -o -i "$UEFI_CD" "$BOOTAA64" ::/EFI/BOOT/BOOTAA64.EFI
 mkdir -p "$ISO_ROOT/boot" "$ISO_ROOT/EFI/BOOT"
 install -m644 "$KERNEL" "$ISO_ROOT/boot/vinix"
 install -m644 "$INITRAMFS" "$ISO_ROOT/boot/initramfs.tar"
-# The image goes in compressed (below); Limine loads it as it is.
-sed 's#^\(    module_path: boot():/boot/initramfs\.tar\)$#\1.gz#' \
-    "$SCRIPT_DIR/build-support/limine.conf" > "$ISO_ROOT/boot/limine.conf"
-grep -q 'module_path: boot():/boot/initramfs\.tar\.gz$' "$ISO_ROOT/boot/limine.conf" || {
-    echo "ERROR: limine.conf has no module_path for boot/initramfs.tar" >&2
-    exit 1
-}
-# A machine booted from the ISO keeps its system on a blank disk if it has
-# one, installing it there on the first boot (kernel/sysdisk). The entry is the
-# file's last, so the option goes at the end.
-printf '    cmdline: vinix.disk=auto\n' >> "$ISO_ROOT/boot/limine.conf"
-# The image's identity, which a system installed from it keeps in
-# /.vinix-image-id: an ISO with a different image updates that system. Taken
-# from the image's contents, so an unchanged image rebuilt is no update.
+# Record the image identity in /.vinix-image-id. The legacy boot entry uses
+# it to tell whether an earlier whole-disk installation needs an update.
 mkdir -p "$IMAGE_ID_DIR"
 sha256_file "$INITRAMFS" | cut -c1-16 > "$IMAGE_ID_DIR/.vinix-image-id"
 COPYFILE_DISABLE=1 tar --format=ustar -rf "$ISO_ROOT/boot/initramfs.tar" \
@@ -108,6 +96,8 @@ fi
 rm -f "$ISO_ROOT/boot/initramfs.tar" "$ISO_ROOT/boot/initramfs.plain.gz"
 install -m644 "$UEFI_CD" "$ISO_ROOT/boot/limine-uefi-cd.bin"
 install -m644 "$BOOTAA64" "$ISO_ROOT/EFI/BOOT/BOOTAA64.EFI"
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/isoboot/main.v" \
+    "$ISO_ROOT" "$ISO_ROOT/EFI/BOOT/BOOTAA64.EFI" '' '' ''
 
 mkdir -p "$(dirname "$OUTPUT_ISO")"
 OUTPUT_ISO_TMP="$(mktemp "$(dirname "$OUTPUT_ISO")/.vinix-aarch64.iso.XXXXXX")"

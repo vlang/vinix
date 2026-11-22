@@ -149,6 +149,55 @@ fn partition_name(prefix string, index int) string {
 	return text.str()
 }
 
+fn publish(parent &resource.Resource, name string, first u64, count u64) {
+	mut parent_device := unsafe { parent }
+	sector := u64(parent_device.stat.blksize)
+	mut part := &Partition{
+		device_offset: first * sector
+		sector_cnt: count
+		parent_device: unsafe { parent }
+	}
+	part.stat.blocks = count
+	part.stat.blksize = parent_device.stat.blksize
+	part.stat.size = count * sector
+	part.identity = partition_identity(resource.block_identity(mut parent_device), part.device_offset,
+		u64(part.stat.size))
+	part.stat.rdev = resource.create_dev_id()
+	part.stat.mode = 0o600 | stat.ifblk
+	fs.devtmpfs_add_device(part, name)
+}
+
+// Publish an extent from a table the caller has already validated. The disk
+// driver may have published this same partition earlier in the boot.
+pub fn ensure_device(disk &fs.VFSNode, index int, first u64, count u64) ?&fs.VFSNode {
+	mut parent := unsafe { disk.resource }
+	sector := u64(parent.stat.blksize)
+	if sector == 0 || count == 0 || first > u64(parent.stat.size) / sector
+		|| count > u64(parent.stat.size) / sector - first {
+		return none
+	}
+	prefix := '${disk.name}-' @[freed]
+	defer { unsafe { prefix.free() } }
+	name := partition_name(prefix, index) @[freed]
+	dev := fs.get_node(vfs_root, '/dev', true) or {
+		unsafe { name.free() }
+		return none
+	}
+	if existing := fs.get_node(dev, name, false) {
+		unsafe { name.free() }
+		mut child := unsafe { existing.resource }
+		actual := resource.block_identity(mut child)
+		wanted := partition_identity(resource.block_identity(mut parent), first * sector, count * sector)
+		if !actual.valid() || actual.disk_id != wanted.disk_id || actual.start != wanted.start
+			|| actual.length != wanted.length {
+			return none
+		}
+		return existing
+	}
+	publish(parent, name, first, count)
+	return fs.get_node(dev, name, false)
+}
+
 // Every partition found keeps `parent` for good, so it must be the device's
 // interface box, made once and never freed: the one its device node holds.
 // A `mut resource.Resource` argument cannot be kept: for a concrete device V
@@ -159,8 +208,8 @@ fn partition_name(prefix string, index int) string {
 // method resource__Resource.read not implemented".
 pub fn scan_partitions(parent &resource.Resource, prefix string) int {
 	mut parent_device := unsafe { parent }
-	parent_identity := resource.block_identity(mut parent_device)
 	lba_buffer := memory.malloc(u64(parent_device.stat.blksize))
+	defer { memory.free(lba_buffer) }
 
 	parent_device.read(0, lba_buffer, u64(parent_device.stat.blksize), u64(parent_device.stat.blksize)) or {
 		print('block: unable to read from device\n')
@@ -180,6 +229,7 @@ pub fn scan_partitions(parent &resource.Resource, prefix string) int {
 		}
 
 		partition_entry_buffer := memory.malloc(entry_list_size)
+		defer { memory.free(partition_entry_buffer) }
 
 		parent_device.read(0, partition_entry_buffer, u64(entry_list_lba * parent_device.stat.blksize),
 			entry_list_size) or {
@@ -199,24 +249,9 @@ pub fn scan_partitions(parent &resource.Resource, prefix string) int {
 			sectors := gpt_sector_count(partition_entry.starting_lba, partition_entry.last_lba,
 				u64(parent_device.stat.size) / u64(parent_device.stat.blksize)) or { continue }
 
-			mut partition := &Partition{
-				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
-				sector_cnt:    sectors
-				parent_device: unsafe { parent }
-			}
-
-			partition.stat.blocks = partition.sector_cnt
-			partition.stat.blksize = parent_device.stat.blksize
-			partition.stat.size = partition.sector_cnt * partition.stat.blksize
-			partition.identity = partition_identity(parent_identity, partition.device_offset,
-				u64(partition.stat.size))
-			partition.stat.rdev = resource.create_dev_id()
-			partition.stat.mode = 0o600 | stat.ifblk
-
 			C.kprintf(c'gpt: partition detected [start: %llx sector cnt: %llu]\n',
-				u64(partition.device_offset), u64(partition.sector_cnt))
-
-			fs.devtmpfs_add_device(partition, partition_name(prefix, i))
+				partition_entry.starting_lba * parent_device.stat.blksize, sectors)
+			publish(parent, partition_name(prefix, i), partition_entry.starting_lba, sectors)
 		}
 
 		return 0
@@ -240,24 +275,9 @@ pub fn scan_partitions(parent &resource.Resource, prefix string) int {
 
 			partition_entry := unsafe { &MBRPartition(&partitions[i]) }
 
-			mut partition := &Partition{
-				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
-				sector_cnt:    partition_entry.sector_cnt
-				parent_device: unsafe { parent }
-			}
-
-			partition.stat.blocks = partition.sector_cnt
-			partition.stat.blksize = parent_device.stat.blksize
-			partition.stat.size = partition.sector_cnt * partition.stat.blksize
-			partition.identity = partition_identity(parent_identity, partition.device_offset,
-				u64(partition.stat.size))
-			partition.stat.rdev = resource.create_dev_id()
-			partition.stat.mode = 0o600 | stat.ifblk
-
 			C.kprintf(c'mbr: partition detected [start: %llx sector cnt: %llu]\n',
-				u64(partition.device_offset), u64(partition.sector_cnt))
-
-			fs.devtmpfs_add_device(partition, partition_name(prefix, i))
+				u64(partition_entry.starting_lba) * parent_device.stat.blksize, u64(partition_entry.sector_cnt))
+			publish(parent, partition_name(prefix, i), partition_entry.starting_lba, partition_entry.sector_cnt)
 		}
 
 		return 0
