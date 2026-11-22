@@ -14,6 +14,7 @@ module guestfixture
 #include <sys/reboot.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/statfs.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -28,7 +29,9 @@ fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
 fn C.mremap(voidptr, usize, usize, i32, ...) voidptr
 fn C.getpagesize() i32
+fn C.fstat(i32, &C.stat) i32
 fn C.fstatfs(i32, &C.statfs) i32
+fn C.ftruncate(i32, i64) i32
 fn C.poll(&C.pollfd, u64, i32) i32
 fn C.__errno_location() &i32
 fn C.dup(i32) i32
@@ -63,6 +66,14 @@ fn C.recvmsg(i32, &C.msghdr, i32) i64
 struct C.rlimit {
 	rlim_cur u64
 	rlim_max u64
+}
+
+struct C.stat {
+	st_mode u32
+	st_nlink u64
+	st_size i64
+	st_blksize i64
+	st_blocks i64
 }
 
 struct C.statfs {
@@ -768,6 +779,16 @@ fn test_gem_metadata_reclamation() bool {
 	return direct && prime
 }
 
+fn test_prime_inode_metadata(fd i32, size u64) bool {
+	mut info := C.stat{}
+	if C.fstat(fd, &info) != 0 { return false }
+	truncate_refused := C.ftruncate(fd, 0) == -1 && unsafe { *C.__errno_location() } == C.EINVAL
+	C.printf(c'DRM PRIME fstat: mode %#o links %u block size %ld truncate refused %d\n',
+		info.st_mode, u32(info.st_nlink), i64(info.st_blksize), i32(truncate_refused))
+	return info.st_mode == 0o600 && info.st_nlink == 1 && i64(info.st_blksize) == i64(C.getpagesize())
+		&& info.st_size == i64(size) && info.st_blocks == i64(size / 512) && truncate_refused
+}
+
 fn test_prime_filesystem_type() bool {
 	mut info := C.statfs{}
 	card := C.open(c'/dev/dri/card0', C.O_RDWR)
@@ -776,13 +797,18 @@ fn test_prime_filesystem_type() bool {
 	if C.fstatfs(card, &info) != 0 || info.f_type == 0x444d4142 { return false }
 	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
 	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
-	mut export := ExtendedPrimeRequest{handle: create.handle, fd: -1}
+	mut export := ExtendedPrimeRequest{handle: create.handle, flags: u32(C.O_RDWR), fd: -1}
 	if C.ioctl(card, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0 { return false }
 	duplicate := C.dup(export.fd)
 	C.close(export.fd)
 	if duplicate < 0 { return false }
 	defer { C.close(duplicate) }
 	if C.ioctl(card, i32(u32(0xc00464b4)), unsafe { &create.handle }) != 0 { return false }
+	if test_prime_inode_metadata(duplicate, create.size) {
+		C.puts(c'VINIX DRM PRIME INODE METADATA: PASS')
+	} else {
+		C.puts(c'DRM PRIME INODE METADATA FAIL: incorrect anonymous inode reply')
+	}
 	if C.fstatfs(duplicate, &info) != 0 { return false }
 	C.printf(c'DRM PRIME fstatfs: type %#lx block %lu fragment %lu name limit %lu\n',
 		info.f_type, info.f_bsize, info.f_frsize, info.f_namelen)

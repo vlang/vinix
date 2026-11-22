@@ -1266,9 +1266,10 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32, reservation &f
 			dev: prime_stat_device()
 			// GEM offsets are globally unique and never reused, even if a handle is.
 			ino: gem.create_mmap_offset(obj) / page_size
-			mode: stat.ifreg | 0o600
+			nlink: 1
+			mode: 0o600 // Linux anonymous inodes have no file type bits.
 			size: i64(obj.size)
-			blksize: i64(4096)
+			blksize: i64(page_size)
 			blocks: i64(obj.size / 512)
 		}
 		dev: dev

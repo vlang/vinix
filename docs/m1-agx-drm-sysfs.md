@@ -744,6 +744,33 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-statfs-20261122.sofdzr/`. The
 `bundle.tar.gz` SHA-256 is
 `b200ff897b8ad90b7604b9854e282ed38b012f1f3a5f6f30ddf7089f585e5267`.
 
+#### PRIME DMA-BUF inode metadata
+
+`fstat` reports mode `0600` with no file-type bits, one link and a
+page-sized preferred block size for PRIME DMA-BUF descriptors. The size
+and 512-byte block count describe the exported buffer. The anonymous
+inode mode makes `ftruncate` return `EINVAL` even on a read-write
+PRIME descriptor.
+[Pinned DMA-BUF inode creation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L602-L622)
+[Pinned anonymous inode setup](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/libfs.c#L1562-L1590)
+[Pinned inode defaults](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/inode.c#L218-L238)
+[Pinned ftruncate check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/open.c#L156-L162)
+
+ARM64 and x86-64 QEMU checked the metadata and truncate refusal on a
+duplicate after closing the original file descriptor and GEM handle.
+The preferred block size matched the guest page size on both kernels.
+The preceding x86-64 kernel reported mode `0100600` and zero links, and
+accepted `ftruncate` with the same guest executable. The PRIME filesystem
+and mapping probes, DRM wire sanitizer suite and AArch64 desktop idle,
+apps and drag scenarios passed. The allocation scan reproduced its 150
+baseline findings. Native M1 validation remains open.
+
+The tested base was `42bfc22f76cb3b5bda979d57389a33c9a532bef3` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-inode-20261122.KUZpR4/`. The
+`bundle.tar.gz` SHA-256 is
+`c32ecb6fccfe82feec937aae45f4d586bd2eeb198ff8a5aff60b113f26045532`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open
