@@ -293,7 +293,11 @@ fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
 		pair: pair
 	}
 	initialise_stat(mut master.stat, 0o666)
-	initialise_stat(mut slave.stat, 0o620)
+	// Only the account that opened ptmx should be able to open the slave by name.
+	process := proc.current_thread().process
+	initialise_stat(mut slave.stat, 0o600)
+	slave.stat.uid = process.fsuid
+	slave.stat.gid = process.fsgid
 	// Boxes of the endpoints themselves, so that the handles share their
 	// event, status and refcount with the pair: boxing *master would box a
 	// copy. destroy_pair() frees them.

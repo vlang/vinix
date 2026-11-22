@@ -43,6 +43,8 @@ struct C.stat {
 mut:
 	st_mode u32
 	st_rdev u64
+	st_uid  u32
+	st_gid  u32
 }
 
 struct C.rlimit {
@@ -101,6 +103,8 @@ fn C.WIFSIGNALED(i32) bool
 fn C.WTERMSIG(i32) i32
 fn C.getpgrp() i32
 fn C.getppid() i32
+fn C.seteuid(u32) i32
+fn C.setegid(u32) i32
 fn C.setpgid(i32, i32) i32
 fn C.setsid() i32
 fn C.tcsetpgrp(i32, i32) i32
@@ -123,6 +127,9 @@ fn C.execl(&char, &char, ...) i32
 fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
 fn C.posix_openpt(i32) i32
+fn C.grantpt(i32) i32
+fn C.unlockpt(i32) i32
+fn C.ptsname(i32) &char
 fn C.ioctl(i32, u64, ...) i32
 fn C.fstat(i32, &C.stat) i32
 fn C.S_ISCHR(u32) bool
@@ -921,6 +928,48 @@ fn owned_open_cases() {
 	}
 }
 
+fn ordinary_pty_cases() i32 {
+	unsafe {
+		// Retain the saved root UID in this isolated child so it can switch
+		// to a second account with the same group while the slave is open.
+		owner := u32(1234)
+		group := u32(2345)
+		if C.setsid() < 0 || C.setegid(group) != 0 || C.seteuid(owner) != 0 {
+			check(false, c'enter ordinary PTY session')
+			return 1
+		}
+		master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY | C.O_CLOEXEC)
+		if master < 0 || C.grantpt(master) != 0 || C.unlockpt(master) != 0 {
+			check(false, c'ordinary account allocates and unlocks a PTY')
+			return 1
+		}
+		path := C.ptsname(master)
+		if path == nil {
+			check(false, c'ordinary account locates its PTY slave')
+			return 1
+		}
+		slave := C.open(path, C.O_RDWR | C.O_NOCTTY | C.O_CLOEXEC)
+		check(slave >= 0, c'ordinary account opens its own PTY slave')
+		if slave < 0 { return 1 }
+		info := &C.stat(C.__builtin_alloca(sizeof(C.stat)))
+		check(C.fstat(slave, info) == 0 && info.st_uid == owner && info.st_gid == group
+			&& info.st_mode & 0o777 == 0o600, c'PTY slave has the opener\'s filesystem IDs and owner-only mode')
+		check(C.ioctl(slave, C.TIOCSCTTY, 0) == 0, c'ordinary account claims its controlling PTY')
+		C.signal(C.SIGHUP, C.SIG_IGN)
+		if C.seteuid(0) != 0 || C.seteuid(1235) != 0 {
+			check(false, c'switch to another ordinary account in the same group')
+			return 1
+		}
+		C.errno = 0
+		check(C.open(path, C.O_RDONLY | C.O_NOCTTY) == -1 && C.errno == C.EACCES,
+			c'another account in the same group cannot read the slave')
+		C.errno = 0
+		check(C.open(path, C.O_WRONLY | C.O_NOCTTY) == -1 && C.errno == C.EACCES,
+			c'another account in the same group cannot write to the slave')
+		return if failures != 0 { 1 } else { 0 }
+	}
+}
+
 fn manager(image &char) i32 {
 	unsafe {
 		check(C.setsid() > 0, c'create controlling session')
@@ -1016,6 +1065,9 @@ pub fn entry(argc i32, argv &&char) i32 {
 		if child == 0 { C._exit(epoll_slave_cases()) }
 		mut passed := child > 0 && exited_ok(child)
 		check(passed, c'bounded epoll slave regression child reaped')
+		child = C.fork()
+		if child == 0 { C._exit(ordinary_pty_cases()) }
+		passed = (child > 0 && exited_ok(child)) && passed
 		child = C.fork()
 		if child == 0 { C._exit(manager(argv[0])) }
 		passed = (child > 0 && exited_ok(child)) && passed
