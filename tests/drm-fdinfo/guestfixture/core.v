@@ -542,6 +542,43 @@ fn test_gem_close_transport() bool {
 	return true
 }
 
+fn test_syncobj_handle_transport() bool {
+	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	// The four-byte requests omit the flags and padding words, which are
+	// deliberately nonzero in userspace. Only the handle is copied back.
+	mut short := [u32(0), 0xffffffff]!
+	if C.ioctl(fd, i32(u32(0xc00464bf)), &short[0]) != 0 || short[0] == 0
+		|| short[1] != 0xffffffff {
+		return false
+	}
+	handle := short[0]
+	if C.ioctl(fd, i32(u32(0xc00464c0)), &short[0]) != 0 || short[0] != handle
+		|| short[1] != 0xffffffff {
+		return false
+	}
+	mut extended := [u32(0), 0, 0x1234, 0x5678]!
+	if C.ioctl(fd, i32(u32(0xc01064bf)), &extended[0]) != 0 || extended[0] == 0
+		|| extended[1] != 0 || extended[2] != 0x1234 || extended[3] != 0x5678 {
+		return false
+	}
+	// A read-only destroy supplies a zero handle. Its error reply must
+	// still be copied out, and the live handle can then be destroyed.
+	mut read_only := extended[0]
+	if C.ioctl(fd, i32(u32(0x800464c0)), unsafe { &read_only }) != -1
+		|| unsafe { *C.__errno_location() } != C.EINVAL || read_only != 0 {
+		return false
+	}
+	extended_handle := extended[0]
+	if C.ioctl(fd, i32(u32(0xc01064c0)), &extended[0]) != 0 || extended[0] != extended_handle
+		|| extended[1] != 0 || extended[2] != 0x1234 || extended[3] != 0x5678 {
+		return false
+	}
+	return C.ioctl(fd, i32(u32(0xc00864c0)), &extended[0]) == -1
+		&& unsafe { *C.__errno_location() } == C.EINVAL
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	if test_open_order() {
@@ -566,6 +603,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM GEM CLOSE TRANSPORT: PASS')
 		} else {
 			C.puts(c'DRM GEM CLOSE TRANSPORT FAIL: unexpected framed close or handle state')
+		}
+		if test_syncobj_handle_transport() {
+			C.puts(c'VINIX DRM SYNCOBJ HANDLE TRANSPORT: PASS')
+		} else {
+			C.puts(c'DRM SYNCOBJ HANDLE TRANSPORT FAIL: unexpected request, reply or handle state')
 		}
 		if test_debugfs_clients() {
 			C.puts(c'VINIX DRM DEBUGFS CLIENTS: PASS')

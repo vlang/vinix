@@ -389,6 +389,26 @@ at `/Users/alex/.local/state/vinix/m1-drm-close-wire-20261122.0XLmdc/`.
 The `bundle.tar.gz` SHA-256 is
 `6ccadd6358fde61f748655423e0cf6a3f305faaec5c97cbd327a77aab63679c7`.
 
+#### Syncobj create and destroy request sizes
+
+`SYNCOBJ_CREATE` and `SYNCOBJ_DESTROY` use the shared extensible read/write
+ioctl layout. Four-byte requests zero-fill the omitted flags or padding
+and copy back only the handle. Extended read/write requests echo their
+trailing bytes. The dispatcher also copies back the reply when the handler
+returns an error. [Pinned Linux ioctl transport](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L874-L916) [Pinned syncobj ioctl definitions](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/drm/drm.h#L1260-L1261)
+
+The sanitizer wire and syncobj suites passed. ARM64 and x86-64 QEMU
+created and destroyed live syncobjs with short and extended requests and
+verified the error reply from a read-only destroy. The preceding ARM64
+kernel rejected the short create. The allocation scan reproduced the
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `58294ee862d5d7633f572317046aa61b1b6d2841` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-syncobj-handle-wire-20261122.6M0Rrz/`.
+The `bundle.tar.gz` SHA-256 is
+`3c56bbd8d50919c7a1518ab49c8e5c4d0904ea4b61563104d6f6848d123f22ba`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

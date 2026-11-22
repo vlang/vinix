@@ -378,12 +378,14 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmSyncobjCreate))
 				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_syncobj_destroy {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmSyncobjDestroy))
 				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_syncobj_handle_to_fd, ioctl.drm_ioctl_syncobj_fd_to_handle {

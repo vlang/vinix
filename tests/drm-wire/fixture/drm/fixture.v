@@ -119,6 +119,14 @@ pub fn run_checks() {
 		assert ioctl_buffer_size(&close_layout, 4) == 8
 		assert ioctl_buffer_size(&close_layout, 16) == if close_layout.direction == 0 { u32(8) } else { u32(16) }
 	}
+	for cmd in [ioctl.drm_ioctl_syncobj_create, ioctl.drm_ioctl_syncobj_destroy]! {
+		for direction := u32(0); direction < 4; direction++ {
+			layout := ioctl_layout(&device, cmd, 4, direction, 0) or { panic('syncobj layout') }
+			assert layout.extensible && layout.direction == direction
+			assert ioctl_buffer_size(&layout, 4) == 8
+			assert ioctl_buffer_size(&layout, 16) == if direction == 0 { u32(8) } else { u32(16) }
+		}
+	}
 	if _ := ioctl_layout(&device, 0x41, 16, 3, 1) {
 		assert false
 	}
