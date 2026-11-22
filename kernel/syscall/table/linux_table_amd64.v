@@ -15,6 +15,7 @@ module table
 import errno
 import file
 import fs
+import futex
 import memory
 import memory.mmap
 import numa
@@ -407,7 +408,11 @@ pub fn init_syscall_table() {
 	syscall_table[217] = voidptr(syscall_linux_getdents64) // getdents64
 	syscall_table[221] = voidptr(file.syscall_fadvise64) // fadvise64
 	syscall_table[187] = voidptr(file.syscall_readahead) // readahead
+	syscall_table[449] = voidptr(futex.syscall_waitv) // futex_waitv
 	syscall_table[452] = voidptr(fs.syscall_fchmodat2) // fchmodat2
+	syscall_table[454] = voidptr(futex.syscall_futex2_wake) // futex_wake
+	syscall_table[455] = voidptr(futex.syscall_futex2_wait) // futex_wait
+	syscall_table[456] = voidptr(futex.syscall_futex2_requeue) // futex_requeue
 	syscall_table[235] = voidptr(syscall_linux_utimes) // utimes
 	syscall_table[135] = voidptr(proc.syscall_personality) // personality
 	syscall_table[103] = voidptr(syscall_syslog) // syslog

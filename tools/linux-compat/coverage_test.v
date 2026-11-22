@@ -36,6 +36,12 @@ fn test_real_tables_keep_architecture_numbers_and_private_extension() {
 		assert private.len == 1 && private[0].status == 'private'
 		bpf := report.syscalls.filter(it.arch == arch && it.name == 'bpf')
 		assert bpf.len == 1 && bpf[0].status == 'unavailable'
+		for name, number in {'futex_waitv': 449, 'futex_wake': 454, 'futex_wait': 455,
+			'futex_requeue': 456} {
+			futex := report.syscalls.filter(it.arch == arch && it.name == name)
+			assert futex.len == 1 && futex[0].number == number
+			assert futex[0].status == 'wired; unqualified'
+		}
 	}
 }
 

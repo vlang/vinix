@@ -2659,6 +2659,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   namespaces. The same probe ELF passes 191 + 16 checks on Vinix and Linux 6.12
   on both architectures. See [the message queue receipts](docs/linux-mqueue.md).
 
+- [x] Implement native futex2 vector waits, masked waits and wakes, and
+  compare-requeue. Qualify 128-entry waits, shared and private keys, absolute
+  deadlines, signal restart, and legacy futex interoperability on AArch64 and
+  x86-64. See [the futex2 receipts](docs/linux-futex2.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -548,7 +548,11 @@ pub fn init_syscall_table() {
 	syscall_table[438] = voidptr(userland.syscall_pidfd_getfd)
 	syscall_table[223] = voidptr(file.syscall_fadvise64) // __NR_fadvise64
 	syscall_table[213] = voidptr(file.syscall_readahead) // __NR_readahead
+	syscall_table[449] = voidptr(futex.syscall_waitv) // __NR_futex_waitv
 	syscall_table[452] = voidptr(fs.syscall_fchmodat2) // __NR_fchmodat2
+	syscall_table[454] = voidptr(futex.syscall_futex2_wake) // __NR_futex_wake
+	syscall_table[455] = voidptr(futex.syscall_futex2_wait) // __NR_futex_wait
+	syscall_table[456] = voidptr(futex.syscall_futex2_requeue) // __NR_futex_requeue
 
 	// Sockets
 	syscall_table[198] = voidptr(socket.syscall_socket) // __NR_socket

@@ -26,15 +26,6 @@ import usercopy
 import vmstorage
 
 
-// Linux's private key only checks the canonical user range; the word need
-// not be mapped for a wake on an empty queue. Shared keys resolve the word.
-fn linux_futex_address_error(address u64, private bool) u64 {
-	if address & 3 != 0 { return errno.einval }
-	if address > memory.user_address_limit() - 4 { return errno.efault }
-	if !private { usercopy.read_u32(address) or { return errno.efault } }
-	return 0
-}
-
 // Linux futex(uaddr, futex_op, val, timeout/val2, uaddr2, val3).
 fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64, uaddr2 u64, val3 u64) (u64, u64) {
 	// PRIVATE selects the address-space/virtual key even on shared mappings.
@@ -64,7 +55,7 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 				return errno.err, errno.einval
 			}
 			bitset := if op == 9 { u32(val3) } else { u32(0xffffffff) }
-			address_error := linux_futex_address_error(uaddr, private)
+			address_error := futex.address_error(uaddr, private)
 			if address_error != 0 { return errno.err, address_error }
 			if timeout == 0 {
 				return futex.wait_mask_key(uaddr, int(val), private, bitset)
@@ -90,13 +81,13 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
 			if op == 10 && u32(val3) == 0 { return errno.err, errno.einval }
 			bitset := if op == 10 { u32(val3) } else { u32(0xffffffff) }
-			address_error := linux_futex_address_error(uaddr, private)
+			address_error := futex.address_error(uaddr, private)
 			if address_error != 0 { return errno.err, address_error }
 			return futex.wake_mask_key(uaddr, int(i32(val)), private, bitset), 0
 		}
 		5 { // FUTEX_WAKE_OP
 			for address in [uaddr, uaddr2]! {
-				address_error := linux_futex_address_error(address, private)
+				address_error := futex.address_error(address, private)
 				if address_error != 0 { return errno.err, address_error }
 			}
 			// Decode FUTEX_OP(op, oparg, cmp, cmparg). In particular Qt's
@@ -139,7 +130,7 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 			move_count := int(i32(timeout))
 			if wake_count < 0 || move_count < 0 { return errno.err, errno.einval }
 			for address in [uaddr, uaddr2]! {
-				address_error := linux_futex_address_error(address, private)
+				address_error := futex.address_error(address, private)
 				if address_error != 0 { return errno.err, address_error }
 			}
 			return futex.requeue(uaddr, uaddr2, wake_count, move_count, private, op == 4, u32(val3))

@@ -342,11 +342,21 @@ pub fn (mut this Timer) disarm() {
 }
 
 pub fn (mut this Timer) arm() {
+	this.arm_timer(false)
+}
+
+// The timestamp in when uses the same clock as deadline_ns.
+pub fn (mut this Timer) arm_monotonic_deadline() {
+	this.arm_timer(true)
+}
+
+fn (mut this Timer) arm_timer(absolute_monotonic bool) {
 	if this.index >= 0 { this.disarm() }
 	timers_lock.acquire()
 
 	this.fired = false
-	this.deadline_ns = timer_deadline(this.when)
+	base := if absolute_monotonic { u64(0) } else { monotonic_ns() }
+	this.deadline_ns = timer_deadline(base, this.when)
 	if !this.absolute_realtime && this.slack_ns != 0 {
 		room := ~u64(0) - this.deadline_ns
 		limit := this.deadline_ns + if this.slack_ns < room { this.slack_ns } else { room }
@@ -399,12 +409,11 @@ pub fn monotonic_ns() u64 {
 	return u64(now.tv_sec) * 1000000000 + u64(now.tv_nsec)
 }
 
-fn timer_deadline(duration TimeSpec) u64 {
-	now := monotonic_ns()
-	if duration.tv_sec < 0 || duration.tv_nsec < 0 { return now }
-	room := ~u64(0) - now
+fn timer_deadline(base u64, duration TimeSpec) u64 {
+	if duration.tv_sec < 0 || duration.tv_nsec < 0 { return base }
+	room := ~u64(0) - base
 	if u64(duration.tv_sec) > room / 1000000000 { return ~u64(0) }
 	whole := u64(duration.tv_sec) * 1000000000
 	if u64(duration.tv_nsec) > room - whole { return ~u64(0) }
-	return now + whole + u64(duration.tv_nsec)
+	return base + whole + u64(duration.tv_nsec)
 }

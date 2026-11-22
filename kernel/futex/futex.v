@@ -30,13 +30,13 @@ mut:
 	next &Futex = unsafe { nil }
 }
 
-// Each syscall frame owns its event. Requeue changes only its futex owner,
-// leaving event.await's listener pointers and timer stable until they detach.
+// A syscall frame owns the event, which can be shared by several wait nodes.
+// Requeue changes only a node's futex owner.
 struct Wait {
 mut:
 	next &Wait = unsafe { nil }
 	futex &Futex = unsafe { nil }
-	event eventstruct.Event
+	event &eventstruct.Event = unsafe { nil }
 	bitset u32
 	woken bool
 }
@@ -53,6 +53,15 @@ __global (
 
 pub fn initialise() {
 	futexes = map[u64]&Futex{}
+}
+
+// A private key only needs an aligned address in the user range. A shared
+// key needs a readable mapping so an unmapped word cannot match a waiter.
+pub fn address_error(address u64, private bool) u64 {
+	if address & 3 != 0 { return errno.einval }
+	if address > memory.user_address_limit() - 4 { return errno.efault }
+	if !private { usercopy.read_u32(address) or { return errno.efault } }
+	return 0
 }
 
 // Name the futex a user address refers to.
@@ -213,8 +222,12 @@ fn wait_common(virt u64, expected int, private bool, bitset u32, duration &time.
 	defer {
 		if timer != unsafe { nil } { timer.disarm(); unsafe { free(timer) } }
 	}
+	mut wake_event := unsafe { &eventstruct.Event(C.__builtin_alloca(sizeof(eventstruct.Event))) }
 	mut node := unsafe { &Wait(C.__builtin_alloca(sizeof(Wait))) }
-	unsafe { *node = Wait{bitset: bitset} }
+	unsafe {
+		*wake_event = eventstruct.Event{}
+		*node = Wait{bitset: bitset, event: wake_event}
+	}
 	mut queued := false
 	for _ in 0..16 {
 		mut f := get(virt, true, private) or { return errno.err, errno.efault }
@@ -237,14 +250,20 @@ fn wait_common(virt u64, expected int, private bool, bitset u32, duration &time.
 		break
 	}
 	if !queued { return errno.err, errno.eagain }
+	return finish_wait(mut node, await_wake(mut wake_event, timer))
+}
+
+fn await_wake(mut wake_event eventstruct.Event, timer &time.Timer) u64 {
+	if timer == unsafe { nil } {
+		event.await_one(mut wake_event, true) or { return errno.eintr }
+		return 0
+	}
 	mut storage := unsafe { &WaitEvents(C.__builtin_alloca(sizeof(WaitEvents))) }
-	storage.items[0] = &node.event
-	storage.items[1] = if timer == unsafe { nil } { &node.event } else { &timer.event }
-	mut events := unsafe { event.stack_list(&storage.items[0], if timer == unsafe { nil } { 1 } else { 2 }) }
-	mut error := u64(0)
-	which := event.await(mut events, true) or { error = errno.eintr; u64(-1) }
-	if which == 1 { error = errno.etimedout }
-	return finish_wait(mut node, error)
+	storage.items[0] = &wake_event
+	storage.items[1] = &timer.event
+	mut events := unsafe { event.stack_list(&storage.items[0], 2) }
+	which := event.await(mut events, true) or { return errno.eintr }
+	return if which == 1 { errno.etimedout } else { 0 }
 }
 
 // Wake and requeue hold futex_lock until their last use of each stack node.
@@ -282,10 +301,14 @@ pub fn wake_n_key(virt u64, maximum int, private bool) u64 {
 }
 
 pub fn wake_mask_key(virt u64, maximum int, private bool, bitset u32) u64 {
-	mut f := get(virt, false, private) or { return 0 }
 	// The original Linux futex ABI wakes one for a nonpositive count when
 	// waiters exist. FUTEX2's strict zero-count behavior is a separate ABI.
 	count := if maximum > 0 { u64(maximum) } else { u64(1) }
+	return wake_count(virt, count, private, bitset)
+}
+
+fn wake_count(virt u64, count u64, private bool, bitset u32) u64 {
+	mut f := get(virt, false, private) or { return 0 }
 	futex_lock.acquire()
 	woken := wake_locked(mut f, count, bitset)
 	futex_lock.release()
@@ -294,10 +317,10 @@ pub fn wake_mask_key(virt u64, maximum int, private bool, bitset u32) u64 {
 }
 
 // None means the comparison page must be faulted in outside futex_lock.
-fn requeue_attempt(source u64, target u64, wake_count int, move_count int, private bool, compare bool, expected u32) ?(u64, u64) {
-	mut from := get(source, true, private) or { return errno.err, errno.efault }
+fn requeue_attempt(source u64, target u64, wake_count int, move_count int, source_private bool, target_private bool, compare bool, expected u32) ?(u64, u64) {
+	mut from := get(source, true, source_private) or { return errno.err, errno.efault }
 	defer { put(mut from) }
-	mut to := get(target, true, private) or { return errno.err, errno.efault }
+	mut to := get(target, true, target_private) or { return errno.err, errno.efault }
 	defer { put(mut to) }
 	futex_lock.acquire()
 	defer { futex_lock.release() }
@@ -327,8 +350,12 @@ fn requeue_attempt(source u64, target u64, wake_count int, move_count int, priva
 }
 
 pub fn requeue(source u64, target u64, wake_count int, move_count int, private bool, compare bool, expected u32) (u64, u64) {
+	return requeue_keys(source, target, wake_count, move_count, private, private, compare, expected)
+}
+
+fn requeue_keys(source u64, target u64, wake_count int, move_count int, source_private bool, target_private bool, compare bool, expected u32) (u64, u64) {
 	for _ in 0..16 {
-		if result, error := requeue_attempt(source, target, wake_count, move_count, private, compare, expected) {
+		if result, error := requeue_attempt(source, target, wake_count, move_count, source_private, target_private, compare, expected) {
 			return result, error
 		}
 		usercopy.read_u32(source) or { return errno.err, errno.efault }
