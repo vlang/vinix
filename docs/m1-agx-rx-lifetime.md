@@ -514,3 +514,29 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-debugfs-claim-20261122.AvqTjQ/`.
 The `bundle.tar.gz` SHA-256 is
 `73571024f83fcbf7c65979a4ffa1c5e9c460b89709968466372034543d8946a5`.
+
+## DRM debugfs minor link ownership
+
+DRM records successful link creation for the card and render minors
+independently. Unregister removes the recorded links and the device's
+directory. An occupied numeric path survives a failed link creation and
+subsequent unregister. Linux likewise removes the symlink saved at
+registration. [Linux DRM debugfs minor lifecycle](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L431-L455)
+
+The DRM sysfs sanitizer fixture blocked each minor path in turn and
+verified that unregister preserved the occupied directory and removed
+the successful link. Controls caught unconditional removal of the card
+and render paths. Independent lifetime review and generated ARM64 code
+confirmed the per-link ownership checks.
+
+Both kernel builds used `-O1` for C compilation. The ARM64 QEMU DRM sysfs
+probe passed with TCG after an HVF assertion in virtio-net initialization.
+The x86-64 descriptor-flags smoke test, DRM wire sanitizer fixture,
+79 local contracts and 122 pinned-reference checks passed. The allocation
+scan matched the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `1d9cb26010811116cf53058dec5696885a50ee8b` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-debugfs-links-20261122.uj7ZJa/`.
+The `bundle.tar.gz` SHA-256 is
+`29908e1c5dd7da82f5d78c81c4881ed76683aec6dbea97172f55fe2d9010813e`.

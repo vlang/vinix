@@ -93,10 +93,11 @@ fn publish_text(directory string, name string, text string) {
 	unsafe { path.free() }
 }
 
-fn publish_link(directory string, name string, target string) {
+fn publish_link(directory string, name string, target string) bool {
 	path := sysfs_join3(directory, '/', name)
-	fs.sysfs_link(path, target)
+	added := fs.sysfs_link(path, target)
 	unsafe { path.free() }
+	return added
 }
 
 fn remove_minor_sysfs(parent string, prefix string, minor u32) {
@@ -130,9 +131,9 @@ fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
 	// A name another device already has stays that device's, as Linux's
 	// debugfs_create_dir() refuses it; this device then gets no directory.
 	if fs.sysfs_create_directory(directory) {
-		publish_debugfs_link(dev.dev_id, unique)
+		dev.debugfs_primary_link = publish_debugfs_link(dev.dev_id, unique)
 		if dev.render_node != unsafe { nil } {
-			publish_debugfs_link(128 + dev.dev_id, unique)
+			dev.debugfs_render_link = publish_debugfs_link(128 + dev.dev_id, unique)
 		}
 		dev.debugfs_dir = directory
 	} else {
@@ -141,18 +142,23 @@ fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
 	unsafe { unique.free() }
 }
 
-fn publish_debugfs_link(minor u32, unique string) {
+fn publish_debugfs_link(minor u32, unique string) bool {
 	name := minor_name('', minor)
-	publish_link(debugfs_dri, name, unique)
+	added := publish_link(debugfs_dri, name, unique)
 	unsafe { name.free() }
+	return added
 }
 
 // Removing the directory waits for every read of a file in it to return.
 fn remove_drm_debugfs(mut dev DrmDevice) {
 	if dev.debugfs_dir.len == 0 { return }
-	remove_debugfs_link(dev.dev_id)
-	if dev.render_node != unsafe { nil } {
+	if dev.debugfs_primary_link {
+		remove_debugfs_link(dev.dev_id)
+		dev.debugfs_primary_link = false
+	}
+	if dev.debugfs_render_link {
 		remove_debugfs_link(128 + dev.dev_id)
+		dev.debugfs_render_link = false
 	}
 	fs.sysfs_remove(dev.debugfs_dir)
 	unsafe { dev.debugfs_dir.free() }

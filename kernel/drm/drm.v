@@ -85,6 +85,8 @@ mut:
 	registered  bool
 	sysfs_parent string // owned copy, for removal after the driver is gone
 	debugfs_dir  string // owned; empty for a device with no parent
+	debugfs_primary_link bool
+	debugfs_render_link bool
 }
 
 pub fn (dev &DrmDevice) is_registered() bool {

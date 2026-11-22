@@ -19,6 +19,8 @@ pub mut:
 	render_node  &DrmNode = unsafe { nil }
 	sysfs_parent string
 	debugfs_dir  string
+	debugfs_primary_link bool
+	debugfs_render_link bool
 }
 
 // Follow every link in `path`, relative links from the link's own directory,
@@ -207,6 +209,24 @@ pub fn run_checks() {
 	remove_drm_sysfs(mut losing_device)
 	assert text_of('${competed_directory}/owner') == 'competing device'
 
+	mut partial_driver := DrmDriver{sysfs_parent: 'devices/platform/partial.gpu'}
+	mut partial_device := DrmDevice{driver: &partial_driver, dev_id: 4, render_node: &node}
+	partial_dir := 'kernel/debug/dri/partial.gpu'
+	minor_paths := ['kernel/debug/dri/4', 'kernel/debug/dri/132']!
+	for blocked_index in 0 .. minor_paths.len {
+		blocked := minor_paths[blocked_index]
+		added := minor_paths[1 - blocked_index]
+		assert fs.sysfs_text('${blocked}/owner', 'existing directory')
+		publish_drm_sysfs(mut partial_device)
+		assert (resolve(added) or { '' }) == partial_dir
+		assert debugfs_add_file(&partial_device, 'stats', show_marker, voidptr(u64(42)))
+		remove_drm_sysfs(mut partial_device)
+		assert text_of('${blocked}/owner') == 'existing directory', 'teardown removed the occupied minor path'
+		assert !fs.published(added) && !fs.published(partial_dir)
+		assert fs.sysfs_remove(blocked)
+	}
+	println('DRM debugfs: unregister preserves occupied card and render paths and removes the links it created')
+
 	// A device with no parent, such as the QEMU framebuffer: Linux's
 	// devices/virtual entries, which libdrm does not enumerate.
 	mut plain := DrmDriver{}
@@ -271,5 +291,5 @@ pub fn run_checks() {
 	assert node_is_drm(0) == false && exists('class/drm/card0')
 	remove_drm_sysfs(mut framebuffer)
 	_ = lib.new_text(0)
-	println('DRM sysfs: libdrm finds the M1 GPU as a platform device named from the pinned device tree, its debugfs directory holds root-only driver files, virtual devices stay unlisted, and unregister removes every link; a VirtIO-MMIO GPU is listed as a platform device through its virtio parent')
+	println('DRM sysfs: libdrm finds the M1 GPU as a platform device named from the pinned device tree, its debugfs directory holds root-only driver files, virtual devices stay unlisted, and unregister removes its own links; a VirtIO-MMIO GPU is listed as a platform device through its virtio parent')
 }
