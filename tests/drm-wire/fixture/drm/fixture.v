@@ -217,10 +217,34 @@ fn check_device_capabilities() {
 			panic('GET_CAP monotonic timestamp probe')
 		}) == 0
 		assert cap.capability == ioctl.drm_cap_timestamp_monotonic && cap.value == 1
+		cap = ioctl.DrmGetCap{capability: ioctl.drm_cap_prime}
+		assert (node.ioctl(voidptr(1), u64(0xc010640c), unsafe { &cap }) or { panic('GET_CAP PRIME probe') }) == 0
+		assert cap.value == ioctl.drm_prime_cap_import | ioctl.drm_prime_cap_export
+		for capability, value in {
+			ioctl.drm_cap_dumb_buffer: u64(1)
+			ioctl.drm_cap_dumb_preferred_depth: 32
+			ioctl.drm_cap_dumb_prefer_shadow: 0
+		} {
+			cap = ioctl.DrmGetCap{capability: capability, value: ~u64(0)}
+			if features & driver_dumb_buffer != 0 {
+				assert (node.ioctl(voidptr(1), u64(0xc010640c), unsafe { &cap }) or { panic('GET_CAP display probe') }) == 0
+				assert cap.value == value
+			} else {
+				expect_error(mut node, u64(0xc010640c), unsafe { &cap }, errno.eopnotsupp)
+				assert cap.capability == capability && cap.value == 0
+			}
+		}
+		cap = ioctl.DrmGetCap{capability: ~u64(0), value: ~u64(0)}
+		expect_error(mut node, u64(0xc010640c), unsafe { &cap }, if features & driver_dumb_buffer != 0 {
+			errno.einval
+		} else {
+			errno.eopnotsupp
+		})
+		assert cap.capability == ~u64(0) && cap.value == 0
 	}
 	memory.fail_next(false)
 	assert memory.outstanding() == 0
-	println('DRM GET_CAP: timeline discovery, binary syncobjs and monotonic timestamps passed')
+	println('DRM GET_CAP: render and display capability replies and errors passed')
 }
 
 fn expect_error(mut node DrmNode, request u64, data voidptr, code u64) {

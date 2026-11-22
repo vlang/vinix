@@ -1088,19 +1088,8 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 		return -14
 	}
 	mut cap := unsafe { &ioctl.DrmGetCap(data) }
+	cap.value = 0
 	match cap.capability {
-		ioctl.drm_cap_dumb_buffer {
-			cap.value = if dev.driver.features & driver_dumb_buffer != 0 { u64(1) } else { u64(0) }
-			return 0
-		}
-		ioctl.drm_cap_dumb_preferred_depth {
-			cap.value = 32
-			return 0
-		}
-		ioctl.drm_cap_dumb_prefer_shadow {
-			cap.value = 0
-			return 0
-		}
 		ioctl.drm_cap_prime {
 			cap.value = ioctl.drm_prime_cap_import | ioctl.drm_prime_cap_export
 			return 0
@@ -1113,8 +1102,24 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 			cap.value = u64(dev.driver.features & driver_syncobj_timeline != 0)
 			return 0
 		}
+		else {}
+	}
+	// The framebuffer driver's dumb-buffer feature marks the devices
+	// that expose display capabilities.
+	if dev.driver.features & driver_dumb_buffer == 0 {
+		return -int(errno.eopnotsupp)
+	}
+	match cap.capability {
+		ioctl.drm_cap_dumb_buffer {
+			cap.value = 1
+			return 0
+		}
+		ioctl.drm_cap_dumb_preferred_depth {
+			cap.value = 32
+			return 0
+		}
+		ioctl.drm_cap_dumb_prefer_shadow { return 0 }
 		else {
-			cap.value = 0
 			return -22
 		}
 	}

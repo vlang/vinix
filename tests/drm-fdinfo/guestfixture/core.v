@@ -494,10 +494,42 @@ fn test_core_query_transport() bool {
 	if C.ioctl(fd, i32(u32(0xc010640c)), &cap[0]) != 0 || cap[0] != 0x6 || cap[1] != 1 {
 		return false
 	}
+	cap[0] = 0x3 // DRM_CAP_DUMB_PREFERRED_DEPTH
+	if C.ioctl(fd, i32(u32(0xc010640c)), &cap[0]) != 0 || cap[1] != 32 {
+		return false
+	}
+	cap[0] = 0x4 // DRM_CAP_DUMB_PREFER_SHADOW
+	cap[1] = ~u64(0)
+	if C.ioctl(fd, i32(u32(0xc010640c)), &cap[0]) != 0 || cap[1] != 0 {
+		return false
+	}
 	cap[0] = ~u64(0)
 	return C.ioctl(fd, i32(u32(0xc018640c)), &cap[0]) == -1
 		&& unsafe { *C.__errno_location() } == C.EINVAL
 		&& cap[1] == 0 && cap[2] == 0x1234 && cap[3] == 0x5678
+}
+
+fn test_render_capabilities(fd i32) bool {
+	mut cap := [u64(0x5), ~u64(0), 0x1234]!
+	if C.ioctl(fd, i32(u32(0xc018640c)), &cap[0]) != 0 || cap[1] != 3 || cap[2] != 0x1234 {
+		return false
+	}
+	cap[0] = 0x13 // DRM_CAP_SYNCOBJ
+	if C.ioctl(fd, i32(u32(0xc010640c)), &cap[0]) != 0 || cap[1] != 1 {
+		return false
+	}
+	capabilities := [u64(0x1), 0x3, 0x4, ~u64(0)]!
+	for i in 0 .. capabilities.len {
+		capability := unsafe { capabilities[i] }
+		cap[0] = capability
+		cap[1] = ~u64(0)
+		if C.ioctl(fd, i32(u32(0xc018640c)), &cap[0]) != -1
+			|| unsafe { *C.__errno_location() } != C.EOPNOTSUPP
+			|| cap[0] != capability || cap[1] != 0 || cap[2] != 0x1234 {
+			return false
+		}
+	}
+	return true
 }
 
 struct DumbCreateRequest {
@@ -806,6 +838,16 @@ pub fn run() i32 {
 		} else {
 			C.puts(c'DRM CLIENT READ ALLOCATIONS FAIL: table or slab usage changed')
 		}
+	}
+	mut render := C.open(c'/dev/dri/renderD129', C.O_RDWR)
+	if render < 0 { render = C.open(c'/dev/dri/renderD128', C.O_RDWR) }
+	if render >= 0 {
+		if test_render_capabilities(render) {
+			C.puts(c'VINIX DRM RENDER CAPABILITIES: PASS')
+		} else {
+			C.puts(c'DRM RENDER CAPABILITIES FAIL: wrong capability reply or error')
+		}
+		C.close(render)
 	}
 	C.fflush(unsafe { nil })
 	C.reboot(C.RB_POWER_OFF)

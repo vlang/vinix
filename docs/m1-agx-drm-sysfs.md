@@ -472,6 +472,30 @@ at `/Users/alex/.local/state/vinix/m1-drm-dumb-wire-20261122.DxBMLG/`.
 The `bundle.tar.gz` SHA-256 is
 `722b36f7af384d8981b9340d0d10f90386eece5638400e5df35f5ebbe95aa4fc`.
 
+#### Display capability queries on render-only devices
+
+`GET_CAP` answers PRIME, syncobj, timeline syncobj and monotonic timestamp
+queries on render-only devices. Other queries on those devices return
+`EOPNOTSUPP` with a zero value. Vinix uses the framebuffer driver's
+dumb-buffer feature to admit display queries. The framebuffer reports
+dumb-buffer support, preferred depth 32 and shadow preference 0, with
+`EINVAL` for unknown capabilities. [Pinned Linux GET_CAP handler](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L234-L310)
+
+The sanitizer wire fixture verified both device classes and reproduced the
+old render-only response against the previous source. The ARM64 QEMU
+fixture enabled software Asahi and checked the render-node replies through
+the ioctl syscall. Software Asahi took `card0` in that boot. The full
+framebuffer fixture ran on x86-64 QEMU and verified the display replies.
+The allocation scan reproduced the 150 baseline findings. Native M1
+validation remains open.
+
+The tested base was `e7a296f420aa0ef6e9a6ee105bda3c18f3546e33` plus the
+archived patch and the simple DRM named-device fixture. The ARM64 build
+also used the archived software Asahi fixture patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-render-caps-20261122.QfZefI/`.
+The `bundle.tar.gz` SHA-256 is
+`d916c46ffa1311010dfcf808c4ed716034da429aafc6f7f9e2b1680dfe502924`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open
