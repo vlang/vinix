@@ -106,7 +106,7 @@ fn dispose(mut pm memory.Pagemap, res &resource.Resource) {
     unsafe { fixture_local.global.shadow_pagemap.pages.free(); pm.pages.free(); free(fixture_local.global); free(fixture_local); free(res); free(active_map) }
     fixture_local = unsafe { nil }
     active_map = unsafe { nil }
-    assert memory.live_pages == 0
+    assert memory.live_page_count() == 0
 }
 
 fn fill_test_page(mut pm memory.Pagemap, source RangePageSource, virt u64, file_page u64) bool {
@@ -130,7 +130,7 @@ fn test_removed_replaced_offset_and_flags_races_give_back_every_acquisition() {
             unsafe { pm.pages.free(); free(res); free(pm) }
         } else { dispose(mut pm, res) }
     }
-    assert memory.live_pages == 0
+    assert memory.live_page_count() == 0
 }
 
 fn test_optional_storage_pin_failure_drops_object_or_handle_pin() {
@@ -175,15 +175,15 @@ fn test_surplus_private_acquisition_and_cow_failure_restore_ownership() {
     second := snapshot(pm)
     assert fill_test_page(mut pm, second, 4096, 0)
     assert res.givebacks == 1 && memory.pmm_refcount(res.physical) == 2
-    memory.fail_alloc = true
+    memory.set_allocation_failure(true)
     assert !resolve_cow_fault(pm, 4113)
-    memory.fail_alloc = false
+    memory.set_allocation_failure(false)
     assert memory.pmm_refcount(res.physical) == 2 && res.refcount == 1 && res.range_refs == 0
     pm.fail_map = true
     assert !resolve_cow_fault(pm, 4113)
     assert pm.pages[4096].physical == u64(res.physical)
     assert fixture_local.global.shadow_pagemap.pages[4096].physical == u64(res.physical)
-    assert memory.live_pages == 1 && memory.pmm_refcount(res.physical) == 2
+    assert memory.live_page_count() == 1 && memory.pmm_refcount(res.physical) == 2
     assert resolve_cow_fault(pm, 4113)
     assert memory.pmm_refcount(res.physical) == 1 && res.givebacks == 2
     installed := pm.pages[4096].physical

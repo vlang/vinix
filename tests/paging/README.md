@@ -16,6 +16,15 @@ foreground reclaim past 600 locked mappings. It also runs the existing
 private-file page suite. AddressSanitizer and UndefinedBehaviorSanitizer are
 optional via the flag above.
 
+The host fixture now uses functions for allocation counters, failure injection
+and the process used by reclaim tests. On the current V compiler, the original
+fixture failed to compile when a test accessed another module's global. The
+normal and ASan/UBSan paging suites and the mapped-file alias fixture passed
+with this change and the same assertions. Sanitizer leak detection was disabled.
+The before/after logs and `paging-host.sha256` are in
+`~/.local/state/vinix/section14-resume-CUyEUnSR`. The checksum list's SHA-256 is
+`e9ee0422cd776adeeef554cf323c7a2fd568bbd0e99a80573535e7f642a445a3`.
+
 The independent device-policy sanitizer fixture also checks swap claims against
 active writes, pending mounts, mounted extents, overlapping aliases and disjoint
 devices:

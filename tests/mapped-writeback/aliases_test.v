@@ -76,7 +76,7 @@ fn test_all_alias_preflight_age_eviction_and_private_cow_identity() {
 	for local in [first, second, clean, cow, lazy] { dispose_file_alias(local) }
 	memory.pmm_free(res.physical, 1)
 	unsafe { free(res) }
-	assert memory.live_pages == 0 && file_globals == unsafe { nil }
+	assert memory.live_page_count() == 0 && file_globals == unsafe { nil }
 }
 
 fn test_alias_workspace_overflow_and_shadow_lock_contention_are_atomic() {
@@ -93,5 +93,5 @@ fn test_alias_workspace_overflow_and_shadow_lock_contention_are_atomic() {
 	for local in locals { dispose_file_alias(local) }
 	memory.pmm_free(res.physical, 1)
 	unsafe { locals.free(); free(res) }
-	assert memory.live_pages == 0 && file_globals == unsafe { nil }
+	assert memory.live_page_count() == 0 && file_globals == unsafe { nil }
 }

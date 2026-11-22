@@ -60,7 +60,8 @@ import memory
 import klock
 pub const max_pid = 4
 pub struct Process { pub mut: exiting bool pagemap &memory.Pagemap = unsafe { nil } }
-__global (pub fixture_process &Process = unsafe { nil } table_lock klock.Lock)
+__global (fixture_process &Process = unsafe { nil } table_lock klock.Lock)
+pub fn set_fixture_process(process &Process) { fixture_process = process }
 pub fn lock_table() { table_lock.acquire() }
 pub fn unlock_table() { table_lock.release() }
 pub fn process_at(pid int) &Process { return if pid == 1 { fixture_process } else { unsafe { nil } } }
@@ -78,7 +79,9 @@ pub const pte_noexec = u64(8)
 pub const pte_file_tracked = u64(512)
 pub const pte_execute_only = u64(32)
 pub fn execute_only_supported() bool { return false }
-__global (pub live_pages int pub fail_alloc bool page_refs map[u64]u32)
+__global (live_pages int fail_alloc bool page_refs map[u64]u32)
+pub fn live_page_count() int { return live_pages }
+pub fn set_allocation_failure(fail bool) { fail_alloc = fail }
 pub fn pmm_alloc_fallible(pages u64) voidptr {
     if fail_alloc { return unsafe { nil } }
     live_pages++
@@ -131,10 +134,11 @@ pub fn (pm &Pagemap) next_present(begin u64, end u64) u64 {
     for address, _ in pm.pages { if address >= begin && address < first { first = address } }
     return first
 }
-__global (heap_allocations map[u64]bool pub heap_objects int pub fixture_total = u64(64 * 1024 * 1024))
+__global (heap_allocations map[u64]bool heap_objects int)
+pub fn heap_object_count() int { return heap_objects }
 pub fn get_hhdm_offset() u64 { return 0 }
 pub const page_size = u64(4096)
-pub fn total_bytes() u64 { return fixture_total }
+pub fn total_bytes() u64 { return 64 * 1024 * 1024 }
 pub fn malloc(bytes u64) voidptr { heap_objects++; address := unsafe { calloc(usize(bytes), 1) }; heap_allocations[u64(address)] = true; return address }
 pub fn malloc_packed_fallible(bytes u64) voidptr { if fail_alloc { return unsafe { nil } }; return malloc(bytes) }
 pub fn note_exhaustion() {}

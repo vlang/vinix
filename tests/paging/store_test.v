@@ -50,14 +50,14 @@ fn test_compression_fallback_and_fork_references_release_every_owner() {
 		memory.pmm_free(loaded, 1)
 		release(backing)
 	}
-	assert snapshot().compressed_pages == 0 && memory.heap_objects == 0
+	assert snapshot().compressed_pages == 0 && memory.heap_object_count() == 0
 	backing = detached(random_frame())
 	assert store(backing) == 0 // no disk: original remains recoverable
 	loaded := load(backing) or { panic('fallback load') }
 	assert_random(loaded)
 	release(backing)
 	memory.pmm_free(loaded, 1)
-	assert memory.live_pages == 0
+	assert memory.live_page_count() == 0
 }
 
 fn pending_load(backing &Backing) voidptr { return load(backing) or { panic('pending load') } }
@@ -73,7 +73,7 @@ fn test_pending_pageout_wait_and_raced_unmap_keep_backing_alive() {
 	assert_random(loaded)
 	release(backing)
 	memory.pmm_free(loaded, 1)
-	assert memory.live_pages == 0
+	assert memory.live_page_count() == 0
 }
 
 fn test_encrypted_slots_integrity_io_failure_reuse_and_swapoff() {
@@ -117,11 +117,11 @@ fn test_encrypted_slots_integrity_io_failure_reuse_and_swapoff() {
 	third := detached(random_frame())
 	assert store(third) == 1 && third.slot == 0
 	assert unsafe { C.memcmp(&res.swap_data[4096], &res.swap_data[8192], 4096) } != 0
-	memory.fail_alloc = true
+	memory.set_allocation_failure(true)
 	if _ := disable(identity) {
 		assert false
 	}
-	memory.fail_alloc = false
+	memory.set_allocation_failure(false)
 	assert snapshot().total == 8192 // activation remains available
 	assert disable(identity) or { panic('swapoff') } == 42
 	assert snapshot().total == 0 && res.refcount == 1
@@ -131,7 +131,7 @@ fn test_encrypted_slots_integrity_io_failure_reuse_and_swapoff() {
 		memory.pmm_free(frame, 1)
 		release(backing)
 	}
-	assert memory.live_pages == 0 && memory.heap_objects == 0
+	assert memory.live_page_count() == 0 && memory.heap_object_count() == 0
 }
 
 fn test_invalid_header_never_enables_or_changes_device() {
@@ -140,7 +140,7 @@ fn test_invalid_header_never_enables_or_changes_device() {
 	if _ := enable(mut res, resource.BlockIdentity{ disk_id: 2, length: 12288 }, 1) {
 		assert false
 	}
-	assert res.refcount == 1 && snapshot().total == 0 && memory.heap_objects == 0
+	assert res.refcount == 1 && snapshot().total == 0 && memory.heap_object_count() == 0
 }
 
 fn test_refault_errors_distinguish_corrupt_compression_and_disk_memory_exhaustion() {
@@ -168,5 +168,5 @@ fn test_refault_errors_distinguish_corrupt_compression_and_disk_memory_exhaustio
 	res.fail_read = false
 	release(disk)
 	assert disable(identity) or { panic('error fixture swapoff') } == 44
-	assert memory.live_pages == 0 && memory.heap_objects == 0
+	assert memory.live_page_count() == 0 && memory.heap_object_count() == 0
 }

@@ -33,7 +33,7 @@ fn dispose_anonymous(mut pm memory.Pagemap) {
 	}
 	fixture_local = unsafe { nil }
 	active_map = unsafe { nil }
-	assert memory.live_pages == 0 && memory.heap_objects == 0 && pager.snapshot().compressed_pages == 0
+	assert memory.live_page_count() == 0 && memory.heap_object_count() == 0 && pager.snapshot().compressed_pages == 0
 }
 
 fn test_pageout_refault_race_rejects_a_zero_page_captured_before_eviction() {
@@ -101,11 +101,11 @@ fn test_swapped_fork_and_uncovered_page_lifetimes() {
 fn test_failed_pageout_restores_original_frame_and_metadata_failure_keeps_mapping() {
 	mut pm := anonymous_fixture()
 	physical := pm.virt2phys(4096) or { panic('no frame') }
-	memory.fail_alloc = true
+	memory.set_allocation_failure(true)
 	assert pageout(pm, 4096, 4096) == 0
 	assert pm.virt2phys(4096) or { u64(0) } == physical
 	assert fixture_local.global.paged_pages == unsafe { nil }
-	memory.fail_alloc = false
+	memory.set_allocation_failure(false)
 	// Incompressible bytes with no active disk must return the original frame
 	// to the shadow and leave private aliases read-only for any fork sharers.
 	mut random := u32(97)
@@ -132,13 +132,13 @@ fn test_pressure_cursor_wraps_in_same_pass_and_reclaims_a_full_target() {
 		fixture_local.global.shadow_pagemap.map_page(address, u64(frame), memory.pte_present) or { panic('shadow') }
 	}
 	mut process := &proc.Process{ pagemap: pm }
-	proc.fixture_process = process
+	proc.set_fixture_process(process)
 	// The previous pass ended here. Recovery must wrap immediately rather
 	// than tell OOM that the process has no evictable frames.
 	pm.pageout_cursor = fixture_local.base + fixture_local.length
 	assert reclaim_anonymous(300, false) == 300
 	assert pm.pages.len == 0 && pm.inspection_refs == 0
-	proc.fixture_process = unsafe { nil }
+	proc.set_fixture_process(unsafe { nil })
 	unsafe { free(process) }
 	dispose_anonymous(mut pm)
 }
@@ -150,14 +150,15 @@ fn test_foreground_reclaim_reaches_eligible_pages_after_a_locked_prefix() {
 	fixture_local.base = 601 * 4096
 	pm.map_page(fixture_local.base, physical, memory.pte_present | memory.pte_writable) or { panic('map') }
 	pressure_locked_prefix = 600
-	proc.fixture_process = &proc.Process{ pagemap: pm }
+	process := &proc.Process{ pagemap: pm }
+	proc.set_fixture_process(process)
 	pm.pageout_cursor = 4096
 	assert reclaim_anonymous(1, false) == 0 // bounded background chunk
 	assert pm.pages.len == 1
 	assert reclaim_anonymous(1, true) == 1 // full foreground search before OOM
 	assert pm.pages.len == 0 && pm.inspection_refs == 0
 	pressure_locked_prefix = 0
-	unsafe { free(proc.fixture_process) }
-	proc.fixture_process = unsafe { nil }
+	proc.set_fixture_process(unsafe { nil })
+	unsafe { free(process) }
 	dispose_anonymous(mut pm)
 }
