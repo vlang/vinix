@@ -560,6 +560,24 @@ at `/Users/alex/.local/state/vinix/m1-drm-dumb-geometry-20261122.7ym3TO/`.
 The `bundle.tar.gz` SHA-256 is
 `4db1e794d261232c473505acf3959b7e2d45a44a84cd49e3d07679e8198221a8`.
 
+#### Dumb-buffer map padding and destroy errors
+
+The framebuffer driver ignores `MODE_MAP_DUMB` padding and returns
+`ENOENT` for an unknown handle. `MODE_DESTROY_DUMB` returns `EINVAL` when
+the handle is absent, including after a successful destroy. [Pinned Linux dumb-buffer dispatch](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_dumb_buffers.c#L247-L303) [Pinned GEM lookup and deletion](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L389-L460)
+
+ARM64 and x86-64 QEMU checked nonzero padding on successful and failed
+maps, zero-handle and repeated destroy errors, and successful write-only
+destroy. The prior ARM64 kernel rejected the map with nonzero padding.
+The wire sanitizer suite passed and the allocation scan reproduced the
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `42d1ead1df53fe6fb4145709410089e3f9e9dc79` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-dumb-map-destroy-20261122.FWHkdU/`.
+The `bundle.tar.gz` SHA-256 is
+`0a65e07fc896122aa7de56349e35e154be0fde490047bb126352616ab90fc53c`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

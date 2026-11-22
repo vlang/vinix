@@ -575,10 +575,10 @@ fn test_dumb_buffer_error_replies(fd i32, create_errno i32, map_errno i32) bool 
 		|| create.handle != 0 || create.pitch != 0 || create.size != 0 {
 		return false
 	}
-	mut mapping := ExtendedDumbMapRequest{offset: 77, tail: 0x12345678}
+	mut mapping := ExtendedDumbMapRequest{pad: 99, offset: 77, tail: 0x12345678}
 	return C.ioctl(fd, i32(u32(0xc01864b3)), &mapping) == -1
 		&& unsafe { *C.__errno_location() } == map_errno
-		&& mapping.handle == 0 && mapping.offset == 0 && mapping.tail == 0x12345678
+		&& mapping.handle == 0 && mapping.pad == 99 && mapping.offset == 0 && mapping.tail == 0x12345678
 }
 
 fn test_unsupported_dumb_buffers(card &char) bool {
@@ -622,15 +622,15 @@ fn test_dumb_buffer_transport() bool {
 		|| create.pitch < 4 || create.size != 123 {
 		return false
 	}
-	mut mapping := ExtendedDumbMapRequest{handle: create.handle, tail: 0x12345678}
+	mut mapping := ExtendedDumbMapRequest{handle: create.handle, pad: 99, tail: 0x12345678}
 	if C.ioctl(fd, i32(u32(0xc01864b3)), &mapping) != 0 || mapping.offset == 0
-		|| mapping.handle != create.handle || mapping.tail != 0x12345678 {
+		|| mapping.handle != create.handle || mapping.pad != 99 || mapping.tail != 0x12345678 {
 		return false
 	}
 	// Read-only DESTROY supplies a zero handle and copies back the error reply.
 	mut read_only := create.handle
 	if C.ioctl(fd, i32(u32(0x800464b4)), unsafe { &read_only }) != -1
-		|| unsafe { *C.__errno_location() } != C.ENOENT || read_only != 0 {
+		|| unsafe { *C.__errno_location() } != C.EINVAL || read_only != 0 {
 		return false
 	}
 	mut destroy := [create.handle, u32(0x87654321)]!
@@ -639,7 +639,7 @@ fn test_dumb_buffer_transport() bool {
 		return false
 	}
 	if C.ioctl(fd, i32(u32(0xc00464b4)), &destroy[0]) != -1
-		|| unsafe { *C.__errno_location() } != C.ENOENT {
+		|| unsafe { *C.__errno_location() } != C.EINVAL {
 		return false
 	}
 	if C.ioctl(fd, i32(u32(0xc02064b2)), &create) != 0 || create.handle == 0 {
