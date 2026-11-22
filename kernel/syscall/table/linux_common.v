@@ -634,6 +634,18 @@ fn syscall_linux_gettid(_ voidptr) (u64, u64) {
 	return u64(proc.own_tid(current)), 0
 }
 
+fn sendfile_position(fd &file.FD) i64 {
+	mut handle := fd.handle
+	handle.l.acquire()
+	position := handle.loc
+	handle.l.release()
+	return position
+}
+
+fn sendfile_range_valid(position i64, count u64) bool {
+	return position >= 0 && count <= u64(0x7fffffffffffffff) - u64(position)
+}
+
 // sendfile(out, in, offset, count).  A page-sized bounce buffer keeps the
 // transfer bounded; an explicit offset leaves the input descriptor position
 // alone, while a null offset consumes it just like read(2).
@@ -668,14 +680,8 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 	if positioned && (input_without_io || stream_input) {
 		return errno.err, errno.espipe
 	}
-	mut position_for_range := input_offset
-	if !positioned && !stream_input {
-		mut handle := input_fd.handle
-		handle.l.acquire()
-		position_for_range = handle.loc
-		handle.l.release()
-	}
-	if position_for_range < 0 || count > u64(0x7fffffffffffffff) - u64(position_for_range) {
+	input_position := if positioned || stream_input { input_offset } else { sendfile_position(input_fd) }
+	if !sendfile_range_valid(input_position, count) {
 		return errno.err, errno.einval
 	}
 	// Linux bounds an admitted request by INT_MAX rounded down to a page.
@@ -696,7 +702,8 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 	output_mode := output_fd.handle.resource.stat.mode
 	pipe_output := stat.isifo(output_mode) || output_mode & stat.ifmt == stat.ifpipe
 	// Linux's direct splice path requires a seekable source and refuses append.
-	if !pipe_output && (stream_input || output_flags & resource.o_append != 0) {
+	if !pipe_output && (!sendfile_range_valid(sendfile_position(output_fd), copy_count)
+		|| stream_input || output_flags & resource.o_append != 0) {
 		return errno.err, errno.einval
 	}
 	if count == 0 {

@@ -881,6 +881,28 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-range-20261122.bpv0Yp/`
 The `bundle.tar.gz` SHA-256 is
 `bbc67a74c9ce1ea934f1f1d652167a7b382a2046e43d873c7642459606569d08`.
 
+#### Sendfile destination range
+
+For a non-pipe destination, `sendfile` checks the destination position
+plus the capped count against the signed 64-bit range. An invalid range
+returns `EINVAL` before reading any source data, including when the source
+is already at EOF. The position check uses a locked snapshot. A concurrent
+seek can still affect a later transfer.
+[Pinned destination check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1366-L1378), [pinned signed range check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L453-L479)
+
+ARM64 and x86-64 QEMU covered overflowing destination ranges with empty
+and populated sources, a count that fits after capping, and preservation of
+file positions and explicit offsets. The same x86-64 guest probe failed on
+the preceding kernel. Independent review checked lock ordering and aliasing
+descriptors. The DRM syncobj host suite passed, and the allocation scan
+reproduced its 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `59b2c60823255c30f22def7bd2660ed7a9334d87` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-sendfile-destination-range-20261122.pjerYB/`.
+The `bundle.tar.gz` SHA-256 is
+`3473f90a81b3325f17574c9843da0aac9337fd4320bd47a9f72efb96a03d0106`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

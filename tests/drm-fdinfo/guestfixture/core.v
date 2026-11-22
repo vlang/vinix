@@ -1268,6 +1268,37 @@ fn test_sendfile_source_range(prime i32) bool {
 		&& C.read(output, &data[0], 4) == 4 && C.strcmp(&data[0], c'abcd') == 0
 }
 
+fn test_sendfile_destination_range() bool {
+	input := i32(C.syscall(C.SYS_memfd_create, c'sendfile-output-range-source', u32(0)))
+	if input < 0 { return false }
+	defer { C.close(input) }
+	output := i32(C.syscall(C.SYS_memfd_create, c'sendfile-output-range-destination', u32(C.MFD_ALLOW_SEALING)))
+	if output < 0 { return false }
+	defer { C.close(output) }
+	max_position := i64(0x7fffffffffffffff)
+	near_limit := max_position - 1
+	if C.fcntl(output, C.F_ADD_SEALS, C.F_SEAL_GROW) != 0
+		|| C.lseek(output, near_limit, C.SEEK_SET) != near_limit
+		|| !sendfile_replies(output, input, unsafe { nil }, 2, C.EINVAL)
+		|| C.syscall(C.SYS_sendfile, output, input, unsafe { nil }, u64(1)) != 0 {
+		return false
+	}
+	mut offset := i64(1)
+	if C.write(input, c'abcd', 4) != 4 || C.lseek(input, 0, C.SEEK_SET) != 0
+		|| !sendfile_replies(output, input, unsafe { nil }, 2, C.EINVAL)
+		|| !sendfile_replies(output, input, &offset, 2, C.EINVAL) || offset != 1
+		|| C.lseek(input, 0, C.SEEK_CUR) != 0 || C.lseek(output, 0, C.SEEK_CUR) != near_limit
+		|| C.lseek(output, 0, C.SEEK_END) != 0 {
+		return false
+	}
+	offset = 4
+	capped_position := max_position - i64(0x7fffffff)
+	return C.lseek(output, capped_position, C.SEEK_SET) == capped_position
+		&& C.syscall(C.SYS_sendfile, output, input, &offset, u64(1) << 32) == 0
+		&& offset == 4 && C.lseek(input, 0, C.SEEK_CUR) == 0
+		&& C.lseek(output, 0, C.SEEK_CUR) == capped_position
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1380,6 +1411,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME SENDFILE RANGE: PASS')
 	} else {
 		C.puts(c'DRM PRIME SENDFILE RANGE FAIL: incorrect error, offset or transferred bytes')
+	}
+	if test_sendfile_destination_range() {
+		C.puts(c'VINIX DRM SENDFILE DESTINATION RANGE: PASS')
+	} else {
+		C.puts(c'DRM SENDFILE DESTINATION RANGE FAIL: incorrect error, offset or position')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')
