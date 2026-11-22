@@ -239,7 +239,9 @@ fn (m &Manager) check_login(request authproto.Frame) (authproto.Frame, ?accountc
 	if request.fields.len != 2 {
 		return authproto.text_frame(authproto.status_invalid, 'login takes a user and a password'), none
 	}
-	name := login_field_text(request.fields[0])
+	typed_name := login_field_text(request.fields[0])
+	defer { unsafe { typed_name.free() } }
+	name := typed_name.to_lower_ascii()
 	defer { unsafe { name.free() } }
 	if !accountcore.valid_name(name) || request.fields[1].len == 0 || request.fields[1].len > 128 {
 		return authproto.Frame{ code: authproto.status_denied }, none

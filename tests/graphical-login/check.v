@@ -47,26 +47,37 @@ fn wait_marker(mut child os.Process, serial string, marker string) ! {
 	return error('timed out waiting for ' + marker)
 }
 
-fn key(mut monitor qmpclient.Monitor, code string) ! {
-	for down in [true, false] {
-		monitor.command('input-send-event', {
-			'events': json2.Any([json2.Any({
-				'type': json2.Any('key')
-				'data': json2.Any({
-					'down': json2.Any(down)
-					'key':  json2.Any({
-						'type': json2.Any('qcode')
-						'data': json2.Any(code)
-					})
+fn key_event(mut monitor qmpclient.Monitor, code string, down bool) ! {
+	monitor.command('input-send-event', {
+		'events': json2.Any([json2.Any({
+			'type': json2.Any('key')
+			'data': json2.Any({
+				'down': json2.Any(down)
+				'key':  json2.Any({
+					'type': json2.Any('qcode')
+					'data': json2.Any(code)
 				})
-			})])
-		})!
-		time.sleep(50 * time.millisecond)
-	}
+			})
+		})])
+	})!
+	time.sleep(50 * time.millisecond)
+}
+
+fn key(mut monitor qmpclient.Monitor, code string) ! {
+	key_event(mut monitor, code, true)!
+	key_event(mut monitor, code, false)!
 }
 
 fn type_text(mut monitor qmpclient.Monitor, text string) ! {
-	for ch in text { key(mut monitor, [ch].bytestr())! }
+	for ch in text {
+		if ch >= `A` && ch <= `Z` {
+			key_event(mut monitor, 'shift', true)!
+			key(mut monitor, [ch + 32].bytestr())!
+			key_event(mut monitor, 'shift', false)!
+		} else {
+			key(mut monitor, [ch].bytestr())!
+		}
+	}
 }
 
 fn click(mut monitor qmpclient.Monitor, x int, y int) ! {
@@ -279,7 +290,7 @@ fn check() ! {
 	defer { monitor.close() }
 	wait_marker(mut child, serial, 'GRAPHICAL LOGIN fresh image exclusive registration READY')!
 	shot(mut monitor, work, '01-registration')!
-	type_text(mut monitor, 'alex')!
+	type_text(mut monitor, 'Alex')!
 	key(mut monitor, 'tab')!
 	type_text(mut monitor, 'loginpass')!
 	key(mut monitor, 'tab')!
@@ -287,7 +298,7 @@ fn check() ! {
 	key(mut monitor, 'ret')!
 	wait_marker(mut child, serial, 'GRAPHICAL LOGIN registered account and ordinary greeter PASS')!
 	shot(mut monitor, work, '02-greeter')!
-	type_text(mut monitor, 'alex')!
+	type_text(mut monitor, 'Alex')!
 	key(mut monitor, 'tab')!
 	type_text(mut monitor, 'wrongpass')!
 	key(mut monitor, 'ret')!

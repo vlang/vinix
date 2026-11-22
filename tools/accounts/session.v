@@ -129,7 +129,13 @@ fn console() {
 	for {
 		print('\nlogin: ')
 		typed := read_line(true) or { return }
-		name := typed.bytestr().trim_space()
+		typed_name := typed.bytestr()
+		unsafe { typed.free() }
+		lower_name := typed_name.to_lower_ascii()
+		unsafe { typed_name.free() }
+		name := lower_name.trim_space()
+		unsafe { lower_name.free() }
+		defer { unsafe { name.free() } }
 		if name == '' {
 			continue
 		}

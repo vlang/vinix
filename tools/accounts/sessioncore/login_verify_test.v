@@ -15,7 +15,7 @@ fn test_both_login_paths_refuse_ordinary_authentication_service_before_sending_p
 	// Exercise the actual manager request handler, including its borrowed
 	// password. A forged status_ok from this peer can never reach account lookup.
 	mut manager := Manager{ config: ManagerConfig{ socket: listener.path } }
-	mut request := authproto.text_frame(op_login, 'somebody', 'manager secret')
+	mut request := authproto.text_frame(op_login, 'Somebody', 'manager secret')
 	defer { request.close() }
 	mut answer, user := manager.check_login(request)
 	defer { answer.close() }
