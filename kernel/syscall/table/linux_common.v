@@ -912,8 +912,10 @@ fn write_statx_timestamp(dst u64, sec i64, nsec i64) {
 fn convert_stat_to_statx(src &stat.Stat, mask u32, user_dst u64) bool {
 	mut buf := [256]u8{}
 	dst := unsafe { u64(&buf[0]) }
-	mount_id := if mask & statx_mnt_id_unique == 0 { fs.dma_buf_mount_id_for_device(src.dev) } else { u64(0) }
-	result_mask := statx_basic_stats | if mount_id != 0 { statx_mnt_id } else { u32(0) }
+	unique := mask & statx_mnt_id_unique != 0
+	mount_id := fs.dma_buf_mount_id_for_device(src.dev, unique)
+	mount_mask := if unique { statx_mnt_id_unique } else { statx_mnt_id }
+	result_mask := statx_basic_stats | if mount_id != 0 { mount_mask } else { u32(0) }
 	unsafe {
 		C.memset(voidptr(dst), 0, 256)
 

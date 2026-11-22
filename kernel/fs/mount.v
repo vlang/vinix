@@ -111,10 +111,15 @@ fn allocate_mount_id() int {
 	return katomic.inc(mut &mount_id_counter) + 1
 }
 
+const mount_unique_id_offset = u64(1) << 31
+
 // The DMA-BUF filesystem has one internal mount, so a stat snapshot's
 // filesystem device ID also identifies that mount.
-pub fn dma_buf_mount_id_for_device(device u64) u64 {
-	return if drm.is_prime_stat_device(device) { u64(dma_buf_mount_id) } else { u64(0) }
+pub fn dma_buf_mount_id_for_device(device u64, unique bool) u64 {
+	if !drm.is_prime_stat_device(device) { return 0 }
+	id := u64(dma_buf_mount_id)
+	// This mount is reserved once at boot and its ordinary ID is never reused.
+	return if unique { mount_unique_id_offset + id } else { id }
 }
 
 fn init_mount_tables() {

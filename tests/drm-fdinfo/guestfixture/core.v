@@ -889,10 +889,15 @@ fn statx_mount_id(result &C.statx) u64 {
 	return unsafe { *(&u64(u64(result) + 0x90)) }
 }
 
+const statx_mount_id_mask = u32(0x1000)
+const statx_unique_mount_id_mask = u32(0x4000)
+const statx_mount_id_masks = statx_mount_id_mask | statx_unique_mount_id_mask
+
 fn prime_statx_mount_matches(fd i32, path &char, flags i32, mask u32, id u64, ino u64) bool {
 	mut result := C.statx{}
 	return C.syscall(C.SYS_statx, fd, path, flags, mask, &result) == 0
-		&& result.stx_mask & 0x1000 != 0 && statx_mount_id(&result) == id && result.stx_ino == ino
+		&& result.stx_mask & statx_mount_id_masks == statx_mount_id_mask
+		&& statx_mount_id(&result) == id && result.stx_ino == ino
 }
 
 fn test_prime_statx_mount_id(fd i32, ino u64) bool {
@@ -900,18 +905,32 @@ fn test_prime_statx_mount_id(fd i32, ino u64) bool {
 	if id <= 0 { return false }
 	mut path := [64]char{}
 	C.snprintf(&path[0], sizeof(path), c'/proc/self/fd/%d', fd)
-	if !prime_statx_mount_matches(fd, c'', C.AT_EMPTY_PATH, 0x1000, u64(id), ino)
+	if !prime_statx_mount_matches(fd, c'', C.AT_EMPTY_PATH, statx_mount_id_mask, u64(id), ino)
 		|| !prime_statx_mount_matches(fd, unsafe { nil }, C.AT_EMPTY_PATH, 0x7ff, u64(id), ino)
-		|| !prime_statx_mount_matches(C.AT_FDCWD, &path[0], 0, 0x1000, u64(id), ino) {
+		|| !prime_statx_mount_matches(C.AT_FDCWD, &path[0], 0, statx_mount_id_mask, u64(id), ino) {
 		return false
 	}
-	mut unique := C.statx{}
-	if C.syscall(C.SYS_statx, fd, c'', C.AT_EMPTY_PATH, u32(0x5000), &unique) != 0
-		|| unique.stx_mask & 0x1000 != 0 { return false }
 	mut link := C.statx{}
-	return C.syscall(C.SYS_statx, C.AT_FDCWD, &path[0], C.AT_SYMLINK_NOFOLLOW, u32(0x1000), &link) == 0
+	return C.syscall(C.SYS_statx, C.AT_FDCWD, &path[0], C.AT_SYMLINK_NOFOLLOW, statx_mount_id_mask, &link) == 0
 		&& link.stx_mode & u16(C.S_IFMT) == u16(C.S_IFLNK)
-		&& (link.stx_mask & 0x1000 == 0 || statx_mount_id(&link) != u64(id))
+		&& (link.stx_mask & statx_mount_id_mask == 0 || statx_mount_id(&link) != u64(id))
+}
+
+fn prime_statx_unique_mount_id(fd i32, path &char, flags i32, mask u32) u64 {
+	mut result := C.statx{}
+	if C.syscall(C.SYS_statx, fd, path, flags, mask, &result) != 0
+		|| result.stx_mask & statx_mount_id_masks != statx_unique_mount_id_mask { return 0 }
+	return statx_mount_id(&result)
+}
+
+fn test_prime_statx_unique_mount_id(first i32, duplicate i32, second i32) bool {
+	id := prime_statx_unique_mount_id(first, c'', C.AT_EMPTY_PATH, statx_unique_mount_id_mask)
+	if id <= (u64(1) << 31) { return false }
+	mut path := [64]char{}
+	C.snprintf(&path[0], sizeof(path), c'/proc/self/fd/%d', second)
+	return prime_statx_unique_mount_id(duplicate, unsafe { nil }, C.AT_EMPTY_PATH, statx_mount_id_masks) == id
+		&& prime_statx_unique_mount_id(second, c'', C.AT_EMPTY_PATH, statx_unique_mount_id_mask) == id
+		&& prime_statx_unique_mount_id(C.AT_FDCWD, &path[0], 0, statx_mount_id_masks) == id
 }
 
 fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
@@ -940,6 +959,11 @@ fn test_prime_fdinfo_mount_id(card i32, first i32, duplicate i32) bool {
 	mut export := ExtendedPrimeRequest{handle: create.handle, fd: -1}
 	if C.ioctl(card, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0 { return false }
 	defer { C.close(export.fd) }
+	if test_prime_statx_unique_mount_id(first, duplicate, export.fd) {
+		C.puts(c'VINIX DRM PRIME STATX UNIQUE MOUNT ID: PASS')
+	} else {
+		C.puts(c'DRM PRIME STATX UNIQUE MOUNT ID FAIL: incorrect unique mount ID or result mask')
+	}
 	return fdinfo_mount_id(export.fd) == internal_id
 		&& check_mountinfo_ids(internal_id, visible_id)
 }

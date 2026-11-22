@@ -896,7 +896,6 @@ PRIME `statx` returns the same mount ID as fdinfo with the
 `STATX_MNT_ID` result bit. It uses the filesystem device ID in the stat
 snapshot to identify the single internal DMA-BUF mount. Descriptor queries
 and followed procfs descriptor links use the same snapshot conversion.
-A request for `STATX_MNT_ID_UNIQUE` leaves the mount-ID result unset.
 [Pinned statx mount selection](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/stat.c#L276-L302)
 [Pinned statx mount ID layout](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/linux/stat.h#L143-L152)
 
@@ -915,6 +914,30 @@ archived patch and the simple DRM named-device fixture. Evidence is stored
 at `/Users/alex/.local/state/vinix/m1-drm-prime-statx-20261122.9fMtPL/`. The
 `bundle.tar.gz` SHA-256 is
 `b0d259f90e7b9e4cac67fd63267e459a163451430e0d8c3eb9f0af719e107685`.
+
+#### PRIME DMA-BUF unique mount ID
+
+PRIME DMA-BUF `statx` fills `stx_mnt_id` with the internal mount's unique
+ID when the caller requests `STATX_MNT_ID_UNIQUE`. The unique bit takes
+precedence when both mount-ID bits are requested. The ID stays stable for
+the boot and sits above the ordinary mount-ID range. Vinix derives it
+from the ID reserved at VFS initialization for the single DMA-BUF mount.
+[Pinned statx mount ID selection](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/stat.c#L276-L288)
+[Pinned unique mount ID allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/namespace.c#L197-L206)
+
+ARM64 and x86-64 QEMU checked the result mask and 64-bit value across a
+duplicate, an export of a second buffer and a followed procfs descriptor
+link. The same x86-64 guest executable failed the new check on the
+preceding kernel. The x86-64 `statx` suite passed 6,214 calls and both
+200-cycle retention checks. The fdinfo sanitizer suite passed, and the
+allocation scan reproduced its 150 baseline findings. Native M1
+validation remains open.
+
+The tested base was `9c1e7bb5309ed792861e56170903ccaf71f7cbcf` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-unique-mount-20261122.M5RBXU/`.
+The `bundle.tar.gz` SHA-256 is
+`8c799d5c50992a4ac39cccc765b1c812e299d2d76e4a4d8125b111501cdcf05c`.
 
 #### PRIME DMA-BUF names
 
