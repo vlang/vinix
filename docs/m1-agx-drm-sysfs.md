@@ -451,6 +451,27 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-wire-20261122.Y0UHMf/`.
 The `bundle.tar.gz` SHA-256 is
 `792bb421159e426e93d9b554b830653a475213ea2f63221ebbcc754eaf59309b`.
 
+#### Dumb-buffer request sizes
+
+`MODE_CREATE_DUMB`, `MODE_MAP_DUMB` and `MODE_DESTROY_DUMB` use the
+shared extensible read/write ioctl layout. The dispatcher zero-fills
+omitted fields and bounds the reply to the encoded size. Request and
+layout direction bits are intersected, so the earlier write-only
+`MODE_DESTROY_DUMB` encoding continues to work. [Pinned Linux ioctl transport](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L874-L916) [Pinned dumb-buffer ioctl definitions](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/drm/drm.h#L1246-L1248)
+
+The sanitizer wire fixture passed. ARM64 and x86-64 QEMU verified a
+24-byte create, an extended map returning a buffer offset, and both
+read/write and write-only destroy. A read-only destroy returned the
+handler error and copied back the zero handle. The preceding ARM64
+kernel rejected the short create. The allocation scan reproduced the
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `4b61334c4198f8ecab205546bafa3ac05b69406c` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-dumb-wire-20261122.DxBMLG/`.
+The `bundle.tar.gz` SHA-256 is
+`722b36f7af384d8981b9340d0d10f90386eece5638400e5df35f5ebbe95aa4fc`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

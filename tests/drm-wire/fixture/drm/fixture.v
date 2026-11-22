@@ -122,6 +122,9 @@ pub fn run_checks() {
 	for cmd, size in {
 		ioctl.drm_ioctl_prime_handle_to_fd: u32(12)
 		ioctl.drm_ioctl_prime_fd_to_handle: 12
+		ioctl.drm_ioctl_mode_create_dumb: 32
+		ioctl.drm_ioctl_mode_map_dumb: 16
+		ioctl.drm_ioctl_mode_destroy_dumb: 4
 		ioctl.drm_ioctl_syncobj_create: 8
 		ioctl.drm_ioctl_syncobj_destroy: 8
 		ioctl.drm_ioctl_syncobj_reset: 16

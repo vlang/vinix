@@ -427,18 +427,21 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmModeCreateDumb))
 				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_mode_map_dumb {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmModeMapDumb))
 				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_mode_destroy_dumb {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmModeDestroyDumb))
-				direction: ioctl_write
+				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_virtgpu_map {

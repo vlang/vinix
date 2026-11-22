@@ -248,8 +248,8 @@ pub mut:
 	pad u32
 }
 
-// include/uapi/drm/drm_mode.h. Keep the field order exact: libdrm builds the
-// ioctl number with sizeof() and the DRM core validates that encoded size.
+// Layouts from include/uapi/drm/drm_mode.h. libdrm encodes sizeof() in the
+// ioctl request number.
 pub struct DrmModeCreateDumb {
 pub mut:
 	height u32

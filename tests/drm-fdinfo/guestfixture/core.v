@@ -511,6 +511,50 @@ mut:
 	size u64
 }
 
+struct ExtendedDumbMapRequest {
+mut:
+	handle u32
+	pad u32
+	offset u64
+	tail u64
+}
+
+fn test_dumb_buffer_transport() bool {
+	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	// The short CREATE reply ends after pitch and leaves the caller's size alone.
+	mut create := DumbCreateRequest{height: 1, width: 1, bpp: 32, size: 123}
+	if C.ioctl(fd, i32(u32(0xc01864b2)), &create) != 0 || create.handle == 0
+		|| create.pitch < 4 || create.size != 123 {
+		return false
+	}
+	mut mapping := ExtendedDumbMapRequest{handle: create.handle, tail: 0x12345678}
+	if C.ioctl(fd, i32(u32(0xc01864b3)), &mapping) != 0 || mapping.offset == 0
+		|| mapping.handle != create.handle || mapping.tail != 0x12345678 {
+		return false
+	}
+	// Read-only DESTROY supplies a zero handle and copies back the error reply.
+	mut read_only := create.handle
+	if C.ioctl(fd, i32(u32(0x800464b4)), unsafe { &read_only }) != -1
+		|| unsafe { *C.__errno_location() } != C.ENOENT || read_only != 0 {
+		return false
+	}
+	mut destroy := [create.handle, u32(0x87654321)]!
+	if C.ioctl(fd, i32(u32(0xc00864b4)), &destroy[0]) != 0 || destroy[0] != create.handle
+		|| destroy[1] != 0x87654321 {
+		return false
+	}
+	if C.ioctl(fd, i32(u32(0xc00464b4)), &destroy[0]) != -1
+		|| unsafe { *C.__errno_location() } != C.ENOENT {
+		return false
+	}
+	if C.ioctl(fd, i32(u32(0xc02064b2)), &create) != 0 || create.handle == 0 {
+		return false
+	}
+	return C.ioctl(fd, i32(0x400464b4), unsafe { &create.handle }) == 0
+}
+
 fn test_gem_close_transport() bool {
 	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
 	if fd < 0 { return false }
@@ -709,6 +753,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM CORE QUERY TRANSPORT: PASS')
 		} else {
 			C.puts(c'DRM CORE QUERY TRANSPORT FAIL: unexpected request or reply shape')
+		}
+		if test_dumb_buffer_transport() {
+			C.puts(c'VINIX DRM DUMB BUFFER TRANSPORT: PASS')
+		} else {
+			C.puts(c'DRM DUMB BUFFER TRANSPORT FAIL: unexpected request, reply or handle state')
 		}
 		if test_gem_close_transport() {
 			C.puts(c'VINIX DRM GEM CLOSE TRANSPORT: PASS')
