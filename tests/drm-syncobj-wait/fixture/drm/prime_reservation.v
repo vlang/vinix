@@ -34,13 +34,13 @@ fn prime_import_result(mut fd file.FD, flags u32, number i32) int {
 	return result
 }
 
-fn check_prime_reservation_waits() {
+fn check_prime_reservation_waits(features u32) {
 	memory.reset()
 	proc.reset()
 	mut object := gem.create(7)
-	object.file_scoped = true
+	object.file_scoped = features == 0
 	prime_exported = unsafe { object }
-	driver := DrmDriver{gem_export: prime_export, gem_import: prime_import}
+	driver := DrmDriver{features: features, gem_export: prime_export, gem_import: prime_import}
 	device := DrmDevice{driver: unsafe { &driver }}
 	mut request := ioctl.DrmPrimeHandle{handle: 7, fd: -1}
 	assert ioctl_prime_handle_to_fd(&device, voidptr(11), &request) == 0

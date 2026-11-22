@@ -204,10 +204,6 @@ fn check_prime_descriptors() {
 		mut fd := file.fd_from_fdnum(unsafe { nil }, request.fd) or { panic('installed PRIME fd') }
 		assert fd.flags & resource.o_cloexec != 0 && fd.handle.flags & resource.o_rdwr != 0
 		check_prime_cpu_access(mut fd)
-		if !object.file_scoped {
-			assert prime_fd_ioctl(mut fd, u64(ioctl.dma_buf_ioctl_export_sync_file), 0) == -25
-			assert prime_fd_ioctl(mut fd, u64(ioctl.dma_buf_ioctl_import_sync_file), 0) == -25
-		}
 		check_prime_seek(mut fd, request.fd, object.size)
 		fd.unref()
 		check_prime_inode(&device, &object, request.fd)

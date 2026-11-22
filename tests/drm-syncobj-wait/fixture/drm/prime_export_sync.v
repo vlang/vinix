@@ -43,13 +43,13 @@ fn prime_add_export_leaf(mut prime file.FD, fence &syncobj.DmaFence, flags u32) 
 	file.close(number)
 }
 
-fn check_prime_sync_file_exports() {
+fn check_prime_sync_file_exports(features u32) {
 	memory.reset()
 	proc.reset()
 	mut object := gem.create(7)
-	object.file_scoped = true
+	object.file_scoped = features == 0
 	prime_exported = unsafe { object }
-	driver := DrmDriver{gem_export: prime_export}
+	driver := DrmDriver{features: features, gem_export: prime_export}
 	device := DrmDevice{driver: unsafe { &driver }}
 	mut export := ioctl.DrmPrimeHandle{handle: 7, fd: -1}
 	assert ioctl_prime_handle_to_fd(&device, voidptr(11), &export) == 0

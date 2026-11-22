@@ -627,8 +627,8 @@ The `bundle.tar.gz` SHA-256 is
 Framebuffer PRIME descriptors accept `DMA_BUF_IOCTL_SYNC`. The handler
 reads one 64-bit flag word and accepts READ, WRITE or both at START and
 END. It returns `EINVAL` for invalid flags and `EFAULT` for an unreadable
-word. Framebuffer buffers have an empty reservation, so valid CPU access
-requests complete immediately. [Pinned Linux DMA-BUF sync ioctl](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L554-L596)
+word. The tested revision used empty framebuffer reservations, which let
+valid requests complete immediately. [Pinned Linux DMA-BUF sync ioctl](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L554-L596)
 
 The sanitizer suite covered all six valid flag combinations, malformed
 commands, copy faults and native PRIME reservation waits. ARM64 and
@@ -642,6 +642,28 @@ archived patch and the simple DRM named-device fixture. Evidence is stored
 at `/Users/alex/.local/state/vinix/m1-drm-framebuffer-prime-sync-20261122.TkKFBj/`.
 The `bundle.tar.gz` SHA-256 is
 `46a6cf58f261f1f01125a2f6a9c1a780c8fdf51af674ec025d9fb517254d2a5c`.
+
+#### Framebuffer DMA-BUF sync files and poll
+
+Framebuffer PRIME descriptors can import and export sync files and poll
+the GEM reservation. Duplicates and re-exports share the buffer's fences.
+Read readiness waits for writers, and write readiness waits for readers
+and writers. CPU START consults those same fences. [Pinned Linux DMA-BUF poll and sync-file ioctls](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L351-L549)
+
+The sanitizer suite checked pending fences, shared reservations, snapshot
+failure cleanup, poll races and final descriptor close for framebuffer and
+file-scoped GEM buffers. ARM64 and x86-64 QEMU checked ready poll events
+and the import and export of a completed sync file. The preceding x86-64
+kernel failed the same probe. The allocation scan reproduced the 150
+baseline findings. The lifetime review identified an existing metadata
+reclamation issue for non-file-scoped framebuffer GEM objects. Native M1
+validation remains open.
+
+The tested base was `4fcdf2221eda3287b8dc6eb33ab5e00a24bf040f` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-framebuffer-prime-reservation-20261122.tLrnSx/`.
+The `bundle.tar.gz` SHA-256 is
+`300cd625ae5be85249c161592849c8f68a2ab428eb381a79621ac4ed238fb014`.
 
 #### UID mapping across descriptor transfer
 

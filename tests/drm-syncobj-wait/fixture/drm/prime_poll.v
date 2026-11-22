@@ -31,13 +31,13 @@ fn close_while_polling_prime() {
 	syncobj.signal(poll_prime_writer)
 }
 
-fn check_prime_poll() {
+fn check_prime_poll(features u32) {
 	memory.reset()
 	proc.reset()
 	mut object := gem.create(7)
-	object.file_scoped = true
+	object.file_scoped = features == 0
 	prime_exported = unsafe { object }
-	driver := DrmDriver{gem_export: prime_export}
+	driver := DrmDriver{features: features, gem_export: prime_export}
 	device := DrmDevice{driver: unsafe { &driver }}
 	mut request := ioctl.DrmPrimeHandle{handle: 7, fd: -1}
 	assert ioctl_prime_handle_to_fd(&device, voidptr(11), &request) == 0

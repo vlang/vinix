@@ -24,7 +24,7 @@ mut:
 }
 
 fn (mut this GemPrimeResource) poll_requested(requested int) resource.PollState {
-	if this.obj == unsafe { nil } || !this.obj.file_scoped {
+	if !this.supports_reservation_sync() {
 		return resource.PollState{status: this.status, generation: this.event.generation}
 	}
 	mut object := unsafe { this.obj }

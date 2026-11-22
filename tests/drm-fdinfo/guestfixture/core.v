@@ -3,6 +3,7 @@ module guestfixture
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +22,7 @@ fn C.read(i32, voidptr, u64) i64
 fn C.lseek(i32, i64, i32) i64
 fn C.write(i32, voidptr, u64) i64
 fn C.ioctl(i32, i32, ...) i32
+fn C.poll(&C.pollfd, u64, i32) i32
 fn C.__errno_location() &i32
 fn C.dup(i32) i32
 fn C.fork() i32
@@ -54,6 +56,13 @@ fn C.recvmsg(i32, &C.msghdr, i32) i64
 struct C.rlimit {
 	rlim_cur u64
 	rlim_max u64
+}
+
+struct C.pollfd {
+mut:
+	fd i32
+	events i16
+	revents i16
 }
 
 struct C.iovec {
@@ -713,6 +722,27 @@ fn test_prime_cpu_access(fd i32) bool {
 		&& unsafe { *C.__errno_location() } == C.EFAULT
 }
 
+fn test_prime_sync_file(fd i32) bool {
+	ready := i16(C.POLLIN | C.POLLOUT)
+	mut buffer_poll := C.pollfd{fd: fd, events: ready}
+	if C.poll(&buffer_poll, 1, 0) != 1 || buffer_poll.revents != ready {
+		return false
+	}
+	mut request := [i32(1), -1]! // Export a READ snapshot of the empty reservation.
+	if C.ioctl(fd, i32(u32(0xc0086202)), &request[0]) != 0 || request[0] != 1 || request[1] < 0 {
+		return false
+	}
+	fence := request[1]
+	defer { C.close(fence) }
+	mut fence_poll := C.pollfd{fd: fence, events: i16(C.POLLIN)}
+	if C.poll(&fence_poll, 1, 0) != 1 || fence_poll.revents != i16(C.POLLIN) {
+		return false
+	}
+	request[0] = 2 // Import the completed fence as a writer.
+	return C.ioctl(fd, i32(0x40086203), &request[0]) == 0
+		&& C.poll(&buffer_poll, 1, 0) == 1 && buffer_poll.revents == ready
+}
+
 fn test_prime_transport(card &char, foreign i32) bool {
 	exporter := C.open(card, C.O_RDWR)
 	if exporter < 0 { return false }
@@ -735,7 +765,7 @@ fn test_prime_transport(card &char, foreign i32) bool {
 		return false
 	}
 	defer { C.close(export.fd) }
-	if !test_prime_cpu_access(export.fd) { return false }
+	if !test_prime_cpu_access(export.fd) || !test_prime_sync_file(export.fd) { return false }
 	if export.handle != create.handle || export.flags != u32(C.O_CLOEXEC)
 		|| export.tail != 0x12345678 || export.fd > 0x00ffffff {
 		return false

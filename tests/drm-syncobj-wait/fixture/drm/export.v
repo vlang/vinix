@@ -12,9 +12,11 @@ import resource
 pub fn run_export_reservation_checks() {
 	file.run_fd_reservation_checks()
 	check_prime_descriptors()
-	check_prime_reservation_waits()
-	check_prime_sync_file_exports()
-	check_prime_poll()
+	for features in [u32(0), driver_dumb_buffer]! {
+		check_prime_reservation_waits(features)
+		check_prime_sync_file_exports(features)
+		check_prime_poll(features)
+	}
 	check_sync_file_merge()
 	mut checks := 0
 	for _ in 0 .. 200 {
