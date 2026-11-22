@@ -111,6 +111,14 @@ pub fn run_checks() {
 	assert (ioctl_layout(&device, 0x41, 16, 3, 0) or { panic('new layout') }).driver_index == 1
 	assert (ioctl_layout(&device, 0x41, 32, 3, 2) or { panic('extended layout') }).driver_index == 1
 	assert (ioctl_layout(&device, 9, 8, ioctl_write, 0) or { panic('metadata fallback') }).driver_index == -1
+	for direction := u32(0); direction < 4; direction++ {
+		close_layout := ioctl_layout(&device, ioctl.drm_ioctl_gem_close, 4, direction, 0) or {
+			panic('GEM_CLOSE layout')
+		}
+		assert close_layout.extensible && close_layout.direction == (direction & ioctl_write)
+		assert ioctl_buffer_size(&close_layout, 4) == 8
+		assert ioctl_buffer_size(&close_layout, 16) == if close_layout.direction == 0 { u32(8) } else { u32(16) }
+	}
 	if _ := ioctl_layout(&device, 0x41, 16, 3, 1) {
 		assert false
 	}

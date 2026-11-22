@@ -365,6 +365,7 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmGemClose))
 				direction: ioctl_write
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_prime_handle_to_fd, ioctl.drm_ioctl_prime_fd_to_handle {

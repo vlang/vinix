@@ -390,6 +390,7 @@ fn check_gem_close_semantics() {
 	client := u64(0x4c04)
 	assert close_wire_gem(&device, client, 1, 0) == -22 && lookup_file(voidptr(client)) == none
 	for abi in [u32(0), legacy_ioctl_abi, modern_ioctl_abi]! {
+		check_short_gem_close(&device, client, abi)
 		for _ in 0 .. 64 {
 			mut pt := pgtable.UatPgtable{}
 			mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: unsafe { &pt }}
@@ -424,6 +425,20 @@ fn check_gem_close_semantics() {
 		}
 	}
 	println('AGX G13 GEM_CLOSE: 192 wire cases cover missing handles, padding, and delayed GPU mapping retirement across both ABIs and before ABI selection')
+}
+
+fn check_short_gem_close(device &drm.DrmDevice, client u64, abi u32) {
+	mut file := GpuFile{ioctl_abi: abi, objects: Objects{table: bo.new_table(true)}}
+	file_map[client] = unsafe { &file }
+	handle := file.objects.add_created(gem.create(7))
+	assert handle != 0
+	buffer := unsafe { voidptr(&handle) }
+	usercopy.configure(u64(buffer), sizeof(handle), -1)
+	assert drm.invoke(device, client, ioctl.drm_ioctl_gem_close, sizeof(handle), 1, buffer) == 0
+	assert file.ioctl_abi == abi && file.objects.get_ref(handle) == none
+	file_map.delete(client)
+	assert file.close() && gem.live() == 0
+	memory.assert_released()
 }
 
 fn check_file_vm_names(mut manager mmu.UatManager) {

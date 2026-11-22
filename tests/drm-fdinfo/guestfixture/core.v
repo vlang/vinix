@@ -500,6 +500,48 @@ fn test_core_query_transport() bool {
 		&& cap[1] == 0 && cap[2] == 0x1234 && cap[3] == 0x5678
 }
 
+struct DumbCreateRequest {
+mut:
+	height u32
+	width u32
+	bpp u32
+	flags u32
+	handle u32
+	pitch u32
+	size u64
+}
+
+fn test_gem_close_transport() bool {
+	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	commands := [u32(0x40046409), u32(0xc0106409)]!
+	for i in 0 .. commands.len {
+		command := unsafe { commands[i] }
+		mut create := DumbCreateRequest{height: 1, width: 1, bpp: 32}
+		if C.ioctl(fd, i32(u32(0xc02064b2)), &create) != 0 || create.handle == 0 {
+			return false
+		}
+		mut close_data := [create.handle, u32(0), 0x1234, 0x5678]!
+		// A read-only request supplies a zero handle. The original buffer
+		// should survive it and close on the following write request.
+		if command == u32(0xc0106409) {
+			if C.ioctl(fd, i32(u32(0x80086409)), &close_data[0]) != -1
+				|| unsafe { *C.__errno_location() } != C.ENOENT || close_data[0] != create.handle {
+				return false
+			}
+		}
+		if C.ioctl(fd, i32(command), &close_data[0]) != 0 || close_data[0] != create.handle
+			|| close_data[1] != 0 || close_data[2] != 0x1234 || close_data[3] != 0x5678 {
+			return false
+		}
+		if C.ioctl(fd, i32(0x40086409), &close_data[0]) != -1 || unsafe { *C.__errno_location() } != C.ENOENT {
+			return false
+		}
+	}
+	return true
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	if test_open_order() {
@@ -519,6 +561,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM CORE QUERY TRANSPORT: PASS')
 		} else {
 			C.puts(c'DRM CORE QUERY TRANSPORT FAIL: unexpected request or reply shape')
+		}
+		if test_gem_close_transport() {
+			C.puts(c'VINIX DRM GEM CLOSE TRANSPORT: PASS')
+		} else {
+			C.puts(c'DRM GEM CLOSE TRANSPORT FAIL: unexpected framed close or handle state')
 		}
 		if test_debugfs_clients() {
 			C.puts(c'VINIX DRM DEBUGFS CLIENTS: PASS')

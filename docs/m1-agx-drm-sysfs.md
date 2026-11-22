@@ -368,6 +368,27 @@ at `/Users/alex/.local/state/vinix/m1-drm-monotonic-cap-20261122.uTh7xA/`.
 The `bundle.tar.gz` SHA-256 is
 `7f0dfd15ce48a0f6cdf39c82beda5600a1a4ed04e02585011db66200f0c90cfc`.
 
+#### GEM_CLOSE request sizes
+
+`GEM_CLOSE` uses the shared extensible write-only ioctl layout. A four-byte
+request supplies the handle and zero-fills the omitted padding. An extended
+write request reaches the close handler, and any requested read direction
+is discarded. [Pinned Linux ioctl transport](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L874-L916) [Pinned GEM_CLOSE definition](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/drm/drm.h#L1091-L1104)
+
+The host wire fixture checked sizing and all direction combinations. The
+G13 fixture also closed four-byte requests before ABI selection and under
+both selected ABIs. ARM64 and x86-64 QEMU closed live framebuffer handles
+with short and extended requests, verified that a read-only request left
+the handle live, and checked that a repeat close failed. The preceding
+ARM64 kernel failed the new probe. The allocation scan reproduced the
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `435390c4a0fe14a93f20a9512cfab830419c11d4` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-close-wire-20261122.0XLmdc/`.
+The `bundle.tar.gz` SHA-256 is
+`6ccadd6358fde61f748655423e0cf6a3f305faaec5c97cbd327a77aab63679c7`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

@@ -25,6 +25,8 @@ fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) int {
 
 fn account_activity(_dev &DrmDevice, _cmd u32) {}
 
+fn update_client_process(_ voidptr) {}
+
 pub fn request(cmd u32, size u32, direction u32) u64 {
 	return u64((direction << 30) | (size << 16) | (u32(`d`) << 8) | cmd)
 }
