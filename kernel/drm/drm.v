@@ -1238,9 +1238,13 @@ fn prime_stat_device() u64 {
 	drm_devices_lock.acquire()
 	defer { drm_devices_lock.release() }
 	if prime_stat_dev_id == 0 {
-		prime_stat_dev_id = resource.create_dev_id()
+		katomic.store(mut &prime_stat_dev_id, resource.create_dev_id())
 	}
 	return prime_stat_dev_id
+}
+
+pub fn is_prime_stat_device(device u64) bool {
+	return device != 0 && device == katomic.load(&prime_stat_dev_id)
 }
 
 fn put_prime_object(dev &DrmDevice, obj &gem.GemObject) {

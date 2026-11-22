@@ -890,6 +890,32 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-mount-20261122.FgEBQU/`. The
 `bundle.tar.gz` SHA-256 is
 `e4f71ba83adf513a4303bc3a1eddc071ba6b524f4cbe6524df708981eeac0d44`.
 
+#### PRIME DMA-BUF statx mount ID
+
+PRIME `statx` returns the same mount ID as fdinfo with the
+`STATX_MNT_ID` result bit. It uses the filesystem device ID in the stat
+snapshot to identify the single internal DMA-BUF mount. Descriptor queries
+and followed procfs descriptor links use the same snapshot conversion.
+A request for `STATX_MNT_ID_UNIQUE` leaves the mount-ID result unset.
+[Pinned statx mount selection](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/stat.c#L276-L302)
+[Pinned statx mount ID layout](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/linux/stat.h#L143-L152)
+
+ARM64 and x86-64 QEMU matched the fdinfo mount ID and the inode from
+`fstat`. The probe checked empty and NULL descriptor paths, a followed
+procfs link, a no-follow query on the link and the unique-ID request
+mask. The same x86-64 guest executable failed the new check on the
+preceding kernel. The x86-64 `statx` and `statabi` cases passed their
+call matrices and 200-cycle retention checks. The fdinfo sanitizer suite
+passed, and the allocation scan reproduced its 150 baseline findings.
+The host DRM syncobj fixture had the same compile errors on both
+revisions. Native M1 validation remains open.
+
+The tested base was `c32325b9fe71a434ce7e6c62ec60c298ab98db2e` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-statx-20261122.9fMtPL/`. The
+`bundle.tar.gz` SHA-256 is
+`b0d259f90e7b9e4cac67fd63267e459a163451430e0d8c3eb9f0af719e107685`.
+
 #### PRIME DMA-BUF names
 
 Both `DMA_BUF_SET_NAME` ioctl encodings accept a NUL-terminated name of

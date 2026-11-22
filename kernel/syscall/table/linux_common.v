@@ -895,6 +895,8 @@ fn syscall_linux_dup3(gpr_state voidptr, oldfd int, newfd int, flags int) (u64, 
 // struct statx, the 256-byte form statx(2) fills. Its timestamps and its
 // split-out device numbers mean it cannot share the struct stat conversion.
 const statx_basic_stats = u32(0x7ff)
+const statx_mnt_id = u32(0x1000)
+const statx_mnt_id_unique = u32(0x4000)
 const statx_reserved = u32(0x80000000)
 const statx_no_automount = u32(0x800)
 const statx_sync_type = u32(0x6000)
@@ -907,13 +909,15 @@ fn write_statx_timestamp(dst u64, sec i64, nsec i64) {
 	}
 }
 
-fn convert_stat_to_statx(src &stat.Stat, user_dst u64) bool {
+fn convert_stat_to_statx(src &stat.Stat, mask u32, user_dst u64) bool {
 	mut buf := [256]u8{}
 	dst := unsafe { u64(&buf[0]) }
+	mount_id := if mask & statx_mnt_id_unique == 0 { fs.dma_buf_mount_id_for_device(src.dev) } else { u64(0) }
+	result_mask := statx_basic_stats | if mount_id != 0 { statx_mnt_id } else { u32(0) }
 	unsafe {
 		C.memset(voidptr(dst), 0, 256)
 
-		*&u32(dst + 0) = statx_basic_stats // stx_mask: what we filled in
+		*&u32(dst + 0) = result_mask
 		*&u32(dst + 4) = u32(src.blksize)
 		*&u64(dst + 8) = 0 // stx_attributes
 		*&u32(dst + 16) = u32(src.nlink)
@@ -934,6 +938,7 @@ fn convert_stat_to_statx(src &stat.Stat, user_dst u64) bool {
 		*&u32(dst + 132) = u32(src.rdev & 0xffffffff) // stx_rdev_minor
 		*&u32(dst + 136) = u32(src.dev >> 32) // stx_dev_major
 		*&u32(dst + 140) = u32(src.dev & 0xffffffff) // stx_dev_minor
+		*&u64(dst + 144) = mount_id
 	}
 	return usercopy.copy_to_user(user_dst, unsafe { voidptr(&buf[0]) }, u64(sizeof(buf)))
 }
@@ -966,7 +971,7 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, ma
 		return ret, err
 	}
 
-	if !convert_stat_to_statx(vinix_stat, buf) {
+	if !convert_stat_to_statx(vinix_stat, mask, buf) {
 		return errno.err, errno.efault
 	}
 	return 0, 0

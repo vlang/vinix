@@ -19,6 +19,7 @@
 module fs
 
 import errno
+import drm
 import katomic
 import klock
 import lib
@@ -108,6 +109,12 @@ __global (
 
 fn allocate_mount_id() int {
 	return katomic.inc(mut &mount_id_counter) + 1
+}
+
+// The DMA-BUF filesystem has one internal mount, so a stat snapshot's
+// filesystem device ID also identifies that mount.
+pub fn dma_buf_mount_id_for_device(device u64) u64 {
+	return if drm.is_prime_stat_device(device) { u64(dma_buf_mount_id) } else { u64(0) }
 }
 
 fn init_mount_tables() {

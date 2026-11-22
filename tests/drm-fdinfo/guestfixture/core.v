@@ -17,6 +17,7 @@ module guestfixture
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -25,6 +26,7 @@ fn C.open(&char, i32, ...) i32
 fn C.close(i32) i32
 fn C.read(i32, voidptr, u64) i64
 fn C.readlinkat(i32, &char, voidptr, u64) i64
+fn C.syscall(isize, ...) isize
 fn C.lseek(i32, i64, i32) i64
 fn C.write(i32, voidptr, u64) i64
 fn C.ioctl(i32, i32, ...) i32
@@ -85,6 +87,7 @@ struct C.timespec {
 
 struct C.stat {
 	st_dev u64
+	st_ino u64
 	st_mode u32
 	st_nlink u64
 	st_uid u32
@@ -875,6 +878,42 @@ fn fdinfo_mount_id(fd i32) i32 {
 	return id
 }
 
+struct C.statx {
+	stx_mask u32
+	stx_mode u16
+	stx_ino u64
+}
+
+fn statx_mount_id(result &C.statx) u64 {
+	// Older musl headers leave this Linux ABI field in the reserved area.
+	return unsafe { *(&u64(u64(result) + 0x90)) }
+}
+
+fn prime_statx_mount_matches(fd i32, path &char, flags i32, mask u32, id u64, ino u64) bool {
+	mut result := C.statx{}
+	return C.syscall(C.SYS_statx, fd, path, flags, mask, &result) == 0
+		&& result.stx_mask & 0x1000 != 0 && statx_mount_id(&result) == id && result.stx_ino == ino
+}
+
+fn test_prime_statx_mount_id(fd i32, ino u64) bool {
+	id := fdinfo_mount_id(fd)
+	if id <= 0 { return false }
+	mut path := [64]char{}
+	C.snprintf(&path[0], sizeof(path), c'/proc/self/fd/%d', fd)
+	if !prime_statx_mount_matches(fd, c'', C.AT_EMPTY_PATH, 0x1000, u64(id), ino)
+		|| !prime_statx_mount_matches(fd, unsafe { nil }, C.AT_EMPTY_PATH, 0x7ff, u64(id), ino)
+		|| !prime_statx_mount_matches(C.AT_FDCWD, &path[0], 0, 0x1000, u64(id), ino) {
+		return false
+	}
+	mut unique := C.statx{}
+	if C.syscall(C.SYS_statx, fd, c'', C.AT_EMPTY_PATH, u32(0x5000), &unique) != 0
+		|| unique.stx_mask & 0x1000 != 0 { return false }
+	mut link := C.statx{}
+	return C.syscall(C.SYS_statx, C.AT_FDCWD, &path[0], C.AT_SYMLINK_NOFOLLOW, u32(0x1000), &link) == 0
+		&& link.stx_mode & u16(C.S_IFMT) == u16(C.S_IFLNK)
+		&& (link.stx_mask & 0x1000 == 0 || statx_mount_id(&link) != u64(id))
+}
+
 fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
 	stream := C.fopen(c'/proc/self/mountinfo', c'r')
 	if stream == unsafe { nil } { return false }
@@ -1089,9 +1128,15 @@ fn test_prime_filesystem_type() bool {
 	}
 	if C.fstatfs(duplicate, &info) != 0 { return false }
 	mut inode := C.stat{}
+	if C.fstat(duplicate, &inode) != 0 { return false }
+	if test_prime_statx_mount_id(duplicate, inode.st_ino) {
+		C.puts(c'VINIX DRM PRIME STATX MOUNT ID: PASS')
+	} else {
+		C.puts(c'DRM PRIME STATX MOUNT ID FAIL: statx mount ID did not match fdinfo')
+	}
 	words := unsafe { &u32(&info.f_fsid) }
 	bits := unsafe { u64(words[0]) | (u64(words[1]) << 32) }
-	if C.fstat(duplicate, &inode) == 0 && bits != 0 && bits == inode.st_dev {
+	if bits != 0 && bits == inode.st_dev {
 		C.puts(c'VINIX DRM PRIME FILESYSTEM ID: PASS')
 	} else {
 		C.printf(c'DRM PRIME FILESYSTEM ID FAIL: filesystem id %#lx device %#lx\n',
