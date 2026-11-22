@@ -665,6 +665,31 @@ at `/Users/alex/.local/state/vinix/m1-drm-framebuffer-prime-reservation-20261122
 The `bundle.tar.gz` SHA-256 is
 `300cd625ae5be85249c161592849c8f68a2ab428eb381a79621ac4ed238fb014`.
 
+#### PRIME DMA-BUF range writeback
+
+`sync_file_range` resolves the descriptor first, rejects malformed
+ranges and flags, then checks the file type. Valid PRIME descriptors
+return `ESPIPE` regardless of access mode. Missing and `O_PATH`
+descriptors return `EBADF`. Regular files, directories and block
+devices use the resource's writeback hook for nonzero flags. That hook
+performs a synchronous whole-resource flush.
+[Pinned range and file-type checks](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/sync.c#L211-L255)
+[Pinned descriptor lookup](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/sync.c#L331-L344)
+
+ARM64 and x86-64 QEMU checked all eight valid flag combinations on
+read-only and read-write PRIME exports, negative and overflowing ranges,
+invalid flags, bad descriptors, a read-only regular file and a directory.
+The same guest executable failed the new check on the preceding x86-64
+kernel. The page-cache and DRM syncobj host suites passed, and the
+allocation scan reproduced its 150 baseline findings. Native M1
+validation remains open.
+
+The tested base was `d04f587b2767d80268ea23039543104389940594` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-sync-range-20261122.OFaISq/`.
+The `bundle.tar.gz` SHA-256 is
+`5216e9b5ac87b6506efed7c1892c53c7d4d901e54347fe725909710582686d82`.
+
 #### GEM metadata reclamation
 
 Final GEM release frees the metadata after unlinking the object and

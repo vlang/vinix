@@ -1547,21 +1547,18 @@ pub fn syscall_readahead(_ voidptr, fd_word u64, offset i64, count u64) (u64, u6
 }
 
 pub fn syscall_sync_file_range(_ voidptr, fdnum int, offset i64, count i64, flags u32) (u64, u64) {
+	mut fd := fd_from_fdnum(unsafe { nil }, int(i32(fdnum))) or { return errno.err, errno.get() }
+	defer { fd.unref() }
+	if fd.handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
+
 	if offset < 0 || count < 0 || flags & ~u32(0x7) != 0
 		|| u64(count) > u64(0x7fffffffffffffff) - u64(offset) {
 		return errno.err, errno.einval
 	}
 
-	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
-	}
 	fd.handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
-	access := fd.handle.flags & resource.o_accmode
-	if access != resource.o_wronly && access != resource.o_rdwr {
-		return errno.err, errno.ebadf
-	}
-	if !stat.isreg(fd.handle.resource.stat.mode) {
+	mode := fd.handle.resource.stat.mode
+	if !stat.isreg(mode) && !stat.isblk(mode) && !stat.isdir(mode) {
 		return errno.err, errno.espipe
 	}
 	// A synchronous whole-resource flush is a conservative implementation of

@@ -933,6 +933,41 @@ fn test_prime_statx_unique_mount_id(first i32, duplicate i32, second i32) bool {
 		&& prime_statx_unique_mount_id(C.AT_FDCWD, &path[0], 0, statx_mount_id_masks) == id
 }
 
+fn sync_file_range_replies(fd u64, offset i64, length i64, flags u64, code i32) bool {
+	result := C.syscall(C.SYS_sync_file_range, fd, offset, length, flags)
+	if code == 0 { return result == 0 }
+	return result == -1 && unsafe { *C.__errno_location() } == code
+}
+
+fn prime_sync_file_range_rejects(fd u64) bool {
+	for flags in 0 .. 8 {
+		if !sync_file_range_replies(fd, 0, 128, u64(flags), C.ESPIPE) { return false }
+	}
+	return sync_file_range_replies(fd, -1, 0, 2, C.EINVAL)
+		&& sync_file_range_replies(fd, 0, -1, 2, C.EINVAL)
+		&& sync_file_range_replies(fd, 0x7fffffffffffffff, 1, 2, C.EINVAL)
+		&& sync_file_range_replies(fd, 0, 0, 8, C.EINVAL)
+}
+
+fn test_prime_sync_file_range(writable i32, read_only i32) bool {
+	if !prime_sync_file_range_rejects(u64(writable))
+		|| !prime_sync_file_range_rejects(u64(read_only)) { return false }
+	file := C.open(c'/proc/self/mountinfo', C.O_RDONLY)
+	if file < 0 { return false }
+	defer { C.close(file) }
+	dir := C.open(c'/dev', C.O_RDONLY | C.O_DIRECTORY)
+	if dir < 0 { return false }
+	defer { C.close(dir) }
+	path := C.open(c'/dev', C.O_PATH)
+	if path < 0 { return false }
+	defer { C.close(path) }
+	upper := u64(0xa5a5a5a500000000)
+	return sync_file_range_replies(upper | u64(file), 0, 0, upper | 2, 0)
+		&& sync_file_range_replies(u64(dir), 0, 0, 7, 0)
+		&& sync_file_range_replies(u64(path), -1, -1, 8, C.EBADF)
+		&& sync_file_range_replies(u64(u32(-1)), -1, -1, 8, C.EBADF)
+}
+
 fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
 	stream := C.fopen(c'/proc/self/mountinfo', c'r')
 	if stream == unsafe { nil } { return false }
@@ -948,7 +983,7 @@ fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
 	return found_visible
 }
 
-fn test_prime_fdinfo_mount_id(card i32, first i32, duplicate i32) bool {
+fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 	internal_id := fdinfo_mount_id(first)
 	visible_id := fdinfo_mount_id(card)
 	if internal_id <= 0 || visible_id <= 0 || internal_id == visible_id
@@ -963,6 +998,11 @@ fn test_prime_fdinfo_mount_id(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME STATX UNIQUE MOUNT ID: PASS')
 	} else {
 		C.puts(c'DRM PRIME STATX UNIQUE MOUNT ID FAIL: incorrect unique mount ID or result mask')
+	}
+	if test_prime_sync_file_range(first, export.fd) {
+		C.puts(c'VINIX DRM PRIME SYNC FILE RANGE: PASS')
+	} else {
+		C.puts(c'DRM PRIME SYNC FILE RANGE FAIL: incorrect descriptor or range admission')
 	}
 	return fdinfo_mount_id(export.fd) == internal_id
 		&& check_mountinfo_ids(internal_id, visible_id)
@@ -1125,7 +1165,7 @@ fn test_prime_filesystem_type() bool {
 	clock_ok := C.clock_gettime(C.CLOCK_REALTIME, &after) == 0
 	duplicate := C.dup(export.fd)
 	two_refs := duplicate >= 0 && test_prime_fdinfo(duplicate, create.size, 2)
-	mount_id_ok := duplicate >= 0 && test_prime_fdinfo_mount_id(card, export.fd, duplicate)
+	mount_id_ok := duplicate >= 0 && check_prime_export_pair(card, export.fd, duplicate)
 	C.close(export.fd)
 	if duplicate < 0 { return false }
 	defer { C.close(duplicate) }

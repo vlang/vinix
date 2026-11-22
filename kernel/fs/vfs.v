@@ -3038,8 +3038,7 @@ pub fn syscall_sync(_ voidptr) (u64, u64) {
 	return 0, 0
 }
 
-// Serves both syncfs(2) and sync_file_range(2): the extra arguments of the
-// latter describe a range to push out, and there is nothing held back to push.
+// syncfs(2) asks the filesystem containing this descriptor to flush.
 pub fn syscall_syncfs(_ voidptr, fdnum int) (u64, u64) {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
 	fd.unref()
