@@ -903,6 +903,28 @@ at `/Users/alex/.local/state/vinix/m1-drm-sendfile-destination-range-20261122.pj
 The `bundle.tar.gz` SHA-256 is
 `3473f90a81b3325f17574c9843da0aac9337fd4320bd47a9f72efb96a03d0106`.
 
+#### Sendfile source position after a pipe write error
+
+When a pipe write reports an error, it accepted zero bytes in that write.
+`sendfile` uses that count to rewind a seekable source after the read.
+After a partial transfer, the position therefore reflects the bytes
+accepted by the pipe. An explicit offset advances only on success. The
+rewind uses the existing seek path and its access checks. Other users of
+the same open description can change the position between read and rewind.
+[Pinned Linux pipe admission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1354-L1389)
+
+ARM64 and x86-64 QEMU checked partial progress, full-pipe `EAGAIN`,
+explicit offset preservation, successful retry after draining the pipe,
+and `EPIPE` after the reader closed. The same x86-64 guest probe failed on
+the preceding kernel. The DRM syncobj host suite passed, and the allocation
+scan reproduced its 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `25be7fb58bc84bde4ef1b72213c441488903bd13` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-sendfile-pipe-write-20261122.3aJ4DK/`.
+The `bundle.tar.gz` SHA-256 is
+`544ff8f94319f54ef6620797893d5473cfdc612c1c5aa4c629593af9c7ff5c60`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

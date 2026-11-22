@@ -770,10 +770,13 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 		}
 
 		written, write_error := fs.write_pinned_descriptor(mut output_fd, buffer, got, false)
-		if written < got && !positioned {
+		// A pipe reports a short count if it accepted any bytes before failing.
+		// On error the VFS returns an unsigned sentinel instead of a byte count.
+		accepted := if pipe_output && write_error != 0 { u64(0) } else { written }
+		if accepted < got && !positioned && !stream_input {
 			// read() already advanced the shared input position.  Put back the
 			// suffix the output did not accept.
-			fs.seek_pinned_descriptor(input_fd, -i64(got - written), fs.seek_cur)
+			fs.seek_pinned_descriptor(input_fd, -i64(got - accepted), fs.seek_cur)
 		}
 		if write_error != 0 {
 			if total == 0 {

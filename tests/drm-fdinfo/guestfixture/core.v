@@ -5,6 +5,7 @@ module guestfixture
 #include <fcntl.h>
 #include <poll.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,6 +48,7 @@ fn C.__errno_location() &i32
 fn C.dup(i32) i32
 fn C.dup2(i32, i32) i32
 fn C.fork() i32
+fn C.signal(i32, voidptr) voidptr
 fn C._exit(i32)
 fn C.waitpid(i32, &i32, i32) i32
 fn C.snprintf(voidptr, u64, &char, ...) i32
@@ -1299,6 +1301,51 @@ fn test_sendfile_destination_range() bool {
 		&& C.lseek(output, 0, C.SEEK_CUR) == capped_position
 }
 
+fn test_sendfile_pipe_write_errors() bool {
+	input := i32(C.syscall(C.SYS_memfd_create, c'sendfile-pipe-write-source', u32(0)))
+	if input < 0 { return false }
+	defer { C.close(input) }
+	mut fds := [2]i32{}
+	if C.pipe(&fds[0]) != 0 { return false }
+	mut reader := fds[0]
+	defer {
+		if reader >= 0 { C.close(reader) }
+		C.close(fds[1])
+	}
+	mut chunk := [4096]char{}
+	capacity := C.fcntl(fds[1], C.F_SETPIPE_SZ, i32(chunk.len))
+	if capacity <= 0 || capacity % chunk.len != 0
+		|| C.fcntl(fds[1], C.F_SETFL, C.O_NONBLOCK) != 0 {
+		return false
+	}
+	for _ in 0 .. capacity / chunk.len {
+		if C.write(input, &chunk[0], u64(chunk.len)) != chunk.len { return false }
+	}
+	if C.write(input, c'keep', 4) != 4 || C.lseek(input, 0, C.SEEK_SET) != 0
+		|| C.syscall(C.SYS_sendfile, fds[1], input, unsafe { nil }, u64(capacity) + 4) != capacity
+		|| C.lseek(input, 0, C.SEEK_CUR) != capacity
+		|| !sendfile_replies(fds[1], input, unsafe { nil }, 4, C.EAGAIN)
+		|| C.lseek(input, 0, C.SEEK_CUR) != capacity {
+		return false
+	}
+	mut offset := i64(1)
+	if !sendfile_replies(fds[1], input, &offset, 4, C.EAGAIN) || offset != 1 { return false }
+	for _ in 0 .. capacity / chunk.len {
+		if C.read(reader, &chunk[0], u64(chunk.len)) != chunk.len { return false }
+	}
+	if C.syscall(C.SYS_sendfile, fds[1], input, unsafe { nil }, u64(4)) != 4
+		|| C.read(reader, &chunk[0], 4) != 4 || C.strncmp(&chunk[0], c'keep', 4) != 0
+		|| C.lseek(input, 0, C.SEEK_CUR) != i64(capacity) + 4
+		|| C.lseek(input, i64(capacity), C.SEEK_SET) != capacity || C.close(reader) != 0 {
+		return false
+	}
+	reader = -1
+	previous := unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+	defer { C.signal(C.SIGPIPE, previous) }
+	return sendfile_replies(fds[1], input, unsafe { nil }, 4, C.EPIPE)
+		&& C.lseek(input, 0, C.SEEK_CUR) == capacity
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1416,6 +1463,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM SENDFILE DESTINATION RANGE: PASS')
 	} else {
 		C.puts(c'DRM SENDFILE DESTINATION RANGE FAIL: incorrect error, offset or position')
+	}
+	if test_sendfile_pipe_write_errors() {
+		C.puts(c'VINIX DRM SENDFILE PIPE WRITE: PASS')
+	} else {
+		C.puts(c'DRM SENDFILE PIPE WRITE FAIL: incorrect error, bytes or source position')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')
