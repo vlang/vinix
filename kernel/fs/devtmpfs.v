@@ -318,7 +318,12 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	if name in parent.children {
 		return unsafe { parent.children[name] or { panic('devtmpfs: missing child ${name}') } }
 	}
+	node := create_devtmpfs_dir(parent, name)
+	publish_child(parent, name, node)
+	return node
+}
 
+fn create_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	// `name` may point into a longer path; the node keeps a copy.
 	// Mounts instantiate their own filesystem. Children must use that same
 	// instance so later namespace checks recognize them as part of this mount.
@@ -341,7 +346,6 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 
 	new_node.resource = new_resource.boxed()
 	new_node.create_dotentries(parent)
-	publish_child(parent, name, new_node)
 	return new_node
 }
 
@@ -444,8 +448,9 @@ pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
 			return none
 		}
 	}
-	if parent == unsafe { nil } {
-		parent = ensure_devtmpfs_dir(devtmpfs_root, 'dri')
+	new_directory := parent == unsafe { nil }
+	if new_directory {
+		parent = create_devtmpfs_dir(devtmpfs_root, 'dri')
 	}
 	primary_leaf.parent = unsafe { parent }
 	primary_leaf.filesystem = parent.filesystem
@@ -454,16 +459,19 @@ pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
 		render_leaf.parent = unsafe { parent }
 		render_leaf.filesystem = parent.filesystem
 		init_devtmpfs_node(mut render_leaf, render, true)
-		// Directory readers see the pair when the map lock is released.
-		children_lock.acquire()
-		unsafe {
-			parent.children[primary_leaf.name] = primary_leaf
+	}
+	// Readers see both leaves together, including when the directory first appears.
+	children_lock.acquire()
+	unsafe {
+		parent.children[primary_leaf.name] = primary_leaf
+		if render_leaf != nil {
 			parent.children[render_leaf.name] = render_leaf
 		}
-		children_lock.release()
-		return
+		if new_directory {
+			devtmpfs_root.children['dri'] = parent
+		}
 	}
-	publish_child(parent, primary_leaf.name, primary_leaf)
+	children_lock.release()
 }
 
 // No namespace or resource reference is transferred until publication.
@@ -485,7 +493,6 @@ fn prepare_dri_leaf(name string) ?&VFSNode {
 		(&u8(name_storage))[name.len] = 0
 		*node = VFSNode{
 			name: tos(&u8(name_storage), name.len)
-			filesystem: filesystems['devtmpfs']
 		}
 	}
 	return node

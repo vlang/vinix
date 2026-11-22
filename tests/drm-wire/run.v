@@ -19,7 +19,6 @@ fn main() {
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/klock', '${scratch}/klock', false)!
 	source := os.read_file(os.getenv_opt('DRM_WIRE_SOURCE') or { '${repo}/kernel/drm/drm.v' })!
 	devtmpfs_source := os.read_file(os.getenv_opt('DRM_DEVTMPFS_SOURCE') or { '${repo}/kernel/fs/devtmpfs.v' })!
-	vfs_source := os.read_file('${repo}/kernel/fs/vfs.v')!
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
 	fdinfo_source := os.read_file(os.getenv_opt('DRM_FDINFO_SOURCE') or { '${repo}/kernel/drm/fdinfo.v' })!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
@@ -51,10 +50,8 @@ fn main() {
 	production += section(devtmpfs_source, 'pub fn devtmpfs_add_dri_devices(', '// Caller holds vfs_lock.')!
 		.replace('resource.Resource', 'NodeBox')
 		.replace('stat.isdir(parent.resource.stat.mode)', 'parent.directory')
-		.replace("filesystem: filesystems['devtmpfs']", '')
 		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
 		.replace('memory.free(', 'memory.free_registration(')
-	production += section(vfs_source, 'pub fn publish_child(', 'fn remove_child(')!
 	production += section(devtmpfs_source, 'pub fn devtmpfs_remove_dri_devices(', '// Take a device node out of devtmpfs')!
 		.replace('resource.Resource', 'NodeBox')
 	production += section(devtmpfs_source, 'fn matching_device_node(', 'pub fn devtmpfs_get_root(')!

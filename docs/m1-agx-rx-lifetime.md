@@ -465,3 +465,28 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-initial-directory-20261119.oXyMjn/`.
 The `bundle.tar.gz` SHA-256 is
 `ed1de8be7a183ce6f14d3590883397578025e164aa62e676559ba9d02b9d6769`.
+
+## Complete `/dev/dri` on first publication
+
+On first registration, devtmpfs initializes the new directory and its dot
+entries privately. It inserts the requested DRM leaves, then adds `/dev/dri`
+to the devtmpfs root under the same directory lock. A reader can find the
+directory as soon as the requested card and optional render name are present.
+
+The DRM wire sanitizer fixture checked the first observable directory for
+card-only and paired registration and retained the 14 allocation failure
+cases. A control that published the directory early exposed an empty one.
+Independent lifetime review and generated code confirmed parent assignment
+and map insertion order. The allocation scan matched the 150 findings at
+the tested base.
+
+Both kernel builds, the DRM sysfs sanitizer fixture, 79 local contracts and
+122 pinned-reference checks passed. The ARM64 QEMU DRM sysfs probe found
+the card and its sysfs entries. The x86-64 descriptor-flags smoke test passed.
+Native M1 validation remains open.
+
+The tested base was `3fb9fece2acca39e35916eb0ff5ccab49f5a2be0` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-first-publication-20261122.yNE37j/`.
+The `bundle.tar.gz` SHA-256 is
+`710d641c0d70cb59b3d756700414efc617734e94ec969ad83f0c1668d8a05a0f`.

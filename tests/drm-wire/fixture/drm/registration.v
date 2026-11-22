@@ -33,6 +33,7 @@ struct VFSNode {
 mut:
 	name string
 	parent &VFSNode = unsafe { nil }
+	filesystem voidptr
 	children &map[string]&VFSNode = unsafe { nil }
 	resource &NodeBox = unsafe { nil }
 	parent_held bool
@@ -58,6 +59,13 @@ fn (mut lock_state NamespaceLock) acquire() {
 fn (mut lock_state NamespaceLock) release() {
 	assert lock_state.held
 	lock_state.held = false
+	if first_dri_leaf_count != 0 && 'dri' in devtmpfs_root.children {
+		dir := unsafe { devtmpfs_root.children['dri'] }
+		assert dir.children.len == first_dri_leaf_count, 'directory reader saw an incomplete first /dev/dri'
+		assert 'card0' in dir.children
+		assert ('renderD128' in dir.children) == (first_dri_leaf_count == 2)
+		first_dri_leaf_count = 0
+	}
 	if staged_devices[0] != unsafe { nil } {
 		observe_dri_publication()
 	} else if detaching_device != unsafe { nil } {
@@ -72,6 +80,7 @@ __global devtmpfs_root = unsafe { &VFSNode(nil) }
 __global registered_devices [64]&DrmDevice
 __global node_names [192]&DrmNode
 __global published_nodes = 0
+__global first_dri_leaf_count = 0
 __global staged_nodes [2]&VFSNode
 __global staged_devices [2]&NodeBox
 __global detaching_device = unsafe { &DrmDevice(nil) }
@@ -125,12 +134,15 @@ fn retire_node(mut node VFSNode) {
 	memory.free_registration(node)
 }
 
-fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
-	if name in parent.children { return unsafe { parent.children[name] } }
-	mut root := unsafe { parent }
-	dir := &VFSNode{directory: true, children: &map[string]&VFSNode{}}
-	unsafe { root.children[name] = dir }
-	return dir
+fn create_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
+	assert vfs_lock.held && !children_lock.held && name !in parent.children
+	return &VFSNode{
+		directory: true
+		name: name
+		parent: unsafe { parent }
+		filesystem: parent.filesystem
+		children: &map[string]&VFSNode{}
+	}
 }
 
 fn init_devtmpfs_node(mut namespace_node VFSNode, device &NodeBox, seat bool) {
@@ -140,6 +152,8 @@ fn init_devtmpfs_node(mut namespace_node VFSNode, device &NodeBox, seat bool) {
 	assert leaf == '${prefix}${device.minor}'
 	assert unsafe { leaf.str[leaf.len] } == 0
 	assert leaf !in namespace_node.parent.children
+	assert namespace_node.filesystem == namespace_node.parent.filesystem
+	assert namespace_node.filesystem == devtmpfs_root.filesystem
 	namespace_node.resource = unsafe { device }
 	mut node := unsafe { device.node }
 	node.stat.nlink = 1
@@ -231,24 +245,36 @@ fn check_initial_registration_failures() {
 		}
 	}
 	assert sysfs_publishes == published_before, 'a failed registration published sysfs entries'
-	retry := register_driver_with_data(&DrmDriver{features: driver_render}, unsafe { nil }) or { panic('first registration retry failed') }
-	assert sysfs_publishes == published_before + 1
-	dir := unsafe { devtmpfs_root.children['dri'] }
-	assert dir.children.len == 2 && 'card0' in dir.children && 'renderD128' in dir.children
-	removed_before := sysfs_removals
-	unregister_device(retry)
-	assert dir.children.len == 0
-	assert sysfs_removals == removed_before + 1
-	unregister_device(retry)
-	assert sysfs_removals == removed_before + 1, 'a second unregister removed sysfs entries again'
-	println('DRM registration: 14 first-registration failures leave /dev/dri absent and allow retry')
+	for render in [false, true]! {
+		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
+		first_dri_leaf_count = if render { 2 } else { 1 }
+		publishes := sysfs_publishes
+		retry := register_driver_with_data(&driver, unsafe { nil }) or { panic('first registration retry failed') }
+		assert first_dri_leaf_count == 0 && sysfs_publishes == publishes + 1
+		dir := unsafe { devtmpfs_root.children['dri'] }
+		removed_before := sysfs_removals
+		unregister_device(retry)
+		assert dir.children.len == 0
+		assert sysfs_removals == removed_before + 1
+		unregister_device(retry)
+		assert sysfs_removals == removed_before + 1, 'a second unregister removed sysfs entries again'
+		if !render {
+			devtmpfs_root.children.delete('dri')
+			unsafe {
+				dir.children.free()
+				free(dir.children)
+				free(dir)
+			}
+		}
+	}
+	println('DRM registration: 14 first-registration failures leave /dev/dri absent, and retries publish it complete')
 }
 
 fn check_registration_collisions() {
 	driver := DrmDriver{features: driver_render}
 	assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enodev
 	assert memory.registration_outstanding() == 0
-	devtmpfs_root = &VFSNode{directory: true, children: &map[string]&VFSNode{}}
+	devtmpfs_root = &VFSNode{directory: true, filesystem: voidptr(1), children: &map[string]&VFSNode{}}
 	blocker := &VFSNode{}
 	unsafe { devtmpfs_root.children['dri'] = blocker }
 	assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enotdir
