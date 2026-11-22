@@ -573,30 +573,9 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 	}
 }
 
-// Driver-private commands all start at DRM_COMMAND_BASE and intentionally
-// reuse the same numbers across drivers. Prefer layout metadata from the
-// device's own table so, for example, Asahi 0x41 is never decoded as VirtIO's
-// unrelated 0x41 request.
 fn ioctl_layout(dev &DrmDevice, cmd u32, request_size u32, direction u32, abi u32) ?DrmIoctlLayout {
-	if dev.driver != unsafe { nil } {
-		mut private_command := false
-		for index, entry in dev.driver.ioctls {
-			if entry.cmd != cmd { continue }
-			if entry.size == 0 || entry.direction == 0 { continue }
-			private_command = true
-			if entry.size != 0 && (entry.extensible || entry.direction == direction)
-				&& (abi == 0 || entry.abi == 0 || entry.abi == abi)
-				&& (entry.extensible || entry.size == request_size) {
-				return DrmIoctlLayout{
-					size: entry.size
-					direction: if entry.extensible { entry.direction & direction } else { entry.direction }
-					driver_index: index
-					extensible: entry.extensible
-					flags: entry.flags
-				}
-			}
-		}
-		if private_command { return none }
+	if cmd >= ioctl.drm_command_base && cmd < ioctl.drm_command_end {
+		return private_ioctl_layout(dev, cmd, request_size, direction, abi)
 	}
 	layout := common_ioctl_layout(cmd) or { return none }
 	if layout.extensible {
@@ -606,6 +585,37 @@ fn ioctl_layout(dev &DrmDevice, cmd u32, request_size u32, direction u32, abi u3
 		}
 	}
 	return layout
+}
+
+// A private request needs an entry in this driver's table. A handler-only
+// entry can use the shared legacy layout, as the VirtIO GPU table does.
+fn private_ioctl_layout(dev &DrmDevice, cmd u32, request_size u32, direction u32, abi u32) ?DrmIoctlLayout {
+	if dev.driver == unsafe { nil } { return none }
+	mut has_layout := false
+	mut legacy_index := -1
+	for index, entry in dev.driver.ioctls {
+		if entry.cmd != cmd { continue }
+		if entry.size == 0 || entry.direction == 0 {
+			if legacy_index < 0 { legacy_index = index }
+			continue
+		}
+		has_layout = true
+		if (entry.extensible || entry.direction == direction)
+			&& (abi == 0 || entry.abi == 0 || entry.abi == abi)
+			&& (entry.extensible || entry.size == request_size) {
+			return DrmIoctlLayout{
+				size: entry.size
+				direction: if entry.extensible { entry.direction & direction } else { entry.direction }
+				driver_index: index
+				extensible: entry.extensible
+				flags: entry.flags
+			}
+		}
+	}
+	if has_layout || legacy_index < 0 || dev.driver.ioctls[legacy_index].handler == unsafe { nil } {
+		return none
+	}
+	return common_ioctl_layout(cmd)
 }
 
 // Linux DRM allocates max(in_size, out_size, driver_size). Unknown input

@@ -221,6 +221,7 @@ fn check_node_transport() {
 	mut detached := DrmNode{dev: &inactive}
 	expect_error(mut detached, foreign, unsafe { nil }, errno.enodev)
 	expect_error(mut detached, unknown, unsafe { nil }, errno.enodev)
+	check_ioctl_handler_selection()
 	handler_status = -22
 	expect_error(mut node, base | (u64(3) << 30), unsafe { &bytes[0] }, 22)
 	assert handler_input == 7 && bytes[1] == 1 && bytes[31] == 0xab
@@ -282,4 +283,30 @@ fn check_node_transport() {
 	expect_error(mut empty, base | (u64(3) << 30), unsafe { nil }, 22)
 	memory.fail_next(false)
 	println('DRM node: unknown-byte echo, zeroed reads, direction intersections, error outputs, fault precedence and fallible buffer lifetime passed')
+}
+
+fn check_ioctl_handler_selection() {
+	// A shared legacy layout exists for this number, even on a driver
+	// without the VirtIO handler.
+	request := u64(0xc0106441)
+	mut data := [16]u8{}
+	buffer := unsafe { &data[0] }
+	usercopy.fail_at(u64(buffer))
+	driver := DrmDriver{}
+	device := DrmDevice{driver: &driver}
+	mut node := DrmNode{dev: &device}
+	expect_error(mut node, request, buffer, errno.einval)
+
+	legacy_driver := DrmDriver{ioctls: [
+		DrmIoctl{cmd: ioctl.drm_virtgpu_map, handler: handle},
+		DrmIoctl{cmd: ioctl.drm_ioctl_version, size: 16, direction: 3, handler: handle},
+	]}
+	legacy_device := DrmDevice{driver: &legacy_driver}
+	mut legacy := DrmNode{dev: &legacy_device}
+	expect_error(mut legacy, request, buffer, errno.efault)
+	usercopy.fail_at(0)
+	layout := ioctl_layout(&legacy_device, ioctl.drm_ioctl_version, 16, 3, 0) or {
+		panic('core VERSION layout')
+	}
+	assert layout.size == sizeof(ioctl.DrmVersion) && layout.driver_index == -1
 }

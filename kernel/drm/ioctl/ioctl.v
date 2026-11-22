@@ -31,6 +31,9 @@ pub const drm_ioctl_mode_create_dumb = u32(0xb2)
 pub const drm_ioctl_mode_map_dumb = u32(0xb3)
 pub const drm_ioctl_mode_destroy_dumb = u32(0xb4)
 
+pub const drm_command_base = u32(0x40)
+pub const drm_command_end = u32(0xa0)
+
 // ---- VirtIO-GPU driver ioctls (DRM_COMMAND_BASE + command) ----
 pub const drm_virtgpu_base = u32(0x40)
 pub const drm_virtgpu_map = drm_virtgpu_base + u32(0x01)

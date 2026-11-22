@@ -304,6 +304,14 @@ fn test_client_ioctl_handoff(fd i32, previous &char, id u64) bool {
 		|| !same_client_rows(previous) {
 		return false
 	}
+	// The simple DRM driver has no private 0x41 handler.
+	mut private_data := [16]u8{}
+	private_request := i32(u32(0xc0106441))
+	if C.ioctl(fd, private_request, u64(1)) != -1 || unsafe { *C.__errno_location() } != C.EINVAL
+		|| C.ioctl(fd, private_request, &private_data[0]) != -1 || unsafe { *C.__errno_location() } != C.EINVAL
+		|| !same_client_rows(previous) {
+		return false
+	}
 	if C.ioctl(fd, i32(u32(0xc01064d1)), u64(1)) != -1 || unsafe { *C.__errno_location() } != C.EFAULT
 		|| !same_client_rows(previous) {
 		return false

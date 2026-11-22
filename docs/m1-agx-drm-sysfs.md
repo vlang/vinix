@@ -296,6 +296,31 @@ Evidence is stored at `/Users/alex/.local/state/vinix/m1-drm-ioctl-type-20261122
 The `bundle.tar.gz` SHA-256 is
 `3271c5aae18a49a85f7dd8c4696b01c86c2610e36e47e762d6c62b955906140d`.
 
+#### Private ioctl handler selection
+
+The DRM dispatcher resolves command numbers from `0x40` through `0x9f`
+against the current driver's ioctl table. If the driver has no matching
+command, dispatch returns `EINVAL` before copying input or attributing
+the client to the caller. The VirtIO GPU's handler-only entries still
+use their shared legacy layouts. Core command numbers use the core
+layouts, including the framebuffer's dumb-buffer operations. [Pinned Linux ioctl table selection](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L856-L872)
+
+The sanitizer fixture checks an unregistered private command, a matching
+handler-only entry and a driver entry that collides with core `VERSION`.
+The preceding dispatcher returned `EFAULT` for the unregistered
+command. Both ARM64 and x86-64 QEMU passed the same probe on the simple DRM
+device with valid and faulting pointers. Client attribution stayed intact.
+The preceding ARM64 kernel failed the guest regression. The DRM wire and
+fdinfo sanitizer suites passed, the allocation scan reproduced the 150
+baseline findings, and both guests measured zero slab growth over 200
+populated-table reads. Native M1 validation remains open.
+
+The tested base was `4182d642ed6048b60bb8656c595066fcf170da07` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-private-ioctl-20261122.nhTti1/`.
+The `bundle.tar.gz` SHA-256 is
+`74ed4e31de200ffb85cc46d03c2750735a147ac0c5ee599d7872a7b654774302`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open
