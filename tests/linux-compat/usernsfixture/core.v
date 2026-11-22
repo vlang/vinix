@@ -18,6 +18,7 @@ module usernsfixture
 #include <alloca.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
@@ -33,6 +34,11 @@ module usernsfixture
 #include <sys/wait.h>
 #include <unistd.h>
 
+struct C.pthread_t {}
+
+fn C.pthread_create(&C.pthread_t, voidptr, fn (voidptr) voidptr, voidptr) i32
+fn C.pthread_join(C.pthread_t, voidptr) i32
+fn C.pipe(&i32) i32
 fn C.syscall(isize, ...) isize
 fn C.__errno_location() &i32
 fn C.printf(&char, ...) i32
@@ -437,6 +443,56 @@ fn boot_root() i32 {
 	}
 }
 
+// Holds the process multithreaded until the main thread closes the pipe writer.
+fn fs_sibling(argument voidptr) voidptr {
+	unsafe {
+		mut byte := u8(0)
+		C.read(*(&i32(argument)), &byte, 1)
+	}
+	return unsafe { nil }
+}
+
+// A thread that stopped sharing its filesystem state (CLONE_FS, while a
+// sibling was alive) keeps a mount namespace of its own. Asking for a user and
+// a mount namespace together must still make the new user namespace own the
+// new mount namespace, so its root may mount there.
+fn own_fs_mount_namespace() i32 {
+	unsafe {
+		mut s := State{}
+		directory := failure(i64(C.mkdir(c'/tmp/fsns', 0o755)))
+		check(mut s, c'mount point', directory == 0, directory)
+		pipe := &i32(C.alloca(2 * sizeof(i32)))
+		opened := failure(i64(C.pipe(pipe)))
+		check(mut s, c'sibling pipe', opened == 0, opened)
+		if opened != 0 { return 1 }
+		mut sibling := C.pthread_t{}
+		started := C.pthread_create(&sibling, nil, fs_sibling, &pipe[0])
+		check(mut s, c'sibling thread', started == 0, i64(started))
+		if started != 0 { return 1 }
+		split := failure(i64(C.syscall(isize(C.SYS_unshare), u64(0x00000200))))
+		check(mut s, c'own filesystem state', split == 0, split)
+		C.close(pipe[1])
+		joined := C.pthread_join(sibling, nil)
+		check(mut s, c'join sibling', joined == 0, i64(joined))
+		C.close(pipe[0])
+		if s.failures != 0 { return 1 }
+		// The exited sibling may still be counted for a moment.
+		mut created := i64(-1)
+		for _ in 0 .. 100 {
+			created = failure(i64(C.syscall(isize(C.SYS_unshare), u64(0x10000000 | 0x00020000))))
+			if created != -C.EINVAL { break }
+			C.usleep(10000)
+		}
+		check(mut s, c'user and mount namespace after CLONE_FS', created == 0, created)
+		if created != 0 { return 1 }
+		mounted := failure(i64(C.mount(c'tmpfs', c'/tmp/fsns', c'tmpfs', 0, nil)))
+		check(mut s, c'mount in the mount namespace the user namespace owns', mounted == 0, mounted)
+		C.printf(c'LINUX USERNS THREAD FS: checks=%d failures=%d\n', s.checks, s.failures)
+		C.fflush(nil)
+		return if s.failures == 0 { 0 } else { 1 }
+	}
+}
+
 fn run_child(mut s State, label &char, which int, reference bool) {
 	unsafe {
 		child := C.fork()
@@ -445,12 +501,13 @@ fn run_child(mut s State, label &char, which int, reference bool) {
 				0 { unprivileged(reference) }
 				1 { chrooted() }
 				2 { masked_proc() }
+				4 { own_fs_mount_namespace() }
 				else { boot_root() }
 			})
 		}
 		mut status := i32(0)
-		C.waitpid(child, &status, 0)
-		check(mut s, label, status == 0, i64(status))
+		waited := if child > 0 { C.waitpid(child, &status, 0) } else { -1 }
+		check(mut s, label, child > 0 && waited == child && status == 0, i64(status))
 	}
 }
 
@@ -501,6 +558,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		listener := prepare(mut s)
 		run_child(mut s, c'unprivileged child', 0, reference)
 		run_child(mut s, c'chrooted child', 1, reference)
+		run_child(mut s, c'own-fs user and mount namespaces', 4, reference)
 		C.close(listener)
 		if !reference {
 			retention(mut s)

@@ -11618,6 +11618,21 @@ procself, execnames, readlinkabi, procpid) pass on aarch64. Receipts are
 outside Git in the author's ~/.cache/vinix-userns/ (compat-r30 to r33,
 compat-x3, ref-r12).
 
+The `CLONE_FS` follow-up creates a user namespace before copying a thread's
+private mount namespace when one `unshare` call requests both. The regression
+detaches the caller's filesystem state while a sibling thread is alive, joins
+the sibling, and checks a tmpfs mount in the resulting namespace. It passed all
+seven thread-filesystem checks on AArch64 and x86-64 Vinix builds from
+`3fb9fece2` plus this change and on the AArch64 Linux 6.12.51 reference. The
+retained earlier AArch64 Vinix kernel refused the tmpfs mount with `EPERM`.
+The Vinix `userns` runner now requires 16 top-level checks and the separate
+seven-check thread-filesystem verdict.
+
+The focused run artifacts and their checksum list are in
+`~/.local/state/vinix/section14-resume-CUyEUnSR`. The SHA-256 of
+`namespace-focused.sha256` is
+`0ac05414ae7714500f1d8ba7cd0b0961d972b3bedb07e93823122698839ca7fb`.
+
 Not supported: several map extents, id translation in stat, credentials
 passed over sockets and /proc status, setns into a user or network
 namespace, IP networking inside a network namespace, idmapped mounts, and

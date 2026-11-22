@@ -365,11 +365,12 @@ pub fn syscall_unshare(_ voidptr, flags u64) (u64, u64) {
 	// Root, working directory and mounts are per process until a thread of a
 	// multithreaded one asks to stop sharing them (CLONE_NEWNS implies
 	// CLONE_FS). From then on that thread alone sees what it changes.
+	mut own_mount_fs := unsafe { &proc.ThreadFS(nil) }
 	if flags & (clone_fs | proc.clone_newns) != 0
 		&& (process.threads.len > 1 || proc.thread_fs_of(process) != unsafe { nil }) {
-		mut own := proc.own_thread_fs()
+		own := proc.own_thread_fs()
 		if ns_flags & proc.clone_newns != 0 && own.mnt != unsafe { nil } {
-			own.mnt = replace_namespace(process, mut own.mnt)
+			own_mount_fs = own
 			ns_flags &= ~proc.clone_newns
 		}
 	}
@@ -381,6 +382,11 @@ pub fn syscall_unshare(_ voidptr, flags u64) (u64, u64) {
 		process.threads_lock.release()
 	}
 	create_namespaces(mut process, ns_flags, false)
+	// Create the thread's mount namespace after installing its owner, which
+	// may be the user namespace requested by this same call.
+	if own_mount_fs != unsafe { nil } {
+		own_mount_fs.mnt = replace_namespace(process, mut own_mount_fs.mnt)
+	}
 	return 0, 0
 }
 
