@@ -665,6 +665,35 @@ at `/Users/alex/.local/state/vinix/m1-drm-framebuffer-prime-reservation-20261122
 The `bundle.tar.gz` SHA-256 is
 `300cd625ae5be85249c161592849c8f68a2ab428eb381a79621ac4ed238fb014`.
 
+#### GEM metadata reclamation
+
+Final GEM release frees the metadata after unlinking the object and
+releasing its backing and reservations. Global handle lookup takes a
+reference under the registry lock and rejects objects whose final release
+has already reached zero. The simple framebuffer and VirtIO create
+handlers fill the response while the file lock still protects the object.
+Independent lifetime review checked those paths and software Asahi.
+
+The same guest probe measured peak growth of 200 live slab objects on
+the preceding x86-64 kernel for 200 direct closes and again for 200
+closes where a PRIME descriptor held the last reference. The updated
+ARM64 and x86-64 kernels measured zero growth in both cases. The GEM
+private, CPU cache and DRM fdinfo sanitizer suites passed. The allocation
+scan reproduced the 150 baseline findings.
+
+The AArch64 desktop run reported zero retained bytes per operation for
+all 36 cohorts and zero growth across all four churn programs at 300
+launches each. Cache, idle, apps and drag completed. The run used QEMU
+instruction counting to advance guest idle waits. A second run passed
+churn, cache, idle, apps and drag with ordinary guest timing and two
+virtual CPUs. Native M1 validation remains open.
+
+The tested base was `5f7006a4dcf19a2a9df1d6039463e290f10d1fd9` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-gem-metadata-20261122.Jl3K5l/`. The
+`bundle.tar.gz` SHA-256 is
+`6c683fd619f24f085258af044e7ff9bb22f28340e30e35dbee8b05aea7287320`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

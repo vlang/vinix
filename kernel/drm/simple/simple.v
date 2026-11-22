@@ -100,10 +100,10 @@ fn create_dumb_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	}
 	file.lock.acquire()
 	file.objects << obj
-	file.lock.release()
 	request.handle = obj.handle
 	request.pitch = u32(pitch)
 	request.size = obj.size
+	file.lock.release()
 	return 0
 }
 

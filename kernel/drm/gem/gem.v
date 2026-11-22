@@ -327,20 +327,27 @@ fn free_scattered_pages(list &u64, page_count u64, pte_extra u64) {
 	memory.free(voidptr(list))
 }
 
-// Look up a GEM object by its handle.
-pub fn get_by_handle(handle u32) ?&GemObject {
+// Look up a global handle and take a reference for the caller to release.
+pub fn lookup_referenced(handle u32) ?&GemObject {
 	if handle == 0 || handle >= gem_max_handles {
 		return none
 	}
 
 	gem_objects_lock.acquire()
+	defer { gem_objects_lock.release() }
 	obj := gem_objects[handle]
-	gem_objects_lock.release()
 
 	if obj == unsafe { nil } {
 		return none
 	}
-	return obj
+	mut refs_now := katomic.load(unsafe { &obj.refcount })
+	// A final put can reach zero before it acquires the registry lock to
+	// unlink the object. The lock keeps its storage live during the lookup.
+	for refs_now != 0 && refs_now != ~u64(0) {
+		if katomic.cas(mut unsafe { &obj.refcount }, refs_now, refs_now + 1) { return obj }
+		refs_now = katomic.load(unsafe { &obj.refcount })
+	}
+	return none
 }
 
 // Increment the reference count of a GEM object.
@@ -361,7 +368,7 @@ pub fn unref(obj &GemObject) {
 	if !katomic.dec(mut rc) {
 		// refcount reached zero
 		destroy(obj)
-		if obj.external || obj.file_scoped { memory.free(voidptr(obj)) }
+		memory.free(voidptr(obj))
 	}
 }
 

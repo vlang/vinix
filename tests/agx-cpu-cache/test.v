@@ -84,11 +84,12 @@ fn check_constructors() int {
 					cpu.reset(); gem.unref(object)
 					assert cpu.count() == 0 && memory.live() == 1
 					handle := object.handle
+					page_count := int(object.size / 4096)
 					gem.unref(object)
 					assert memory.live() == 0 && !memory.locked()
 					assert cpu.at(cpu.count() - 1).kind == 'pmm_free'
-					if !writeback { check_bbm(int(object.size / 4096), false) }
-					if _ := gem.get_by_handle(handle) { assert false }
+					if !writeback { check_bbm(page_count, false) }
+					if _ := gem.lookup_referenced(handle) { assert false }
 					cases++
 				}
 			}
@@ -175,21 +176,18 @@ fn check_metadata_refusal() int {
 		}
 		if _ := gem.create_external(16384) { panic('metadata OOM must refuse external GEM creation') }
 		assert memory.backing_attempts() == before && memory.live() == 1 && cpu.count() == 0
-		if _ := gem.get_by_handle(expected_handle) { panic('failed constructor published a handle') }
-		visible := gem.get_by_handle(first.handle) or { panic('existing handle disappeared') }
-		assert voidptr(visible) == voidptr(first) && first.refcount == 1
+		if _ := gem.lookup_referenced(expected_handle) { panic('failed constructor published a handle') }
+		visible := gem.lookup_referenced(first.handle) or { panic('existing handle disappeared') }
+		assert voidptr(visible) == voidptr(first) && first.refcount == 2
+		gem.unref(visible)
 	}
 	memory.fail_metadata(false)
 	retry := gem.create_aligned_with_cache(16384, 16384, 17, false, false) or { panic('GEM retry') }
 	assert retry.handle == expected_handle && retry.mmap_offset == expected_offset
+	metadata_before := memory.metadata_frees()
 	gem.unref(retry)
 	gem.unref(first)
-	assert memory.live() == 0
-	// The host fixture owns all pointers and can release retained metadata.
-	unsafe {
-		free(voidptr(retry))
-		free(voidptr(first))
-	}
+	assert memory.live() == 0 && memory.metadata_frees() == metadata_before + 2
 	return 300
 }
 
@@ -249,7 +247,9 @@ fn check_file_scoped_objects() {
 	}
 	table.release_all()
 	assert memory.metadata_frees() == metadata_before + 10000 && memory.frees() == pages_before + 10000
-	assert voidptr(gem.get_by_handle(1) or { panic('global object disappeared') }) == voidptr(global_objects[0])
+	visible := gem.lookup_referenced(1) or { panic('global object disappeared') }
+	assert voidptr(visible) == voidptr(global_objects[0])
+	gem.unref(visible)
 	for object in global_objects { gem.unref(object) }
 	unsafe { global_objects.free() }
 	println('AGX file-scoped GEM: 10000 backing and metadata releases after the final reference with all 4095 global slots occupied')

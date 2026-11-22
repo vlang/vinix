@@ -6,23 +6,23 @@ fn main() {
 	for identity := u64(1); identity <= 200; identity++ {
 		object := gem.create_aligned_private(16385, 16384, identity) or { panic('private GEM') }
 		handle := object.handle
-		visible := gem.get_by_handle(handle) or { panic('published GEM') }
+		visible := gem.lookup_referenced(handle) or { panic('published GEM') }
 		assert voidptr(visible) == voidptr(object)
 		assert visible.vm_private_identity == identity && visible.size == 32768
-		assert visible.refcount == 1 && !visible.external
-		gem.ref_obj(object)
-		assert object.refcount == 2
+		assert visible.refcount == 2 && !visible.external
 		gem.unref(object)
-		assert object.refcount == 1 && memory.live() == 1
-		gem.unref(object)
-		assert object.refcount == 0 && memory.live() == 0
-		if _ := gem.get_by_handle(handle) { panic('destroyed GEM handle retained') }
+		assert visible.refcount == 1 && memory.live() == 1
+		gem.unref(visible)
+		if _ := gem.lookup_referenced(handle) { panic('destroyed GEM handle retained') }
 		assert memory.live() == 0
-		// Normal GEM metadata currently has a separate retention policy in the
-		// kernel. This isolated fixture has no borrowed pointers remaining and
-		// explicitly frees that metadata; it does not change/measure that policy.
-		unsafe { free(voidptr(object)) }
 	}
+	mut retiring := gem.create(16384) or { panic('retiring GEM') }
+	// Model a final put that reached zero and is about to unlink the handle.
+	retiring.refcount = 0
+	if _ := gem.lookup_referenced(retiring.handle) { panic('retiring GEM acquired a reference') }
+	retiring.refcount = 1
+	gem.unref(retiring)
+	assert memory.live() == 0
 	if _ := gem.create_aligned_private(16384, 16384, 0) { panic('zero private identity') }
 	if _ := gem.create_aligned_private(~u64(0), 16384, 1) { panic('size overflow') }
 	if _ := gem.create_aligned_private(0, 16384, 1) { panic('empty object') }
@@ -34,7 +34,6 @@ fn main() {
 	shareable := gem.create_aligned(16384, 16384) or { panic('shareable GEM') }
 	assert shareable.vm_private_identity == 0 && !shareable.external
 	gem.unref(shareable)
-	unsafe { free(voidptr(shareable)) }
 	external := gem.create_external(16384) or { panic('external GEM') }
 	assert external.vm_private_identity == 0 && external.external
 	// An external object has no backing until its driver installs an aperture.
@@ -79,7 +78,6 @@ fn check_backing_accessors() {
 	assert !object.write_bytes(object.size + 1, voidptr(&data[0]), 0)
 	assert object.write_bytes(object.size, voidptr(&data[0]), 0)
 	gem.unref(object)
-	unsafe { free(voidptr(object)) }
 	assert memory.live() == 0
 	println('GEM backing accessors: page lookup, bounded runs, single-run base and direct-map writes passed')
 }
@@ -119,7 +117,6 @@ fn check_scattered_backing() {
 	assert !object.write_bytes(object.size - 4, voidptr(&data[0]), 8)
 	gem.unref(object)
 	assert memory.live() == baseline
-	unsafe { free(voidptr(object)) }
 
 	$if arm64 {
 		// Uncached objects set the policy per page and restore every page.
@@ -127,7 +124,6 @@ fn check_scattered_backing() {
 		assert uncached.pages != unsafe { nil } && memory.uncached() == 3
 		gem.unref(uncached)
 		assert memory.uncached() == 0 && memory.live() == baseline
-		unsafe { free(voidptr(uncached)) }
 	}
 	// Running out partway releases the pages already taken.
 	memory.fail_single_pages_after(2)
@@ -144,7 +140,6 @@ fn check_scattered_backing() {
 	assert contiguous.pages == unsafe { nil } && contiguous.phys_addr != 0
 	assert (contiguous.contiguous_phys() or { 0 }) == contiguous.phys_addr
 	gem.unref(contiguous)
-	unsafe { free(voidptr(contiguous)) }
 	assert memory.live() == baseline
 	println('GEM scattered backing: single-page fallback, merged and split runs, writes across gaps, per-page cache policy and partial-failure release passed')
 }

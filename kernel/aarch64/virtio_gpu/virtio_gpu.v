@@ -781,9 +781,9 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 	file.lock.acquire()
 	file.objects << virtio_object
 	file.owned[object.handle] = virtio_object
-	file.lock.release()
 	request.bo_handle = object.handle
 	request.res_handle = resource_id
+	file.lock.release()
 	return 0
 }
 

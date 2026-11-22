@@ -709,6 +709,49 @@ mut:
 	tail u32
 }
 
+fn gem_close_cycle(fd i32, prime bool) bool {
+	mut create := DumbCreateRequest{height: 1, width: 1, bpp: 32}
+	if C.ioctl(fd, i32(u32(0xc02064b2)), &create) != 0 || create.handle == 0 {
+		return false
+	}
+	mut export := ExtendedPrimeRequest{handle: create.handle, fd: -1}
+	if prime && (C.ioctl(fd, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0) {
+		return false
+	}
+	defer { if export.fd >= 0 { C.close(export.fd) } }
+	return C.ioctl(fd, i32(u32(0xc00464b4)), unsafe { &create.handle }) == 0
+}
+
+fn measure_gem_close_cycles(fd i32, prime bool) bool {
+	for _ in 0 .. 20 {
+		if !gem_close_cycle(fd, prime) { return false }
+	}
+	mut before := [64]i64{}
+	mut after := [64]i64{}
+	count := client_read_heap(&before[0], before.len)
+	for _ in 0 .. 200 {
+		if !gem_close_cycle(fd, prime) { return false }
+	}
+	if count <= 0 || client_read_heap(&after[0], after.len) != count { return false }
+	mut largest := i64(0)
+	for i in 0 .. count {
+		growth := unsafe { after[i] - before[i] }
+		if growth > largest { largest = growth }
+	}
+	C.printf(c'DRM GEM metadata: peak live slab growth %ld over 200 closes (PRIME %d)\n',
+		largest, i32(prime))
+	return largest <= 8
+}
+
+fn test_gem_metadata_reclamation() bool {
+	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	direct := measure_gem_close_cycles(fd, false)
+	prime := measure_gem_close_cycles(fd, true)
+	return direct && prime
+}
+
 fn test_prime_cpu_access(fd i32) bool {
 	command := i32(0x40086200)
 	mut flags := u64(1) // START | READ
@@ -962,6 +1005,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM CLIENT READ ALLOCATIONS: PASS')
 		} else {
 			C.puts(c'DRM CLIENT READ ALLOCATIONS FAIL: table or slab usage changed')
+		}
+		if test_gem_metadata_reclamation() {
+			C.puts(c'VINIX DRM GEM METADATA RECLAMATION: PASS')
+		} else {
+			C.puts(c'DRM GEM METADATA RECLAMATION FAIL: objects retained after final close')
 		}
 	}
 	mut render := C.open(c'/dev/dri/renderD129', C.O_RDWR)
