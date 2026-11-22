@@ -872,6 +872,33 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-names-20261122.NwN95i/`. The
 `bundle.tar.gz` SHA-256 is
 `ab27abf792fe06e0c31dfe0bd7ce172873862f9aa9387289e5f45cb85bc4b788`.
 
+#### PRIME DMA-BUF descriptor links
+
+`readlink` displays `/dmabuf:` for an unnamed PRIME export and
+`/dmabuf:<name>` for a named export. An explicitly empty name displays
+the bare prefix. `readlinkat` on an already-open procfs symlink reads the
+current descriptor and name, including after a rename.
+[Pinned Linux DMA-BUF link format](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L138-L152)
+
+Readlink and fdinfo use the same bounded descriptor lookup. It pins the
+descriptor under the process and descriptor-table locks, then releases
+both locks before reading the GEM name. Readlink writes the target to
+stack storage before copying it to userspace.
+
+ARM64 and x86-64 QEMU checked unnamed and empty names, rename visibility
+through a retained symlink, descriptor reuse, truncation without a NUL
+byte and `ENOENT` after close. The same x86-64 guest executable failed
+the link check on the preceding kernel. The fdinfo sanitizer suite
+passed, and the x86-64 procfs fdinfo probe kept heap usage flat over
+200 cycles per operation. The allocation scan reproduced its 150
+baseline findings. Native M1 validation remains open.
+
+The tested base was `5163fbe09aed7c9bcd0e8e999d70533f1e39910d` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-links-20261122.oDkBtX/`. The
+`bundle.tar.gz` SHA-256 is
+`e31f3caee56c983e6df0bef5a168c18ea3afb8e2fdde797bd3a87ecef88827e7`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

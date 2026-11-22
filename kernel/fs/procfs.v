@@ -2162,23 +2162,24 @@ fn fdinfo_descriptor_open(pid int, fdnum int) bool {
 	return true
 }
 
-// Linux's fdinfo: the offset, the open flags with O_CLOEXEC, the mount and the
-// inode, then what the kind of file adds; for a DRM file, its client and its
-// memory. The descriptor is taken without blocking under the process table,
-// as the directory scan does, and kept while the text is made with both locks
-// dropped. A descriptor that is gone reads as empty.
-fn fdinfo_text(pid int, fdnum int) string {
-	mut descriptor := &file.FD(unsafe { nil })
-	for attempt := 0; attempt < 4096 && descriptor == unsafe { nil }; attempt++ {
+// Pin a descriptor without waiting for its table while holding the process
+// table lock. The caller uses it with both locks released.
+fn procfs_pin_descriptor(pid int, fdnum int) ?&file.FD {
+	for _ in 0 .. 4096 {
 		proc.lock_table()
 		mut process := proc.process_at(pid)
-		// Checked again under the lock: read() checked before the process
-		// could exec something privileged or its number be reused.
-		if process == unsafe { nil } || !proc.may_inspect_locked(process) {
+		if process == unsafe { nil } {
 			proc.unlock_table()
-			break
+			errno.set(errno.enoent)
+			return none
+		}
+		if !proc.may_inspect_locked(process) {
+			proc.unlock_table()
+			errno.set(errno.eacces)
+			return none
 		}
 		if process.fds_lock.test_and_acquire() {
+			mut descriptor := &file.FD(unsafe { nil })
 			if fdnum >= 0 && fdnum < process.fds.len && process.fds[fdnum] != unsafe { nil } {
 				mut candidate := unsafe { &file.FD(process.fds[fdnum]) }
 				if candidate.handle != unsafe { nil } && candidate.handle.resource != unsafe { nil } {
@@ -2189,13 +2190,22 @@ fn fdinfo_text(pid int, fdnum int) string {
 			}
 			process.fds_lock.release()
 			proc.unlock_table()
-			break
+			if descriptor == unsafe { nil } {
+				errno.set(errno.enoent)
+				return none
+			}
+			return descriptor
 		}
 		proc.unlock_table()
 	}
-	if descriptor == unsafe { nil } {
-		return ''
-	}
+	errno.set(errno.eagain)
+	return none
+}
+
+// Linux's fdinfo: the offset, the open flags with O_CLOEXEC, the mount and the
+// inode, then what the kind of file adds. A descriptor that is gone reads as empty.
+fn fdinfo_text(pid int, fdnum int) string {
+	mut descriptor := procfs_pin_descriptor(pid, fdnum) or { return '' }
 	defer {
 		descriptor.unref()
 	}

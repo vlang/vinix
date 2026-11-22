@@ -24,6 +24,7 @@ module guestfixture
 fn C.open(&char, i32, ...) i32
 fn C.close(i32) i32
 fn C.read(i32, voidptr, u64) i64
+fn C.readlinkat(i32, &char, voidptr, u64) i64
 fn C.lseek(i32, i64, i32) i64
 fn C.write(i32, voidptr, u64) i64
 fn C.ioctl(i32, i32, ...) i32
@@ -41,6 +42,7 @@ fn C.ftruncate(i32, i64) i32
 fn C.poll(&C.pollfd, u64, i32) i32
 fn C.__errno_location() &i32
 fn C.dup(i32) i32
+fn C.dup2(i32, i32) i32
 fn C.fork() i32
 fn C._exit(i32)
 fn C.waitpid(i32, &i32, i32) i32
@@ -48,6 +50,7 @@ fn C.snprintf(voidptr, u64, &char, ...) i32
 fn C.strstr(voidptr, &char) &char
 fn C.strlen(&char) u64
 fn C.strcmp(&char, &char) i32
+fn C.strncmp(&char, &char, u64) i32
 fn C.strtoull(&char, &&char, i32) u64
 fn C.sscanf(&char, &char, ...) i32
 fn C.fopen(&char, &char) voidptr
@@ -908,6 +911,61 @@ fn test_prime_names() bool {
 	return C.ioctl(duplicate, first, c'') == 0 && prime_fdinfo_has_name(other.fd, c'')
 }
 
+fn expect_prime_link(dirfd i32, path &char, expected &char, capacity u64) bool {
+	mut result := [64]char{}
+	length := C.strlen(expected)
+	if length >= u64(result.len) { return false }
+	unsafe { result[length] = char(`!`) }
+	return C.readlinkat(dirfd, path, &result[0], capacity) == i64(length)
+		&& C.strncmp(&result[0], expected, length) == 0 && unsafe { result[length] } == char(`!`)
+}
+
+fn test_prime_link_reused_slot(prime i32) bool {
+	mut fds := [2]i32{}
+	if C.pipe(&fds[0]) != 0 { return false }
+	defer {
+		C.close(fds[0])
+		C.close(fds[1])
+	}
+	mut path := [64]char{}
+	C.snprintf(&path[0], sizeof(path), c'/proc/self/fd/%d', fds[0])
+	linkfd := C.open(&path[0], C.O_PATH | C.O_NOFOLLOW)
+	if linkfd < 0 { return false }
+	defer { C.close(linkfd) }
+	return C.dup2(prime, fds[0]) == fds[0]
+		&& expect_prime_link(linkfd, c'', c'/dmabuf:frame buffer', 64)
+}
+
+fn test_prime_descriptor_links() bool {
+	card := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if card < 0 { return false }
+	defer { C.close(card) }
+	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
+	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
+	mut export := ExtendedPrimeRequest{handle: create.handle, fd: -1}
+	if C.ioctl(card, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0 { return false }
+	defer { if export.fd >= 0 { C.close(export.fd) } }
+	mut path := [64]char{}
+	C.snprintf(&path[0], sizeof(path), c'/proc/self/fd/%d', export.fd)
+	if !expect_prime_link(C.AT_FDCWD, &path[0], c'/dmabuf:', 64) { return false }
+	linkfd := C.open(&path[0], C.O_PATH | C.O_NOFOLLOW)
+	if linkfd < 0 { return false }
+	defer { C.close(linkfd) }
+	if C.ioctl(export.fd, i32(0x40086201), c'frame buffer') != 0
+		|| !expect_prime_link(linkfd, c'', c'/dmabuf:frame buffer', 64) { return false }
+	if !expect_prime_link(C.AT_FDCWD, &path[0], c'/dmabuf:frame buffer', 64)
+		|| !expect_prime_link(linkfd, c'', c'/dma', 4)
+		|| !test_prime_link_reused_slot(export.fd) { return false }
+	if C.ioctl(card, i32(u32(0xc00464b4)), unsafe { &create.handle }) != 0 { return false }
+	if C.ioctl(export.fd, i32(0x40046201), c'') != 0
+		|| !expect_prime_link(linkfd, c'', c'/dmabuf:', 64) { return false }
+	if C.close(export.fd) != 0 { return false }
+	export.fd = -1
+	mut result := [64]char{}
+	return C.readlinkat(linkfd, c'', &result[0], sizeof(result)) == -1
+		&& unsafe { *C.__errno_location() } == C.ENOENT
+}
+
 fn test_prime_filesystem_type() bool {
 	mut info := C.statfs{}
 	card := C.open(c'/dev/dri/card0', C.O_RDWR)
@@ -1269,6 +1327,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM PRIME DMA-BUF NAMES: PASS')
 		} else {
 			C.puts(c'DRM PRIME DMA-BUF NAMES FAIL: incorrect name or ioctl result')
+		}
+		if test_prime_descriptor_links() {
+			C.puts(c'VINIX DRM PRIME FD LINKS: PASS')
+		} else {
+			C.puts(c'DRM PRIME FD LINKS FAIL: incorrect descriptor link text')
 		}
 		if test_prime_mmap_bounds() {
 			C.puts(c'VINIX DRM PRIME MMAP BOUNDS: PASS')

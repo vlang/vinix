@@ -1137,6 +1137,18 @@ fn readlink_node(node &VFSNode, buf voidptr, limit u64) (u64, u64) {
 		return errno.err, follow_error
 	}
 
+	if descriptor := procfs_anonymous_descriptor(node) {
+		mut fd := procfs_pin_descriptor(descriptor.pid, descriptor.fdnum) or {
+			return errno.err, errno.get()
+		}
+		defer { fd.unref() }
+		mut res := fd.handle.resource
+		mut target := [drm.prime_link_capacity]u8{}
+		if length := drm.prime_link_target(mut res, unsafe { &target[0] }) {
+			return copy_link_target(unsafe { &target[0] }, length, buf, limit)
+		}
+	}
+
 	if procfs_is_dynamic_link(node) {
 		self_target := procfs_dynamic_link_target(node)
 		defer {
@@ -1145,28 +1157,21 @@ fn readlink_node(node &VFSNode, buf voidptr, limit u64) (u64, u64) {
 		if self_target.len == 0 {
 			return errno.err, errno.enoent
 		}
-		mut self_copy := u64(self_target.len)
-		if self_copy > limit {
-			self_copy = limit
-		}
-		if !usercopy.copy_to_user(u64(buf), self_target.str, self_copy) {
-			return errno.err, errno.efault
-		}
-		return self_copy, 0
+		return copy_link_target(self_target.str, u64(self_target.len), buf, limit)
 	}
 
+	target := node.symlink_target
+	return copy_link_target(target.str, u64(target.len), buf, limit)
+}
+
+fn copy_link_target(target &u8, length u64, buf voidptr, limit u64) (u64, u64) {
 	// readlink(2) does not terminate the buffer, and reports only the bytes it
 	// placed there. Counting the NUL made every caller see a target one byte
 	// longer than it is.
-	mut to_copy := u64(node.symlink_target.len)
-	if to_copy > limit {
-		to_copy = limit
-	}
-
-	if !usercopy.copy_to_user(u64(buf), node.symlink_target.str, to_copy) {
+	to_copy := if length > limit { limit } else { length }
+	if !usercopy.copy_to_user(u64(buf), target, to_copy) {
 		return errno.err, errno.efault
 	}
-
 	return to_copy, 0
 }
 
