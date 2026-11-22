@@ -143,7 +143,9 @@ fn https_owner_scope(work string, producer string, text string, mode string, res
 }
 
 fn test_complete_https_transport_owns_process_arguments_fallback_and_refusal_scratch() {
-	assert os.args.len == 3 && os.args[1] == '--producer'
+	producer := if os.args.len == 3 && os.args[1] == '--producer' { os.args[2] }
+		else { os.getenv('VINIX_PACKAGE_OUTPUT_FIXTURE') }
+	assert os.is_file(producer) && os.is_executable(producer), 'provide the output fixture via --producer or VINIX_PACKAGE_OUTPUT_FIXTURE'
 	work := os.temp_dir() + '/vinix-https-owner-' + os.getpid().str()
 	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
 	text := '0123456789abcdef'.repeat(1024)
@@ -155,12 +157,12 @@ fn test_complete_https_transport_owns_process_arguments_fallback_and_refusal_scr
 	defer { assert C.setrlimit(C.RLIMIT_NOFILE, unsafe { voidptr(&original) }) == 0 }
 	for resume in [false, true]! {
 		for mode in ['full', 'no-range', 'empty', 'partial', 'oversized', 'failure', 'terminated', 'missing-program',
-			'offline', 'insecure', 'nul', 'alias', 'directory', 'fifo', 'hardlink']! { https_owner_scope(work, os.args[2], text, mode, resume)! }
+			'offline', 'insecure', 'nul', 'alias', 'directory', 'fifo', 'hardlink']! { https_owner_scope(work, producer, text, mode, resume)! }
 		for phase in ['opened', 'written', 'finished', 'start', 'finish']! {
-			for kind in ['alias', 'grow']! { https_owner_scope(work, os.args[2], text, 'change-' + phase + '-' + kind, resume)! }
+			for kind in ['alias', 'grow']! { https_owner_scope(work, producer, text, 'change-' + phase + '-' + kind, resume)! }
 		}
-		for mode in ['flush-interrupted', 'flush-failure', 'flush-link']! { https_owner_scope(work, os.args[2], text, mode, resume)! }
+		for mode in ['flush-interrupted', 'flush-failure', 'flush-link']! { https_owner_scope(work, producer, text, mode, resume)! }
 	}
-	https_owner_scope(work, os.args[2], text, 'prefix-limit', true)!
+	https_owner_scope(work, producer, text, 'prefix-limit', true)!
 	$if !https_owner_baseline ? { println('HTTPS OWNER 57 cases with 64 measured calls preserve bytes, bounded retries, output guards and child/descriptor retirement PASS') }
 }

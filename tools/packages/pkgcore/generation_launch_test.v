@@ -7,8 +7,10 @@ import time
 #include <unistd.h>
 #include <grp.h>
 #include <sys/wait.h>
-#include <sys/prctl.h>
-fn C.prctl(i32, ...voidptr) i32
+$if wine_kernel_lease ? {
+	#include <sys/prctl.h>
+	fn C.prctl(i32, ...voidptr) i32
+}
 #define generation_test_wait waitpid
 fn C.generation_test_wait(i32, &i32, i32) i32
 fn C.getpid() i32

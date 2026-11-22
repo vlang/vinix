@@ -32,8 +32,13 @@ v run tools/packages/stage.v --arch x86_64 --staging /path/to/root
 v run tools/packages/stage.v --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json
 v run tools/packages/stage.v --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json --repositories /release/repository-bundle
 v run tools/packages/stage.v --check --arch aarch64 --staging /path/to/fresh-root --config /release/reviewed-packages.json --repositories /release/repository-bundle
-v run tests/packages/distribution-check.v --cross --desktop
+VINIX_PROFILE_EXPORT_SOURCE=/reviewed/ffmpeg-8.0.1.tar.xz \
+  v run tests/packages/distribution-check.v --cross --desktop
 ```
+
+The host driver builds the HTTPS output fixture and passes it to the package
+tests. The FFmpeg publisher checks require the source archive pinned by the
+profile. See [FFmpeg qualification](../../tests/packages/ffmpeg-owner-check.md).
 
 Release builders can supply a reviewed format-1 package configuration with
 `--config FILE` or `VINIX_PACKAGE_IMAGE_CONFIG=/absolute/FILE`. The option takes

@@ -53,6 +53,10 @@ fn check() ! {
 		if '--https-only' in os.args { println('Package HTTPS checks passed'); return }
 	}
 	if '--software-only' !in os.args {
+		output_fixture := work + '/output-fixture'
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', output_fixture,
+			repository + '/tests/packages/output-fixture.v'])!
+		os.setenv('VINIX_PACKAGE_OUTPUT_FIXTURE', os.real_path(output_fixture), true)
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', work + '/launch-child',
 			repository + '/tests/packages/launch-process-child.v'])!
 		os.setenv('VINIX_PACKAGE_LAUNCH_CHILD', os.real_path(work + '/launch-child'), true)
