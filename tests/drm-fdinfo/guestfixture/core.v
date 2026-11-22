@@ -15,6 +15,7 @@ module guestfixture
 #include <sys/prctl.h>
 #include <sys/reboot.h>
 #include <sys/resource.h>
+#include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
@@ -51,6 +52,8 @@ fn C.fork() i32
 fn C.signal(i32, voidptr) voidptr
 fn C._exit(i32)
 fn C.waitpid(i32, &i32, i32) i32
+fn C.WIFSIGNALED(i32) i32
+fn C.WTERMSIG(i32) i32
 fn C.snprintf(voidptr, u64, &char, ...) i32
 fn C.strstr(voidptr, &char) &char
 fn C.strlen(&char) u64
@@ -68,6 +71,7 @@ fn C.reboot(i32) i32
 fn C.pause() i32
 fn C.pipe(&i32) i32
 fn C.getpid() i32
+fn C.getuid() u32
 fn C.geteuid() u32
 fn C.prctl(i32, ...) i32
 fn C.unshare(i32) i32
@@ -85,6 +89,14 @@ struct C.rlimit {
 struct C.timespec {
 	tv_sec i64
 	tv_nsec i64
+}
+
+struct C.signalfd_siginfo {
+	ssi_signo u32
+	ssi_errno i32
+	ssi_code i32
+	ssi_pid u32
+	ssi_uid u32
 }
 
 struct C.stat {
@@ -1386,6 +1398,71 @@ fn test_sendfile_pipe_admission() bool {
 		&& C.read(sockets[0], &chunk[0], 4) == 4 && C.strncmp(&chunk[0], c'keep', 4) == 0
 }
 
+fn check_pending_sendfile_sigpipe(output i32, input i32, mask u64) bool {
+	signal_fd := i32(C.syscall(C.SYS_signalfd4, i64(-1), &mask, u64(sizeof(u64)), C.SFD_NONBLOCK))
+	if signal_fd < 0 {
+		C.printf(c'DRM sendfile signal fd errno %d\n', unsafe { *C.__errno_location() })
+		return false
+	}
+	defer { C.close(signal_fd) }
+	mut info := C.signalfd_siginfo{}
+	for attempt in 0 .. 2 {
+		if !sendfile_replies(output, input, unsafe { nil }, u64(attempt * 4), C.EPIPE) {
+			return false
+		}
+		got := C.read(signal_fd, &info, sizeof(info))
+		if got != sizeof(info)
+			|| info.ssi_signo != u32(C.SIGPIPE) || info.ssi_errno != 0 || info.ssi_code != C.SI_USER
+			|| info.ssi_pid != u32(C.getpid()) || info.ssi_uid != C.getuid() {
+			C.printf(c'DRM sendfile signal read %d errno %d number %u code %d pid %u uid %u\n',
+				i32(got), unsafe { *C.__errno_location() }, info.ssi_signo, info.ssi_code,
+				info.ssi_pid, info.ssi_uid)
+			return false
+		}
+	}
+	return C.read(signal_fd, &info, sizeof(info)) == -1
+		&& unsafe { *C.__errno_location() } == C.EAGAIN && C.lseek(input, 0, C.SEEK_CUR) == 0
+}
+
+fn test_sendfile_pipe_signal() bool {
+	input := i32(C.syscall(C.SYS_memfd_create, c'sendfile-pipe-signal-source', u32(0)))
+	if input < 0 { return false }
+	defer { C.close(input) }
+	mut fds := [2]i32{}
+	if C.pipe(&fds[0]) != 0 { return false }
+	defer { C.close(fds[1]) }
+	if C.close(fds[0]) != 0 || C.write(input, c'keep', 4) != 4
+		|| C.lseek(input, 0, C.SEEK_SET) != 0 {
+		return false
+	}
+	mask := u64(1) << (C.SIGPIPE - 1)
+	mut previous := u64(0)
+	if C.syscall(C.SYS_rt_sigprocmask, C.SIG_BLOCK, &mask, &previous, u64(sizeof(u64))) != 0 {
+		return false
+	}
+	defer {
+		C.syscall(C.SYS_rt_sigprocmask, C.SIG_SETMASK, &previous, unsafe { nil }, u64(sizeof(u64)))
+	}
+	if !check_pending_sendfile_sigpipe(fds[1], input, mask) { return false }
+	child := C.fork()
+	if child < 0 { return false }
+	if child == 0 {
+		if C.unshare(C.CLONE_NEWUSER) != 0 || C.getuid() != 65534
+			|| !check_pending_sendfile_sigpipe(fds[1], input, mask) {
+			C._exit(2)
+		}
+		unsafe { C.signal(C.SIGPIPE, C.SIG_DFL) }
+		if C.syscall(C.SYS_rt_sigprocmask, C.SIG_UNBLOCK, &mask, unsafe { nil }, u64(sizeof(u64))) != 0 {
+			C._exit(1)
+		}
+		C.syscall(C.SYS_sendfile, fds[1], input, unsafe { nil }, u64(4))
+		C._exit(1)
+	}
+	mut status := i32(0)
+	return C.waitpid(child, &status, 0) == child && C.WIFSIGNALED(status) != 0
+		&& C.WTERMSIG(status) == C.SIGPIPE
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1513,6 +1590,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM SENDFILE PIPE ADMISSION: PASS')
 	} else {
 		C.puts(c'DRM SENDFILE PIPE ADMISSION FAIL: incorrect error or socket data was consumed')
+	}
+	if test_sendfile_pipe_signal() {
+		C.puts(c'VINIX DRM SENDFILE SIGPIPE: PASS')
+	} else {
+		C.puts(c'DRM SENDFILE SIGPIPE FAIL: incorrect signal, sender, error or position')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')

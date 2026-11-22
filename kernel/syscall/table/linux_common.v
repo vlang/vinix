@@ -24,6 +24,7 @@ import sched
 import stat
 import time
 import usercopy
+import userland
 import vmstorage
 
 
@@ -713,7 +714,11 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 		input_fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 		output_fd.handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 		pipe_room = destination_pipe.wait_sendfile_room(output_flags & resource.o_nonblock != 0) or {
-			return errno.err, errno.get()
+			failure := errno.get()
+			if failure == errno.epipe {
+				userland.signal_broken_pipe()
+			}
+			return errno.err, failure
 		}
 	}
 	if count == 0 {
@@ -765,7 +770,12 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 		}
 		if destination_pipe != unsafe { nil } {
 			if total != 0 {
-				pipe_room = destination_pipe.wait_sendfile_room(true) or { break }
+				pipe_room = destination_pipe.wait_sendfile_room(true) or {
+					if errno.get() == errno.epipe {
+						userland.signal_broken_pipe()
+					}
+					break
+				}
 			}
 			if chunk > pipe_room {
 				chunk = pipe_room
@@ -797,6 +807,9 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 			fs.seek_pinned_descriptor(input_fd, -i64(got - accepted), fs.seek_cur)
 		}
 		if write_error != 0 {
+			if destination_pipe != unsafe { nil } && write_error == errno.epipe {
+				userland.signal_broken_pipe()
+			}
 			if total == 0 {
 				return written, write_error
 			}

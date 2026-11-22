@@ -44,6 +44,14 @@ pub fn sendsig(_thread &proc.Thread, signal u8) {
 	sendsig_from(_thread, signal, unsafe { nil })
 }
 
+pub fn signal_broken_pipe() {
+	current := proc.current_thread()
+	process := current.process
+	mut source := sender_source(proc.si_user, process)
+	source.uid = proc.own_visible_id(process, process.uid, false)
+	sendsig_from(current, u8(sigpipe), unsafe { &source })
+}
+
 // sendsig(), recording `source` (nil: none) as the signal's sender.
 fn sendsig_from(_thread &proc.Thread, signal u8, source &proc.SignalSource) {
 	if signal == 0 || signal > 64 { return }

@@ -947,6 +947,30 @@ at `/Users/alex/.local/state/vinix/m1-drm-sendfile-pipe-admission-20261122.qA3sn
 The `bundle.tar.gz` SHA-256 is
 `c69bdba3220c8d3ee864375975e15d06392ca04398ae31fbe3191489dbf5d2d2`.
 
+#### Sendfile SIGPIPE delivery
+
+When `sendfile` encounters a pipe with no readers, it queues `SIGPIPE` on
+the calling thread and returns `EPIPE` if no bytes have been transferred.
+The readiness check also covers zero-count requests. Signal delivery runs
+after the pipe and rewind locks are released. The sender metadata uses
+`SI_USER`, the caller's PID and its real UID as seen in its user namespace.
+[Pinned pipe signal](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1354-L1365), [pinned sender metadata](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/kernel/signal.c#L1133-L1144)
+
+ARM64 and x86-64 QEMU checked blocked `SIGPIPE` and sender metadata through
+`signalfd`, including an unmapped user namespace. They verified zero and
+positive counts, source cursor preservation, and termination by `SIGPIPE`
+with the default disposition. The same x86-64 guest probe found no pending
+signal on the preceding kernel. Independent review checked lock ordering
+and sender record ownership. The DRM syncobj host suite passed, and the
+allocation scan reproduced its 150 baseline findings. Native M1 validation
+remains open.
+
+The tested base was `de673d4f05b5e22f6ccea993414a03b6a782056c` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-sendfile-sigpipe-20261122.w8s9bG/`.
+The `bundle.tar.gz` SHA-256 is
+`5d042079bbc22882b40a4805d38655570db4afe361a7f13ccd7874d6c4400ae6`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,
