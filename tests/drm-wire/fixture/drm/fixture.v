@@ -165,6 +165,7 @@ pub fn run_checks() {
 	check_descriptor_transport()
 	check_timeline_capability()
 	check_agx_version()
+	check_core_query_transport()
 }
 
 fn check_timeline_capability() {

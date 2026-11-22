@@ -474,6 +474,27 @@ fn test_client_read_allocations() bool {
 	return largest <= 8
 }
 
+fn test_core_query_transport() bool {
+	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	mut version := [4]i32{init: -1}
+	if C.ioctl(fd, i32(u32(0x800c6400)), &version[0]) != 0
+		|| version[0] != 1 || version[1] != 0 || version[2] != 0 || version[3] != -1 {
+		return false
+	}
+	mut cap := [u64(1), 99, 0x1234, 0x5678]!
+	if C.ioctl(fd, i32(u32(0xc008640c)), &cap[0]) != 0 || cap[1] != 99
+		|| C.ioctl(fd, i32(u32(0xc018640c)), &cap[0]) != 0 || cap[1] != 1
+		|| cap[2] != 0x1234 || cap[3] != 0x5678 {
+		return false
+	}
+	cap[0] = ~u64(0)
+	return C.ioctl(fd, i32(u32(0xc018640c)), &cap[0]) == -1
+		&& unsafe { *C.__errno_location() } == C.EINVAL
+		&& cap[1] == 0 && cap[2] == 0x1234 && cap[3] == 0x5678
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	if test_open_order() {
@@ -489,6 +510,11 @@ pub fn run() i32 {
 	clients := C.open(clients_path, C.O_RDONLY)
 	if clients >= 0 {
 		C.close(clients)
+		if test_core_query_transport() {
+			C.puts(c'VINIX DRM CORE QUERY TRANSPORT: PASS')
+		} else {
+			C.puts(c'DRM CORE QUERY TRANSPORT FAIL: unexpected request or reply shape')
+		}
 		if test_debugfs_clients() {
 			C.puts(c'VINIX DRM DEBUGFS CLIENTS: PASS')
 		} else {

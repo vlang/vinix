@@ -321,6 +321,33 @@ at `/Users/alex/.local/state/vinix/m1-drm-private-ioctl-20261122.nhTti1/`.
 The `bundle.tar.gz` SHA-256 is
 `74ed4e31de200ffb85cc46d03c2750735a147ac0c5ee599d7872a7b654774302`.
 
+#### VERSION and GET_CAP request sizes
+
+`VERSION` and `GET_CAP` intersect the request's read and write bits with
+the core layout. They zero-extend omitted input, return only the requested
+output bytes and echo extra input bytes on read/write requests. The
+dispatcher copies back the reply after a handler error. [Pinned Linux ioctl transport](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L874-L916)
+
+`VERSION` writes its version numbers first, then reports each string's
+required length before attempting the bounded copy. A null string pointer
+queries the length. A nested copy fault returns the fields reached so far.
+The replies use Vinix's existing driver metadata and capability values.
+[Pinned Linux VERSION handler](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L503-L558)
+
+The sanitizer fixture checks short, one-way and extended requests, null
+string pointers, nested copy faults and output on a rejected capability.
+The preceding dispatcher rejected the short read-only `VERSION` request.
+ARM64 and x86-64 QEMU verified short `VERSION`, short and extended
+`GET_CAP`, and the error reply through the public ioctl syscall. The
+preceding ARM64 kernel failed this guest probe. The allocation scan
+reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `87702361f16e25ad85e8136e871932ac4b0a4856` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-query-wire-20261122.xCuv0t/`.
+The `bundle.tar.gz` SHA-256 is
+`7c01409bbb5ced512b201e47c52d5f02698f2b9185b448e39f335f96f81d9da0`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

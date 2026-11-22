@@ -343,12 +343,14 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmVersion))
 				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_get_cap {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmGetCap))
 				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_set_client_name {
@@ -1057,15 +1059,11 @@ fn release_device_slot(dev &DrmDevice) {
 	drm_devices_lock.release()
 }
 
-fn copy_version_field(address u64, capacity u64, value string) bool {
-	if capacity == 0 {
-		return true
-	}
-	if address == 0 {
-		return false
-	}
-	copy_size := if capacity < u64(value.len) { capacity } else { u64(value.len) }
-	return usercopy.copy_to_user(address, voidptr(value.str), copy_size)
+fn copy_version_field(address u64, capacity &u64, value string) bool {
+	length := u64(value.len)
+	copy_size := if *capacity < length { *capacity } else { length }
+	unsafe { *capacity = length }
+	return address == 0 || copy_size == 0 || usercopy.copy_to_user(address, voidptr(value.str), copy_size)
 }
 
 fn ioctl_version(dev &DrmDevice, data voidptr) int {
@@ -1073,20 +1071,14 @@ fn ioctl_version(dev &DrmDevice, data voidptr) int {
 		return -14 // EFAULT
 	}
 	mut version := unsafe { &ioctl.DrmVersion(data) }
-	name_capacity := version.name_len
-	date_capacity := version.date_len
-	desc_capacity := version.desc_len
-	if !copy_version_field(version.name, name_capacity, dev.driver.name)
-		|| !copy_version_field(version.date, date_capacity, dev.driver.date)
-		|| !copy_version_field(version.desc, desc_capacity, dev.driver.desc) {
-		return -14
-	}
 	version.version_major = i32(dev.driver.major)
 	version.version_minor = i32(dev.driver.minor)
 	version.version_patchlevel = i32(dev.driver.patchlevel)
-	version.name_len = u64(dev.driver.name.len)
-	version.date_len = u64(dev.driver.date.len)
-	version.desc_len = u64(dev.driver.desc.len)
+	if !copy_version_field(version.name, unsafe { &version.name_len }, dev.driver.name)
+		|| !copy_version_field(version.date, unsafe { &version.date_len }, dev.driver.date)
+		|| !copy_version_field(version.desc, unsafe { &version.desc_len }, dev.driver.desc) {
+		return -14
+	}
 	return 0
 }
 
