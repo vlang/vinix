@@ -489,6 +489,11 @@ fn test_core_query_transport() bool {
 		|| cap[2] != 0x1234 || cap[3] != 0x5678 {
 		return false
 	}
+	cap[0] = 0x6 // DRM_CAP_TIMESTAMP_MONOTONIC
+	cap[1] = ~u64(0)
+	if C.ioctl(fd, i32(u32(0xc010640c)), &cap[0]) != 0 || cap[0] != 0x6 || cap[1] != 1 {
+		return false
+	}
 	cap[0] = ~u64(0)
 	return C.ioctl(fd, i32(u32(0xc018640c)), &cap[0]) == -1
 		&& unsafe { *C.__errno_location() } == C.EINVAL

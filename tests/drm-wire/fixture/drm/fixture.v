@@ -163,13 +163,14 @@ pub fn run_checks() {
 	println('DRM wire: ABI dispatch, direction intersections, legacy metadata fallback, zero extension, unknown-tail echo, bounds and copy faults passed')
 	check_wait_transport()
 	check_descriptor_transport()
-	check_timeline_capability()
+	check_device_capabilities()
 	check_agx_version()
 	check_core_query_transport()
 }
 
-fn check_timeline_capability() {
+fn check_device_capabilities() {
 	assert ioctl.drm_cap_syncobj_timeline == 0x14 && sizeof(ioctl.DrmGetCap) == 16
+	assert ioctl.drm_cap_timestamp_monotonic == 0x6
 	compute := driver_gem | driver_render | driver_compute
 	memory.fail_next(true)
 	for index, features in [compute, driver_gem | driver_dumb_buffer, compute | driver_syncobj_timeline]! {
@@ -182,10 +183,15 @@ fn check_timeline_capability() {
 		cap = ioctl.DrmGetCap{capability: ioctl.drm_cap_syncobj}
 		assert (node.ioctl(voidptr(1), u64(0xc010640c), unsafe { &cap }) or { panic('GET_CAP binary probe') }) == 0
 		assert cap.value == 1
+		cap = ioctl.DrmGetCap{capability: ioctl.drm_cap_timestamp_monotonic, value: ~u64(0)}
+		assert (node.ioctl(voidptr(1), u64(0xc010640c), unsafe { &cap }) or {
+			panic('GET_CAP monotonic timestamp probe')
+		}) == 0
+		assert cap.capability == ioctl.drm_cap_timestamp_monotonic && cap.value == 1
 	}
 	memory.fail_next(false)
 	assert memory.outstanding() == 0
-	println('DRM GET_CAP: timeline discovery follows the device feature and the binary capability is available for all three devices')
+	println('DRM GET_CAP: timeline discovery, binary syncobjs and monotonic timestamps passed')
 }
 
 fn expect_error(mut node DrmNode, request u64, data voidptr, code u64) {

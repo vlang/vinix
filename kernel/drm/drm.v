@@ -1104,7 +1104,7 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 			cap.value = ioctl.drm_prime_cap_import | ioctl.drm_prime_cap_export
 			return 0
 		}
-		ioctl.drm_cap_syncobj {
+		ioctl.drm_cap_syncobj, ioctl.drm_cap_timestamp_monotonic {
 			cap.value = 1
 			return 0
 		}

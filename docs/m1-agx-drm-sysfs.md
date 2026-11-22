@@ -348,6 +348,26 @@ at `/Users/alex/.local/state/vinix/m1-drm-query-wire-20261122.xCuv0t/`.
 The `bundle.tar.gz` SHA-256 is
 `7c01409bbb5ced512b201e47c52d5f02698f2b9185b448e39f335f96f81d9da0`.
 
+#### Monotonic timestamp capability
+
+`DRM_IOCTL_GET_CAP` returns `1` for `DRM_CAP_TIMESTAMP_MONOTONIC`
+(`0x06`) regardless of driver features. This reports Linux's monotonic
+timestamp convention. [Pinned Linux GET_CAP handler](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L234-L255) [Pinned DRM UAPI definition](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/drm/drm.h#L714-L725)
+
+The sanitizer fixture queried the capability across framebuffer and
+render-driver configurations, including both timeline feature states.
+ARM64 and x86-64 QEMU verified the framebuffer reply through the ioctl
+syscall. The preceding handler rejected the capability in the sanitizer
+fixture and the preceding ARM64 kernel failed the guest probe. The
+allocation scan reproduced the 150 baseline findings. Native M1
+validation remains open.
+
+The tested base was `a4f8d1ce9b78a86f4d5496851572880198db21d8` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-monotonic-cap-20261122.uTh7xA/`.
+The `bundle.tar.gz` SHA-256 is
+`7f0dfd15ce48a0f6cdf39c82beda5600a1a4ed04e02585011db66200f0c90cfc`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open
