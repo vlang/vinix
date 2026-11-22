@@ -932,6 +932,19 @@ fn discard_unpublished_device(dev &DrmDevice) {
 pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDevice {
 	mut dev := register_device_nodes(driver, driver_data)?
 	publish_drm_sysfs(mut dev)
+	// The slot and both device names are already reserved. Admit data opens
+	// and registry lookups once the sysfs publisher has finished. Serialize
+	// the transition with the registry's activity report.
+	drm_devices_lock.acquire()
+	katomic.store(mut dev.registered, true)
+	drm_devices_lock.release()
+	id := dev.dev_id
+	C.kprintf(c'drm: Registered driver %.*s as card%llu\n', i32(driver.name.len), driver.name.str,
+		u64(id))
+	C.kprintf(c'drm: created device node /dev/dri/card%llu\n', u64(id))
+	if dev.render_node != unsafe { nil } {
+		C.kprintf(c'drm: created device node /dev/dri/renderD%llu\n', u64(128 + id))
+	}
 	return dev
 }
 
@@ -979,16 +992,6 @@ fn register_device_nodes(driver &DrmDriver, driver_data voidptr) ?&DrmDevice {
 	publish_device_nodes(dev)?
 	published = true
 	registered_devices[id] = dev
-	// Both nodes can already be visible. Admit data opens after installing
-	// the registry entry.
-	katomic.store(mut dev.registered, true)
-
-	C.kprintf(c'drm: Registered driver %.*s as card%llu\n', i32(driver.name.len), driver.name.str,
-		u64(id))
-	C.kprintf(c'drm: created device node /dev/dri/card%llu\n', u64(id))
-	if dev.render_node != unsafe { nil } {
-		C.kprintf(c'drm: created device node /dev/dri/renderD%llu\n', u64(128 + id))
-	}
 	return dev
 }
 

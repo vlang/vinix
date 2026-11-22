@@ -54,15 +54,19 @@ fn check_timestamp_bind_local(file string) ! {
 fn check_timestamp_registration_local(file string, drm string, driver string) ! {
 	device := section(drm, 'pub struct DrmDevice {', '// Forward-reference placeholder', 'DRM registration data')!
 	require_order(device, ['pub:', 'driver_data voidptr', 'pub mut:'], 'DRM device context is immutable')!
-	registration := section(drm, 'pub fn register_driver_with_data(', 'pub fn unregister_device(', 'DRM publication')!
+	activation := section(drm, 'pub fn register_driver_with_data(', 'fn register_device_nodes(', 'DRM activation')!
+	require_order(activation, ['register_device_nodes(driver, driver_data)?', 'publish_drm_sysfs(mut dev)',
+		'drm_devices_lock.acquire()', 'katomic.store(mut dev.registered, true)', 'drm_devices_lock.release()'],
+		'Activate DRM under the registry lock after devtmpfs and sysfs publication')!
+	registration := section(drm, 'fn register_device_nodes(', 'pub fn unregister_device(', 'DRM publication')!
 	require_order(registration, ['memory.malloc_packed_fallible(sizeof(DrmDevice))',
 		'if storage == unsafe { nil }', 'errno.set(errno.enomem)', 'return none',
 		'*dev = DrmDevice{', 'driver_data: driver_data',
 		'registered: false', 'if !published { discard_unpublished_device(dev) }',
 		'dev.node = create_device_node(dev, false)?', 'dev.render_node = create_device_node(dev, true)?',
 		'publish_device_nodes(dev)?', 'published = true',
-		'registered_devices[id] = dev', 'katomic.store(mut dev.registered, true)'],
-		'Publish device readiness after installing its context, nodes and registry entry')!
+		'registered_devices[id] = dev'], 'Reserve the device slot after installing its context and nodes')!
+	require(!registration.contains('katomic.store(mut dev.registered, true)'), 'The device slot stays inactive during namespace setup')!
 	discard := section(drm, 'fn discard_unpublished_device(', '// Install driver-private context', 'DRM registration rollback')!
 	require_order(discard, ['for node in [dev.node, dev.render_node]!', 'if node == unsafe { nil }',
 		'memory.free(voidptr(node.box))', 'memory.free(voidptr(node))', 'memory.free(voidptr(dev))'],

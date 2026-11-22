@@ -188,12 +188,43 @@ fn observe_dri_publication() {
 
 __global sysfs_publishes = 0
 __global sysfs_removals = 0
+__global register_during_publication = false
+
+fn expect_activity_header(header string) {
+	text := activity_text()
+	assert text.starts_with(header), 'activity report exposed an inactive device: ${text}'
+	unsafe { text.free() }
+}
 
 // tests/drm-sysfs covers what is published; here only when, and that it is
 // outside the device lock, since sysfs calls may sleep.
 fn publish_drm_sysfs(mut dev DrmDevice) {
 	assert !drm_devices_lock.held, 'sysfs published under the device lock'
+	assert registered_devices[dev.dev_id] == dev
+	assert !dev.is_registered(), 'device became ready before sysfs publication'
+	assert get_device(dev.dev_id) == none
+	mut card := unsafe { dev.node }
+	expect_unavailable(mut card)
+	if dev.render_node != unsafe { nil } {
+		mut render := unsafe { dev.render_node }
+		expect_unavailable(mut render)
+	}
 	sysfs_publishes++
+	if register_during_publication {
+		register_during_publication = false
+		expect_activity_header('devices: 0\ndrivers:\n')
+		other := register_driver_with_data(&DrmDriver{name: 'sysfs-sibling'}, unsafe { nil }) or { panic('registration during publication failed') }
+		assert other.dev_id != dev.dev_id && other.is_registered()
+		assert registered_devices[dev.dev_id] == dev && get_device(dev.dev_id) == none
+		expect_activity_header('devices: 1\ndrivers: sysfs-sibling\n')
+		unregister_device(other)
+		// The device is still in setup. A request to retire it must leave its
+		// slot and nodes available for the registering caller to finish.
+		removals := sysfs_removals
+		unregister_device(dev)
+		assert sysfs_removals == removals && registered_devices[dev.dev_id] == dev
+		assert node_names[dev.dev_id] == dev.node
+	}
 }
 
 __global register_during_removal = false
@@ -206,6 +237,7 @@ fn remove_drm_sysfs(mut dev DrmDevice) {
 	sysfs_removals++
 	if register_during_removal {
 		register_during_removal = false
+		expect_activity_header('devices: 0\ndrivers:\n')
 		other := register_driver_with_data(&DrmDriver{}, unsafe { nil }) or { panic('registration during removal failed') }
 		assert other.dev_id != dev.dev_id, 'a device registering during removal took the retiring card number'
 		registered_during_removal = other
@@ -227,6 +259,24 @@ fn check_card_number_held_during_removal() {
 	unregister_device(other)
 	assert get_device(other.dev_id) == none && sysfs_removals == removals + 1
 	println('DRM unregister: a card number stays taken until its sysfs entries are gone, and a retired device unregisters once')
+}
+
+fn check_device_ready_after_sysfs() {
+	for features in [u32(0), driver_render]! {
+		register_during_publication = true
+		dev := register_driver_with_data(&DrmDriver{name: 'sysfs-ready', features: features}, unsafe { nil }) or { panic('registration failed') }
+		assert !register_during_publication && dev.dev_id == 0
+		assert (get_device(dev.dev_id) or { panic('device stayed unavailable after sysfs publication') }) == dev
+		expect_activity_header('devices: 1\ndrivers: sysfs-ready\n')
+		mut card := unsafe { dev.node }
+		assert (card.open(0) or { panic('primary data open failed after sysfs publication') }) == card.box
+		if features == driver_render {
+			mut render := unsafe { dev.render_node }
+			assert (render.open(0) or { panic('render data open failed after sysfs publication') }) == render.box
+		}
+		unregister_device(dev)
+	}
+	println('DRM registration: reserved slots and metadata opens precede data opens and registry lookup')
 }
 
 fn check_initial_registration_failures() {
@@ -282,6 +332,7 @@ fn check_registration_collisions() {
 	assert unsafe { devtmpfs_root.children['dri'] == blocker }
 	devtmpfs_root.children.delete('dri')
 	check_initial_registration_failures()
+	check_device_ready_after_sysfs()
 	check_card_number_held_during_removal()
 	mut dir := unsafe { devtmpfs_root.children['dri'] }
 	prior_publications := published_nodes

@@ -565,3 +565,31 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-minor-sysfs-20261122.iRMg3j/`.
 The `bundle.tar.gz` SHA-256 is
 `e439641bdaa916b326ccc5397b4ce24f249b66d9ae3294e95978193ea84bca2d`.
+
+## DRM readiness after core sysfs publication
+
+DRM reserves the card number and publishes its devtmpfs entries before
+running the core sysfs publisher. During that interval, metadata-only opens
+can reach the nodes. Data opens and registry lookups become available when
+the publisher returns. The registry lock serializes both readiness changes
+with the GPU activity count and driver list, which omit pending and retiring
+devices.
+
+The DRM wire sanitizer fixture paused card-only and paired registration at
+the publication boundary. It checked metadata and data opens, registry
+lookup, a second registration, an unregister attempt, and the GPU activity
+report during setup and teardown. Controls caught early readiness and
+activity that counted reserved slots. Independent lifetime review and
+generated code confirmed the lock and publication order.
+
+Both kernel builds used `-O1` for C compilation. The ARM64 QEMU DRM sysfs
+probe passed with TCG and the x86-64 descriptor-flags smoke test passed.
+The DRM sysfs sanitizer fixture, 79 local contracts and 122 pinned-reference
+checks passed. The allocation scan matched the 150 baseline findings.
+Native M1 validation remains open.
+
+The tested base was `06f322926e381d197ef00fc7190adb5574a21ad5` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-sysfs-readiness-20261122.AQvL4K/`.
+The `bundle.tar.gz` SHA-256 is
+`99363127ae80162a221cc0779cdfcdf9c5b8fe9c402cb7c4c8ece2b8472bc3d1`.

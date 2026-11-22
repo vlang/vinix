@@ -15,14 +15,17 @@ fn main() {
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/drm-wire/fixture', scratch, false)!
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
+	os.mkdir_all('${scratch}/lib')!
+	os.cp('${repo}/kernel/lib/text.v', '${scratch}/lib/text.v')!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/katomic', '${scratch}/katomic', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/klock', '${scratch}/klock', false)!
 	source := os.read_file(os.getenv_opt('DRM_WIRE_SOURCE') or { '${repo}/kernel/drm/drm.v' })!
 	devtmpfs_source := os.read_file(os.getenv_opt('DRM_DEVTMPFS_SOURCE') or { '${repo}/kernel/fs/devtmpfs.v' })!
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
 	fdinfo_source := os.read_file(os.getenv_opt('DRM_FDINFO_SOURCE') or { '${repo}/kernel/drm/fdinfo.v' })!
+	activity_source := os.read_file(os.getenv_opt('DRM_ACTIVITY_SOURCE') or { '${repo}/kernel/drm/activity.v' })!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
-	production += 'import katomic\nimport klock\n'
+	production += 'import katomic\nimport klock\nimport lib\n'
 	production += '#include <alloca.h>\nfn C.alloca(u64) voidptr\n'
 	production += section(resource_source, 'pub const o_path = ', 'pub const o_accmode = ')!
 	production += section(fdinfo_source, '__global (', '// Append the DRM lines')!
@@ -66,6 +69,8 @@ fn main() {
 		.replace('memory.free(', 'memory.free_registration(')
 	assert source.contains('\npub fn get_device(')
 	production += 'pub fn get_device(' + source.all_after('\npub fn get_device(')
+	assert activity_source.contains('\npub fn activity_text(')
+	production += '\n__global gpu_submissions u64\n\npub fn activity_text(' + activity_source.all_after('\npub fn activity_text(')
 	os.write_file('${scratch}/drm/production.v', production)!
 	agx_source := os.read_file(os.getenv_opt('AGX_DRM_DRIVER_SOURCE') or {
 		'${repo}/kernel/gpu/agx/driver/driver.v'

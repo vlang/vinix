@@ -23,13 +23,13 @@ pub fn activity_text() string {
 	drm_devices_lock.acquire()
 	mut active := u64(0)
 	for device in registered_devices {
-		if device != unsafe { nil } { active++ }
+		if device != unsafe { nil } && device.is_registered() { active++ }
 	}
 	text.add('devices: ')
 	text.add_unsigned(active)
 	text.add('\ndrivers:')
 	for device in registered_devices {
-		if device != unsafe { nil } && device.driver != unsafe { nil } {
+		if device != unsafe { nil } && device.is_registered() && device.driver != unsafe { nil } {
 			text.add(' ')
 			text.add(device.driver.name)
 		}

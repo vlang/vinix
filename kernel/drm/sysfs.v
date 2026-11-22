@@ -23,7 +23,7 @@ struct DrmMinorSysfs {
 	char_link bool
 }
 
-// Called after registration, with no lock held: sysfs calls may sleep.
+// Called with the slot reserved and data opens still gated. Sysfs calls may sleep.
 fn publish_drm_sysfs(mut dev DrmDevice) {
 	parent := if dev.driver != unsafe { nil } && dev.driver.sysfs_parent.len != 0 {
 		dev.driver.sysfs_parent.clone()
