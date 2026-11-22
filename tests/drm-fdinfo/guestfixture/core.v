@@ -865,6 +865,46 @@ fn prime_fdinfo_has_flags(fd i32, expected i32) bool {
 	return end != value && unsafe { *end } == char(10) && flags == u64(expected)
 }
 
+fn fdinfo_mount_id(fd i32) i32 {
+	mut info := [512]u8{}
+	if !read_fdinfo(fd, &info[0], sizeof(info)) { return 0 }
+	line := C.strstr(&info[0], c'\nmnt_id:\t')
+	if line == unsafe { nil } { return 0 }
+	mut id := i32(0)
+	if C.sscanf(line, c' mnt_id: %d', &id) != 1 { return 0 }
+	return id
+}
+
+fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
+	stream := C.fopen(c'/proc/self/mountinfo', c'r')
+	if stream == unsafe { nil } { return false }
+	defer { C.fclose(stream) }
+	mut line := [1024]char{}
+	mut found_visible := false
+	for C.fgets(&line[0], line.len, stream) != unsafe { nil } {
+		mut id := i32(0)
+		if C.sscanf(&line[0], c'%d', &id) != 1 { continue }
+		if id == internal_id { return false }
+		if id == visible_id { found_visible = true }
+	}
+	return found_visible
+}
+
+fn test_prime_fdinfo_mount_id(card i32, first i32, duplicate i32) bool {
+	internal_id := fdinfo_mount_id(first)
+	visible_id := fdinfo_mount_id(card)
+	if internal_id <= 0 || visible_id <= 0 || internal_id == visible_id
+		|| fdinfo_mount_id(duplicate) != internal_id { return false }
+	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
+	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
+	defer { C.ioctl(card, i32(u32(0xc00464b4)), unsafe { &create.handle }) }
+	mut export := ExtendedPrimeRequest{handle: create.handle, fd: -1}
+	if C.ioctl(card, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0 { return false }
+	defer { C.close(export.fd) }
+	return fdinfo_mount_id(export.fd) == internal_id
+		&& check_mountinfo_ids(internal_id, visible_id)
+}
+
 fn test_prime_fdinfo_flags(card i32, flags i32) bool {
 	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
 	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
@@ -1022,6 +1062,7 @@ fn test_prime_filesystem_type() bool {
 	clock_ok := C.clock_gettime(C.CLOCK_REALTIME, &after) == 0
 	duplicate := C.dup(export.fd)
 	two_refs := duplicate >= 0 && test_prime_fdinfo(duplicate, create.size, 2)
+	mount_id_ok := duplicate >= 0 && test_prime_fdinfo_mount_id(card, export.fd, duplicate)
 	C.close(export.fd)
 	if duplicate < 0 { return false }
 	defer { C.close(duplicate) }
@@ -1030,6 +1071,11 @@ fn test_prime_filesystem_type() bool {
 		C.puts(c'VINIX DRM PRIME FDINFO: PASS')
 	} else {
 		C.puts(c'DRM PRIME FDINFO FAIL: incorrect size, count or exporter')
+	}
+	if mount_id_ok {
+		C.puts(c'VINIX DRM PRIME FDINFO MOUNT ID: PASS')
+	} else {
+		C.puts(c'DRM PRIME FDINFO MOUNT ID FAIL: DMA-BUF did not share a private mount ID')
 	}
 	if test_prime_inode_metadata(duplicate, create.size) {
 		C.puts(c'VINIX DRM PRIME INODE METADATA: PASS')

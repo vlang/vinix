@@ -2214,18 +2214,20 @@ fn fdinfo_text(pid int, fdnum int) string {
 	// access mode, without the O_LARGEFILE default from open(2).
 	mut flags := u64(handle.flags) & ~u64(resource.o_creat | resource.o_excl
 		| resource.o_noctty | resource.o_trunc)
-	if !drm.is_prime_resource(handle.resource) {
+	prime := drm.is_prime_resource(handle.resource)
+	if !prime {
 		flags |= u64(resource.o_largefile)
 	}
 	if descriptor.flags & resource.o_cloexec != 0 {
 		flags |= u64(resource.o_cloexec)
 	}
-	// Pipes, sockets and the other anonymous files were not opened through a
-	// mount; Linux shows its internal ones, which have no number here.
+	// PRIME exports share the DMA-BUF pseudo-filesystem's internal mount ID.
 	mut mount_id := 0
 	top := lib.mount_context_top(&handle.mount)
 	if top != unsafe { nil } {
 		mount_id = unsafe { &Mount(top) }.id
+	} else if prime {
+		mount_id = dma_buf_mount_id
 	}
 	// Formatting helpers borrow the stack builder; finish_text returns owned bytes.
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }

@@ -103,9 +103,16 @@ pub mut:
 __global (
 	initial_mount_table &MountTable
 	mount_id_counter    = int(0)
+	dma_buf_mount_id    int
 )
 
+fn allocate_mount_id() int {
+	return katomic.inc(mut &mount_id_counter) + 1
+}
+
 fn init_mount_tables() {
+	// The DMA-BUF pseudo-filesystem has an ID but no namespace attachment.
+	dma_buf_mount_id = allocate_mount_id()
 	initial_mount_table = &MountTable{
 		initial: true
 	}
@@ -211,7 +218,7 @@ fn detach_mount(mut table MountTable, mut covered VFSNode) {
 fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source string,
 	fstype string, flags u64, options string, parent_mount &lib.MountContext) &Mount {
 	entry := &Mount{
-		id:      katomic.inc(mut &mount_id_counter) + 1
+		id:      allocate_mount_id()
 		covered: unsafe { covered }
 		root:    unsafe { root }
 		source:  source.clone()

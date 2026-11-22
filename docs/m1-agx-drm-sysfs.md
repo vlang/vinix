@@ -866,6 +866,30 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-flags-20261122.ESbvuE/`. The
 `bundle.tar.gz` SHA-256 is
 `725dbf4a0b741b0aa448b14ba9c8a25ee127198f8a75be05459527b2f1a98ba0`.
 
+#### PRIME DMA-BUF fdinfo mount ID
+
+All PRIME exports report the same `mnt_id` in fdinfo. VFS initialization
+reserves the ID from the mount allocator for the DMA-BUF pseudo-filesystem.
+The internal mount has no namespace attachment, so it is absent from
+`mountinfo`.
+[Pinned DMA-BUF mount initialization](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L1764-L1772)
+[Pinned internal mount allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/namespace.c#L6051-L6063)
+[Pinned fdinfo mount ID](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/proc/fd.c#L54-L57)
+
+ARM64 and x86-64 QEMU verified that a duplicate and an export of a second
+buffer share the ID. The DRM card's mount remained visible in
+`mountinfo`. The same x86-64 guest executable failed the new check on
+the preceding kernel. PRIME flags, descriptor links and the fdinfo
+sanitizer suite passed. The x86-64 procfs test saw no sustained heap
+growth across 200 cycles per operation, and the allocation scan
+reproduced its 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `643f562ebf03fbfa8fd94df65e5cee8845e744b1` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-mount-20261122.FgEBQU/`. The
+`bundle.tar.gz` SHA-256 is
+`e4f71ba83adf513a4303bc3a1eddc071ba6b524f4cbe6524df708981eeac0d44`.
+
 #### PRIME DMA-BUF names
 
 Both `DMA_BUF_SET_NAME` ioctl encodings accept a NUL-terminated name of
