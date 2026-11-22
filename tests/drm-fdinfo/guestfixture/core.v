@@ -1103,6 +1103,30 @@ fn test_prime_sendfile(read_write i32, read_only i32) bool {
 		&& C.strncmp(&result[0], c'ab', 2) == 0
 }
 
+fn test_prime_sendfile_eof(read_write i32, read_only i32) bool {
+	input := i32(C.syscall(C.SYS_memfd_create, c'prime-sendfile-eof', u32(0)))
+	if input < 0 { return false }
+	defer { C.close(input) }
+	if C.syscall(C.SYS_sendfile, read_write, input, unsafe { nil }, u64(1)) != 0
+		|| C.lseek(input, 0, C.SEEK_CUR) != 0 || C.write(input, c'abcd', 4) != 4 {
+		return false
+	}
+	mut offset := i64(3)
+	if !sendfile_replies(read_write, input, &offset, 2, C.EINVAL) || offset != 3
+		|| C.syscall(C.SYS_sendfile, read_write, input, unsafe { nil }, u64(2)) != 0
+		|| C.lseek(input, 0, C.SEEK_CUR) != 4 {
+		return false
+	}
+	for position in 4 .. 6 {
+		offset = i64(position)
+		if C.syscall(C.SYS_sendfile, read_write, input, &offset, u64(2)) != 0
+			|| offset != position || C.lseek(input, 0, C.SEEK_CUR) != 4 {
+			return false
+		}
+	}
+	return sendfile_replies(read_only, input, &offset, 2, C.EBADF) && offset == 5
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1195,6 +1219,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME SENDFILE: PASS')
 	} else {
 		C.puts(c'DRM PRIME SENDFILE FAIL: incorrect error, input data or cursor')
+	}
+	if test_prime_sendfile_eof(first, export.fd) {
+		C.puts(c'VINIX DRM PRIME SENDFILE EOF: PASS')
+	} else {
+		C.puts(c'DRM PRIME SENDFILE EOF FAIL: incorrect result, offset or cursor')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')

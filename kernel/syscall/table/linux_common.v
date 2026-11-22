@@ -685,7 +685,31 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 	if count == 0 {
 		return 0, 0
 	}
-	if input_without_io || output_fd.handle.resource is resource.NoByteIOResource {
+	if input_without_io {
+		return errno.err, errno.einval
+	}
+	if output_fd.handle.resource is resource.NoByteIOResource {
+		mut source := input_fd.handle
+		if !stat.isreg(source.resource.stat.mode) || output_flags & resource.o_append != 0 {
+			return errno.err, errno.einval
+		}
+		mut sink := output_fd.handle
+		source.mac_check(proc.mac_read) or { return errno.err, errno.get() }
+		sink.mac_check(proc.mac_write) or { return errno.err, errno.get() }
+		// Direct splice reaches the sink only after getting data. Probe the
+		// regular source at the selected position without advancing its cursor.
+		source.l.acquire()
+		defer {
+			source.l.release()
+		}
+		position := if positioned { input_offset } else { source.loc }
+		mut byte := u8(0)
+		got := source.resource.read(voidptr(source), unsafe { &byte }, u64(position), 1) or {
+			return errno.err, errno.get()
+		}
+		if got == 0 {
+			return 0, 0
+		}
 		return errno.err, errno.einval
 	}
 

@@ -746,12 +746,12 @@ The `bundle.tar.gz` SHA-256 is
 #### PRIME DMA-BUF sendfile
 
 `sendfile` checks the access mode of both open descriptions before accepting
-a zero count. An explicit offset on a PRIME input returns `ESPIPE`. With a
-positive count, Vinix returns `EINVAL` for a PRIME endpoint before consuming
-input. This also rejects a PRIME destination when an ordinary source is
-already at EOF. Both descriptions stay pinned through transfer and any
-short-write rewind.
-[Pinned sendfile admission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1226-L1297)
+a zero count. An explicit offset on a PRIME input returns `ESPIPE`. Both
+descriptions stay pinned through transfer and any short-write rewind. The
+initial change rejected PRIME endpoints for positive counts before consuming
+input, including at EOF. The follow-up below restores the regular-file EOF
+result for a PRIME destination.
+[Pinned sendfile admission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1303-L1396)
 
 ARM64 and x86-64 QEMU confirmed pipe data and file position preservation on
 rejection, the PRIME offset and access errors, and successful ordinary
@@ -765,6 +765,31 @@ archived patch and the simple DRM named-device fixture. Evidence is stored
 at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-20261122.rVaAAS/`.
 The `bundle.tar.gz` SHA-256 is
 `7fa5c34593a95316db9b44f9e4d13bc58f325a620ed18e3b3bdd3ce2cec22413`.
+
+#### PRIME DMA-BUF sendfile at EOF
+
+A positive-count `sendfile` to a writable PRIME destination without
+`O_APPEND` returns zero when the selected position in a regular source is
+at or beyond EOF. Vinix uses a one-byte backend read under the source
+description lock to preserve the shared cursor and any explicit offset.
+Available data produces `EINVAL`, and a source pipe is rejected before
+reading its queue. The probe can have ordinary backend read effects, such
+as refreshing a procfs snapshot.
+[Pinned direct splice loop](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1175-L1210)
+
+ARM64 and x86-64 QEMU passed empty-file, exact-EOF and past-EOF cases,
+with cursor preservation and rejection of a read-only destination. The same
+x86-64 guest probe failed on the preceding kernel. PRIME byte I/O, splice,
+sendfile and copy range controls also passed. Independent review confirmed
+that the source lock is released before either descriptor reference. The
+DRM syncobj host suite passed, and the allocation scan reproduced its
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `e5bea42fd2b7b66f9086e037d9d44b3b4e777d70` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-eof-20261122.XY1AoI/`.
+The `bundle.tar.gz` SHA-256 is
+`0ebcfab6a6c48003ea96daef22a95bbea790ad2f8d05ce41368bf0af07c887e9`.
 
 #### PRIME DMA-BUF copy_file_range
 
