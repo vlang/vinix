@@ -700,8 +700,7 @@ mut:
 	tail u32
 }
 
-fn test_prime_transport() bool {
-	card := c'/dev/dri/card0'
+fn test_prime_transport(card &char, foreign i32) bool {
 	exporter := C.open(card, C.O_RDWR)
 	if exporter < 0 { return false }
 	defer { C.close(exporter) }
@@ -726,6 +725,14 @@ fn test_prime_transport() bool {
 	if export.handle != create.handle || export.flags != u32(C.O_CLOEXEC)
 		|| export.tail != 0x12345678 || export.fd > 0x00ffffff {
 		return false
+	}
+	if foreign >= 0 {
+		mut request := ExtendedPrimeRequest{handle: 99, fd: export.fd, tail: 0x87654321}
+		if C.ioctl(foreign, i32(u32(0xc010642e)), &request) != -1
+			|| unsafe { *C.__errno_location() } != C.EINVAL || request.handle != 99
+			|| request.fd != export.fd || request.tail != 0x87654321 {
+			return false
+		}
 	}
 	// The eleven-byte little-endian request omits the top byte of the fd.
 	// Kernel storage must zero-extend it and leave that user byte alone.
@@ -870,7 +877,7 @@ pub fn run() i32 {
 		} else {
 			C.puts(c'DRM GEM CLOSE TRANSPORT FAIL: unexpected framed close or handle state')
 		}
-		if test_prime_transport() {
+		if test_prime_transport(c'/dev/dri/card0', -1) {
 			C.puts(c'VINIX DRM PRIME TRANSPORT: PASS')
 		} else {
 			C.puts(c'DRM PRIME TRANSPORT FAIL: unexpected request, reply or imported handle')
@@ -915,9 +922,11 @@ pub fn run() i32 {
 	}
 	mut render := C.open(c'/dev/dri/renderD129', C.O_RDWR)
 	mut render_primary := c'/dev/dri/card1'
+	mut framebuffer := c'/dev/dri/card0'
 	if render < 0 {
 		render = C.open(c'/dev/dri/renderD128', C.O_RDWR)
 		render_primary = c'/dev/dri/card0'
+		framebuffer = c'/dev/dri/card1'
 	}
 	if render >= 0 {
 		if test_render_capabilities(render) {
@@ -939,6 +948,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM UNSUPPORTED DUMB BUFFERS: PASS')
 		} else {
 			C.puts(c'DRM UNSUPPORTED DUMB BUFFERS FAIL: wrong primary-node error reply')
+		}
+		if test_prime_transport(framebuffer, render) {
+			C.puts(c'VINIX DRM FOREIGN PRIME IMPORT: PASS')
+		} else {
+			C.puts(c'DRM FOREIGN PRIME IMPORT FAIL: wrong rejection or same-device import')
 		}
 		C.close(render)
 	}

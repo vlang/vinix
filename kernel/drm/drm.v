@@ -1307,7 +1307,9 @@ fn ioctl_prime_fd_to_handle(dev &DrmDevice, handle voidptr, data voidptr) int {
 	if fd.handle.flags & resource.o_path != 0 { return -9 }
 	mut res := fd.handle.resource
 	if mut res is GemPrimeResource {
-		if voidptr(res.dev) != voidptr(dev) || res.obj == unsafe { nil } { return -9 }
+		// The descriptor is valid. Import between devices needs a backend
+		// capable of attaching the buffer to the receiving device.
+		if voidptr(res.dev) != voidptr(dev) || res.obj == unsafe { nil } { return -22 }
 		request.handle = dev.driver.gem_import(dev, handle, res.obj) or { return -12 }
 		return 0
 	}

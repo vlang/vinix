@@ -600,6 +600,28 @@ also used the archived software Asahi fixture patch. Evidence is stored at
 The `bundle.tar.gz` SHA-256 is
 `d2e1ad9f2e08ae159fd471f985b84381f5d23a0039bea1dca4d803468eb6074b`.
 
+#### PRIME import from another DRM device
+
+Vinix supports PRIME import within the exporting DRM device.
+`PRIME_FD_TO_HANDLE` returns `EINVAL` when a valid DMA-BUF belongs to
+another DRM device. Invalid and `O_PATH` descriptors return `EBADF`.
+Linux's generic GEM import helper also returns `EINVAL` when a receiving
+driver lacks a cross-device import callback. [Pinned Linux DMA-BUF lookup](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L847-L866) [Pinned Linux GEM import helper](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_prime.c#L968-L990)
+
+The sanitizer fixture checked the error, reply fields and descriptor
+and object references. ARM64 QEMU passed a framebuffer DMA-BUF to the
+software Asahi render node, then imported the same descriptor on the
+framebuffer device. The preceding ARM64 kernel failed that probe. The
+x86-64 QEMU same-device PRIME round trip passed. The allocation scan
+reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `186da7c1df6063d1ccd1cfb40631cc14bf8af072` plus the
+archived patch and the simple DRM named-device fixture. The ARM64 build
+also used the archived software Asahi fixture patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-prime-foreign-device-20261122.t32Jsw/`.
+The `bundle.tar.gz` SHA-256 is
+`c93965f7f5a474c8826af9e3386e1077193288df52d3012fb8a8a7a3dd73091d`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

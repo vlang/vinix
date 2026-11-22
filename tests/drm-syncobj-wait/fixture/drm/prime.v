@@ -27,6 +27,7 @@ struct DrmDevice {
 
 __global prime_exported &gem.GemObject = unsafe { nil }
 __global prime_export_calls = 0
+__global prime_import_calls = 0
 __global prime_custom_puts = 0
 __global prime_fd_to_close = -1
 
@@ -44,6 +45,7 @@ fn prime_put(_dev &DrmDevice, object &gem.GemObject) {
 }
 
 fn prime_import(_dev &DrmDevice, _handle voidptr, object &gem.GemObject) ?u32 {
+	prime_import_calls++
 	assert voidptr(object) == voidptr(prime_exported) && object.references == 2
 	assert file.outstanding() == 1 && memory.outstanding() == 2
 	return 19
@@ -204,8 +206,11 @@ fn check_prime_descriptors() {
 		assert ioctl_prime_fd_to_handle(&device, client, &imported) == -9
 		assert imported.handle == 55
 		imported.fd = request.fd
-		assert ioctl_prime_fd_to_handle(&foreign, client, &imported) == -9
-		assert imported.handle == 55
+		imports_before := prime_import_calls
+		assert ioctl_prime_fd_to_handle(&foreign, client, &imported) == -22
+		assert imported.handle == 55 && imported.flags == ~u32(0) && imported.fd == request.fd
+		assert prime_import_calls == imports_before && object.references == 2
+		assert file.outstanding() == 1 && memory.outstanding() == 2
 		other := test_eventfd(0)
 		imported.fd = i32(other)
 		assert ioctl_prime_fd_to_handle(&device, client, &imported) == -22
