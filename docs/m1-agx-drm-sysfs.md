@@ -539,6 +539,27 @@ also used the archived software Asahi fixture patch. Evidence is stored at
 The `bundle.tar.gz` SHA-256 is
 `035f4d8a840cf09fdda7e3d878dee13fd570e0c05535538199e987f5618809dd`.
 
+#### Dumb-buffer create geometry
+
+DRM rejects `MODE_CREATE_DUMB` dimensions when the stride, total size or
+page-rounded size would overflow the 32-bit calculation. It clears the
+handle, pitch and size before invoking the driver. The framebuffer
+driver also checks the size after applying its 64-byte pitch alignment.
+Both geometry checks return `EINVAL` before GEM allocation. [Pinned Linux geometry checks](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_dumb_buffers.c#L64-L92) [Pinned create wrapper](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_dumb_buffers.c#L192-L245)
+
+The wire sanitizer verified the overflow boundaries, the largest valid
+page-aligned size and the fields received by a mock driver. ARM64 and
+x86-64 QEMU rejected stride, size, page-rounding and padded-pitch
+overflows and passed ordinary framebuffer create, map and destroy. The
+preceding x86-64 kernel failed the geometry probe. The allocation scan
+reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `43fda21477b5b357439fac20ead9bb4aef42e903` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-dumb-geometry-20261122.7ym3TO/`.
+The `bundle.tar.gz` SHA-256 is
+`4db1e794d261232c473505acf3959b7e2d45a44a84cd49e3d07679e8198221a8`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

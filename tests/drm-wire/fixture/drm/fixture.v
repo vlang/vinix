@@ -75,6 +75,7 @@ __global handler_status = 0
 __global handler_calls = 0
 __global activity_calls = 0
 __global handler_input = u32(0)
+const page_size = u64(4096)
 
 fn account_activity(_ &DrmDevice, _ u32) { activity_calls++ }
 
@@ -199,6 +200,34 @@ pub fn run_checks() {
 	check_agx_version()
 	check_core_query_transport()
 	check_dumb_node_access()
+	check_dumb_create_geometry()
+}
+
+fn observe_dumb_create(_ &DrmDevice, _ voidptr, data voidptr) int {
+	mut request := unsafe { &ioctl.DrmModeCreateDumb(data) }
+	assert request.handle == 0 && request.pitch == 0 && request.size == 0
+	request.handle = 1
+	return 0
+}
+
+fn check_dumb_create_geometry() {
+	driver := DrmDriver{ioctls: [DrmIoctl{cmd: ioctl.drm_ioctl_mode_create_dumb, handler: observe_dumb_create}]}
+	device := DrmDevice{driver: &driver}
+	mut node := DrmNode{dev: &device}
+	command := u64(0xc02064b2)
+	max_aligned := ~u32(0) & ~u32(page_size - 1)
+	for geometry in [ioctl.DrmModeCreateDumb{width: 1, height: 1, bpp: ~u32(0) - 7},
+		ioctl.DrmModeCreateDumb{width: 1 << 30, height: 1, bpp: 32},
+		ioctl.DrmModeCreateDumb{width: 1 << 20, height: 1 << 10, bpp: 32},
+		ioctl.DrmModeCreateDumb{width: max_aligned + 1, height: 1, bpp: 8}]! {
+		mut request := ioctl.DrmModeCreateDumb{...geometry, handle: 9, pitch: 9, size: 9}
+		expect_error(mut node, command, unsafe { &request }, errno.einval)
+		assert request.handle == 0 && request.pitch == 0 && request.size == 0
+	}
+	mut valid := ioctl.DrmModeCreateDumb{width: max_aligned, height: 1, bpp: 8, handle: 9, pitch: 9, size: 9}
+	assert (node.ioctl(unsafe { nil }, command, unsafe { &valid }) or { panic('largest aligned size') }) == 0
+	assert valid.handle == 1
+	println('DRM dumb-buffer geometry: stride, size, page rounding and zeroed driver outputs passed')
 }
 
 fn check_dumb_node_access() {

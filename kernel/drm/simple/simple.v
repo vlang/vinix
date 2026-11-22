@@ -87,12 +87,10 @@ fn create_dumb_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	}
 	bytes_per_pixel := (u64(request.bpp) + 7) / 8
 	row_bytes := u64(request.width) * bytes_per_pixel
-	if row_bytes > u64(-1) - 63 {
-		return -75 // EOVERFLOW
-	}
 	pitch := lib.align_up(row_bytes, 64)
-	if pitch > u64(-1) / u64(request.height) {
-		return -75
+	max_page_aligned := u64(~u32(0)) & ~(page_size - 1)
+	if pitch > max_page_aligned / u64(request.height) {
+		return -22
 	}
 	size := pitch * u64(request.height)
 	obj := gem.create(size) or { return -12 }

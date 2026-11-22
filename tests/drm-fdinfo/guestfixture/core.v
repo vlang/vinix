@@ -591,11 +591,31 @@ fn test_unsupported_dumb_buffers(card &char) bool {
 		&& unsafe { *C.__errno_location() } == C.ENOSYS
 }
 
+fn test_dumb_buffer_geometry(fd i32) bool {
+	requests := [DumbCreateRequest{width: 1 << 30, height: 1, bpp: 32},
+		DumbCreateRequest{width: 1 << 20, height: 1 << 10, bpp: 32},
+		DumbCreateRequest{width: ~u32(0), height: 1, bpp: 8},
+		DumbCreateRequest{width: 1, height: 1 << 26, bpp: 8}]!
+	for i in 0 .. requests.len {
+		mut request := unsafe { requests[i] }
+		request.handle = 77
+		request.pitch = 77
+		request.size = 77
+		if C.ioctl(fd, i32(u32(0xc02064b2)), &request) != -1
+			|| unsafe { *C.__errno_location() } != C.EINVAL
+			|| request.handle != 0 || request.pitch != 0 || request.size != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 fn test_dumb_buffer_transport() bool {
 	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
 	if fd < 0 { return false }
 	defer { C.close(fd) }
 	if !test_dumb_buffer_error_replies(fd, C.EINVAL, C.ENOENT) { return false }
+	if !test_dumb_buffer_geometry(fd) { return false }
 	// The short CREATE reply ends after pitch and leaves the caller's size alone.
 	mut create := DumbCreateRequest{height: 1, width: 1, bpp: 32, size: 123}
 	if C.ioctl(fd, i32(u32(0xc01864b2)), &create) != 0 || create.handle == 0

@@ -1131,11 +1131,34 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 	}
 }
 
+fn valid_dumb_create_geometry(request &ioctl.DrmModeCreateDumb) bool {
+	max_size := u64(~u32(0))
+	if request.width == 0 || request.height == 0 || request.bpp == 0
+		|| u64(request.bpp) > max_size - 8 {
+		return false
+	}
+	bytes_per_pixel := (u64(request.bpp) + 7) / 8
+	stride := u64(request.width) * bytes_per_pixel
+	// The raw size and its page rounding must both fit in u32.
+	max_page_aligned := max_size & ~(page_size - 1)
+	return u64(request.height) <= max_page_aligned / stride
+}
+
 fn ioctl_dumb_buffer(dev &DrmDevice, cmd u32, handle voidptr, data voidptr) int {
 	if data == unsafe { nil } { return -14 }
 	mut result := -int(errno.enosys)
 	for entry in dev.driver.ioctls {
 		if entry.cmd == cmd && entry.handler != unsafe { nil } {
+			if cmd == ioctl.drm_ioctl_mode_create_dumb {
+				mut request := unsafe { &ioctl.DrmModeCreateDumb(data) }
+				if !valid_dumb_create_geometry(request) {
+					result = -int(errno.einval)
+					break
+				}
+				request.handle = 0
+				request.pitch = 0
+				request.size = 0
+			}
 			result = entry.handler(dev, handle, data)
 			break
 		}
