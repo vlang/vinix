@@ -46,19 +46,5 @@ pub fn run_checks() {
 	})
 	assert every == 'drm-driver:\tvirtio_gpu\ndrm-client-id:\t1\ndrm-total-system:\t12 KiB\ndrm-shared-system:\t4 KiB\ndrm-active-system:\t1 KiB\ndrm-resident-system:\t2 KiB\ndrm-purgeable-system:\t0\n'
 
-	// Numbers are never reused while their description is open, and a
-	// released address that comes back gets a new one.
-	first := drm_client_id(voidptr(u64(0x1000)))
-	second := drm_client_id(voidptr(u64(0x2000)))
-	assert first == 1 && second == 2
-	assert drm_client_id(voidptr(u64(0x1000))) == first
-	forget_drm_client(voidptr(u64(0x1000)))
-	forget_drm_client(voidptr(u64(0x3000)))
-	assert drm_client_id(voidptr(u64(0x1000))) == 3
-	assert drm_client_id(voidptr(u64(0x2000))) == second
-	assert drm_client_ids.len == 2
-	forget_drm_client(voidptr(u64(0x1000)))
-	forget_drm_client(voidptr(u64(0x2000)))
-	assert drm_client_ids.len == 0
-	println('DRM fdinfo: Linux size units, G13 and full memory keys, stable unique client ids passed')
+	println('DRM fdinfo: Linux size units, client line formatting, G13 and full memory keys passed')
 }

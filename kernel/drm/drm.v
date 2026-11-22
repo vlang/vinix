@@ -857,7 +857,6 @@ fn (mut this DrmNode) unref(handle voidptr) ? {
 		}
 		syncobj.destroy_owner(u64(handle))
 	}
-	forget_drm_client(handle)
 	katomic.dec(mut &this.refcount)
 }
 

@@ -51,10 +51,10 @@ Sizes take a KiB or MiB suffix only while they divide evenly, as in Linux. A
 platform device has no `drm-pdev` line, and Vinix has no client names. An
 `O_PATH` descriptor gets no DRM lines.
 
-Linux numbers a DRM file when it is opened. Vinix keeps no per-open DRM state,
-so a description is numbered the first time its fdinfo is read and keeps that
-number until it is closed. Numbers are unique and never reused; only the point
-at which they are assigned differs.
+Vinix assigns each DRM data open an ID from a single atomic counter before
+publishing its descriptor, following Linux's DRM file allocation. The ID
+lives on the open file description, so dup and fork share it and fdinfo
+reads only report it. [Pinned Linux client ID allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_file.c#L129-L147)
 
 ## What the AGX driver counts
 
@@ -79,6 +79,9 @@ The device-wide `gpu_memory` and `agx_stats` files are described in
 [G13 statistics](m1-agx-stats.md).
 
 ## Validation
+
+These results cover the original fdinfo implementation, which used an
+address-keyed ID table.
 
 - `tests/drm-fdinfo` runs the production formatting and numbering on the host
   under ASan/UBSan: size units, the G13 lines and the full key order, and client
@@ -116,3 +119,27 @@ Evidence is under
 | --- | --- |
 | `bundle.tar.gz` | `f2f0de6a466ebc6631ead7cf6eba4adceba8f15d8b3151b5dd7c391bb16b8cff` |
 | `bundle.tar.gz` inventory | `c173d750616d4d4cfd99f30f81afc7e0afd0e450debccea1568d8e3208481fc6` |
+
+## Open-time client ID validation
+
+The ARM64 and x86-64 QEMU guests opened two DRM descriptions and read
+fdinfo in reverse. Both reported IDs `1 2` in open order. The same ARM64
+guest binary reported `2 1` on the baseline. The updated kernels passed
+the dup, fork, descriptor reuse and `O_PATH` checks. Descriptor installation
+can fail after ID assignment and leave a gap in the counter.
+
+Both kernels used `-O1` for C compilation and TCG for the guest runs.
+The DRM fdinfo and wire sanitizer suites passed. The broad procfs probe
+ran 200 cycles per phase and passed on both architectures, with peak
+live-object growth of zero on ARM64 and one on x86-64. The allocation scan
+reproduced the 150 baseline findings. The ID adds eight bytes to the open
+description while keeping it in the 1536-byte slab class on both architectures.
+Independent review confirmed that the ID is assigned before descriptor
+publication and that closing the description requires no ID cleanup.
+Native M1 validation remains open.
+
+The tested base was `92535a8a9c2eeb778304da322fc607f1b25a683a` plus the
+archived patches. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-client-ids-20261122.MCVKe0/`.
+The `bundle.tar.gz` SHA-256 is
+`2ede09358ed7ac01ee796f939a44e9c978da1fc98dcbfe5d1ef1db555cf93af4`.

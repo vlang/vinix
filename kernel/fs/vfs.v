@@ -8,6 +8,7 @@ import katomic
 import klock
 import proc
 import file
+import drm
 import errno
 import security
 import ioctl
@@ -973,6 +974,9 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
 			return none
 		}
 		fd.handle.mount_writer = writer
+	}
+	if fd.handle.mac_device {
+		drm.assign_client_id(mut fd.handle)
 	}
 	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific) or {
 		// In particular, roll back a /dev/ptmx allocation or slave-open count if

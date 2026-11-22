@@ -83,6 +83,8 @@ pub mut:
 	// Duplicates and fork retain this same description.
 	created bool
 	seat_owner u32
+	// Set before publication for DRM data opens. Dup and fork share it.
+	drm_client_id u64
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.
 	// Mount entries are permanent; fs resolves namespace copies by mount id.

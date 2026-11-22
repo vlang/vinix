@@ -7,9 +7,8 @@ fn section(source string, start string, end string) !string {
 	return source[begin..finish]
 }
 
-// Run the production DRM fdinfo formatting and client numbering on the host,
-// under address/undefined-behavior sanitizers. Only the description lookup,
-// which needs the kernel's file and resource types, is left out.
+// Run the production DRM fdinfo formatting under sanitizers. The guest
+// fixture covers client numbering through the VFS.
 fn main() {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
@@ -18,10 +17,9 @@ fn main() {
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.mkdir_all('${scratch}/lib')!
 	os.cp('${repo}/kernel/lib/text.v', '${scratch}/lib/text.v')!
-	os.cp_all('${repo}/tests/agx-g13-failure/fixture/klock', '${scratch}/klock', false)!
 	source := os.read_file(os.getenv_opt('DRM_FDINFO_SOURCE') or { '${repo}/kernel/drm/fdinfo.v' })!
-	production := '@[has_globals]\nmodule drm\nimport klock\nimport lib\n' +
-		section(source, 'pub struct MemoryStats {', '// Append the DRM lines')! +
+	production := 'module drm\nimport lib\n' +
+		section(source, 'pub struct MemoryStats {', '__global (')! +
 		'// drm_show_fdinfo(): the driver' + source.all_after('// drm_show_fdinfo(): the driver')
 	os.write_file('${scratch}/drm/production.v', production)!
 	os.cp('${repo}/tests/drm-fdinfo/check.v', '${scratch}/drm/check.v')!

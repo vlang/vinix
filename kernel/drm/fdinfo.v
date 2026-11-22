@@ -7,7 +7,7 @@ module drm
 // Documentation/gpu/drm-usage-stats.rst. Monitoring tools read these.
 
 import file
-import klock
+import katomic
 import lib
 import resource
 
@@ -28,31 +28,17 @@ pub const memory_stats_resident = u32(1)
 pub const memory_stats_purgeable = u32(2)
 pub const memory_stats_active = u32(4)
 
-// Linux numbers every DRM file from one counter when it is opened. Vinix has no
-// per-open DRM state, so a description gets its number the first time fdinfo
-// shows it, and keeps it until it is closed.
 __global (
-	drm_client_lock    klock.Lock
-	drm_client_ids     = map[u64]u64{}
 	drm_last_client_id = u64(0)
 )
 
-fn drm_client_id(handle voidptr) u64 {
-	key := u64(handle)
-	drm_client_lock.acquire()
-	defer { drm_client_lock.release() }
-	if id := drm_client_ids[key] { return id }
-	drm_last_client_id++
-	drm_client_ids[key] = drm_last_client_id
-	return drm_last_client_id
-}
-
-// Called when the description is released, before its address can be reused.
-fn forget_drm_client(handle voidptr) {
-	key := u64(handle)
-	drm_client_lock.acquire()
-	drm_client_ids.delete(key)
-	drm_client_lock.release()
+// Number a new DRM data open before its description enters the fd table.
+pub fn assign_client_id(mut description file.Handle) {
+	if description.flags & resource.o_path != 0 { return }
+	res := description.resource
+	if res != unsafe { nil } && res is DrmNode {
+		description.drm_client_id = katomic.inc(mut &drm_last_client_id) + 1
+	}
 }
 
 // Append the DRM lines for an open description of a DRM node. The caller keeps
@@ -67,7 +53,7 @@ pub fn add_fdinfo(handle voidptr, mut text lib.Text) {
 	if mut res is DrmNode {
 		dev := res.dev
 		if dev == unsafe { nil } || dev.driver == unsafe { nil } || !dev.is_registered() { return }
-		add_client_lines(mut text, dev.driver.name, drm_client_id(handle))
+		add_client_lines(mut text, dev.driver.name, description.drm_client_id)
 		if dev.driver.memory_stats == unsafe { nil } { return }
 		stats := dev.driver.memory_stats(dev, handle) or { return }
 		add_memory_stats(mut text, stats, 'system')
