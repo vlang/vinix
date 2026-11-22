@@ -10,8 +10,8 @@ pub struct ImageApplications {
 	root string
 	architecture string
 	configuration string
-	device u64
-	inode u64
+	capture_device u64
+	capture_inode u64
 	text string
 	report_text string
 }
@@ -44,7 +44,7 @@ fn image_applications_action(root string, text string) !string {
 
 pub fn (configuration &ImageConfiguration) prepare_applications(repositories &ImageRepositories, required []string) !ImageApplications {
 	if required.len == 0 { return error('image applications require at least one application ID') }
-	return configuration.plan_inputs(repositories, required, '', ImageDeploymentOutput{})
+	return configuration.plan_inputs(repositories, DeploymentLock{ format: 1, packages: required }, '', ImageDeploymentOutput{})
 }
 
 pub fn (configuration &ImageConfiguration) prepare_application_file(repositories &ImageRepositories, source string) !ImageApplications {
@@ -60,9 +60,9 @@ pub fn (plan &ImageApplications) publish(repositories &ImageRepositories) !bool 
 
 fn (plan &ImageApplications) publish_with(repositories &ImageRepositories, options AtomicWriteOptions) !bool {
 	if plan.root == '' { return false } // no requirements were selected
-	if !image_configuration_root_matches(plan.root, plan.device, plan.inode)
-		|| repositories.root != plan.root || repositories.architecture != plan.architecture
-		|| repositories.configuration != plan.configuration || repositories.capture == '' {
+	if repositories.root != plan.root || repositories.architecture != plan.architecture
+		|| repositories.configuration != plan.configuration || repositories.capture == ''
+		|| repositories.capture_stage.device != plan.capture_device || repositories.capture_stage.inode != plan.capture_inode {
 		return error('image applications require their unchanged root and matching captured repositories')
 	}
 	repositories.current()!

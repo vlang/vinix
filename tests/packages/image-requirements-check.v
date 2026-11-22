@@ -47,7 +47,7 @@ fn image_requirements_check() ! {
 	checks << image_requirements_task('distribution-cli-run', [work + '/distribution-cli', cli], work)!
 	assert checks.len == 30
 	os.write_file(work + '/qualification.json', json2.encode(ImageRequirementsReceipt{ compiler: v, compiler_sha256: sha256.sum(os.read_bytes(v)!).hex(),
-		scope: 'release-image application requirements files: bounded format-1 deployment roots, exact source digests, target schema and format-2 downgrade refusal, CLI/environment/inline precedence and mutual exclusion, normal/check compiler gates, native desktop cache selection/content invalidation; eleven package suites, cache suite, ASan/UBSan, real staging/package CLIs and signed maintenance; structural payloads are never executed and no full image or runtime qualification is claimed', checks: checks }) + '\n')!
+		scope: 'release-image application requirements files: bounded format-1 roots and format-2 locks, exact source digests, target schema, publisher/closure validation, CLI/environment/inline precedence and mutual exclusion, normal/check compiler gates, native desktop cache selection/content invalidation; eleven package suites, cache suite, ASan/UBSan, real staging/package CLIs and signed maintenance; structural payloads are never executed and no full image or runtime qualification is claimed', checks: checks }) + '\n')!
 	println('Image requirements preflight: thirty host build/test checks PASS')
 }
 

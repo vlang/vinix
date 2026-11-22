@@ -60,9 +60,8 @@ pub fn (configuration &ImageConfiguration) check_applications(repositories &Imag
 	return configuration.check_inputs(repositories, required, '', ImageDeploymentOutput{})
 }
 
-// Format-1 deployment roots are a declarative advertised application set.
-// Format-2 locks must never be reduced to IDs, discarding their exact pins.
-// Capture once: resolution and the reported digest refer to the same bytes.
+// Capture once so admission and the report digest refer to the same bytes.
+// Format-2 inputs retain their reviewed pins, including the sequence floors.
 pub fn (configuration &ImageConfiguration) check_application_file(repositories &ImageRepositories, source string) !string {
 	return configuration.check_application_source(repositories, source, ImageDeploymentOutput{})
 }
@@ -78,20 +77,20 @@ fn (configuration &ImageConfiguration) plan_application_source(repositories &Ima
 	defer { unsafe { text.free() } }
 	mut document := decode_deployment(text, configuration.architecture)!
 	defer { document.close() }
-	if document.format != 1 { return error('image application requirements need a format-1 root manifest; exact format-2 deployment locks cannot be used as unpinned requirements') }
 	if document.packages.len == 0 { return error('image application requirements must name at least one application') }
 	digest := index_digest(text)
 	defer { unsafe { digest.free() } }
-	return configuration.plan_inputs(repositories, document.packages, digest, output)
+	return configuration.plan_inputs(repositories, document, digest, output)
 }
 
 fn (configuration &ImageConfiguration) check_inputs(repositories &ImageRepositories, required []string, requirements_sha256 string, output ImageDeploymentOutput) !string {
-	mut plan := configuration.plan_inputs(repositories, required, requirements_sha256, output)!
+	mut plan := configuration.plan_inputs(repositories, DeploymentLock{ format: 1, packages: required }, requirements_sha256, output)!
 	defer { plan.close() }
 	return unsafe { &plan }.report()
 }
 
-fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositories, required []string, requirements_sha256 string, output ImageDeploymentOutput) !ImageApplications {
+fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositories, selection DeploymentLock, requirements_sha256 string, output ImageDeploymentOutput) !ImageApplications {
+	required := selection.packages
 	if output.destination != '' && required.len == 0 { return error('image deployment export requires selected application requirements') }
 	if required.len > 4096 { return error('image application check supports at most 4096 application IDs') }
 	mut seen := map[string]bool{}
@@ -116,7 +115,8 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 	if config.architecture != configuration.architecture { return error('image input check configuration targets another architecture') }
 	mut bundle_action := 'none'
 	if repositories.capture != '' {
-		if repositories.root != configuration.root || repositories.architecture != configuration.architecture || repositories.configuration != text {
+		if repositories.root != configuration.root || repositories.device != configuration.device || repositories.inode != configuration.inode
+			|| repositories.architecture != configuration.architecture || repositories.configuration != text {
 			return error('image input check requires repositories captured for this configuration')
 		}
 		repositories.current()!
@@ -128,9 +128,9 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 		if image_configuration_exists(target)! { repositories.verify(target, 0o755)!; bundle_action = 'preserve' }
 		else { bundle_action = 'publish' }
 	}
-	mut deployment := if required.len > 0 { image_application_deployment(config, repositories, required)! }
-		else { DeploymentLock{ architecture: config.architecture.clone() } }
-	defer { deployment.close() }
+	mut deployment := if required.len > 0 { image_application_deployment(config, repositories, selection)! }
+		else { DeploymentLock{ architecture: config.architecture } }
+	defer { if required.len > 0 && selection.format != 2 { deployment.close() } }
 	mut rows := []ImageBundleCheck{cap: repositories.repositories.len}
 	defer {
 		for row in rows { unsafe { row.index_sha256.free() } }
@@ -179,5 +179,6 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 	accepted = true
 	return ImageApplications{ root: if required.len > 0 { configuration.root.clone() } else { '' },
 		architecture: configuration.architecture.clone(), configuration: text.clone(),
-		device: configuration.device, inode: configuration.inode, text: lock_text.clone(), report_text: report }
+		capture_device: repositories.capture_stage.device, capture_inode: repositories.capture_stage.inode,
+		text: lock_text.clone(), report_text: report }
 }

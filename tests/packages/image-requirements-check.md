@@ -1,19 +1,19 @@
 # Reviewed application requirements in release builds
 
 `stage.v --applications FILE` and `VINIX_PACKAGE_IMAGE_APPLICATIONS` select a
-reviewed format-1 deployment root manifest for the release's advertised apps.
-Both normal staging and compiler-free preflight resolve that complete set from
-the selected signed bundle before compiler lookup or image publication. The
-report retains an exact source digest alongside the canonical format-2 result
-lock. The existing desktop/security staging path inherits the environment input,
+reviewed format-1 root manifest or format-2 deployment lock for the release's
+advertised apps. Both normal staging and compiler-free preflight check that
+complete set against the selected signed bundle before compiler lookup or image
+publication. The report retains an exact source digest alongside the canonical
+format-2 lock. The desktop/security staging path inherits the environment input,
 and the native desktop image cache hashes its selection and contents.
 
 Explicit file selection overrides the environment file. Explicit inline
 `--require-app` IDs also override it. The two explicit forms cannot be combined
-in either order. Missing or invalid selected files refuse, rather than silently
-disabling the gate. Format-2 exact deployment locks refuse explicitly so their
-version/publisher pins cannot be discarded. A requirements file remains a build
-input and is not copied into the image or authorized as a consumer deployment.
+in either order. Missing or invalid selected files fail preflight. A format-2
+input retains each version, publisher, manifest digest and minimum signed index
+sequence in the staged declaration. Consumers review and authorize deployment
+through the ordinary approval flow.
 
 The new `ImageConfiguration.check_application_file` API uses the existing bounded
 regular-file reader and strict deployment decoder, resolves from the captured
@@ -29,12 +29,18 @@ covers both targets, byte-identical repeated reports, exact source digests,
 inline/file lock parity, changed whitespace/root ordering with stable canonical
 results, and independent text after inputs/plans are removed.
 
-It refuses valid format-2 locks, malformed/incomplete/duplicate/unknown/incorrectly
-typed JSON, trailing documents, wrong architectures, empty/duplicate/invalid/
+It refuses malformed/incomplete/duplicate/unknown/incorrectly typed JSON,
+trailing documents, wrong architectures, empty/duplicate/invalid/
 oversized app sets, nonapp/missing roots and conflicting runtime requirements.
 Missing files, directories, leaf links, FIFOs and oversized regular files refuse
 without image writes; restoring valid input permits retry. The full signed
 bundle's existing policy, payload, provenance and closure checks still apply.
+
+The format-2 regression covers both targets. An exported lock for an older
+version stages from a newer signed index with matching metadata. Changed pins,
+sequence floors above the signed index, incomplete/extra closure and non-app
+roots fail preflight. The plan survives source removal and requires the same
+authenticated bundle capture at publication.
 
 Real staging CLI assertions cover both hosts, literal paths, inherited file
 selection, explicit-file and inline overrides of an invalid environment input,
@@ -56,7 +62,7 @@ ASan/UBSan for the app/file fixture, real package CLI and signed CLI maintenance
 Leak detection is disabled; no whole-plan heap-retention claim is made.
 
 The [guest controller](image-requirements-runtime-check.v) builds the real stager
-and eight assertion programs. Both guests must complete all thirteen report
+and eight assertion programs. Both guests must complete all fourteen report
 markers, all eight processes and guest-initiated QMP shutdown. Each receipt pins
 twelve artifacts: kernel, PID 1, nine binaries and raw serial output.
 
@@ -74,6 +80,39 @@ VINIX_HWTEST_TCG=1 V=/path/to/reviewed/v VFLAGS=-nocache \
 Repeat for `x86_64` with its matching kernel and a fresh state directory. The
 controller requires explicit TCG opt-in and checked inputs; list mode creates no
 guest. Cross-toolchain prerequisites follow the [hardware controller](../hardware-platform/README.md).
+
+## Format-2 staging follow-up
+
+The application fixture passed normally and under ASan/UBSan with leak
+detection disabled. Both runs exercised the real host stager. A separate run
+built the real Hello, Counter and
+Memo packages for AArch64 and x86-64, signed them with a disposable test
+publisher, and exported one reviewed lock per target. Normal staging built the
+target package tools and wrote an `applications.json` byte-identical to each
+reviewed lock. Both staged roots were free of consumer package state.
+
+The source patch against `25b0de45b`, host logs, native SDK build receipt,
+preflight receipts and staged tool/declaration checksums are retained in
+`~/.local/state/vinix/section14-resume-CUyEUnSR`. The SHA-256 of
+`image-lock-stage.sha256` is
+`33be27238193aa86bc81745f941f8987225cc41803be3902ec2a7393ab4d7707`.
+
+In the guest run of that source snapshot, AArch64 passed the full requirements
+suite with guest-initiated shutdown in 64.1 seconds. The x86-64 guest started
+the suite and reached the 360-second deadline before the first worker verdict.
+The boot logs and checksums are in `~/.local/state/vinix/r14-g-d9QK4S`, under
+`aarch64` and `x86_64`. Each run reused the recorded cross-built fixtures and
+the maintained scenario's verdicts with a short QMP socket path.
+
+After tightening capture identity checks and retiring the resolver buffers
+without an extra compiler-generated allocation, the final host fixture passed
+again normally and under ASan/UBSan. Compiler-free preflight preserved and
+re-exported both staged SDK declarations byte for byte. The tracked complete
+AArch64 staging case retained 5,200 bytes in 44 records on both the original
+source and the final source with this V compiler. The strict zero-retention
+check therefore still fails on this baseline. The same state directory holds
+`image-lock-final.sha256`, whose SHA-256 is
+`440778bf079fc5c1df9ab283083f20c0c78fb16c7e35640bf7ac0883d743608d`.
 
 ## Qualification, 2026-10-16
 

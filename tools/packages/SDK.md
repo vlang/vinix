@@ -504,8 +504,8 @@ runtime, graphical and device compatibility must still be qualified. See
 
 Use `--applications FILE`, or set `VINIX_PACKAGE_IMAGE_APPLICATIONS` to an
 absolute file path, to carry the release's advertised application set through
-the existing desktop/security package staging path. The file is an existing
-**format-1 deployment root manifest**, with all three fields required:
+the existing desktop/security package staging path. A **format-1 deployment
+root manifest** names the applications to resolve from the signed bundle:
 
 ```json
 {"format":1,"architecture":"aarch64","packages":["org.vinix.counter","org.vinix.memo"]}
@@ -515,9 +515,14 @@ Select the matching architecture for each build. The set must contain 1–4096
 distinct valid application IDs. The bounded regular-file reader and strict
 deployment decoder reject leaf links, special/oversized files, duplicate or
 unknown keys, missing/wrongly typed fields, trailing documents, wrong hosts and
-invalid/empty sets. A format-2 exact deployment lock is explicitly refused;
-reducing it to roots would silently discard its version and publisher pins.
-Use normal deployment review/apply for those exact locks.
+invalid or empty sets.
+
+Supply a **format-2 deployment lock**, such as one saved by `--export-deployment`,
+to build from a previously reviewed set. The signed bundle must contain every
+pinned version, architecture, publisher key and manifest digest. Each signed
+index must meet the reviewed minimum sequence. The stage checks the complete
+dependency and runtime closure against current organization policy and carries
+the reviewed pins and sequence floors into the canonical image declaration.
 
 An explicit `--applications FILE` wins over the environment file. Repeated
 `--require-app ID` options also override the environment file and use inline IDs.
@@ -527,7 +532,7 @@ the existing behavior; an invalid selected file fails instead of disabling the
 release gate. Unset the environment variable to remove that selection.
 
 The stager reads the selected file once before compiler lookup or image writes.
-The same captured bytes supply both resolution roots and
+The same captured bytes supply the roots or lock pins and
 `application_requirements_sha256` in the report. Reordering fields/roots or
 changing whitespace can retain the same resolved deployment while changing
 that source digest. Inline requests and calls without requirements report an
@@ -543,10 +548,9 @@ and applies the normal signed-bundle gate on either target. Requirements still
 apply when existing image configuration/bundles are preserved; supplying a
 different release configuration cannot override retained trust or policy.
 
-This file is a build input. It is not copied into the image, installed as
-consumer state, or automatically authorized as a deployment. A successful
-preflight's `application_deployment` remains the exact format-2 lock for later
-ordinary review. See [file/cache qualification](../../tests/packages/image-requirements-check.md).
+The staged format-2 declaration is available for ordinary Software review
+after boot. Installation still requires confirmation and administrator approval.
+See [file/cache qualification](../../tests/packages/image-requirements-check.md).
 
 ### Export an image application deployment
 

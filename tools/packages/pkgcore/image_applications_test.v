@@ -416,7 +416,7 @@ fn test_image_requirements_file_captures_exact_digest_and_resolves_owned_target_
 	println('IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS')
 }
 
-fn test_image_requirements_file_refuses_unpinned_lock_downgrades_bad_documents_and_special_inputs() {
+fn test_image_requirements_file_refuses_bad_documents_and_special_inputs() {
 	work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
 	root := work + '/image'; os.mkdir(root)!
 	source := image_apps_config(work, 'aarch64', key, Policy{})!
@@ -426,11 +426,6 @@ fn test_image_requirements_file_refuses_unpinned_lock_downgrades_bad_documents_a
 	defer { repositories.close() }
 	path := work + '/requirements.json'
 	valid := '{"format":1,"architecture":"aarch64","packages":["editor"]}'
-	inline := json2.decode[ImageInputCheck](unsafe { &configuration }.check_applications(unsafe { &repositories }, ['editor'])!)!
-	os.write_file(path, publisher_json(inline.application_deployment))!
-	if _ := unsafe { &configuration }.check_application_file(unsafe { &repositories }, path) { assert false } else {
-		assert err.msg().contains('exact format-2 deployment locks cannot be used as unpinned requirements')
-	}
 	for text in ['{}', valid + '{}', valid.replace('1,', 'true,'), valid.replace('"editor"', 'null'),
 		valid.replace('"editor"', '"editor","editor"'), valid.replace('"editor"', '"../editor"'),
 		valid.replace('"editor"', '"support"'), valid.replace('"editor"', '"missing"'),
@@ -458,7 +453,69 @@ fn test_image_requirements_file_refuses_unpinned_lock_downgrades_bad_documents_a
 	}
 	os.write_file(path, valid)!
 	assert unsafe { &configuration }.check_application_file(unsafe { &repositories }, path)!.len > 0 && os.ls(root)!.len == 0
-	println('IMAGE REQUIREMENTS FILE format-2 pin downgrades, schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS')
+	println('IMAGE REQUIREMENTS FILE schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS')
+}
+
+fn test_image_requirements_file_honors_reviewed_versions_publishers_and_sequence_floors() {
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_apps_fixture()!
+		defer { os.rmdir_all(work) or {} }
+		root := work + '/image'
+		os.mkdir(root)!
+		source := image_apps_config(work, architecture, key, Policy{})!
+		mut configuration := prepare_image_configuration(root, architecture, source)!
+		defer { configuration.close() }
+		mut original := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		defer { original.close() }
+		path := work + '/reviewed.json'
+		review := json2.decode[ImageInputCheck](unsafe { &configuration }.export_applications(unsafe { &original }, ['editor', 'modern'], path)!)!
+		reviewed := review.application_deployment
+		golden := os.read_file(path)!
+		assert reviewed.locked.map(it.id) == ['editor', 'modern', 'runtime', 'support']
+		assert reviewed.locked[0].version == '1.0.0'
+
+		os.write_file(work + '/manifest.json', publisher_json(Package{ id: 'editor', architecture: architecture,
+			version: '2.0.0', kind: 'native', name: 'New editor', license: 'MIT', entrypoint: 'bin/runner' }))!
+		pack(work + '/manifest.json', work + '/payload', work + '/workspace')!
+		for id in ['native', 'organization']! {
+			publish_release(work + '/workspace', id, work + '/seed', 12, time.now().unix() + 3600, work + '/later/' + id)!
+		}
+		mut later := unsafe { &configuration }.prepare_repositories(work + '/later')!
+		defer { later.close() }
+		latest := json2.decode[ImageInputCheck](unsafe { &configuration }.check_applications(unsafe { &later }, reviewed.packages)!)!
+		assert latest.application_deployment.locked[0].version == '2.0.0'
+		captured := json2.decode[ImageInputCheck](unsafe { &configuration }.check_application_file(unsafe { &later }, path)!)!
+		assert captured.application_requirements_sha256 == index_digest(golden)
+		assert captured.application_deployment == reviewed
+
+		editor := reviewed.locked[0]
+		for changed in [DeploymentPackage{ ...editor, version: '0.1.0' },
+			DeploymentPackage{ ...editor, public_key: '1'.repeat(64) },
+			DeploymentPackage{ ...editor, metadata_sha256: '2'.repeat(64) },
+			DeploymentPackage{ ...editor, minimum_sequence: 13 }] {
+			os.write_file(path, publisher_json(DeploymentLock{ ...reviewed, locked: [changed, ...reviewed.locked[1..]] }))!
+			if _ := unsafe { &configuration }.check_application_file(unsafe { &later }, path) { assert false }
+		}
+		for invalid in [DeploymentLock{ ...reviewed, locked: reviewed.locked[..3] },
+			DeploymentLock{ ...reviewed, packages: ['editor'] },
+			DeploymentLock{ ...reviewed, packages: ['support'], locked: [reviewed.locked[3]] }] {
+			os.write_file(path, publisher_json(invalid))!
+			if _ := unsafe { &configuration }.check_application_file(unsafe { &later }, path) { assert false }
+		}
+		assert os.ls(root)!.len == 0
+		os.write_file(path, golden)!
+		mut applications := unsafe { &configuration }.prepare_application_file(unsafe { &later }, path)!
+		defer { applications.close() }
+		os.rm(path)!
+		if _ := unsafe { &applications }.publish(unsafe { &original }) { assert false } else {
+			assert err.msg().contains('matching captured repositories')
+		}
+		assert unsafe { &later }.publish()! && unsafe { &configuration }.publish()!
+		assert unsafe { &applications }.publish(unsafe { &later })!
+		assert os.read_file(root + pkgprotocol.image_applications_path)! == golden
+		assert !unsafe { &applications }.publish(unsafe { &later })! && !os.exists(root + '/var')
+	}
+	println('IMAGE REQUIREMENTS LOCK both targets retain an older reviewed version and sequence floor, refuse changed pins or closure, and publish through the matching capture PASS')
 }
 
 fn test_image_requirements_file_cli_explicit_and_environment_inputs_preserve_precedence_and_gate_staging() {
@@ -641,6 +698,19 @@ fn test_image_deployment_export_cli_requires_explicit_context_and_saves_a_review
 		file_code, file_text := image_apps_cli(binary, ['--export-deployment', work + '/file.json', ...base, '--applications', requirements, '--check'])
 		assert file_code == 0, file_text
 		assert os.read_file(work + '/file.json')! == os.read_file(path)!
+		locked_code, locked_text := image_apps_cli(binary, [...base, '--applications', path, '--check'])
+		assert locked_code == 0, locked_text
+		locked := json2.decode[ImageInputCheck](locked_text)!
+		assert locked.application_deployment == report.application_deployment
+		assert locked.application_requirements_sha256 == hash_file(path)!
+		build_code, build_text := image_apps_cli(binary, [...base, '--applications', path])
+		assert build_code != 0 && build_text.contains('target compiler is missing or not executable:'), build_text
+		pin := report.application_deployment.locked[0]
+		reviewed := report.application_deployment
+		bad := DeploymentLock{ ...reviewed, locked: [DeploymentPackage{ ...pin, minimum_sequence: 99 }, ...reviewed.locked[1..]] }
+		os.write_file(requirements, publisher_json(bad))!
+		bad_code, bad_text := image_apps_cli(binary, [...base, '--applications', requirements])
+		assert bad_code != 0 && bad_text.contains('locked publisher sequence') && !bad_text.contains('missing-compiler'), bad_text
 		for options in [['--check'], ['--require-app', 'editor']] {
 			invalid, reason := image_apps_cli(binary, [...base, ...options, '--export-deployment', work + '/uncreated'])
 			assert invalid != 0 && reason.contains('requires --check and selected application requirements'), reason

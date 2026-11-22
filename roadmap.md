@@ -793,6 +793,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Explicit deployment export](tests/packages/image-export-check.md) saves the
     resolved lock atomically outside the image for normal reviewed deployment,
     retaining output digests and preserving existing/concurrent files.
+    [Reviewed deployment locks](tests/packages/image-requirements-check.md)
+    can also drive image staging. The gate checks every version, publisher,
+    manifest digest, minimum signed sequence and dependency against the
+    bundled catalog and retains the approved pins in the image declaration.
     [Image catalog declarations](tests/packages/image-catalog-check.md) carry the
     exact lock into normal staging. Software discovers it for a full-set review
     with separate confirmation; matching trust and signed offline bundles remain
