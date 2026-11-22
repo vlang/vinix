@@ -1232,6 +1232,42 @@ fn test_sendfile_stream_offsets(prime i32) bool {
 		&& C.read(destination[0], &data[0], 4) == 4 && C.strcmp(&data[0], c'pass') == 0
 }
 
+fn test_sendfile_source_range(prime i32) bool {
+	input := i32(C.syscall(C.SYS_memfd_create, c'sendfile-range-source', u32(0)))
+	if input < 0 { return false }
+	defer { C.close(input) }
+	output := i32(C.syscall(C.SYS_memfd_create, c'sendfile-range-destination', u32(0)))
+	if output < 0 { return false }
+	defer { C.close(output) }
+	if C.write(input, c'abcd', 4) != 4 || C.lseek(input, 0, C.SEEK_SET) != 0 {
+		return false
+	}
+	max_signed := u64(0x7fffffffffffffff)
+	bad_count := max_signed + 1
+	if !sendfile_replies(output, input, unsafe { nil }, bad_count, C.EINVAL)
+		|| !sendfile_replies(-1, input, unsafe { nil }, bad_count, C.EINVAL)
+		|| !sendfile_replies(-1, prime, unsafe { nil }, bad_count, C.EINVAL)
+		|| !sendfile_replies(output, -1, unsafe { nil }, bad_count, C.EBADF)
+		|| C.lseek(input, 0, C.SEEK_CUR) != 0 || C.lseek(output, 0, C.SEEK_END) != 0 {
+		return false
+	}
+	near_limit := i64(max_signed - 1)
+	mut offset := near_limit
+	if C.lseek(input, near_limit, C.SEEK_SET) != near_limit
+		|| !sendfile_replies(prime, input, unsafe { nil }, 2, C.EINVAL)
+		|| !sendfile_replies(-1, input, unsafe { nil }, 2, C.EINVAL)
+		|| !sendfile_replies(-1, input, &offset, 2, C.EINVAL)
+		|| !sendfile_replies(-1, prime, &offset, bad_count, C.ESPIPE)
+		|| offset != near_limit || C.lseek(input, 0, C.SEEK_CUR) != near_limit {
+		return false
+	}
+	mut data := [5]char{}
+	return C.lseek(input, 0, C.SEEK_SET) == 0
+		&& C.syscall(C.SYS_sendfile, output, input, unsafe { nil }, max_signed) == 4
+		&& C.lseek(input, 0, C.SEEK_CUR) == 4 && C.lseek(output, 0, C.SEEK_SET) == 0
+		&& C.read(output, &data[0], 4) == 4 && C.strcmp(&data[0], c'abcd') == 0
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1339,6 +1375,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME SENDFILE STREAM OFFSET: PASS')
 	} else {
 		C.puts(c'DRM PRIME SENDFILE STREAM OFFSET FAIL: incorrect error, offset or queued bytes')
+	}
+	if test_sendfile_source_range(first) {
+		C.puts(c'VINIX DRM PRIME SENDFILE RANGE: PASS')
+	} else {
+		C.puts(c'DRM PRIME SENDFILE RANGE FAIL: incorrect error, offset or transferred bytes')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')

@@ -665,14 +665,22 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 	input_mode := input_fd.handle.resource.stat.mode
 	pipe_input := stat.isifo(input_mode) || input_mode & stat.ifmt == stat.ifpipe
 	stream_input := pipe_input || stat.issock(input_mode)
-	if positioned {
-		if input_without_io || stream_input {
-			return errno.err, errno.espipe
-		}
-		if input_offset < 0 || count > u64(0x7fffffffffffffff) - u64(input_offset) {
-			return errno.err, errno.einval
-		}
+	if positioned && (input_without_io || stream_input) {
+		return errno.err, errno.espipe
 	}
+	mut position_for_range := input_offset
+	if !positioned && !stream_input {
+		mut handle := input_fd.handle
+		handle.l.acquire()
+		position_for_range = handle.loc
+		handle.l.release()
+	}
+	if position_for_range < 0 || count > u64(0x7fffffffffffffff) - u64(position_for_range) {
+		return errno.err, errno.einval
+	}
+	// Linux bounds an admitted request by INT_MAX rounded down to a page.
+	max_copy := u64(0x7fffffff) & ~(u64(page_size) - 1)
+	copy_count := if count > max_copy { max_copy } else { count }
 	mut output_fd := file.fd_from_fdnum(unsafe { nil }, int(i32(out_fd))) or {
 		return errno.err, errno.get()
 	}
@@ -733,8 +741,8 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 	}
 
 	mut total := u64(0)
-	for total < count {
-		mut chunk := count - total
+	for total < copy_count {
+		mut chunk := copy_count - total
 		if chunk > page_size {
 			chunk = page_size
 		}

@@ -856,6 +856,31 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-stream-source-20261122.
 The `bundle.tar.gz` SHA-256 is
 `b363f45828469067442265808b95a3b9232d97fe7a23c9314686edf2682df51f`.
 
+#### Sendfile source range and count limit
+
+`sendfile` returns `EINVAL` before destination lookup if the count or the
+source position plus count exceeds the signed 64-bit range. The check covers
+both explicit offsets and the position read from the pinned description.
+Positioned requests on sources that lack positioned I/O still return
+`ESPIPE` first. Admitted transfers are limited to `INT_MAX` rounded down to
+a page. The source lock protects the admission snapshot. A concurrent seek
+can still affect the shared position used by the transfer loop.
+[Pinned range validation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L453-L479), [pinned sendfile limit](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1321-L1339), [pinned limit definition](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/linux/fs.h#L2424)
+
+ARM64 and x86-64 QEMU checked out-of-range counts, explicit and implicit
+position overflow, error precedence, cursor preservation and a valid large
+count that stopped at EOF. Generated code on both architectures uses the
+page-aligned cap as the loop bound. The same x86-64 guest probe failed on the
+preceding kernel. Independent review confirmed the lock and signed range
+arithmetic. The DRM syncobj host suite passed, and the allocation scan
+reproduced its 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `cce6fa4303c4e8091d1ab56ff5971b231a5732e5` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-range-20261122.bpv0Yp/`.
+The `bundle.tar.gz` SHA-256 is
+`bbc67a74c9ce1ea934f1f1d652167a7b382a2046e43d873c7642459606569d08`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,
