@@ -812,6 +812,27 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-append-20261122.GvXeaG/
 The `bundle.tar.gz` SHA-256 is
 `2d176cd6b023bcbcfa0e57160452b323709a94a61869b8e831a981832702dc6c`.
 
+#### Sendfile with a positioned pipe or socket source
+
+An explicit `sendfile` offset on a readable pipe or socket returns
+`ESPIPE`, even with a zero count. The check follows input access validation
+and precedes numeric offset validation and destination lookup. It leaves
+the supplied offset and queued data alone.
+[Pinned sendfile checks](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1313-L1341), [pinned stream open](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/open.c#L1578-L1583)
+
+ARM64 and x86-64 QEMU checked pipe and Unix socket sources with a PRIME
+destination. They covered zero length, a negative offset, an invalid
+destination, a write-only source, and the queued bytes after rejection.
+The same x86-64 guest probe failed on the preceding kernel. The DRM syncobj
+host suite passed, and the allocation scan reproduced its 150 baseline
+findings. Native M1 validation remains open.
+
+The tested base was `176f14c4c152198e43edc0fbbb0073751f5bc7de` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-stream-20261122.f9N0XI/`.
+The `bundle.tar.gz` SHA-256 is
+`034a9a4255fe279d3280d63734ddfb68c20ebb404671c25bd6900cc2a98d49cf`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

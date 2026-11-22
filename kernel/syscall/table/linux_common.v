@@ -663,7 +663,8 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 	}
 	input_without_io := input_fd.handle.resource is resource.NoByteIOResource
 	if positioned {
-		if input_without_io {
+		mode := input_fd.handle.resource.stat.mode
+		if input_without_io || stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
 			return errno.err, errno.espipe
 		}
 		if input_offset < 0 || count > u64(0x7fffffffffffffff) - u64(input_offset) {

@@ -1164,6 +1164,44 @@ fn test_sendfile_append(prime i32) bool {
 		&& C.read(fds[0], &data[0], 2) == 2 && C.strncmp(&data[0], c'ab', 2) == 0
 }
 
+fn test_positioned_sendfile_stream(input i32, writer i32, output i32) bool {
+	if C.fcntl(input, C.F_SETFL, C.O_NONBLOCK) != 0 || C.write(writer, c'keep', 4) != 4 {
+		return false
+	}
+	mut offset := i64(0)
+	if !sendfile_replies(output, input, &offset, 0, C.ESPIPE) || offset != 0
+		|| !sendfile_replies(-1, input, &offset, 4, C.ESPIPE) || offset != 0 {
+		return false
+	}
+	offset = -1
+	if !sendfile_replies(output, input, &offset, 4, C.ESPIPE) || offset != -1 {
+		return false
+	}
+	mut data := [5]char{}
+	return C.read(input, &data[0], 4) == 4 && C.strcmp(&data[0], c'keep') == 0
+}
+
+fn test_sendfile_stream_offsets(prime i32) bool {
+	mut pipe := [2]i32{}
+	if C.pipe(&pipe[0]) != 0 { return false }
+	defer {
+		C.close(pipe[0])
+		C.close(pipe[1])
+	}
+	mut offset := i64(-1)
+	if !sendfile_replies(prime, pipe[1], &offset, 0, C.EBADF) || offset != -1
+		|| !test_positioned_sendfile_stream(pipe[0], pipe[1], prime) {
+		return false
+	}
+	mut sockets := [2]i32{}
+	if C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &sockets[0]) != 0 { return false }
+	defer {
+		C.close(sockets[0])
+		C.close(sockets[1])
+	}
+	return test_positioned_sendfile_stream(sockets[0], sockets[1], prime)
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1266,6 +1304,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME SENDFILE APPEND: PASS')
 	} else {
 		C.puts(c'DRM PRIME SENDFILE APPEND FAIL: incorrect result, offset, cursor or pipe data')
+	}
+	if test_sendfile_stream_offsets(first) {
+		C.puts(c'VINIX DRM PRIME SENDFILE STREAM OFFSET: PASS')
+	} else {
+		C.puts(c'DRM PRIME SENDFILE STREAM OFFSET FAIL: incorrect error, offset or queued bytes')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')
