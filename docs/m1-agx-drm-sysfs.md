@@ -833,6 +833,29 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-stream-20261122.f9N0XI/
 The `bundle.tar.gz` SHA-256 is
 `034a9a4255fe279d3280d63734ddfb68c20ebb404671c25bd6900cc2a98d49cf`.
 
+#### Sendfile from a pipe or socket without an explicit offset
+
+After checking descriptor access, `sendfile` returns `EINVAL` for a pipe
+or socket source with a non-pipe destination, including a PRIME export.
+This check runs even for zero counts. Positive counts from a pipe into
+another pipe also return `EINVAL` because Linux pipe file operations lack
+a splice-read callback. These rejections preserve the source queue. A
+Unix stream socket can send bytes to a pipe.
+[Pinned direct splice source check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1120-L1134), [pinned pipe file operations](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/pipe.c#L1344-L1364)
+
+ARM64 and x86-64 QEMU checked zero and positive counts, invalid destination
+precedence, preservation of source bytes and regular-file positions, and a
+successful Unix socket-to-pipe transfer. The same x86-64 guest probe failed
+on the preceding kernel. The DRM syncobj host suite passed, and the
+allocation scan reproduced its 150 baseline findings. Native M1 validation
+remains open.
+
+The tested base was `fdeba690ae474b433a6fcad06455fbb896a015d2` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-stream-source-20261122.mG9ZRV/`.
+The `bundle.tar.gz` SHA-256 is
+`b363f45828469067442265808b95a3b9232d97fe7a23c9314686edf2682df51f`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

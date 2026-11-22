@@ -662,9 +662,11 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 		return errno.err, errno.ebadf
 	}
 	input_without_io := input_fd.handle.resource is resource.NoByteIOResource
+	input_mode := input_fd.handle.resource.stat.mode
+	pipe_input := stat.isifo(input_mode) || input_mode & stat.ifmt == stat.ifpipe
+	stream_input := pipe_input || stat.issock(input_mode)
 	if positioned {
-		mode := input_fd.handle.resource.stat.mode
-		if input_without_io || stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
+		if input_without_io || stream_input {
 			return errno.err, errno.espipe
 		}
 		if input_offset < 0 || count > u64(0x7fffffffffffffff) - u64(input_offset) {
@@ -683,22 +685,22 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 		&& output_access != resource.o_rdwr) {
 		return errno.err, errno.ebadf
 	}
-	// Linux routes pipe destinations around the direct splice append check.
-	if output_flags & resource.o_append != 0 {
-		mode := output_fd.handle.resource.stat.mode
-		if !stat.isifo(mode) && mode & stat.ifmt != stat.ifpipe {
-			return errno.err, errno.einval
-		}
+	output_mode := output_fd.handle.resource.stat.mode
+	pipe_output := stat.isifo(output_mode) || output_mode & stat.ifmt == stat.ifpipe
+	// Linux's direct splice path requires a seekable source and refuses append.
+	if !pipe_output && (stream_input || output_flags & resource.o_append != 0) {
+		return errno.err, errno.einval
 	}
 	if count == 0 {
 		return 0, 0
 	}
-	if input_without_io {
+	// Linux pipe file operations have no splice_read callback.
+	if input_without_io || pipe_input {
 		return errno.err, errno.einval
 	}
 	if output_fd.handle.resource is resource.NoByteIOResource {
 		mut source := input_fd.handle
-		if !stat.isreg(source.resource.stat.mode) {
+		if !stat.isreg(input_mode) {
 			return errno.err, errno.einval
 		}
 		mut sink := output_fd.handle

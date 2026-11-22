@@ -1164,7 +1164,7 @@ fn test_sendfile_append(prime i32) bool {
 		&& C.read(fds[0], &data[0], 2) == 2 && C.strncmp(&data[0], c'ab', 2) == 0
 }
 
-fn test_positioned_sendfile_stream(input i32, writer i32, output i32) bool {
+fn test_sendfile_stream_source(input i32, writer i32, output i32) bool {
 	if C.fcntl(input, C.F_SETFL, C.O_NONBLOCK) != 0 || C.write(writer, c'keep', 4) != 4 {
 		return false
 	}
@@ -1177,11 +1177,19 @@ fn test_positioned_sendfile_stream(input i32, writer i32, output i32) bool {
 	if !sendfile_replies(output, input, &offset, 4, C.ESPIPE) || offset != -1 {
 		return false
 	}
+	if !sendfile_replies(output, input, unsafe { nil }, 0, C.EINVAL)
+		|| !sendfile_replies(output, input, unsafe { nil }, 4, C.EINVAL)
+		|| !sendfile_replies(-1, input, unsafe { nil }, 0, C.EBADF) {
+		return false
+	}
 	mut data := [5]char{}
 	return C.read(input, &data[0], 4) == 4 && C.strcmp(&data[0], c'keep') == 0
 }
 
 fn test_sendfile_stream_offsets(prime i32) bool {
+	ordinary := i32(C.syscall(C.SYS_memfd_create, c'sendfile-stream-destination', u32(0)))
+	if ordinary < 0 { return false }
+	defer { C.close(ordinary) }
 	mut pipe := [2]i32{}
 	if C.pipe(&pipe[0]) != 0 { return false }
 	defer {
@@ -1190,7 +1198,8 @@ fn test_sendfile_stream_offsets(prime i32) bool {
 	}
 	mut offset := i64(-1)
 	if !sendfile_replies(prime, pipe[1], &offset, 0, C.EBADF) || offset != -1
-		|| !test_positioned_sendfile_stream(pipe[0], pipe[1], prime) {
+		|| !test_sendfile_stream_source(pipe[0], pipe[1], prime)
+		|| !test_sendfile_stream_source(pipe[0], pipe[1], ordinary) {
 		return false
 	}
 	mut sockets := [2]i32{}
@@ -1199,7 +1208,28 @@ fn test_sendfile_stream_offsets(prime i32) bool {
 		C.close(sockets[0])
 		C.close(sockets[1])
 	}
-	return test_positioned_sendfile_stream(sockets[0], sockets[1], prime)
+	if !test_sendfile_stream_source(sockets[0], sockets[1], prime)
+		|| !test_sendfile_stream_source(sockets[0], sockets[1], ordinary)
+		|| C.lseek(ordinary, 0, C.SEEK_CUR) != 0 || C.lseek(ordinary, 0, C.SEEK_END) != 0 {
+		return false
+	}
+	mut destination := [2]i32{}
+	if C.pipe(&destination[0]) != 0 { return false }
+	defer {
+		C.close(destination[0])
+		C.close(destination[1])
+	}
+	mut data := [5]char{}
+	if C.fcntl(destination[0], C.F_SETFL, C.O_NONBLOCK) != 0
+		|| C.write(pipe[1], c'keep', 4) != 4
+		|| C.syscall(C.SYS_sendfile, destination[1], pipe[0], unsafe { nil }, u64(0)) != 0
+		|| !sendfile_replies(destination[1], pipe[0], unsafe { nil }, 4, C.EINVAL)
+		|| C.read(pipe[0], &data[0], 4) != 4 || C.strcmp(&data[0], c'keep') != 0 {
+		return false
+	}
+	return C.write(sockets[1], c'pass', 4) == 4
+		&& C.syscall(C.SYS_sendfile, destination[1], sockets[0], unsafe { nil }, u64(4)) == 4
+		&& C.read(destination[0], &data[0], 4) == 4 && C.strcmp(&data[0], c'pass') == 0
 }
 
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
