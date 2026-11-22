@@ -217,11 +217,10 @@ The `bundle.tar.gz` SHA-256 is
 Each row reads the associated process's current group leader command and
 effective UID. It shows `<unknown>` and the mapped root UID after that
 process is reaped. A stored process generation prevents a recycled PID from
-supplying the previous process's command or UID. The table maps IDs using the
-current reader's PID and user namespaces. Authentication still records the
-open-time `CAP_SYS_ADMIN` check, and the master and magic columns report
-`n` and `0`. Linux uses the debugfs opener's user namespace for UID
-mapping. [Pinned Linux client listing](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L75-L122)
+supplying the previous process's command or UID. The reader's PID namespace
+governs TGID, and the debugfs opener's user namespace governs UID.
+Authentication records the open-time `CAP_SYS_ADMIN` check, and the master
+and magic columns report `n` and `0`. [Pinned Linux client listing](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L75-L122)
 
 The reader copies client rows into temporary storage under the device's
 list lock. It releases that lock before looking up processes and formatting
@@ -272,6 +271,37 @@ archived patch and the simple DRM named-device fixture. Evidence is stored at
 `/Users/alex/.local/state/vinix/m1-drm-handoff-20261122.9gyMnR/`.
 The `bundle.tar.gz` SHA-256 is
 `b7baa16697d6915a30aba3b0e218c523454db19580380f10501923912a1a2e69`.
+
+#### UID mapping across descriptor transfer
+
+Opening `clients` retains the opener's user namespace on its open
+description. Reads use that namespace's live UID map, including updates
+written after open. Duplication, fork and SCM_RIGHTS share the open
+description and its namespace reference. Final close and failed descriptor
+publication release the reference. The initial namespace uses the identity
+map without a reference. [Pinned Linux seq_user_ns](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/linux/seq_file.h#L248-L256)
+
+Independent review checked that the process-table lock serializes the
+open-time pin and UID-map access. The syscall retains the description
+through the callback. The added pointer keeps the description in the
+1536-byte slab class on both architectures.
+
+The named-device probe passed on ARM64 and x86-64 QEMU. It checks an
+initial-namespace open inherited by a child, the overflow UID before its
+map is written, and the mapped UID after the write. The child duplicates
+and passes its own debugfs descriptor to the initial namespace, where a
+read after reap still uses the child's map. The preceding ARM64 kernel
+failed the inherited-descriptor check.
+
+The DRM sanitizer suites and 200-cycle procfs probes passed. Both guests
+measured zero slab growth over 200 populated-table reads. The allocation
+scan reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `4b8f4414bddc77047f49fbfabe35626e40e37842` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-userns-20261122.USqHLX/`.
+The `bundle.tar.gz` SHA-256 is
+`4a5724bc049046c96b62a60d70139d8b6880a51a8dedc3c01428482662a2be6f`.
 
 ### Global GEM names
 

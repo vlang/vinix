@@ -3,6 +3,7 @@ module drm
 
 import fs
 import lib
+import proc
 
 // The DRM core types the publisher reads.
 pub struct DrmDriver {
@@ -132,7 +133,11 @@ fn read_attribute(path string) ?string {
 	entry := fs.entry(real) or { return none }
 	if entry.kind != .attribute { return none }
 	mut text := lib.new_text(64)
-	entry.show(entry.context, mut text)
+	if entry.namespaced_show != unsafe { nil } {
+		entry.namespaced_show(entry.context, unsafe { nil }, mut text)
+	} else {
+		entry.show(entry.context, mut text)
+	}
 	return lib.finish_text(text)
 }
 
@@ -177,7 +182,7 @@ fn show_marker(context voidptr, mut text lib.Text) {
 	text.add_byte(`\n`)
 }
 
-fn show_clients(context voidptr, mut text lib.Text) {
+fn show_clients(context voidptr, _ &proc.Namespace, mut text lib.Text) {
 	dev := unsafe { &DrmDevice(context) }
 	show_marker(voidptr(u64(dev.dev_id)), mut text)
 }

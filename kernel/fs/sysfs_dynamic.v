@@ -29,15 +29,20 @@
 module fs
 
 import errno
+import file
 import katomic
 import klock
 import lib
+import proc
 import resource
 import sched
 import stat
 
 // Writes `context`'s text to `text`.
 pub type SysfsShow = fn (context voidptr, mut text lib.Text)
+
+// Writes text using the user namespace of the open description.
+pub type SysfsNamespacedShow = fn (context voidptr, user_namespace &proc.Namespace, mut text lib.Text)
 
 // Takes the `length` bytes at `data` -- not NUL terminated, and usually ending
 // in the newline echo adds -- for `context`. Returns 0 or an errno.
@@ -100,7 +105,17 @@ fn (mut this SysFSResource) leave() {
 	katomic.dec(mut &this.busy)
 }
 
-fn (mut this SysFSResource) attribute_text() ?string {
+fn (this &SysFSResource) capture_user_namespace(mut description file.Handle, opener &proc.Process) {
+	if this.namespaced_show == unsafe { nil } { return }
+	proc.lock_table()
+	mut ns := opener.ns.user
+	if !proc.is_initial_namespace(ns) {
+		description.sysfs_user_namespace = proc.get_namespace(mut ns)
+	}
+	proc.unlock_table()
+}
+
+fn (mut this SysFSResource) attribute_text(handle voidptr) ?string {
 	if !this.enter() {
 		errno.set(errno.enodev)
 		return none
@@ -109,7 +124,12 @@ fn (mut this SysFSResource) attribute_text() ?string {
 	// it is handed to the owner, and left there by every read.
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(128) }
-	if this.show != unsafe { nil } {
+	if this.namespaced_show != unsafe { nil } {
+		ns := if handle == unsafe { nil } { unsafe { &proc.Namespace(nil) } } else {
+			unsafe { (&file.Handle(handle)).sysfs_user_namespace }
+		}
+		this.namespaced_show(this.context, ns, mut text)
+	} else if this.show != unsafe { nil } {
 		this.show(this.context, mut text)
 	}
 	this.leave()
@@ -237,6 +257,15 @@ fn sysfs_make_directory(path string, exclusive bool) bool {
 // written through it. `mode` is its permission bits: 0o444, or 0o644 for one
 // root may write. False if the name is taken or the path is not a directory.
 pub fn sysfs_attribute(path string, mode u32, show SysfsShow, store SysfsStore, context voidptr) bool {
+	return publish_sysfs_attribute(path, mode, show, unsafe { nil }, store, context)
+}
+
+// Publish a read-only attribute that formats IDs in its opener's namespace.
+pub fn sysfs_namespaced_attribute(path string, mode u32, show SysfsNamespacedShow, context voidptr) bool {
+	return publish_sysfs_attribute(path, mode, unsafe { nil }, show, unsafe { nil }, context)
+}
+
+fn publish_sysfs_attribute(path string, mode u32, show SysfsShow, namespaced_show SysfsNamespacedShow, store SysfsStore, context voidptr) bool {
 	vfs_lock.acquire()
 	sysfs_lock.acquire()
 	defer {
@@ -249,6 +278,7 @@ pub fn sysfs_attribute(path string, mode u32, show SysfsShow, store SysfsStore, 
 	}
 	mut attribute := new_sysfs_resource(.attribute, stat.ifreg | (mode & 0o777), 0)
 	attribute.show = show
+	attribute.namespaced_show = namespaced_show
 	attribute.store = store
 	attribute.context = context
 	// What Linux says for every attribute: its text is made when it is read.
@@ -270,10 +300,10 @@ pub fn sysfs_text(path string, text string) bool {
 	if parent == unsafe { nil } || name.len == 0 || name in parent.children {
 		return false
 	}
-	mut file := new_sysfs_resource(.text, stat.ifreg | 0o444, 0)
-	file.text = text.clone()
-	file.stat.size = u64(text.len)
-	sysfs_new_leaf(mut parent, name, mut file)
+	mut entry := new_sysfs_resource(.text, stat.ifreg | 0o444, 0)
+	entry.text = text.clone()
+	entry.stat.size = u64(text.len)
+	sysfs_new_leaf(mut parent, name, mut entry)
 	return true
 }
 

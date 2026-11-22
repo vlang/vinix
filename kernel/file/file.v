@@ -95,6 +95,9 @@ pub mut:
 	// The handle lock protects process attribution after publication.
 	drm_client_process proc.ProcessIdentity
 	drm_client_authenticated bool
+	// Owned by a sysfs attribute that presents IDs in its opener's namespace.
+	// Nil represents the initial user namespace.
+	sysfs_user_namespace &proc.Namespace = unsafe { nil }
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.
 	// Mount entries are permanent; fs resolves namespace copies by mount id.

@@ -25,6 +25,7 @@ import sched
 import klock
 import katomic
 import errno
+import file
 import numa
 import memory
 import resource
@@ -68,6 +69,7 @@ pub mut:
 	dynamic bool
 	box     &resource.Resource = unsafe { nil }
 	show    SysfsShow          = unsafe { nil }
+	namespaced_show SysfsNamespacedShow = unsafe { nil }
 	store   SysfsStore         = unsafe { nil }
 	context voidptr
 	gone    u32
@@ -408,7 +410,7 @@ fn (mut this SysFSResource) poll_status(_access int) int {
 	return 0x145 // IN | OUT | RDNORM | WRNORM
 }
 
-fn (mut this SysFSResource) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+fn (mut this SysFSResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	if stat.isdir(this.stat.mode) {
 		errno.set(errno.eisdir)
 		return none
@@ -417,7 +419,7 @@ fn (mut this SysFSResource) read(_handle voidptr, buf voidptr, loc u64, count u6
 	// An attribute's owner is asked for it; a file that has been removed has
 	// nobody left to ask.
 	text := if this.kind == .attribute {
-		this.attribute_text() or { return none }
+		this.attribute_text(handle) or { return none }
 	} else {
 		this.contents()
 	}
@@ -464,7 +466,13 @@ fn (mut this SysFSResource) grow(_handle voidptr, _new_size u64) ? {
 	return none
 }
 
-fn (mut this SysFSResource) unref(_handle voidptr) ? {
+fn (mut this SysFSResource) unref(handle voidptr) ? {
+	if this.namespaced_show != unsafe { nil } && handle != unsafe { nil } {
+		mut ns := unsafe { (&file.Handle(handle)).sysfs_user_namespace }
+		if ns != unsafe { nil } {
+			release_namespace(mut ns)
+		}
+	}
 	if katomic.dec(mut &this.refcount) || !this.dynamic {
 		return
 	}

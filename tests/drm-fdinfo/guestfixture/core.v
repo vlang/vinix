@@ -3,6 +3,7 @@ module guestfixture
 
 #include <errno.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +18,7 @@ module guestfixture
 fn C.open(&char, i32, ...) i32
 fn C.close(i32) i32
 fn C.read(i32, voidptr, u64) i64
+fn C.lseek(i32, i64, i32) i64
 fn C.write(i32, voidptr, u64) i64
 fn C.ioctl(i32, i32, ...) i32
 fn C.__errno_location() &i32
@@ -42,6 +44,7 @@ fn C.pipe(&i32) i32
 fn C.getpid() i32
 fn C.geteuid() u32
 fn C.prctl(i32, ...) i32
+fn C.unshare(i32) i32
 fn C.setrlimit(i32, &C.rlimit) i32
 fn C.setresuid(u32, u32, u32) i32
 fn C.socketpair(i32, i32, i32, &i32) i32
@@ -195,9 +198,13 @@ const clients_path = c'/sys/kernel/debug/dri/0/clients'
 fn same_client_rows(expected &char) bool {
 	info := C.open(clients_path, C.O_RDONLY)
 	if info < 0 { return false }
+	defer { C.close(info) }
+	return match_client_rows(info, expected)
+}
+
+fn match_client_rows(info i32, expected &char) bool {
 	mut actual := [512]u8{}
 	count := C.read(info, &actual[0], sizeof(actual) - 1)
-	C.close(info)
 	return count >= 0 && C.strcmp(expected, unsafe { &char(&actual[0]) }) == 0
 }
 
@@ -266,7 +273,7 @@ fn test_debugfs_clients() bool {
 	return row_retained && exited && empty
 }
 
-fn pass_client(socket i32, outgoing i32) i32 {
+fn pass_fd(socket i32, outgoing i32) i32 {
 	unsafe {
 		mut byte := u8(0)
 		mut control := [3]u64{}
@@ -322,14 +329,14 @@ fn test_live_client_identity() bool {
 		C.close(sockets[0])
 		client := C.open(c'/dev/dri/card0', C.O_RDWR)
 		if client < 0 || C.prctl(C.PR_SET_NAME, c'live-drm-opener', u64(0), u64(0), u64(0)) != 0
-			|| C.setresuid(0, 1234, 0) != 0 || C.geteuid() != 1234 || pass_client(sockets[1], client) < 0 {
+			|| C.setresuid(0, 1234, 0) != 0 || C.geteuid() != 1234 || pass_fd(sockets[1], client) < 0 {
 			C._exit(2)
 		}
 		mut byte := u8(0)
 		C._exit(if C.read(sockets[1], &byte, 1) == 0 { 0 } else { 3 })
 	}
 	C.close(sockets[1])
-	passed := if child > 0 { pass_client(sockets[0], -1) } else { -1 }
+	passed := if child > 0 { pass_fd(sockets[0], -1) } else { -1 }
 	mut expected := [512]u8{}
 	header_len := format_client_header(&expected[0], sizeof(expected))
 	id := client_id(passed)
@@ -350,6 +357,67 @@ fn test_live_client_identity() bool {
 	if passed >= 0 { C.close(passed) }
 	unsafe { expected[header_len] = 0 }
 	return live && gone && same_client_rows(unsafe { &char(&expected[0]) })
+}
+
+fn test_client_user_namespace() bool {
+	client := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if client < 0 { return false }
+	defer { C.close(client) }
+	view := C.open(clients_path, C.O_RDONLY)
+	if view < 0 { return false }
+	defer { C.close(view) }
+	id := client_id(client)
+	if id <= 0 { return false }
+	pid := C.getpid()
+	mut expected := [512]u8{}
+	header_len := format_client_header(&expected[0], sizeof(expected))
+	row := unsafe { &expected[header_len] }
+	capacity := sizeof(expected) - u64(header_len)
+	command := c'vinix-clients'
+	format_client_row(row, capacity, command, pid, 0, c'<unset>', u64(id))
+
+	mut sockets := [2]i32{}
+	if C.socketpair(C.AF_UNIX, C.SOCK_SEQPACKET, 0, &sockets[0]) != 0 { return false }
+	child := C.fork()
+	if child == 0 {
+		C.close(sockets[0])
+		if C.unshare(C.CLONE_NEWUSER) != 0 { C._exit(2) }
+		// This inherited description was opened in the initial user namespace.
+		if !match_client_rows(view, unsafe { &char(&expected[0]) }) { C._exit(3) }
+		own := C.open(clients_path, C.O_RDONLY)
+		if own < 0 { C._exit(4) }
+		format_client_row(row, capacity, command, pid, 65534, c'<unset>', u64(id))
+		if !match_client_rows(own, unsafe { &char(&expected[0]) }) { C._exit(5) }
+
+		// The open description retains the namespace and observes its new map.
+		mapping := c'1234 0 1\n'
+		map_fd := C.open(c'/proc/self/uid_map', C.O_WRONLY)
+		if map_fd < 0 || C.write(map_fd, mapping, C.strlen(mapping)) != i64(C.strlen(mapping)) { C._exit(6) }
+		C.close(map_fd)
+		format_client_row(row, capacity, command, pid, 1234, c'<unset>', u64(id))
+		if C.lseek(own, 0, C.SEEK_SET) != 0 || !match_client_rows(own, unsafe { &char(&expected[0]) }) {
+			C._exit(7)
+		}
+		alias := C.dup(own)
+		C.close(own)
+		if alias < 0 || C.lseek(alias, 0, C.SEEK_SET) != 0 || pass_fd(sockets[1], alias) < 0 { C._exit(8) }
+		C._exit(0)
+	}
+	C.close(sockets[1])
+	received := if child > 0 { pass_fd(sockets[0], -1) } else { -1 }
+	C.close(sockets[0])
+	mut status := i32(0)
+	reaped := child > 0 && C.waitpid(child, &status, 0) == child && status == 0
+	if received < 0 || !reaped {
+		if received >= 0 { C.close(received) }
+		C.printf(c'DRM user namespace child status: %d\n', status)
+		return false
+	}
+	// Read in the initial user namespace after the mapped namespace's task exited.
+	format_client_row(row, capacity, command, pid, 1234, c'<unset>', u64(id))
+	mapped := match_client_rows(received, unsafe { &char(&expected[0]) })
+	C.close(received)
+	return mapped
 }
 
 fn client_read_heap(objects &i64, capacity int) int {
@@ -419,6 +487,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM LIVE CLIENT IDENTITY: PASS')
 		} else {
 			C.puts(c'DRM LIVE CLIENT IDENTITY FAIL: incorrect live or reaped opener')
+		}
+		if test_client_user_namespace() {
+			C.puts(c'VINIX DRM CLIENT USER NAMESPACE: PASS')
+		} else {
+			C.puts(c'DRM CLIENT USER NAMESPACE FAIL: incorrect UID mapping')
 		}
 		if test_client_read_allocations() {
 			C.puts(c'VINIX DRM CLIENT READ ALLOCATIONS: PASS')

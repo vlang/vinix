@@ -83,7 +83,7 @@ mut:
 	name_len u8
 }
 
-fn show_clients(context voidptr, mut text lib.Text) {
+fn show_clients(context voidptr, user_namespace &proc.Namespace, mut text lib.Text) {
 	mut dev := unsafe { &DrmDevice(context) }
 	add_client_column(mut text, 'command', 20)
 	text.add('  tgid dev master a   uid      magic ')
@@ -121,13 +121,13 @@ fn show_clients(context voidptr, mut text lib.Text) {
 	dev.clients_lock.release()
 	text.reserve(count * client_row_max)
 	for i in 0 .. count {
-		add_client_row(mut text, unsafe { &rows[i] })
+		add_client_row(mut text, unsafe { &rows[i] }, user_namespace)
 	}
 }
 
-fn add_client_row(mut text lib.Text, row &ClientRow) {
+fn add_client_row(mut text lib.Text, row &ClientRow, user_namespace &proc.Namespace) {
 	mut comm := [16]u8{}
-	pid, uid, live := proc.copy_process_identity(row.process, unsafe { &comm[0] })
+	pid, uid, live := proc.copy_process_identity(row.process, user_namespace, unsafe { &comm[0] })
 	mut length := 0
 	for length < comm.len && comm[length] != 0 {
 		length++

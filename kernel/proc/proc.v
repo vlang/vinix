@@ -1248,9 +1248,10 @@ pub fn process_identity(process &Process) ProcessIdentity {
 	}
 }
 
-// Read an identity as the caller sees it. Only copy the command if this
-// exact process is still in the table. The caller supplies 16 zeroed bytes.
-pub fn copy_process_identity(identity ProcessIdentity, destination voidptr) (int, u32, bool) {
+// Translate the PID for the caller and the UID for user_namespace.
+// Copy the command if this exact process is still in the table. The caller
+// supplies 16 zeroed bytes.
+pub fn copy_process_identity(identity ProcessIdentity, user_namespace &Namespace, destination voidptr) (int, u32, bool) {
 	lock_table()
 	defer { unlock_table() }
 	viewer := current_thread().process
@@ -1264,10 +1265,10 @@ pub fn copy_process_identity(identity ProcessIdentity, destination voidptr) (int
 	}
 	process := process_at(identity.pid)
 	if process == unsafe { nil } || process.kernel_owner.generation != identity.generation {
-		return pid, own_visible_id(viewer, 0, false), false
+		return pid, visible_id(user_namespace, 0, false), false
 	}
 	copy_command(process, threads_by_tid[identity.pid], destination)
-	return pid, own_visible_id(viewer, process.euid, false), true
+	return pid, visible_id(user_namespace, process.euid, false), true
 }
 
 fn copy_command(process &Process, task &Thread, destination voidptr) {

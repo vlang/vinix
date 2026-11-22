@@ -154,12 +154,14 @@ fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
 		// Legacy GEM names are distinct from handles and DMA-BUF exports.
 		// Vinix has no GEM_FLINK namespace, so the table has no rows.
 		publish_text(directory, 'gem_names', '  name     size handles refcount\n')
+		clients_path := sysfs_join3(directory, '/', 'clients')
+		fs.sysfs_namespaced_attribute(clients_path, 0o444, show_clients, voidptr(dev))
+		unsafe { clients_path.free() }
 		dev.debugfs_primary_link = publish_debugfs_link(dev.dev_id, unique)
 		if dev.render_node != unsafe { nil } {
 			dev.debugfs_render_link = publish_debugfs_link(128 + dev.dev_id, unique)
 		}
 		dev.debugfs_dir = directory
-		debugfs_add_file(dev, 'clients', show_clients, voidptr(dev))
 	} else {
 		unsafe { directory.free() }
 	}

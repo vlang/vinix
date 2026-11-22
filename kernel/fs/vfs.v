@@ -956,6 +956,11 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
 		origin_transferred = true
 	}
 	mut fd := file.fd_create_from_opened(opened_resource, flags) or { return none }
+	if flags & resource.o_path == 0 {
+		if mut node_resource is SysFSResource {
+			node_resource.capture_user_namespace(mut fd.handle, current_process)
+		}
+	}
 	fd.handle.created = created
 	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
 	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)

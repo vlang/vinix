@@ -32,6 +32,8 @@ fn main() {
 	os.mkdir_all('${scratch}/lib')!
 	os.cp('${repo}/kernel/lib/text.v', '${scratch}/lib/text.v')!
 	os.mkdir_all('${scratch}/fs')!
+	os.mkdir_all('${scratch}/proc')!
+	os.write_file('${scratch}/proc/namespace.v', 'module proc\npub struct Namespace {}\n')!
 	os.cp('${repo}/tests/drm-sysfs/fakefs.v', '${scratch}/fs/fakefs.v')!
 	drm_source := os.read_file(os.getenv_opt('DRM_SYSFS_SOURCE') or { '${repo}/kernel/drm/sysfs.v' })!
 	agx_source := os.read_file(os.getenv_opt('AGX_SYSFS_SOURCE') or { '${repo}/kernel/gpu/agx/driver/sysfs.v' })!

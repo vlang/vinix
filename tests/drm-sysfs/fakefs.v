@@ -3,6 +3,7 @@
 module fs
 
 import lib
+import proc
 
 // A recording /sys with the semantics of kernel/fs/sysfs_dynamic.v: parents
 // are made on demand, a taken name is refused, and removing a directory
@@ -16,6 +17,7 @@ pub enum Kind {
 }
 
 pub type SysfsShow = fn (context voidptr, mut text lib.Text)
+pub type SysfsNamespacedShow = fn (context voidptr, user_namespace &proc.Namespace, mut text lib.Text)
 
 pub type SysfsStore = fn (context voidptr, data &u8, length u64) u64
 
@@ -25,6 +27,7 @@ pub:
 	value   string // a text's contents or a link's target
 	mode    u32    // an attribute's permission bits
 	show    SysfsShow = unsafe { nil }
+	namespaced_show SysfsNamespacedShow = unsafe { nil }
 	context voidptr
 }
 
@@ -85,6 +88,12 @@ pub fn sysfs_link(path string, target string) bool {
 pub fn sysfs_attribute(path string, mode u32, show SysfsShow, store SysfsStore, context voidptr) bool {
 	if !make_parents(path) || path in sysfs_entries { return false }
 	sysfs_entries[path] = Entry{kind: .attribute, mode: mode, show: show, context: context}
+	return true
+}
+
+pub fn sysfs_namespaced_attribute(path string, mode u32, show SysfsNamespacedShow, context voidptr) bool {
+	if !make_parents(path) || path in sysfs_entries { return false }
+	sysfs_entries[path] = Entry{kind: .attribute, mode: mode, namespaced_show: show, context: context}
 	return true
 }
 
