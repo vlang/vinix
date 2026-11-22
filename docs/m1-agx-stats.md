@@ -93,10 +93,9 @@ core now publishes that directory
 in /sys at the path Linux mounts debugfs on. Drivers add files to it with
 `drm.debugfs_add_file()`, Linux's `drm_debugfs_add_file()`
 ([DRM sysfs](m1-agx-drm-sysfs.md#drm-debugfs)). The AGX driver adds
-`asahi_stats` once the DRM device is registered, as Asahi does. Only root may
-read it, as only root may enter debugfs on Linux; anyone may list the
-directories. Unregistering the DRM device removes it before the GPU is
-stopped, and removal waits for any read still running.
+`asahi_stats` once the DRM device is registered. The file has mode `0444`
+behind the `0700` debugfs root. Unregistering the DRM device removes the
+file and waits for active reads before the GPU stops.
 
 ## Validation
 
@@ -140,10 +139,10 @@ Evidence is under
   repeated kind. Vinix's text must match the oracle's byte for byte. Mutants
   that read `power` or `sensor_id` from a pad, swap `util1` and `util2`, or
   count a tag past the last fail it.
-- `tests/drm-sysfs` checks the debugfs directory, its links, a root-only file
+- `tests/drm-sysfs` checks the debugfs directory, its links, a read-only file
   read through either link and removal at unregister, and that a parentless
   device and a second device with a taken name get no directory. Mutants with
-  a wrong link target, no removal, a world-readable file or a shared directory
+  a wrong link target, no removal, an incorrect file mode or a shared directory
   fail it. In QEMU, on both architectures, the parentless devices have no
   debugfs entry.
 - An independent lifetime review found no bug. It confirmed the following:

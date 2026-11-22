@@ -134,7 +134,7 @@ part of it in /sys, at the path where Linux mounts debugfs:
 /sys/kernel/debug/dri/206400000.gpu/
     name           asahi dev=206400000.gpu unique=206400000.gpu
     gem_names      empty global GEM name table
-    asahi_stats    added by the AGX driver; root-only
+    asahi_stats    added by the AGX driver, mode 0444
 /sys/kernel/debug/dri/0    -> 206400000.gpu
 /sys/kernel/debug/dri/128  -> 206400000.gpu
 ```
@@ -200,6 +200,28 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/m1-drm-gem-names-20261122.XWd8qs/`.
 The `bundle.tar.gz` SHA-256 is
 `485dd5826fda99537243a6f51d2c958cfe0ac1969d3a534f6d61060904fcdd38`.
+
+### Driver file permissions
+
+`debugfs_add_file()` creates files such as `asahi_stats` with mode
+`0444`. The `0700` debugfs root gates access through the normal
+`/sys/kernel/debug` path. [Pinned Linux DRM file mode](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L460-L482)
+
+The DRM sysfs sanitizer fixture checked the file mode, reads through
+both minor links and removal at unregister. The same fixture rejected
+the previous `0400` mode.
+
+Both kernel builds used `-O1` for C compilation. ARM64 and x86-64 QEMU
+guests under TCG verified that unprivileged traversal of the debugfs root
+still returns `EACCES`. The ARM64 DRM discovery probe passed, and the
+allocation scan reproduced the 150 baseline findings. Native M1 validation
+remains open.
+
+The tested base was `1c1a6efa934dae901c4802862f05cea645a1d63e` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-debugfs-file-mode-20261122.TgKbIb/`.
+The `bundle.tar.gz` SHA-256 is
+`d0f6bc3d89ec66f5b8a5222ffd30eec22ac853a70150e6abe095681a9ea5950e`.
 
 ### Debugfs root permissions
 

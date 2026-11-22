@@ -309,12 +309,12 @@ pub fn run_checks() {
 	}
 	assert !debugfs_add_file(&gpu_device, 'name', show_marker, unsafe { nil })
 	assert !debugfs_add_file(&gpu_device, 'gem_names', show_marker, unsafe { nil })
-	// A driver's file in it: root-only, read through its show function, and
+	// A driver's read-only file, read through its show function and
 	// reachable through either minor's link.
 	assert debugfs_add_file(&gpu_device, 'asahi_stats', show_marker, voidptr(u64(42)))
 	assert !debugfs_add_file(&gpu_device, 'asahi_stats', show_marker, voidptr(u64(42)))
 	stats := fs.entry('${debugfs}/asahi_stats') or { panic('asahi_stats missing') }
-	assert stats.kind == .attribute && stats.mode == 0o400
+	assert stats.kind == .attribute && stats.mode == 0o444
 	assert (read_attribute('kernel/debug/dri/1/asahi_stats') or { '' }) == 'stats of 42\n'
 	assert (read_attribute('kernel/debug/dri/129/asahi_stats') or { '' }) == 'stats of 42\n'
 	// A second device whose parent has the same name gets no directory, as
@@ -435,5 +435,5 @@ pub fn run_checks() {
 	assert node_is_drm(0) == false && exists('class/drm/card0')
 	remove_drm_sysfs(mut framebuffer)
 	_ = lib.new_text(0)
-	println('DRM sysfs: libdrm finds the M1 GPU as a platform device named from the pinned device tree, its debugfs directory holds root-only driver files, virtual devices stay unlisted, and unregister removes its own links; a VirtIO-MMIO GPU is listed as a platform device through its virtio parent')
+	println('DRM sysfs: libdrm finds the M1 GPU through its platform device, debugfs driver files have mode 0444, and unregister removes the owned entries. Virtual devices stay unlisted, and the VirtIO-MMIO GPU is listed through its platform parent.')
 }

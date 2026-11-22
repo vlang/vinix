@@ -207,16 +207,15 @@ fn remove_debugfs_link(minor u32) {
 }
 
 // Add the read-only file `name` to the device's debugfs directory, read
-// through `show`: Linux's drm_debugfs_add_file(). Only root may read it, as
-// only root may enter debugfs on Linux. The file goes when the device
-// unregisters, once no read of it is running, so `context` must last until
-// then. It does not synchronize with unregister_device(): call it before
-// anything can unregister the device, as the AGX driver does during its own
-// registration. False for a device with no directory.
+// through `show`: Linux's drm_debugfs_add_file(). The file has mode 0444
+// behind the 0700 debugfs root. Unregister waits for reads of the file to
+// finish before returning, so `context` must last until then.
+// Add files during driver registration, before anything can unregister the
+// device. False for a device with no directory.
 pub fn debugfs_add_file(dev &DrmDevice, name string, show fs.SysfsShow, context voidptr) bool {
 	if dev.debugfs_dir.len == 0 { return false }
 	path := sysfs_join3(dev.debugfs_dir, '/', name)
-	added := fs.sysfs_attribute(path, 0o400, show, unsafe { nil }, context)
+	added := fs.sysfs_attribute(path, 0o444, show, unsafe { nil }, context)
 	unsafe { path.free() }
 	return added
 }

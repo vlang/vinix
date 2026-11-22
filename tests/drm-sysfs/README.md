@@ -19,8 +19,8 @@ and device parsing. The expected node name, unit address and compatibles come
 from the pinned `t8103.dtsi`. It also requires that `driver.v` names the device
 from the ASC base. It then checks Linux's DRM debugfs directory in
 `kernel/debug/dri`: the directory named after the parent, a link per minor, a
-root-only driver file read through either link, none for the parentless device,
-and removal at unregister. A VirtIO-MMIO GPU, named by
+read-only driver file with mode `0444` through either link, no directory for
+the parentless device, and removal at unregister. A VirtIO-MMIO GPU, named by
 `kernel/aarch64/virtio_gpu/sysfs.v`, must be listed as a platform device
 through its virtio parent, as libdrm's `drmParseSubsystemType()` does, named
 from its `MODALIAS`, with subsystem links that lead to the buses.
