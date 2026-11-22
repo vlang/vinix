@@ -89,6 +89,10 @@ mut:
 	debugfs_dir  string // owned; empty for a device with no parent
 	debugfs_primary_link bool
 	debugfs_render_link bool
+	clients_lock klock.Lock
+	clients_first &file.Handle = unsafe { nil }
+	clients_last &file.Handle = unsafe { nil }
+	clients_count int
 }
 
 pub fn (dev &DrmDevice) is_registered() bool {
@@ -859,6 +863,11 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 
 fn (mut this DrmNode) unref(handle voidptr) ? {
 	if handle != unsafe { nil } && unsafe { (&file.Handle(handle)).flags & resource.o_path == 0 } {
+		mut description := unsafe { &file.Handle(handle) }
+		if description.drm_client_id != 0 {
+			mut dev := unsafe { this.dev }
+			dev.remove_client(mut description)
+		}
 		if this.dev != unsafe { nil } && this.dev.driver != unsafe { nil }
 			&& this.dev.driver.file_close != unsafe { nil } {
 			this.dev.driver.file_close(this.dev, handle)

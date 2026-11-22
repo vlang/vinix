@@ -19,7 +19,8 @@ pub fn new_text(capacity int) Text {
 	}
 }
 
-fn (mut t Text) reserve(extra int) {
+// Reserve space for the next extra bytes before appending them.
+pub fn (mut t Text) reserve(extra int) {
 	if t.bytes.len + extra <= t.bytes.cap {
 		return
 	}

@@ -1226,7 +1226,18 @@ pub fn copy_current_command(destination voidptr) {
 	lock_table()
 	defer { unlock_table() }
 	task := current_thread()
-	name, start, end := selected_command_bounds(task.process, task)
+	copy_command(task.process, task, destination)
+}
+
+// Copy the group leader's comm into the caller's zeroed 16-byte buffer.
+pub fn copy_process_command(process &Process, destination voidptr) {
+	lock_table()
+	defer { unlock_table() }
+	copy_command(process, threads_by_tid[process.pid], destination)
+}
+
+fn copy_command(process &Process, task &Thread, destination voidptr) {
+	name, start, end := selected_command_bounds(process, task)
 	limit := if end - start > 15 { start + 15 } else { end }
 	for i in start .. limit { unsafe { (&u8(destination))[i - start] = name[i] } }
 }

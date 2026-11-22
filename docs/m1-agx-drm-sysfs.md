@@ -133,6 +133,7 @@ part of it in /sys, at the path where Linux mounts debugfs:
 ```
 /sys/kernel/debug/dri/206400000.gpu/
     name           asahi dev=206400000.gpu unique=206400000.gpu
+    clients        open DRM descriptions, oldest first
     gem_names      empty global GEM name table
     asahi_stats    added by the AGX driver, mode 0444
 /sys/kernel/debug/dri/0    -> 206400000.gpu
@@ -175,6 +176,44 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/m1-drm-debugfs-name-20261122.dQB93U/`.
 The `bundle.tar.gz` SHA-256 is
 `64dbb921db254658c8eec3ce7eaf7ba6a09ad7c73c07f47782abd4c45d27d912`.
+
+### Open clients
+
+The read-only `clients` file shows one row per open DRM data description,
+oldest first. Both minor links reach the same table. The minor column records
+the node used for each open, and the name and ID match that description's
+`fdinfo`. Duplicates and inherited descriptors share the row until the last
+reference goes away. Metadata-only opens have no row. [Pinned Linux client listing](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L75-L122)
+
+Vinix records the group leader's command, kernel TGID, effective UID and
+`CAP_SYS_ADMIN` check at open. The command and credentials stay associated
+with that open after the opener exits. The master and magic columns report
+`n` and `0`, respectively. Linux derives command and UID from a live task
+and maps identifiers into the reader's namespaces.
+
+The device list borrows open descriptions until final resource close.
+Independent lifetime review and generated C confirmed that readers and
+close serialize on the list lock. The reader reserves output before taking
+the final list lock and holds it while formatting the rows. The extra inline
+fields add 48 bytes on each architecture and keep the description in the
+1536-byte slab class.
+
+The DRM sysfs, wire and fdinfo sanitizer fixtures passed. Both standard
+kernels passed the client ID and name checks and the 200-cycle procfs
+probe under QEMU TCG. The allocation scan reproduced the 150 baseline
+findings. Native M1 validation remains open.
+
+The named-device QEMU fixture passed on ARM64 and x86-64. It sets the simple
+DRM driver's parent to `devices/platform/drm-clients-fixture` in isolated
+builds. It checks the exact header and rows, 64-byte names, duplicate and
+fork retention, rollback on `EMFILE` and removal after final close. The
+device's parent override is included in the evidence bundle.
+
+The tested base was `abfff7bdd62d79f80758ba013472825a2a12eb3d` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-clients-20261122.bpIpJS/`.
+The `bundle.tar.gz` SHA-256 is
+`62776282975bb00176acdae1d56ec99aabf901eb097d1a35af670790760fe61a`.
 
 ### Global GEM names
 

@@ -89,6 +89,14 @@ pub mut:
 	// The handle lock protects the optional DRM client name and its length.
 	drm_client_name [drm_client_name_max_len]u8
 	drm_client_name_len u8
+	// The DRM device's clients lock protects the links. Opener fields are
+	// set before insertion and remain valid after the opening task exits.
+	drm_client_prev &Handle = unsafe { nil }
+	drm_client_next &Handle = unsafe { nil }
+	drm_client_command [16]u8
+	drm_client_tgid int
+	drm_client_uid u32
+	drm_client_authenticated bool
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.
 	// Mount entries are permanent; fs resolves namespace copies by mount id.

@@ -177,6 +177,11 @@ fn show_marker(context voidptr, mut text lib.Text) {
 	text.add_byte(`\n`)
 }
 
+fn show_clients(context voidptr, mut text lib.Text) {
+	dev := unsafe { &DrmDevice(context) }
+	show_marker(voidptr(u64(dev.dev_id)), mut text)
+}
+
 fn show_agx_stats(context voidptr, mut text lib.Text) {
 	show_marker(context, mut text)
 }
@@ -306,9 +311,12 @@ pub fn run_checks() {
 		assert (resolve('kernel/debug/dri/${minor}') or { '' }) == debugfs
 		assert text_of('kernel/debug/dri/${minor}/name') == expected_name
 		assert text_of('kernel/debug/dri/${minor}/gem_names') == expected_gem_names
+		assert (read_attribute('kernel/debug/dri/${minor}/clients') or { '' }) == 'stats of 1\n'
 	}
+	assert (fs.entry('${debugfs}/clients') or { panic('clients missing') }).mode == 0o444
 	assert !debugfs_add_file(&gpu_device, 'name', show_marker, unsafe { nil })
 	assert !debugfs_add_file(&gpu_device, 'gem_names', show_marker, unsafe { nil })
+	assert !debugfs_add_file(&gpu_device, 'clients', show_marker, unsafe { nil })
 	// A driver's read-only file, read through its show function and
 	// reachable through either minor's link.
 	assert debugfs_add_file(&gpu_device, 'asahi_stats', show_marker, voidptr(u64(42)))
@@ -343,6 +351,7 @@ pub fn run_checks() {
 	assert text_of('${competed_directory}/owner') == 'competing device'
 	assert !fs.published('${competed_directory}/name')
 	assert !fs.published('${competed_directory}/gem_names')
+	assert !fs.published('${competed_directory}/clients')
 
 	mut partial_driver := DrmDriver{sysfs_parent: 'devices/platform/partial.gpu'}
 	mut partial_device := DrmDevice{driver: &partial_driver, dev_id: 4, render_node: &node}
@@ -417,7 +426,7 @@ pub fn run_checks() {
 	for path in ['class/drm/card1', 'class/drm/renderD129', 'dev/char/226:1', 'dev/char/226:129',
 		'${parent}/drm/card1', '${parent}/drm/renderD129', 'class/drm/card0', 'dev/char/226:0',
 		'devices/virtual/drm/card0', 'kernel/debug/dri/1', 'kernel/debug/dri/129', debugfs,
-		'${debugfs}/asahi_stats', '${debugfs}/name', '${debugfs}/gem_names'] {
+		'${debugfs}/asahi_stats', '${debugfs}/name', '${debugfs}/gem_names', '${debugfs}/clients'] {
 		assert !fs.published(path), '${path} survived unregister'
 	}
 	assert fs.published('${parent}/uevent')

@@ -159,6 +159,7 @@ fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
 			dev.debugfs_render_link = publish_debugfs_link(128 + dev.dev_id, unique)
 		}
 		dev.debugfs_dir = directory
+		debugfs_add_file(dev, 'clients', show_clients, voidptr(dev))
 	} else {
 		unsafe { directory.free() }
 	}

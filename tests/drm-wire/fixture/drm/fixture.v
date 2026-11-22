@@ -5,6 +5,7 @@ import drm.ioctl
 import usercopy
 import memory
 import errno
+import klock
 
 struct DrmIoctl {
 	cmd        u32
@@ -42,6 +43,10 @@ mut:
 	registered bool       = true
 	node &DrmNode = unsafe { nil }
 	render_node &DrmNode = unsafe { nil }
+	clients_lock klock.Lock
+	clients_first &NodeHandle = unsafe { nil }
+	clients_last &NodeHandle = unsafe { nil }
+	clients_count int
 }
 
 struct NodeStat {

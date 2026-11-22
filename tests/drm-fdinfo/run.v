@@ -19,7 +19,7 @@ fn main() {
 	os.cp('${repo}/kernel/lib/text.v', '${scratch}/lib/text.v')!
 	source := os.read_file(os.getenv_opt('DRM_FDINFO_SOURCE') or { '${repo}/kernel/drm/fdinfo.v' })!
 	production := 'module drm\nimport lib\n' +
-		section(source, 'pub struct MemoryStats {', '__global (')! +
+		section(source, 'pub struct MemoryStats {', 'fn ioctl_set_client_name(')! +
 		'// drm_show_fdinfo(): the driver' + source.all_after('// drm_show_fdinfo(): the driver')
 	os.write_file('${scratch}/drm/production.v', production)!
 	os.cp('${repo}/tests/drm-fdinfo/check.v', '${scratch}/drm/check.v')!

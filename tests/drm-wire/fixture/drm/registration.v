@@ -16,6 +16,10 @@ mut:
 
 struct NodeHandle {
 	flags int
+	drm_client_id u64
+mut:
+	drm_client_prev &NodeHandle = unsafe { nil }
+	drm_client_next &NodeHandle = unsafe { nil }
 }
 
 struct RegistryLock {
@@ -582,9 +586,13 @@ fn check_file_close_after_unregister() {
 	defer { close_device = unsafe { nil } }
 	close_device = unsafe { old }
 	mut node := unsafe { old.node }
-	data := NodeHandle{}
+	data := NodeHandle{drm_client_id: 1}
 	path := NodeHandle{flags: o_path}
 	assert (node.open(0) or { panic('data open failed') }) == node.box
+	mut previous := unsafe { old }
+	previous.clients_first = &data
+	previous.clients_last = &data
+	previous.clients_count = 1
 	node.refcount++
 	unregister_device(old)
 	replacement := register_driver_with_data(&driver, unsafe { nil }) or { panic('replacement registration failed') }
@@ -596,6 +604,8 @@ fn check_file_close_after_unregister() {
 	assert node.refcount == 1 && closed_handle == unsafe { nil } && destroyed_owner == 0
 	node.unref(voidptr(&data)) or { panic('data close failed') }
 	assert node.refcount == 0 && closed_handle == voidptr(&data) && destroyed_owner == u64(&data)
+	assert old.clients_count == 0 && old.clients_first == unsafe { nil } && old.clients_last == unsafe { nil }
+	assert replacement.clients_count == 0
 	closed_handle = unsafe { nil }
 	destroyed_owner = 0
 	println('DRM close: metadata handles skip driver cleanup and old data handles close on their original device')

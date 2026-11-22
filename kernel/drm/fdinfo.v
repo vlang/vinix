@@ -8,7 +8,6 @@ module drm
 
 import file
 import drm.ioctl
-import katomic
 import lib
 import resource
 import usercopy
@@ -29,19 +28,6 @@ pub:
 pub const memory_stats_resident = u32(1)
 pub const memory_stats_purgeable = u32(2)
 pub const memory_stats_active = u32(4)
-
-__global (
-	drm_last_client_id = u64(0)
-)
-
-// Number a new DRM data open before its description enters the fd table.
-pub fn assign_client_id(mut description file.Handle) {
-	if description.flags & resource.o_path != 0 { return }
-	res := description.resource
-	if res != unsafe { nil } && res is DrmNode {
-		description.drm_client_id = katomic.inc(mut &drm_last_client_id) + 1
-	}
-}
 
 fn ioctl_set_client_name(handle voidptr, data voidptr) int {
 	if handle == unsafe { nil } || data == unsafe { nil } { return -22 }

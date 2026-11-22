@@ -38,6 +38,9 @@ fn main() {
 	production += section(source, 'fn (mut this DrmNode) unref(', 'fn (mut this DrmNode) link(')!
 		.replace('file.Handle', 'NodeHandle').replace('resource.o_path', 'o_path')
 		.replace('syncobj.destroy_owner(', 'destroy_owner(')
+	clients_source := os.read_file('${repo}/kernel/drm/clients.v')!
+	production += section(clients_source, 'fn (mut dev DrmDevice) remove_client(', '// The fixed widths')!
+		.replace('file.Handle', 'NodeHandle')
 	production += section(source, 'fn create_device_node(', 'fn drm_node_name(')!
 		.replace('sizeof(resource.Resource)', 'sizeof(NodeBox)')
 		.replace('resource.Resource(node)', 'NodeBox{minor: u64(minor), node: node}')
