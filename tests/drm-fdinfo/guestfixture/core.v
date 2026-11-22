@@ -1009,6 +1009,58 @@ fn test_prime_byte_io(fd i32, writable bool) bool {
 	return byte == 0x5a
 }
 
+fn splice_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, code i32) bool {
+	return C.syscall(C.SYS_splice, input, input_offset, output, output_offset, u64(4), u32(0)) == -1
+		&& unsafe { *C.__errno_location() } == code
+}
+
+fn test_prime_splice(read_write i32, read_only i32) bool {
+	mut fds := [2]i32{}
+	if C.pipe(&fds[0]) != 0 { return false }
+	defer {
+		C.close(fds[0])
+		C.close(fds[1])
+	}
+	if C.fcntl(fds[0], C.F_SETFL, C.O_NONBLOCK) != 0
+		|| C.write(fds[1], c'keep', 4) != 4 { return false }
+	mut result := [5]char{}
+	if !splice_replies(fds[0], unsafe { nil }, read_write, unsafe { nil }, C.EINVAL)
+		|| C.read(fds[0], &result[0], 4) != 4 || C.strcmp(&result[0], c'keep') != 0
+		|| C.write(fds[1], c'keep', 4) != 4 { return false }
+	mut offset := i64(1)
+	bad_pointer := voidptr(~u64(0))
+	if !splice_replies(read_only, unsafe { nil }, fds[1], unsafe { nil }, C.EINVAL)
+		|| !splice_replies(read_only, &offset, fds[1], unsafe { nil }, C.EINVAL)
+		|| !splice_replies(read_only, bad_pointer, fds[1], unsafe { nil }, C.EFAULT)
+		|| !splice_replies(fds[0], unsafe { nil }, read_write, &offset, C.EINVAL)
+		|| !splice_replies(fds[0], unsafe { nil }, read_only, unsafe { nil }, C.EBADF)
+		|| !splice_replies(fds[0], unsafe { nil }, read_only, bad_pointer, C.EFAULT)
+		|| !splice_replies(fds[0], &offset, read_only, unsafe { nil }, C.ESPIPE) {
+		return false
+	}
+	if offset != 1 || C.syscall(C.SYS_splice, i32(-1), bad_pointer, i32(-1), bad_pointer, u64(0), u32(16)) != 0 {
+		return false
+	}
+	if C.read(fds[0], &result[0], 4) != 4 || C.strcmp(&result[0], c'keep') != 0 { return false }
+
+	ordinary := i32(C.syscall(C.SYS_memfd_create, c'prime-splice-control', u32(0)))
+	if ordinary < 0 { return false }
+	defer { C.close(ordinary) }
+	if C.write(ordinary, c'abcd', 4) != 4 { return false }
+	if C.syscall(C.SYS_splice, ordinary, &offset, fds[1], unsafe { nil }, u64(2), u32(0)) != 2
+		|| offset != 3 || C.lseek(ordinary, 0, C.SEEK_CUR) != 4
+		|| C.read(fds[0], &result[0], 2) != 2 || C.strncmp(&result[0], c'bc', 2) != 0 { return false }
+
+	copy := i32(C.syscall(C.SYS_memfd_create, c'prime-copy-control', u32(0)))
+	if copy < 0 { return false }
+	defer { C.close(copy) }
+	mut output_offset := i64(0)
+	offset = 1
+	return C.syscall(C.SYS_copy_file_range, ordinary, &offset, copy, &output_offset, u64(2), u32(0)) == 2
+		&& offset == 3 && output_offset == 2 && C.lseek(ordinary, 0, C.SEEK_CUR) == 4
+		&& C.read(copy, &result[0], 2) == 2 && C.strncmp(&result[0], c'bc', 2) == 0
+}
+
 fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
 	stream := C.fopen(c'/proc/self/mountinfo', c'r')
 	if stream == unsafe { nil } { return false }
@@ -1049,6 +1101,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME BYTE IO: PASS')
 	} else {
 		C.puts(c'DRM PRIME BYTE IO FAIL: incorrect scalar or vectored I/O error')
+	}
+	if test_prime_splice(first, export.fd) {
+		C.puts(c'VINIX DRM PRIME SPLICE: PASS')
+	} else {
+		C.puts(c'DRM PRIME SPLICE FAIL: incorrect error, queued data or cursor')
 	}
 	return fdinfo_mount_id(export.fd) == internal_id
 		&& check_mountinfo_ids(internal_id, visible_id)

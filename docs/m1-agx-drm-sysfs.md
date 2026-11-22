@@ -718,6 +718,31 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-byte-io-20261122.QyAh14/`.
 The `bundle.tar.gz` SHA-256 is
 `9cea75e2fff5cec51d4c78fced808466edf3d60aa474940cd724c0593c45b470`.
 
+#### PRIME DMA-BUF splice
+
+A nonempty `splice` using a PRIME DMA-BUF returns `EINVAL` after
+descriptor, offset and access checks. A rejected destination leaves
+the bytes queued in the source pipe. An offset on the pipe side returns
+`ESPIPE`. A zero-length splice returns zero before descriptor, pointer
+or flag checks.
+[Pinned splice callbacks](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1026-L1068)
+[Pinned splice offset handling](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1395-L1535)
+[Pinned zero-length handling](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1788-L1807)
+
+ARM64 and x86-64 QEMU checked rejection in both directions, preservation
+of queued pipe bytes, offset and access errors, zero-length requests and
+successful positioned transfers through `splice` and `copy_file_range`.
+The same x86-64 guest executable failed the pipe preservation check on the
+preceding kernel. The DRM syncobj host suite passed, and the allocation
+scan reproduced its 150 baseline findings. Native M1 validation remains
+open.
+
+The tested base was `d792ccbd655842c9052725e042a9ac745e6e2f2e` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-splice-20261122.ykJR8Z/`.
+The `bundle.tar.gz` SHA-256 is
+`e739530593cff4f03c2a33da22f27b75fd3af892bc12ecb967a08ddf14c35ef7`.
+
 #### GEM metadata reclamation
 
 Final GEM release frees the metadata after unlinking the object and

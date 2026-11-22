@@ -52,44 +52,44 @@ fn pipe_from_fd(fd &file.FD) ?&Pipe {
 // happens through a kernel buffer rather than by handing pages over: there is
 // no page stealing here, and the observable result is the same.
 pub fn syscall_splice(_ voidptr, fd_in int, off_in u64, fd_out int, off_out u64, length u64, flags u32) (u64, u64) {
-	if flags & ~u32(splice_f_known) != 0 {
-		return errno.err, errno.einval
-	}
 	if length == 0 {
 		return 0, 0
 	}
+	if flags & ~u32(splice_f_known) != 0 {
+		return errno.err, errno.einval
+	}
 
-	mut source := file.fd_from_fdnum(unsafe { nil }, fd_in) or { return errno.err, errno.ebadf }
+	mut source := file.fd_from_fdnum(unsafe { nil }, int(i32(fd_in))) or { return errno.err, errno.ebadf }
 	defer {
 		source.unref()
 	}
-	mut sink := file.fd_from_fdnum(unsafe { nil }, fd_out) or { return errno.err, errno.ebadf }
+	mut sink := file.fd_from_fdnum(unsafe { nil }, int(i32(fd_out))) or { return errno.err, errno.ebadf }
 	defer {
 		sink.unref()
 	}
 
-	if !readable(source) || !writable(sink) {
+	if (source.handle.flags | sink.handle.flags) & resource.o_path != 0 {
 		return errno.err, errno.ebadf
-	}
-	// It writes at an offset, which an O_APPEND file does not take, as on
-	// Linux.
-	if sink.handle.flags & resource.o_append != 0 {
-		return errno.err, errno.einval
 	}
 
 	source_pipe := pipe_from_fd(source) or { unsafe { nil } }
 	sink_pipe := pipe_from_fd(sink) or { unsafe { nil } }
-
-	if source_pipe == unsafe { nil } && sink_pipe == unsafe { nil } {
-		return errno.err, errno.einval
-	}
 	// An offset only makes sense for the side that is not a pipe.
 	if (source_pipe != unsafe { nil } && off_in != 0)
 		|| (sink_pipe != unsafe { nil } && off_out != 0) {
 		return errno.err, errno.espipe
 	}
+	sink_offset := read_transfer_offset(off_out) or { return errno.err, errno.efault }
+	source_offset := read_transfer_offset(off_in) or { return errno.err, errno.efault }
+	if !readable(source) || !writable(sink) {
+		return errno.err, errno.ebadf
+	}
+	if (source_pipe == unsafe { nil } && sink_pipe == unsafe { nil })
+		|| sink.handle.flags & resource.o_append != 0 {
+		return errno.err, errno.einval
+	}
 
-	return move_between(mut source, off_in, mut sink, off_out, length)
+	return move_between(mut source, source_offset, mut sink, sink_offset, length)
 }
 
 // tee(fd_in, fd_out, len, flags): copy between two pipes and leave the source
@@ -258,31 +258,31 @@ pub fn syscall_copy_file_range(_ voidptr, fd_in int, off_in u64, fd_out int, off
 		return errno.err, errno.ebadf
 	}
 
-	return move_between(mut source, off_in, mut sink, off_out, length)
+	source_offset := read_transfer_offset(off_in) or { return errno.err, errno.efault }
+	if source_offset.value < 0 { return errno.err, errno.einval }
+	sink_offset := read_transfer_offset(off_out) or { return errno.err, errno.efault }
+	return move_between(mut source, source_offset, mut sink, sink_offset, length)
 }
 
-// The shared body of splice and copy_file_range: read a chunk, write it, repeat.
-// An offset pointer, where given, is read and written back rather than the
-// descriptor's own position being disturbed.
-fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, length u64) (u64, u64) {
-	mut source_offset := i64(0)
-	mut sink_offset := i64(0)
+struct TransferOffset {
+	address u64
+	value i64
+}
 
-	if off_in != 0 {
-		if !usercopy.copy_from_user(voidptr(&source_offset), off_in, sizeof(i64)) {
-			return errno.err, errno.efault
-		}
-		if source_offset < 0 {
-			return errno.err, errno.einval
-		}
+fn read_transfer_offset(address u64) ?TransferOffset {
+	mut value := i64(0)
+	if address != 0 && !usercopy.copy_from_user(unsafe { &value }, address, sizeof(i64)) {
+		return none
 	}
-	if off_out != 0 {
-		if !usercopy.copy_from_user(voidptr(&sink_offset), off_out, sizeof(i64)) {
-			return errno.err, errno.efault
-		}
-		if sink_offset < 0 {
-			return errno.err, errno.einval
-		}
+	return TransferOffset{address: address, value: value}
+}
+
+// An explicit offset is written back instead of advancing the description.
+fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.FD, sink_offset TransferOffset, length u64) (u64, u64) {
+	if source_offset.value < 0 || sink_offset.value < 0
+		|| source.handle.resource is resource.NoByteIOResource
+		|| sink.handle.resource is resource.NoByteIOResource {
+		return errno.err, errno.einval
 	}
 
 	mut source_handle := source.handle
@@ -307,8 +307,8 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 
 		buffer := memory.malloc(chunk)
 
-		read_from := if off_in != 0 {
-			u64(source_offset) + moved
+		read_from := if source_offset.address != 0 {
+			u64(source_offset.value) + moved
 		} else {
 			u64(source_handle.loc)
 		}
@@ -327,8 +327,8 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 			break
 		}
 
-		write_to := if off_out != 0 {
-			u64(sink_offset) + moved
+		write_to := if sink_offset.address != 0 {
+			u64(sink_offset.value) + moved
 		} else {
 			u64(sink_handle.loc)
 		}
@@ -348,10 +348,10 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 		}
 
 		// Only a side without an explicit offset advances its descriptor.
-		if off_in == 0 {
+		if source_offset.address == 0 {
 			source_handle.loc += put
 		}
-		if off_out == 0 {
+		if sink_offset.address == 0 {
 			sink_handle.loc += put
 		}
 
@@ -362,15 +362,15 @@ fn move_between(mut source file.FD, off_in u64, mut sink file.FD, off_out u64, l
 		}
 	}
 
-	if off_in != 0 {
-		updated := source_offset + i64(moved)
-		if !usercopy.copy_to_user(off_in, voidptr(&updated), sizeof(i64)) {
+	if source_offset.address != 0 {
+		updated := source_offset.value + i64(moved)
+		if !usercopy.copy_to_user(source_offset.address, voidptr(&updated), sizeof(i64)) {
 			return errno.err, errno.efault
 		}
 	}
-	if off_out != 0 {
-		updated := sink_offset + i64(moved)
-		if !usercopy.copy_to_user(off_out, voidptr(&updated), sizeof(i64)) {
+	if sink_offset.address != 0 {
+		updated := sink_offset.value + i64(moved)
+		if !usercopy.copy_to_user(sink_offset.address, voidptr(&updated), sizeof(i64)) {
 			return errno.err, errno.efault
 		}
 	}
