@@ -791,6 +791,27 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-eof-20261122.XY1AoI/`.
 The `bundle.tar.gz` SHA-256 is
 `0ebcfab6a6c48003ea96daef22a95bbea790ad2f8d05ce41368bf0af07c887e9`.
 
+#### PRIME DMA-BUF sendfile with O_APPEND
+
+`sendfile` returns `EINVAL` for a writable non-pipe destination with
+`O_APPEND`, including PRIME exports and regular files. The check runs
+before the zero-count return or the first source read. Pipe destinations
+accept the flag and can still receive data.
+[Pinned direct splice admission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1275-L1301), [pinned pipe dispatch](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1366-L1378)
+
+ARM64 and x86-64 QEMU passed zero and positive counts for PRIME, regular
+file and pipe destinations. The tests also checked explicit and shared
+offset preservation, unchanged regular destination length and the bytes
+received by the pipe. The same x86-64 guest probe failed on the preceding
+kernel. The DRM syncobj host suite passed, and the allocation scan
+reproduced its 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `ac97e57127d06a74f1217d0cdd2ccf80a0dfdb4b` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-append-20261122.GvXeaG/`.
+The `bundle.tar.gz` SHA-256 is
+`2d176cd6b023bcbcfa0e57160452b323709a94a61869b8e831a981832702dc6c`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

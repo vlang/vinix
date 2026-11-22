@@ -682,6 +682,13 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 		&& output_access != resource.o_rdwr) {
 		return errno.err, errno.ebadf
 	}
+	// Linux routes pipe destinations around the direct splice append check.
+	if output_flags & resource.o_append != 0 {
+		mode := output_fd.handle.resource.stat.mode
+		if !stat.isifo(mode) && mode & stat.ifmt != stat.ifpipe {
+			return errno.err, errno.einval
+		}
+	}
 	if count == 0 {
 		return 0, 0
 	}
@@ -690,7 +697,7 @@ fn syscall_linux_sendfile(_ voidptr, out_fd int, in_fd int, offset_ptr u64, coun
 	}
 	if output_fd.handle.resource is resource.NoByteIOResource {
 		mut source := input_fd.handle
-		if !stat.isreg(source.resource.stat.mode) || output_flags & resource.o_append != 0 {
+		if !stat.isreg(source.resource.stat.mode) {
 			return errno.err, errno.einval
 		}
 		mut sink := output_fd.handle
