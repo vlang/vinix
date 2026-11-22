@@ -593,3 +593,28 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-sysfs-readiness-20261122.AQvL4K/`.
 The `bundle.tar.gz` SHA-256 is
 `99363127ae80162a221cc0779cdfcdf9c5b8fe9c402cb7c4c8ece2b8472bc3d1`.
+
+## AGX platform sysfs entry ownership
+
+AGX records each of the five platform sysfs paths only when creation
+succeeds. Shutdown removes those entries, preserves the shared platform
+directory and its other contents, and waits for active sysfs callbacks
+before stopping the GPU manager.
+
+The DRM sysfs sanitizer fixture occupied each path in turn and verified
+that the occupied entry and an unrelated subtree survived duplicate
+publication and repeated teardown. Two controls caught recursive deletion
+and removal of an occupied path. Independent lifetime review and generated
+ARM64 code confirmed the ownership checks and cleanup order. The allocation
+scan matched the 150 baseline findings.
+
+Both kernel builds used `-O1` for C compilation. The ARM64 QEMU DRM sysfs
+probe passed with TCG, and the x86-64 descriptor-flags smoke test passed.
+The DRM wire and AGX G13 failure sanitizer fixtures, 79 local contracts,
+and 122 pinned-reference checks passed. Native M1 validation remains open.
+
+The tested base was `f60064a8d84e5fc1e488fd3a4308a9c1d65f7062` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-agx-platform-sysfs-20261122.uTZ9fJ/`.
+The `bundle.tar.gz` SHA-256 is
+`76978c9da5ab7c306c006d165cad7a70e2d5cc94b0ce59d9d9b075db33ab8cbf`.

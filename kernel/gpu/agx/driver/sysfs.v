@@ -27,6 +27,9 @@ fn gpu_sysfs_path(unit_address u64) string {
 // reads to describe the device, and Asahi's agx_stats and gpu_memory.
 fn (mut driver AgxDriver) publish_sysfs(mgr &gpu.GpuManager) {
 	if mgr.hw_config.gpu_gen != .g13 || driver.unit_address == 0 { return }
+	for path in driver.sysfs_entries {
+		if path.len != 0 { return }
+	}
 	directory := gpu_sysfs_path(driver.unit_address)
 	if !fs.sysfs_directory(directory) {
 		unsafe { directory.free() }
@@ -37,27 +40,30 @@ fn (mut driver AgxDriver) publish_sysfs(mgr &gpu.GpuManager) {
 	modalias_line := sysfs_child(modalias, '\n', '')
 	uevent_path := sysfs_child(directory, '/', 'uevent')
 	modalias_path := sysfs_child(directory, '/', 'modalias')
-	fs.sysfs_text(uevent_path, uevent)
-	fs.sysfs_text(modalias_path, modalias_line)
 	// devices/platform/soc/206400000.gpu/subsystem -> ../../../../bus/platform
 	subsystem := sysfs_child(directory, '/', 'subsystem')
 	fs.sysfs_directory('bus/platform')
-	fs.sysfs_link(subsystem, '../../../../bus/platform')
 	stats := sysfs_child(directory, '/', 'agx_stats')
 	memory_path := sysfs_child(directory, '/', 'gpu_memory')
-	fs.sysfs_attribute(stats, 0o444, show_agx_stats, unsafe { nil }, voidptr(mgr))
-	fs.sysfs_attribute(memory_path, 0o444, show_gpu_memory, unsafe { nil }, voidptr(mgr))
+	driver.sysfs_entries = [
+		owned_sysfs_path(uevent_path, fs.sysfs_text(uevent_path, uevent)),
+		owned_sysfs_path(modalias_path, fs.sysfs_text(modalias_path, modalias_line)),
+		owned_sysfs_path(subsystem, fs.sysfs_link(subsystem, '../../../../bus/platform')),
+		owned_sysfs_path(stats, fs.sysfs_attribute(stats, 0o444, show_agx_stats, unsafe { nil }, voidptr(mgr))),
+		owned_sysfs_path(memory_path, fs.sysfs_attribute(memory_path, 0o444, show_gpu_memory, unsafe { nil }, voidptr(mgr))),
+	]!
 	unsafe {
+		directory.free()
 		modalias.free()
 		uevent.free()
 		modalias_line.free()
-		uevent_path.free()
-		modalias_path.free()
-		subsystem.free()
-		stats.free()
-		memory_path.free()
 	}
-	driver.sysfs_device = directory
+}
+
+fn owned_sysfs_path(path string, created bool) string {
+	if created { return path }
+	unsafe { path.free() }
+	return ''
 }
 
 // of:N<name>T<type>C<compatible>..., with Linux's "(null)" for a node that has
@@ -102,13 +108,15 @@ fn sysfs_child(a string, b string, c string) string {
 	return lib.finish_text(text)
 }
 
-// Removal waits for any read still running, so the manager outlives them. The
-// DRM core removes its minors' class and dev/char links when it unregisters.
+// Removal waits for any read still running, so the manager outlives them.
+// Other owners can keep entries in the platform directory.
 fn (mut driver AgxDriver) remove_sysfs() {
-	if driver.sysfs_device.len == 0 { return }
-	fs.sysfs_remove(driver.sysfs_device)
-	unsafe { driver.sysfs_device.free() }
-	driver.sysfs_device = ''
+	for index, path in driver.sysfs_entries {
+		if path.len == 0 { continue }
+		fs.sysfs_remove(path)
+		unsafe { path.free() }
+		driver.sysfs_entries[index] = ''
+	}
 }
 
 fn show_agx_stats(context voidptr, mut text lib.Text) {

@@ -25,6 +25,25 @@ pub mut:
 	debugfs_render_link bool
 }
 
+enum GpuGeneration {
+	g13
+	g17
+}
+
+struct GpuConfig {
+	gpu_gen GpuGeneration
+}
+
+struct GpuManager {
+	hw_config GpuConfig
+}
+
+struct AgxDriver {
+mut:
+	unit_address u64
+	sysfs_entries [5]string
+}
+
 // Follow every link in `path`, relative links from the link's own directory,
 // as the kernel's path walk does. None if anything along it is missing.
 fn resolve(path string) ?string {
@@ -157,8 +176,45 @@ fn show_marker(context voidptr, mut text lib.Text) {
 	text.add_byte(`\n`)
 }
 
+fn show_agx_stats(context voidptr, mut text lib.Text) {
+	show_marker(context, mut text)
+}
+
+fn show_gpu_memory(context voidptr, mut text lib.Text) {
+	show_marker(context, mut text)
+}
+
+fn check_agx_sysfs_ownership() {
+	mut driver := AgxDriver{unit_address: 0x206400000}
+	mgr := GpuManager{hw_config: GpuConfig{gpu_gen: .g13}}
+	parent := gpu_sysfs_path(driver.unit_address)
+	other_entry := '${parent}/other/owner'
+	assert fs.sysfs_text(other_entry, 'another owner')
+	files := ['uevent', 'modalias', 'subsystem', 'agx_stats', 'gpu_memory']!
+	for blocked in files {
+		blocked_path := '${parent}/${blocked}'
+		assert fs.sysfs_text(blocked_path, 'occupied')
+		driver.publish_sysfs(&mgr)
+		driver.publish_sysfs(&mgr)
+		for name in files {
+			assert fs.published('${parent}/${name}')
+		}
+		assert text_of(blocked_path) == 'occupied'
+		driver.remove_sysfs()
+		driver.remove_sysfs()
+		assert text_of(blocked_path) == 'occupied', 'AGX teardown removed an occupied path'
+		assert text_of(other_entry) == 'another owner', 'AGX teardown removed an unrelated entry'
+		for name in files {
+			assert fs.published('${parent}/${name}') == (name == blocked)
+		}
+		assert fs.sysfs_remove(blocked_path)
+	}
+	println('AGX sysfs: five collisions preserve occupied files and unrelated entries through teardown and retry')
+}
+
 pub fn run_checks() {
 	check_minor_sysfs_collisions()
+	check_agx_sysfs_ownership()
 	// The base M1 GPU as the AGX driver registers it: card1 and renderD129,
 	// under the directory named after the device-tree node.
 	parent := gpu_sysfs_path(0x206400000)
@@ -167,10 +223,9 @@ pub fn run_checks() {
 	mut node := DrmNode{}
 	mut gpu_device := DrmDevice{driver: &driver, dev_id: 1, render_node: &node}
 	publish_drm_sysfs(mut gpu_device)
-	// The AGX driver's own files in that directory.
-	modalias := gpu_modalias()
-	assert fs.sysfs_text(parent + '/uevent', gpu_uevent(0x206400000, modalias))
-	assert fs.sysfs_link(parent + '/subsystem', agx_subsystem_link)
+	mut agx := AgxDriver{unit_address: 0x206400000}
+	mgr := GpuManager{hw_config: GpuConfig{gpu_gen: .g13}}
+	agx.publish_sysfs(&mgr)
 
 	for minor, name in {
 		u32(1):   'card1'
@@ -322,6 +377,9 @@ pub fn run_checks() {
 		assert !fs.published(path), '${path} survived unregister'
 	}
 	assert fs.published('${parent}/uevent')
+	agx.remove_sysfs()
+	assert fs.published(parent)
+	assert !fs.published('${parent}/uevent') && !fs.published('${parent}/gpu_memory')
 	assert gpu_device.sysfs_parent == '' && framebuffer.sysfs_parent == ''
 	assert gpu_device.debugfs_dir == ''
 	// A second registration can publish the same names again.

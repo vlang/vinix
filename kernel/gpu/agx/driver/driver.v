@@ -30,8 +30,8 @@ pub mut:
 	hw_config   hw.HwConfig
 	detected    bool
 	initialized bool
-	// The /sys directory holding agx_stats and gpu_memory, or empty.
-	sysfs_device string
+	// Paths of the platform entries AGX created. The directory is shared.
+	sysfs_entries [5]string
 	// Physical base of the GPU's first register range, the ASC: its device-tree
 	// unit address, which Linux names the platform device after.
 	unit_address u64
@@ -1283,8 +1283,8 @@ pub fn shutdown() {
 
 	println('agx: Shutting down Apple GPU driver')
 
-	// Unregister the DRM device, which removes its minors from /sys, before the
-	// device directory they sit in: each owner removes its own entries.
+	// Remove the DRM minors and debugfs entries before removing AGX's own
+	// files from the shared platform directory.
 	if agx_driver_inst.drm_dev != unsafe { nil } {
 		drm.unregister_device(agx_driver_inst.drm_dev)
 		agx_driver_inst.drm_dev = unsafe { nil }
