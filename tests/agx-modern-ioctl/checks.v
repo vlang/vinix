@@ -325,7 +325,7 @@ fn check_gem_handle_storage() {
 }
 
 fn check_gem_file_names() {
-	driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle, gem_close_request: close_gem_request}
+	driver := drm.DrmDriver{features: drm.driver_gem, ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle, gem_close_request: close_gem_request}
 	device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: unsafe { voidptr(gpu.registration_manager()) }}
 	first_key, second_key := u64(0x4c02), u64(0x4c03)
 	first_fd, second_fd := voidptr(first_key), voidptr(second_key)
@@ -385,7 +385,7 @@ fn close_wire_gem(device &drm.DrmDevice, client u64, handle u32, pad u32) int {
 }
 
 fn check_gem_close_semantics() {
-	driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle, gem_close_request: close_gem_request}
+	driver := drm.DrmDriver{features: drm.driver_gem, ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle, gem_close_request: close_gem_request}
 	device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: unsafe { voidptr(gpu.registration_manager()) }}
 	client := u64(0x4c04)
 	assert close_wire_gem(&device, client, 1, 0) == -22 && lookup_file(voidptr(client)) == none

@@ -578,6 +578,28 @@ at `/Users/alex/.local/state/vinix/m1-drm-dumb-map-destroy-20261122.FWHkdU/`.
 The `bundle.tar.gz` SHA-256 is
 `0a65e07fc896122aa7de56349e35e154be0fde490047bb126352616ab90fc53c`.
 
+#### Standard GEM close handle lookup
+
+`GEM_CLOSE` requires the GEM feature and returns `EOPNOTSUPP` on devices
+without it. The standard callback receives only the handle from the
+request. Missing handles return `EINVAL`, and closing requires a callback
+that can resolve the handle in the caller's file description. Native
+Asahi continues to use its ABI-specific close callback. [Pinned Linux GEM close and handle deletion](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L389-L420) [Pinned Linux GEM feature check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L928-L942)
+
+The DRM wire and AGX file-close sanitizer suites passed. x86-64 QEMU
+closed a framebuffer handle with nonzero padding, rejected the same
+handle on another file description and rejected a repeat close. The
+preceding x86-64 kernel failed the probe. ARM64 QEMU verified the
+missing-handle error through software Asahi. The allocation scan
+reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `cffe3674f1b8db87b1dfaaefc16c73768dda089d` plus the
+archived patch and the simple DRM named-device fixture. The ARM64 build
+also used the archived software Asahi fixture patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-gem-close-semantics-20261122.sDCdKH/`.
+The `bundle.tar.gz` SHA-256 is
+`d2e1ad9f2e08ae159fd471f985b84381f5d23a0039bea1dca4d803468eb6074b`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

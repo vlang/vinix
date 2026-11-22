@@ -85,7 +85,7 @@ fn checks() !int {
 		section(gem_source, 'pub struct PrimeFence {', '@[heap]\npub struct GemObject')!)!
 	os.cp_all(repo + '/tests/drm-wire/fixture/errno', scratch + '/errno', false)!
 	os.cp(repo + '/tests/agx-modern-ioctl/drm.v', scratch + '/drm/modern_fixture.v')!
-	os.write_file(scratch + '/drm/wire.v', 'module drm\nimport drm.gem\nimport drm.ioctl\nimport usercopy\nimport memory\nimport memory.mmap\nimport errno\n' +
+	os.write_file(scratch + '/drm/wire.v', 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport memory.mmap\nimport errno\n' +
 		section(drm_source, 'pub fn static_ioctl_table(', '// Store a driver definition')! +
 		section(drm_source, 'fn decode_ioctl_cmd(', '// The node is /dev/dri/')! +
 		section(drm_source, 'fn ioctl_gem_close(', 'fn ioctl_syncobj_create(')! +

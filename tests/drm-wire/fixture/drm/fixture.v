@@ -27,6 +27,8 @@ struct DrmDriver {
 	features  u32
 	ioctls    []DrmIoctl
 	ioctl_abi fn (&DrmDevice, voidptr) u32 = unsafe { nil }
+	gem_close fn (&DrmDevice, voidptr, u32) int = unsafe { nil }
+	gem_close_request fn (&DrmDevice, voidptr, &ioctl.DrmGemClose) int = unsafe { nil }
 	file_close fn (&DrmDevice, voidptr) = unsafe { nil }
 	mmap voidptr = unsafe { nil }
 	mmap_admit fn (&DrmDevice, voidptr, u64, u64, bool) int = unsafe { nil }
@@ -83,6 +85,7 @@ fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, client voidptr) int {
 	return match cmd {
 		ioctl.drm_ioctl_version { ioctl_version(dev, data) }
 		ioctl.drm_ioctl_get_cap { ioctl_get_cap(dev, data) }
+		ioctl.drm_ioctl_gem_close { ioctl_gem_close(dev, client, data) }
 		ioctl.drm_ioctl_mode_create_dumb, ioctl.drm_ioctl_mode_map_dumb, ioctl.drm_ioctl_mode_destroy_dumb {
 			ioctl_dumb_buffer(dev, cmd, client, data)
 		}
@@ -201,6 +204,34 @@ pub fn run_checks() {
 	check_core_query_transport()
 	check_dumb_node_access()
 	check_dumb_create_geometry()
+	check_gem_close_dispatch()
+}
+
+fn close_fixture_gem(_ &DrmDevice, client voidptr, name u32) int {
+	if client != voidptr(4) { return -int(errno.enodev) }
+	return if name == 7 { 0 } else { -int(errno.enoent) }
+}
+
+fn check_gem_close_dispatch() {
+	unsupported_driver := DrmDriver{gem_close: close_fixture_gem}
+	unsupported_device := DrmDevice{driver: &unsupported_driver}
+	mut unsupported := DrmNode{dev: &unsupported_device}
+	no_owner_driver := DrmDriver{features: driver_gem}
+	no_owner_device := DrmDevice{driver: &no_owner_driver}
+	mut no_owner := DrmNode{dev: &no_owner_device}
+	driver := DrmDriver{features: driver_gem, gem_close: close_fixture_gem}
+	device := DrmDevice{driver: &driver}
+	mut node := DrmNode{dev: &device}
+	command := u64(0x40086409)
+	mut request := ioctl.DrmGemClose{handle: 7, pad: 0xffffffff}
+	expect_error(mut unsupported, command, unsafe { &request }, errno.eopnotsupp)
+	expect_error(mut no_owner, command, unsafe { &request }, errno.einval)
+	expect_error(mut node, command, unsafe { &request }, errno.enodev)
+	assert (node.ioctl(voidptr(4), command, unsafe { &request }) or { panic('GEM close') }) == 0
+	request.handle = 8
+	if _ := node.ioctl(voidptr(4), command, unsafe { &request }) { panic('expected missing GEM handle') }
+	assert errno.get() == errno.einval
+	println('DRM GEM_CLOSE: feature gate, client lookup, padding and errno passed')
 }
 
 fn observe_dumb_create(_ &DrmDevice, _ voidptr, data voidptr) int {

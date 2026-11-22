@@ -29,7 +29,7 @@ fn main() {
 	production += section(resource_source, 'pub const o_path = ', 'pub const o_accmode = ')!
 	production += section(source, 'pub const driver_gem', 'pub struct DrmIoctl {')!
 	production += section(source, 'pub const default_driver_date', 'pub struct DrmDriver {')!
-	production += section(source, 'fn copy_version_field(', 'fn ioctl_gem_close(')!
+	production += section(source, 'fn copy_version_field(', 'fn ioctl_syncobj_create(')!
 	production += section(source, 'fn decode_ioctl_cmd(', '// The node is /dev/dri/')!
 	production += section(source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!
 	production += section(source, 'pub fn (dev &DrmDevice) is_registered(', '// Forward-reference placeholder')!

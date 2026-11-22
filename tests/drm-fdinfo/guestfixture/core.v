@@ -652,6 +652,9 @@ fn test_gem_close_transport() bool {
 	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
 	if fd < 0 { return false }
 	defer { C.close(fd) }
+	other := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if other < 0 { return false }
+	defer { C.close(other) }
 	commands := [u32(0x40046409), u32(0xc0106409)]!
 	for i in 0 .. commands.len {
 		command := unsafe { commands[i] }
@@ -659,24 +662,34 @@ fn test_gem_close_transport() bool {
 		if C.ioctl(fd, i32(u32(0xc02064b2)), &create) != 0 || create.handle == 0 {
 			return false
 		}
-		mut close_data := [create.handle, u32(0), 0x1234, 0x5678]!
+		mut close_data := [create.handle, u32(0xffffffff), 0x1234, 0x5678]!
+		if C.ioctl(other, i32(0x40086409), &close_data[0]) != -1
+			|| unsafe { *C.__errno_location() } != C.EINVAL {
+			return false
+		}
 		// A read-only request supplies a zero handle. The original buffer
 		// should survive it and close on the following write request.
 		if command == u32(0xc0106409) {
 			if C.ioctl(fd, i32(u32(0x80086409)), &close_data[0]) != -1
-				|| unsafe { *C.__errno_location() } != C.ENOENT || close_data[0] != create.handle {
+				|| unsafe { *C.__errno_location() } != C.EINVAL || close_data[0] != create.handle {
 				return false
 			}
 		}
 		if C.ioctl(fd, i32(command), &close_data[0]) != 0 || close_data[0] != create.handle
-			|| close_data[1] != 0 || close_data[2] != 0x1234 || close_data[3] != 0x5678 {
+			|| close_data[1] != 0xffffffff || close_data[2] != 0x1234 || close_data[3] != 0x5678 {
 			return false
 		}
-		if C.ioctl(fd, i32(0x40086409), &close_data[0]) != -1 || unsafe { *C.__errno_location() } != C.ENOENT {
+		if C.ioctl(fd, i32(0x40086409), &close_data[0]) != -1 || unsafe { *C.__errno_location() } != C.EINVAL {
 			return false
 		}
 	}
 	return true
+}
+
+fn test_render_gem_close(fd i32) bool {
+	mut missing := [u32(1), 0]!
+	return C.ioctl(fd, i32(0x40086409), &missing[0]) == -1
+		&& unsafe { *C.__errno_location() } == C.EINVAL
 }
 
 struct ExtendedPrimeRequest {
@@ -916,6 +929,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM RENDER DUMB PERMISSIONS: PASS')
 		} else {
 			C.puts(c'DRM RENDER DUMB PERMISSIONS FAIL: wrong permission or copy result')
+		}
+		if test_render_gem_close(render) {
+			C.puts(c'VINIX DRM RENDER GEM CLOSE: PASS')
+		} else {
+			C.puts(c'DRM RENDER GEM CLOSE FAIL: wrong missing handle reply')
 		}
 		if test_unsupported_dumb_buffers(render_primary) {
 			C.puts(c'VINIX DRM UNSUPPORTED DUMB BUFFERS: PASS')

@@ -51,7 +51,7 @@ fn check_cpu_mapping_policy() {
 }
 
 fn check_cpu_mmap_revocation() {
-	driver := drm.DrmDriver{gem_close_request: close_gem_request, mmap_admit: admit_mmap_range_handle, mmap_no_expand: true,
+	driver := drm.DrmDriver{features: drm.driver_gem, gem_close_request: close_gem_request, mmap_admit: admit_mmap_range_handle, mmap_no_expand: true,
 		mmap_retain: retain_mmap_range_handle, mmap_release: release_mmap_range_handle}
 	mut device := drm.DrmDevice{driver: unsafe { &driver }}
 	other_device := drm.DrmDevice{driver: unsafe { &driver }}

@@ -4,8 +4,11 @@ module drm
 import drm.gem
 import drm.ioctl
 
+pub const driver_gem = u32(1)
+
 pub struct DrmDriver {
 pub:
+	features u32
 	ioctls []DrmIoctl
 	ioctl_abi fn (&DrmDevice, voidptr) u32 = unsafe { nil }
 	gem_close fn (&DrmDevice, voidptr, u32) int = unsafe { nil }

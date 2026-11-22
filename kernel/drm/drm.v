@@ -1185,19 +1185,18 @@ fn ioctl_gem_close(dev &DrmDevice, handle voidptr, data voidptr) int {
 	if data == unsafe { nil } {
 		return -14
 	}
+	if dev.driver.features & driver_gem == 0 {
+		return -int(errno.eopnotsupp)
+	}
 	request := unsafe { &ioctl.DrmGemClose(data) }
 	if dev.driver.gem_close_request != unsafe { nil } {
 		return dev.driver.gem_close_request(dev, handle, request)
 	}
-	if request.pad != 0 {
-		return -22
+	if dev.driver.gem_close == unsafe { nil } {
+		return -int(errno.einval)
 	}
-	if dev.driver.gem_close != unsafe { nil } {
-		return dev.driver.gem_close(dev, handle, request.handle)
-	}
-	obj := gem.get_by_handle(request.handle) or { return -2 }
-	gem.unref(obj)
-	return 0
+	result := dev.driver.gem_close(dev, handle, request.handle)
+	return if result == -int(errno.enoent) { -int(errno.einval) } else { result }
 }
 
 fn ioctl_syncobj_create(handle voidptr, data voidptr) int {

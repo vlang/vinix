@@ -1,6 +1,7 @@
 @[has_globals]
 module errno
 
+pub const enoent = u64(2)
 pub const einval = u64(22)
 pub const enodev = u64(19)
 pub const enomem = u64(12)
