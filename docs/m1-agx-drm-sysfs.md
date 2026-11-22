@@ -842,6 +842,36 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-fdinfo-20261122.AN3cS0/`. The
 `bundle.tar.gz` SHA-256 is
 `a65e2efb1b1a3c954a7b0d47877202ddbdf9180b73fc0bbd634340ebe448632f`.
 
+#### PRIME DMA-BUF names
+
+Both `DMA_BUF_SET_NAME` ioctl encodings accept a NUL-terminated name of
+up to 31 bytes. A successful ioctl updates the name shown in fdinfo.
+An explicit empty name produces an empty `name` field. An inaccessible
+pointer returns `EFAULT`, and a name with no terminator in the first 32
+bytes returns `EINVAL`. Either failure preserves the current name.
+[Pinned naming ioctl encodings](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/linux/dma-buf.h#L162-L169)
+[Pinned name update and fdinfo output](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L558-L584)
+[Pinned string copy errors](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/mm/util.c#L250-L270)
+
+Vinix stores the name inline on the GEM object, where duplicates and
+separate exports of that object share it. The ioctl copies userspace data
+before taking the object lock. Fdinfo copies the name and its length
+under that lock and formats the snapshot after releasing it.
+
+ARM64 and x86-64 QEMU verified both ioctl encodings, names shared across
+exports, the length limit, the empty name and a terminator at the end of
+a readable page. The test checked that faults leave the old name visible.
+The preceding x86-64 kernel failed the same probe. The fdinfo and AGX CPU
+cache sanitizer suites passed. GEM metadata remained in the 192-byte slab
+class on both architectures, and the allocation scan reproduced its 150
+baseline findings. Native M1 validation remains open.
+
+The tested base was `866af26ce25f5648f90eeec2e7325bda8eabceda` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-names-20261122.NwN95i/`. The
+`bundle.tar.gz` SHA-256 is
+`ab27abf792fe06e0c31dfe0bd7ce172873862f9aa9387289e5f45cb85bc4b788`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

@@ -29,6 +29,7 @@ fn C.write(i32, voidptr, u64) i64
 fn C.ioctl(i32, i32, ...) i32
 fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
+fn C.mprotect(voidptr, usize, i32) i32
 fn C.mremap(voidptr, usize, usize, i32, ...) voidptr
 fn C.getpagesize() i32
 fn C.setfsuid(u32) i32
@@ -849,6 +850,64 @@ fn test_prime_fdinfo(fd i32, size u64, refs i32) bool {
 	return suffix != unsafe { nil } && C.strcmp(suffix, &expected[0]) == 0
 }
 
+fn prime_fdinfo_has_name(fd i32, expected &char) bool {
+	mut info := [512]u8{}
+	if !read_fdinfo(fd, &info[0], sizeof(info)) { return false }
+	line := C.strstr(&info[0], c'\nname:\t')
+	if expected == unsafe { nil } { return line == unsafe { nil } }
+	mut name := [48]char{}
+	C.snprintf(&name[0], sizeof(name), c'\nname:\t%s\n', expected)
+	return line != unsafe { nil } && C.strcmp(line, &name[0]) == 0
+}
+
+fn test_prime_name_page_end(writer i32, reader i32, command i32) bool {
+	page := u64(C.getpagesize())
+	mapping := C.mmap(unsafe { nil }, 2 * page, C.PROT_READ | C.PROT_WRITE,
+		C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+	if mapping == voidptr(C.MAP_FAILED) { return false }
+	defer { C.munmap(mapping, 2 * page) }
+	if C.mprotect(unsafe { &u8(mapping) + page }, page, C.PROT_NONE) != 0 { return false }
+	name := unsafe { &u8(mapping) + page - 2 }
+	unsafe { name[0] = `p` }
+	if C.ioctl(writer, command, name) != 0 || !prime_fdinfo_has_name(reader, c'p') { return false }
+	unsafe { name[1] = `x` }
+	return C.ioctl(writer, command, name) == -1 && unsafe { *C.__errno_location() } == C.EFAULT
+		&& prime_fdinfo_has_name(reader, c'p')
+}
+
+fn test_prime_names() bool {
+	card := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if card < 0 { return false }
+	defer { C.close(card) }
+	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
+	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
+	mut original := ExtendedPrimeRequest{handle: create.handle, fd: -1}
+	mut other := original
+	if C.ioctl(card, i32(u32(0xc00c642d)), &original) != 0 || original.fd < 0 { return false }
+	defer { C.close(original.fd) }
+	if C.ioctl(card, i32(u32(0xc00c642d)), &other) != 0 || other.fd < 0 { return false }
+	defer { C.close(other.fd) }
+	duplicate := C.dup(original.fd)
+	if duplicate < 0 { return false }
+	defer { C.close(duplicate) }
+	first := i32(0x40046201)
+	second := i32(0x40086201)
+	longest := c'0123456789012345678901234567890'
+	if !prime_fdinfo_has_name(other.fd, unsafe { nil }) { return false }
+	if C.ioctl(original.fd, first, c'render target') != 0
+		|| !prime_fdinfo_has_name(other.fd, c'render target') { return false }
+	if C.ioctl(other.fd, second, longest) != 0 || !prime_fdinfo_has_name(duplicate, longest) { return false }
+	if C.ioctl(other.fd, second, c'01234567890123456789012345678901') != -1
+		|| unsafe { *C.__errno_location() } != C.EINVAL { return false }
+	if C.ioctl(other.fd, first, voidptr(0)) != -1
+		|| unsafe { *C.__errno_location() } != C.EFAULT { return false }
+	if !prime_fdinfo_has_name(duplicate, longest) || !test_prime_name_page_end(other.fd, duplicate, second) {
+		return false
+	}
+	if C.ioctl(card, i32(u32(0xc00464b4)), unsafe { &create.handle }) != 0 { return false }
+	return C.ioctl(duplicate, first, c'') == 0 && prime_fdinfo_has_name(other.fd, c'')
+}
+
 fn test_prime_filesystem_type() bool {
 	mut info := C.statfs{}
 	card := C.open(c'/dev/dri/card0', C.O_RDWR)
@@ -1205,6 +1264,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM PRIME FILESYSTEM TYPE: PASS')
 		} else {
 			C.puts(c'DRM PRIME FILESYSTEM TYPE FAIL: incorrect DMA-BUF filesystem reply')
+		}
+		if test_prime_names() {
+			C.puts(c'VINIX DRM PRIME DMA-BUF NAMES: PASS')
+		} else {
+			C.puts(c'DRM PRIME DMA-BUF NAMES FAIL: incorrect name or ioctl result')
 		}
 		if test_prime_mmap_bounds() {
 			C.puts(c'VINIX DRM PRIME MMAP BOUNDS: PASS')

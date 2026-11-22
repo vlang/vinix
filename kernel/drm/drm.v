@@ -225,6 +225,11 @@ fn (this &GemPrimeResource) supports_reservation_sync() bool {
 }
 
 fn (mut this GemPrimeResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	if u32(request) in [ioctl.dma_buf_set_name_a, ioctl.dma_buf_set_name_b]! {
+		result := set_prime_name(this.obj, u64(argp))
+		if result < 0 { errno.set(u64(-result)); return none }
+		return 0
+	}
 	if !this.supports_reservation_sync() {
 		return resource.default_ioctl(handle, request, argp)
 	}

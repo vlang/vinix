@@ -11,6 +11,8 @@ import katomic
 import memory
 import lib
 
+pub const dma_buf_name_capacity = 32
+
 pub struct PrimeFence {
 pub:
 	source voidptr // published DmaFence metadata, retained by syncobj
@@ -39,11 +41,13 @@ pub mut:
 	pages       &u64 = unsafe { nil } // one physical page address per page when scattered
 	lock        klock.Lock
 	mmap_offset u64
-	name        string
 	pte_extra   u64 // identical cache attributes for kernel and user aliases
 	external    bool // host-visible aperture; never returned to the PMM
 	advice_dontneed bool // private BO advice; resident backing is not yet purgeable
 	prime_fences &PrimeFence = unsafe { nil } // protected by lock
+	// The lock protects the shared DMA-BUF name. Length includes the NUL.
+	prime_name [dma_buf_name_capacity]u8
+	prime_name_len u8
 	// Serial of the DRM client that created this user object, for its fdinfo
 	// totals; zero for kernel and imported objects. Set once, before the
 	// creator publishes the handle.

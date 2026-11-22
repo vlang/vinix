@@ -65,6 +65,18 @@ pub fn add_fdinfo(handle voidptr, mut text lib.Text) {
 		// Exclude the temporary reference held by the procfs reader.
 		refs := katomic.load(&description.refcount) - 1
 		add_dma_buf_lines(mut text, u64(res.stat.size), refs)
+		if res.obj != unsafe { nil } {
+			mut obj := unsafe { res.obj }
+			obj.lock.acquire()
+			name := obj.prime_name
+			length := int(obj.prime_name_len)
+			obj.lock.release()
+			if length != 0 {
+				text.add('name:\t')
+				text.add(unsafe { tos(&name[0], length - 1) })
+				text.add_byte(`\n`)
+			}
+		}
 		return
 	}
 	if mut res is DrmNode {
