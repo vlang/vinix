@@ -842,6 +842,30 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-fdinfo-20261122.AN3cS0/`. The
 `bundle.tar.gz` SHA-256 is
 `a65e2efb1b1a3c954a7b0d47877202ddbdf9180b73fc0bbd634340ebe448632f`.
 
+#### PRIME DMA-BUF fdinfo flags
+
+The `flags` line reports the DMA-BUF description's access mode and
+status flags, plus `O_CLOEXEC` for the queried descriptor when set.
+Creating a PRIME export skips the `open(2)` default that adds
+`O_LARGEFILE`. Duplicates share changes made by `F_SETFL` and retain
+their own close-on-exec bits.
+[Pinned DMA-BUF file allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L602-L622)
+[Pinned procfs flags formatting](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/proc/fd.c#L32-L57)
+
+ARM64 and x86-64 QEMU checked read-only and read-write exports,
+`F_GETFL`, `F_GETFD`, and the effect of `dup`, `F_SETFL` and
+`F_SETFD` on fdinfo. The same x86-64 guest executable failed the new
+check on the preceding kernel. The PRIME fdinfo, descriptor-link and
+sanitizer checks passed. The x86-64 generic procfs probe kept heap
+usage flat over 200 cycles per operation. The allocation scan
+reproduced its 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `fbcd74668fabf6793d84bd7fd4d3b12195ad8c97` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-flags-20261122.ESbvuE/`. The
+`bundle.tar.gz` SHA-256 is
+`725dbf4a0b741b0aa448b14ba9c8a25ee127198f8a75be05459527b2f1a98ba0`.
+
 #### PRIME DMA-BUF names
 
 Both `DMA_BUF_SET_NAME` ioctl encodings accept a NUL-terminated name of

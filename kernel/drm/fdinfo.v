@@ -52,6 +52,10 @@ fn ioctl_set_client_name(handle voidptr, data voidptr) int {
 	return 0
 }
 
+pub fn is_prime_resource(res resource.Resource) bool {
+	return res is GemPrimeResource
+}
+
 // Append the lines for a DRM node or PRIME export. The caller keeps the
 // description referenced, which keeps the driver's file state alive.
 pub fn add_fdinfo(handle voidptr, mut text lib.Text) {

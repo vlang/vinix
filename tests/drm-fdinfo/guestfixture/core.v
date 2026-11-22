@@ -38,6 +38,7 @@ fn C.setfsgid(u32) i32
 fn C.clock_gettime(i32, &C.timespec) i32
 fn C.fstat(i32, &C.stat) i32
 fn C.fstatfs(i32, &C.statfs) i32
+fn C.fcntl(i32, i32, ...) i32
 fn C.ftruncate(i32, i64) i32
 fn C.poll(&C.pollfd, u64, i32) i32
 fn C.__errno_location() &i32
@@ -853,6 +854,40 @@ fn test_prime_fdinfo(fd i32, size u64, refs i32) bool {
 	return suffix != unsafe { nil } && C.strcmp(suffix, &expected[0]) == 0
 }
 
+fn prime_fdinfo_has_flags(fd i32, expected i32) bool {
+	mut info := [512]u8{}
+	if !read_fdinfo(fd, &info[0], sizeof(info)) { return false }
+	line := C.strstr(&info[0], c'\nflags:\t')
+	if line == unsafe { nil } { return false }
+	value := unsafe { line + C.strlen(c'\nflags:\t') }
+	mut end := &char(unsafe { nil })
+	flags := C.strtoull(value, &end, 8)
+	return end != value && unsafe { *end } == char(10) && flags == u64(expected)
+}
+
+fn test_prime_fdinfo_flags(card i32, flags i32) bool {
+	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
+	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
+	defer { C.ioctl(card, i32(u32(0xc00464b4)), unsafe { &create.handle }) }
+	mut export := ExtendedPrimeRequest{handle: create.handle, flags: u32(flags | C.O_CLOEXEC), fd: -1}
+	if C.ioctl(card, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0 { return false }
+	defer { C.close(export.fd) }
+	duplicate := C.dup(export.fd)
+	if duplicate < 0 { return false }
+	defer { C.close(duplicate) }
+	if C.fcntl(export.fd, C.F_GETFL) != flags || C.fcntl(export.fd, C.F_GETFD) != C.FD_CLOEXEC
+		|| !prime_fdinfo_has_flags(export.fd, flags | C.O_CLOEXEC)
+		|| !prime_fdinfo_has_flags(duplicate, flags) {
+		return false
+	}
+	if C.fcntl(duplicate, C.F_SETFL, C.O_NONBLOCK) != 0
+		|| C.fcntl(export.fd, C.F_SETFD, 0) != 0 { return false }
+	status := flags | C.O_NONBLOCK
+	return C.fcntl(export.fd, C.F_GETFL) == status
+		&& prime_fdinfo_has_flags(export.fd, status)
+		&& prime_fdinfo_has_flags(duplicate, status)
+}
+
 fn prime_fdinfo_has_name(fd i32, expected &char) bool {
 	mut info := [512]u8{}
 	if !read_fdinfo(fd, &info[0], sizeof(info)) { return false }
@@ -972,6 +1007,11 @@ fn test_prime_filesystem_type() bool {
 	if card < 0 { return false }
 	defer { C.close(card) }
 	if C.fstatfs(card, &info) != 0 || info.f_type == 0x444d4142 { return false }
+	if test_prime_fdinfo_flags(card, C.O_RDONLY) && test_prime_fdinfo_flags(card, C.O_RDWR) {
+		C.puts(c'VINIX DRM PRIME FDINFO FLAGS: PASS')
+	} else {
+		C.puts(c'DRM PRIME FDINFO FLAGS FAIL: incorrect descriptor or status flags')
+	}
 	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
 	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
 	mut before := C.timespec{}

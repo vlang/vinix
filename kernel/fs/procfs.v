@@ -2210,10 +2210,13 @@ fn fdinfo_text(pid int, fdnum int) string {
 		descriptor.unref()
 	}
 	handle := descriptor.handle
-	// Linux keeps none of the open-time flags, and on 64-bit always sets
-	// O_LARGEFILE.
-	mut flags := (u64(handle.flags) | u64(resource.o_largefile)) & ~u64(resource.o_creat | resource.o_excl
+	// PRIME exports create their descriptions directly with the requested
+	// access mode, without the O_LARGEFILE default from open(2).
+	mut flags := u64(handle.flags) & ~u64(resource.o_creat | resource.o_excl
 		| resource.o_noctty | resource.o_trunc)
+	if !drm.is_prime_resource(handle.resource) {
+		flags |= u64(resource.o_largefile)
+	}
 	if descriptor.flags & resource.o_cloexec != 0 {
 		flags |= u64(resource.o_cloexec)
 	}
