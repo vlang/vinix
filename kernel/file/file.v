@@ -63,6 +63,7 @@ mut:
 }
 
 pub const fd_cloexec = 1
+pub const drm_client_name_max_len = 64
 
 pub struct Handle {
 pub mut:
@@ -85,6 +86,9 @@ pub mut:
 	seat_owner u32
 	// Set before publication for DRM data opens. Dup and fork share it.
 	drm_client_id u64
+	// The handle lock protects the optional DRM client name and its length.
+	drm_client_name [drm_client_name_max_len]u8
+	drm_client_name_len u8
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.
 	// Mount entries are permanent; fs resolves namespace copies by mount id.

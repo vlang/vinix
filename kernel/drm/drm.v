@@ -347,6 +347,14 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 				direction: ioctl_write | ioctl_read
 			}
 		}
+		ioctl.drm_ioctl_set_client_name {
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmSetClientName))
+				direction: ioctl_write | ioctl_read
+				extensible: true
+				flags: ioctl_no_activity
+			}
+		}
 		ioctl.drm_ioctl_gem_close {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmGemClose))
@@ -1524,6 +1532,9 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 		}
 		ioctl.drm_ioctl_get_cap {
 			return ioctl_get_cap(dev, data)
+		}
+		ioctl.drm_ioctl_set_client_name {
+			return ioctl_set_client_name(handle, data)
 		}
 		ioctl.drm_ioctl_gem_close {
 			return ioctl_gem_close(dev, handle, data)

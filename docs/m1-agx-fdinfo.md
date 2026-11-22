@@ -48,13 +48,18 @@ drm-resident-system:	48 MiB
 ```
 
 Sizes take a KiB or MiB suffix only while they divide evenly, as in Linux. A
-platform device has no `drm-pdev` line, and Vinix has no client names. An
-`O_PATH` descriptor gets no DRM lines.
+platform device has no `drm-pdev` line. An `O_PATH` descriptor gets no DRM
+lines.
 
 Vinix assigns each DRM data open an ID from a single atomic counter before
 publishing its descriptor, following Linux's DRM file allocation. The ID
 lives on the open file description, so dup and fork share it and fdinfo
 reads only report it. [Pinned Linux client ID allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_file.c#L129-L147)
+
+Applications can set `drm-client-name` with `DRM_IOCTL_SET_CLIENT_NAME`
+on card and render nodes. Names use up to 64 printable ASCII characters
+excluding spaces. A zero-length request clears the name. The name is
+shared by all descriptors for the same open file description. [Pinned Linux DRM UAPI](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/drm/drm.h#L1337-L1345)
 
 ## What the AGX driver counts
 
@@ -143,3 +148,28 @@ archived patches. Evidence is stored at
 `/Users/alex/.local/state/vinix/m1-drm-client-ids-20261122.MCVKe0/`.
 The `bundle.tar.gz` SHA-256 is
 `2ede09358ed7ac01ee796f939a44e9c978da1fc98dcbfe5d1ef1db555cf93af4`.
+
+## Client name validation
+
+The ARM64 and x86-64 QEMU guests exercised name replacement, clearing,
+duplicate sharing, independent opens, the 64-byte limit, invalid bytes
+and bad pointers. Rejected inputs preserved the existing name. The same
+ARM64 probe failed on the baseline kernel.
+
+The kernel stores names inline on the open description. This adds 72 bytes
+with padding and keeps the description in the 1536-byte slab class on
+both architectures. Name storage requires no separate allocation.
+Independent review and generated ARM64 code confirmed that the handle
+lock protects replacement and the fdinfo snapshot.
+
+Both kernels used `-O1` for C compilation and TCG for guest runs.
+The DRM wire and fdinfo sanitizer suites passed. The 200-cycle procfs
+probe passed on both architectures, with peak live-object growth of
+zero on ARM64 and one on x86-64. The allocation scan reproduced the
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `f6e4307f37f5136ed7d118672ffda292236dcee8` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-client-names-20261122.Oxe68t/`.
+The `bundle.tar.gz` SHA-256 is
+`40f47ad958e1b52141a931ec50070402d62f0f332652c9a6a61c882a900eb6a6`.

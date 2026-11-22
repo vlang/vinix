@@ -7,9 +7,11 @@ module drm
 // Documentation/gpu/drm-usage-stats.rst. Monitoring tools read these.
 
 import file
+import drm.ioctl
 import katomic
 import lib
 import resource
+import usercopy
 
 // What a client's memory is, in bytes. A driver fills in what it can tell;
 // `supported` says which of the optional keys to print.
@@ -41,11 +43,33 @@ pub fn assign_client_id(mut description file.Handle) {
 	}
 }
 
+fn ioctl_set_client_name(handle voidptr, data voidptr) int {
+	if handle == unsafe { nil } || data == unsafe { nil } { return -22 }
+	request := unsafe { &ioctl.DrmSetClientName(data) }
+	if request.name_len > file.drm_client_name_max_len { return -22 }
+	mut name := [file.drm_client_name_max_len]u8{}
+	if request.name_len != 0 {
+		if request.name == 0 || request.name_len - 1 > ~request.name
+			|| !usercopy.copy_from_user(unsafe { &name[0] }, request.name, request.name_len) {
+			return -14
+		}
+		for i in 0 .. int(request.name_len) {
+			if name[i] < 0x21 || name[i] > 0x7e { return -22 }
+		}
+	}
+	mut description := unsafe { &file.Handle(handle) }
+	description.l.acquire()
+	description.drm_client_name = name
+	description.drm_client_name_len = u8(request.name_len)
+	description.l.release()
+	return 0
+}
+
 // Append the DRM lines for an open description of a DRM node. The caller keeps
 // the description referenced, which keeps the driver's file state alive.
 pub fn add_fdinfo(handle voidptr, mut text lib.Text) {
 	if handle == unsafe { nil } { return }
-	description := unsafe { &file.Handle(handle) }
+	mut description := unsafe { &file.Handle(handle) }
 	// An O_PATH descriptor is not a DRM file; Linux gives it no DRM lines.
 	if description.flags & resource.o_path != 0 { return }
 	mut res := description.resource
@@ -54,14 +78,26 @@ pub fn add_fdinfo(handle voidptr, mut text lib.Text) {
 		dev := res.dev
 		if dev == unsafe { nil } || dev.driver == unsafe { nil } || !dev.is_registered() { return }
 		add_client_lines(mut text, dev.driver.name, description.drm_client_id)
+		add_client_name(mut description, mut text)
 		if dev.driver.memory_stats == unsafe { nil } { return }
 		stats := dev.driver.memory_stats(dev, handle) or { return }
 		add_memory_stats(mut text, stats, 'system')
 	}
 }
 
+fn add_client_name(mut description file.Handle, mut text lib.Text) {
+	description.l.acquire()
+	length := int(description.drm_client_name_len)
+	name := description.drm_client_name
+	description.l.release()
+	if length == 0 { return }
+	text.add('drm-client-name:\t')
+	text.add(unsafe { tos(&name[0], length) })
+	text.add_byte(`\n`)
+}
+
 // drm_show_fdinfo(): the driver and the client. A platform device has no
-// drm-pdev line, and Vinix has no client names.
+// drm-pdev line.
 fn add_client_lines(mut text lib.Text, driver string, client u64) {
 	text.add('drm-driver:\t')
 	text.add(driver)

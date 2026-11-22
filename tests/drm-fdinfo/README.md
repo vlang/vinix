@@ -10,10 +10,13 @@ while the size divides evenly, never past MiB), the key order of
 
 The guest checks open-order IDs by reading fdinfo in reverse. It also
 checks dup, fork, descriptor-number reuse, ordinary files and `O_PATH`.
+The client-name checks cover descriptor sharing, independent opens,
+validation, user-pointer faults and clearing through the full and short ioctl.
 
 ```sh
 tests/kernel-gaps/run-native --source tests/drm-fdinfo/guestfixture/core.v \
-  --kernel-dir kernel --arch aarch64 --expect 'VINIX DRM CLIENT IDS: PASS'
+  --kernel-dir kernel --arch aarch64 --expect 'VINIX DRM CLIENT IDS: PASS' \
+  --expect 'VINIX DRM CLIENT NAMES: PASS'
 ```
 
 Repeat with `--arch x86_64` after building the x86-64 kernel. For a

@@ -26,6 +26,7 @@ pub const drm_ioctl_syncobj_transfer = u32(0xcc)
 pub const drm_ioctl_syncobj_query = u32(0xcb)
 pub const drm_ioctl_syncobj_timeline_signal = u32(0xcd)
 pub const drm_ioctl_syncobj_eventfd = u32(0xcf)
+pub const drm_ioctl_set_client_name = u32(0xd1)
 pub const drm_ioctl_mode_create_dumb = u32(0xb2)
 pub const drm_ioctl_mode_map_dumb = u32(0xb3)
 pub const drm_ioctl_mode_destroy_dumb = u32(0xb4)
@@ -145,6 +146,12 @@ pub mut:
 	date               u64
 	desc_len           u64
 	desc               u64
+}
+
+pub struct DrmSetClientName {
+pub:
+	name_len u64
+	name     u64
 }
 
 pub struct DrmGetCap {
