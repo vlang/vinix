@@ -287,6 +287,33 @@ fn pass_client(socket i32, outgoing i32) i32 {
 	}
 }
 
+fn test_client_ioctl_handoff(fd i32, previous &char, id u64) bool {
+	// Admission failures leave the previous process associated with the file.
+	if C.ioctl(fd, i32(0x64ff), u64(0)) != -1 || unsafe { *C.__errno_location() } != C.EINVAL
+		|| !same_client_rows(previous) {
+		return false
+	}
+	if C.ioctl(fd, i32(u32(0xc01064d1)), u64(1)) != -1 || unsafe { *C.__errno_location() } != C.EFAULT
+		|| !same_client_rows(previous) {
+		return false
+	}
+
+	// A request that reaches the handler changes attribution even if the
+	// driver rejects its contents. The open description keeps its client ID.
+	if set_name(fd, 0, 65) != C.EINVAL { return false }
+	mut expected := [512]u8{}
+	header_len := format_client_header(&expected[0], sizeof(expected))
+	format_client_row(unsafe { &expected[header_len] }, sizeof(expected) - u64(header_len),
+		c'vinix-clients', C.getpid(), C.geteuid(), c'<unset>', id)
+	if !same_client_rows(unsafe { &char(&expected[0]) }) { return false }
+
+	name := c'received-client'
+	if set_name(fd, u64(name), C.strlen(name)) != 0 || client_id(fd) != i64(id) { return false }
+	format_client_row(unsafe { &expected[header_len] }, sizeof(expected) - u64(header_len),
+		c'vinix-clients', C.getpid(), C.geteuid(), name, id)
+	return same_client_rows(unsafe { &char(&expected[0]) })
+}
+
 fn test_live_client_identity() bool {
 	mut sockets := [2]i32{}
 	if C.socketpair(C.AF_UNIX, C.SOCK_SEQPACKET, 0, &sockets[0]) != 0 { return false }
@@ -315,6 +342,11 @@ fn test_live_client_identity() bool {
 	format_client_row(unsafe { &expected[header_len] }, sizeof(expected) - u64(header_len),
 		c'<unknown>', child, 0, c'<unset>', u64(id))
 	gone := reaped && same_client_rows(unsafe { &char(&expected[0]) })
+	if gone && test_client_ioctl_handoff(passed, unsafe { &char(&expected[0]) }, u64(id)) {
+		C.puts(c'VINIX DRM CLIENT IOCTL HANDOFF: PASS')
+	} else {
+		C.puts(c'DRM CLIENT IOCTL HANDOFF FAIL: incorrect ioctl attribution')
+	}
 	if passed >= 0 { C.close(passed) }
 	unsafe { expected[header_len] = 0 }
 	return live && gone && same_client_rows(unsafe { &char(&expected[0]) })

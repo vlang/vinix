@@ -214,14 +214,14 @@ The `bundle.tar.gz` SHA-256 is
 
 #### Live opener identity
 
-Each row now reads the original opener's current group leader command and
+Each row reads the associated process's current group leader command and
 effective UID. It shows `<unknown>` and the mapped root UID after that
 process is reaped. A stored process generation prevents a recycled PID from
-supplying the old opener's command or UID. The table maps IDs using the
+supplying the previous process's command or UID. The table maps IDs using the
 current reader's PID and user namespaces. Authentication still records the
 open-time `CAP_SYS_ADMIN` check, and the master and magic columns report
-`n` and `0`. Linux can update the associated process after eligible ioctls
-and uses the debugfs opener's user namespace for UID mapping. [Pinned Linux client listing](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L75-L122) and [pinned Linux file ownership](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_file.c#L452-L480)
+`n` and `0`. Linux uses the debugfs opener's user namespace for UID
+mapping. [Pinned Linux client listing](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L75-L122)
 
 The reader copies client rows into temporary storage under the device's
 list lock. It releases that lock before looking up processes and formatting
@@ -243,6 +243,35 @@ archived patch and the simple DRM named-device fixture. Evidence is stored at
 `/Users/alex/.local/state/vinix/m1-drm-live-clients-20261122.aP5F6m/`.
 The `bundle.tar.gz` SHA-256 is
 `a37d84ebbff5839b8351ae07d9d17fa3d5dda07d20d9dd3996e42ba0a6da22de`.
+
+#### Attribution after descriptor transfer
+
+An open description starts with the opening process. The DRM ioctl path
+updates attribution to the caller after request validation and input copy,
+before invoking the handler. An input fault preserves the prior association.
+A handler error can still change attribution. The client ID, name and
+open-time authentication belong to the open description across a transfer.
+Linux exempts descriptions that have held DRM master. Vinix currently applies
+the update to all DRM data descriptions. [Pinned Linux ioctl dispatch](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L800-L819) and [pinned Linux file ownership](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_file.c#L452-L480)
+
+The handle lock serializes the attribution update with the debugfs snapshot.
+The ioctl path releases it before the handler runs. The update uses the
+existing scalar identity and requires no allocation or process reference.
+
+ARM64 and x86-64 QEMU verified that a client ID survives SCM_RIGHTS transfer.
+An unsupported request and an input copy fault preserved the reaped opener's
+row. An oversized client name passed input copy, returned `EINVAL` from
+the handler and reassigned the row to the caller. The same ARM64 guest
+detected the missing handoff on the preceding kernel. The DRM sanitizer
+suites and 200-cycle procfs probes passed. Both guests measured zero slab
+growth over 200 populated-table reads, and the allocation scan reproduced
+the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `44f5fc30ec967ed1a41dde86c02f49e9e74943bc` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-handoff-20261122.9gyMnR/`.
+The `bundle.tar.gz` SHA-256 is
+`b7baa16697d6915a30aba3b0e218c523454db19580380f10501923912a1a2e69`.
 
 ### Global GEM names
 

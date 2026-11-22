@@ -59,6 +59,8 @@ mut:
 	nlink u64
 }
 
+fn update_client_process(_ voidptr) {}
+
 struct DrmNode {
 	dev &DrmDevice
 mut:

@@ -840,6 +840,7 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		unsafe { C.memset(buffer, 0, buffer_size) }
 	}
 
+	update_client_process(handle)
 	ret := if layout.driver_index >= 0 {
 		entry := this.dev.driver.ioctls[layout.driver_index]
 		if entry.handler == unsafe { nil } { -22 } else { entry.handler(this.dev, handle, buffer) }

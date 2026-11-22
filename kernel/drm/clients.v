@@ -20,7 +20,7 @@ pub fn add_client(mut description file.Handle, opener &proc.Process) {
 		mut dev := unsafe { res.dev }
 		if dev == unsafe { nil } { return }
 
-		description.drm_client_opener = proc.process_identity(opener)
+		description.drm_client_process = proc.process_identity(opener)
 		description.drm_client_authenticated = proc.has_capability(opener, proc.cap_sys_admin)
 
 		dev.clients_lock.acquire()
@@ -35,6 +35,18 @@ pub fn add_client(mut description file.Handle, opener &proc.Process) {
 		dev.clients_count++
 		dev.clients_lock.release()
 	}
+}
+
+// After ioctl admission and copy-in, attribute the client to the caller.
+// This only changes the identity displayed in debugfs.
+fn update_client_process(handle voidptr) {
+	if handle == unsafe { nil } { return }
+	mut description := unsafe { &file.Handle(handle) }
+	if description.drm_client_id == 0 { return }
+	identity := proc.process_identity(proc.current_thread().process)
+	description.l.acquire()
+	description.drm_client_process = identity
+	description.l.release()
 }
 
 // The list borrows the handle through its final resource close callback.
@@ -63,7 +75,7 @@ const client_row_max = 20 + 1 + 5 + 1 + 3 + 3 + 1 + 4 + 1 + 1 + 10 + 1 + 10 + 1 
 
 struct ClientRow {
 mut:
-	opener proc.ProcessIdentity
+	process proc.ProcessIdentity
 	id u64
 	minor u8
 	authenticated bool
@@ -96,11 +108,11 @@ fn show_clients(context voidptr, mut text lib.Text) {
 	count := dev.clients_count
 	for i in 0 .. count {
 		mut row := unsafe { &rows[i] }
-		row.opener = description.drm_client_opener
 		row.id = description.drm_client_id
 		row.minor = u8(description.resource.stat.rdev)
 		row.authenticated = description.drm_client_authenticated
 		description.l.acquire()
+		row.process = description.drm_client_process
 		row.name = description.drm_client_name
 		row.name_len = description.drm_client_name_len
 		description.l.release()
@@ -115,7 +127,7 @@ fn show_clients(context voidptr, mut text lib.Text) {
 
 fn add_client_row(mut text lib.Text, row &ClientRow) {
 	mut comm := [16]u8{}
-	pid, uid, live := proc.copy_process_identity(row.opener, unsafe { &comm[0] })
+	pid, uid, live := proc.copy_process_identity(row.process, unsafe { &comm[0] })
 	mut length := 0
 	for length < comm.len && comm[length] != 0 {
 		length++
