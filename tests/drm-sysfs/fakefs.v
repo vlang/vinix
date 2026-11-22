@@ -29,6 +29,7 @@ pub:
 }
 
 __global sysfs_entries = map[string]Entry{}
+__global pending_directory_claim = ''
 
 fn make_parents(path string) bool {
 	mut prefix := ''
@@ -45,8 +46,26 @@ fn make_parents(path string) bool {
 }
 
 pub fn sysfs_directory(path string) bool {
+	return make_directory(path, false)
+}
+
+pub fn sysfs_create_directory(path string) bool {
+	return make_directory(path, true)
+}
+
+// Let a competing publisher win just before the next create of this path.
+pub fn compete_for_directory(path string) {
+	pending_directory_claim = path
+}
+
+fn make_directory(path string, exclusive bool) bool {
 	if !make_parents(path) { return false }
-	if existing := sysfs_entries[path] { return existing.kind == .directory }
+	if path == pending_directory_claim {
+		pending_directory_claim = ''
+		sysfs_entries[path] = Entry{kind: .directory}
+		sysfs_entries[path + '/owner'] = Entry{kind: .text, value: 'competing device'}
+	}
+	if existing := sysfs_entries[path] { return !exclusive && existing.kind == .directory }
 	sysfs_entries[path] = Entry{kind: .directory}
 	return true
 }

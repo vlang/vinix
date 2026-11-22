@@ -490,3 +490,27 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-first-publication-20261122.yNE37j/`.
 The `bundle.tar.gz` SHA-256 is
 `710d641c0d70cb59b3d756700414efc617734e94ec969ad83f0c1668d8a05a0f`.
+
+## Exclusive DRM debugfs directory claims
+
+DRM claims the final debugfs directory name under the VFS and sysfs
+locks. Intermediate directories can be shared. Only the successful
+claimant publishes debugfs minor links and stores the directory path
+for teardown.
+
+The DRM sysfs sanitizer fixture made a competing publisher take the name
+immediately before creation. The previous publisher accepted the occupied
+directory. The revised publisher rejected the claim and left the winner's
+file accessible after the losing device unregistered. Independent review
+and generated kernel code confirmed the locking and ownership order.
+
+Both kernel builds, the DRM wire sanitizer fixture, 79 local contracts
+and 122 pinned-reference checks passed. The ARM64 QEMU DRM sysfs probe
+and x86-64 descriptor-flags smoke test passed. The allocation scan matched
+the 150 findings at the tested base. Native M1 validation remains open.
+
+The tested base was `8b4c3f6f32b223deb270a1564667da96dc9d83d3` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-debugfs-claim-20261122.AvqTjQ/`.
+The `bundle.tar.gz` SHA-256 is
+`73571024f83fcbf7c65979a4ffa1c5e9c460b89709968466372034543d8946a5`.

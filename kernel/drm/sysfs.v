@@ -129,7 +129,7 @@ fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
 	directory := sysfs_join3(debugfs_dri, '/', unique)
 	// A name another device already has stays that device's, as Linux's
 	// debugfs_create_dir() refuses it; this device then gets no directory.
-	if !fs.sysfs_exists(directory) && fs.sysfs_directory(directory) {
+	if fs.sysfs_create_directory(directory) {
 		publish_debugfs_link(dev.dev_id, unique)
 		if dev.render_node != unsafe { nil } {
 			publish_debugfs_link(128 + dev.dev_id, unique)

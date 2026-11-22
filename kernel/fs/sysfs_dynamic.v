@@ -204,6 +204,16 @@ fn sysfs_new_leaf(mut parent VFSNode, name string, mut leaf SysFSResource) &VFSN
 // Make the directory `path`, relative to /sys, and those above it. True if it
 // is there afterwards.
 pub fn sysfs_directory(path string) bool {
+	return sysfs_make_directory(path, false)
+}
+
+// Claim a new directory at path. Intermediate directories can be shared.
+// False if the final name is already taken.
+pub fn sysfs_create_directory(path string) bool {
+	return sysfs_make_directory(path, true)
+}
+
+fn sysfs_make_directory(path string, exclusive bool) bool {
 	vfs_lock.acquire()
 	sysfs_lock.acquire()
 	defer {
@@ -215,6 +225,7 @@ pub fn sysfs_directory(path string) bool {
 		return false
 	}
 	if name in parent.children {
+		if exclusive { return false }
 		existing := unsafe { parent.children[name] }
 		return existing.children != unsafe { nil }
 	}

@@ -196,6 +196,17 @@ pub fn run_checks() {
 	remove_drm_sysfs(mut twin)
 	assert (read_attribute('kernel/debug/dri/1/asahi_stats') or { '' }) == 'stats of 42\n'
 
+	competed_name := 'competing.gpu'
+	competed_directory := 'kernel/debug/dri/${competed_name}'
+	mut competing_driver := DrmDriver{sysfs_parent: 'devices/platform/${competed_name}'}
+	mut losing_device := DrmDevice{driver: &competing_driver, dev_id: 3, render_node: &node}
+	fs.compete_for_directory(competed_directory)
+	publish_drm_sysfs(mut losing_device)
+	assert losing_device.debugfs_dir == '', 'a losing claim acquired the competing debugfs directory'
+	assert !fs.published('kernel/debug/dri/3') && !fs.published('kernel/debug/dri/131')
+	remove_drm_sysfs(mut losing_device)
+	assert text_of('${competed_directory}/owner') == 'competing device'
+
 	// A device with no parent, such as the QEMU framebuffer: Linux's
 	// devices/virtual entries, which libdrm does not enumerate.
 	mut plain := DrmDriver{}
