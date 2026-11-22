@@ -195,6 +195,26 @@ pub fn run_checks() {
 	check_device_capabilities()
 	check_agx_version()
 	check_core_query_transport()
+	check_dumb_node_access()
+}
+
+fn check_dumb_node_access() {
+	driver := DrmDriver{}
+	device := DrmDevice{driver: &driver}
+	mut render := DrmNode{dev: &device, render: true}
+	mut primary := DrmNode{dev: &device}
+	mut request := [32]u8{init: 0xab}
+	for encoded in [u64(0xc02064b2), 0xc01064b3, 0xc00464b4]! {
+		// The mock DRM handler returns EOPNOTSUPP for dumb buffers.
+		expect_error(mut primary, encoded, &request[0], errno.eopnotsupp)
+		expect_error(mut render, encoded, &request[0], errno.eacces)
+		assert request[0] == 0xab
+		expect_error(mut render, encoded, unsafe { nil }, errno.efault)
+	}
+	expect_error(mut render, u64(0x802064b3), unsafe { nil }, errno.efault)
+	expect_error(mut render, u64(0x802064b3), &request[0], errno.eacces)
+	assert request[0] == 0 && request[31] == 0
+	println('DRM dumb-buffer permissions: render denial, copy faults and primary dispatch passed')
 }
 
 fn check_device_capabilities() {

@@ -496,6 +496,27 @@ also used the archived software Asahi fixture patch. Evidence is stored at
 The `bundle.tar.gz` SHA-256 is
 `d916c46ffa1311010dfcf808c4ed716034da429aafc6f7f9e2b1680dfe502924`.
 
+#### Render-node permissions for dumb buffers
+
+Render nodes return `EACCES` for `MODE_CREATE_DUMB`, `MODE_MAP_DUMB` and
+`MODE_DESTROY_DUMB`. The dispatcher checks permissions after copying input
+and updating client attribution. It still attempts any requested copy-out,
+so a copy fault takes precedence over the permission error. [Pinned Linux permissions](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L611-L631) [Pinned dumb-buffer registrations](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L708-L710) [Pinned dispatcher](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L900-L916)
+
+The DRM wire and AGX file-close sanitizer suites passed. ARM64 QEMU
+verified all three permission errors and the reply from a denied read-only
+map through software Asahi. The preceding ARM64 kernel failed the render
+probe. The x86-64 QEMU framebuffer suite verified primary-node create,
+map and destroy. The allocation scan reproduced the 150 baseline findings.
+Native M1 validation remains open.
+
+The tested base was `c4e40d0c3afa9c3cb4aa2aca62a2081e3a329be0` plus the
+archived patch and the simple DRM named-device fixture. The ARM64 build
+also used the archived software Asahi fixture patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-dumb-render-20261122.gQe6Yl/`.
+The `bundle.tar.gz` SHA-256 is
+`130ec49a413bf3229f8c8c00c639b22de665e26ce643692efbb828134a974a59`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

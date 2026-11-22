@@ -551,6 +551,22 @@ mut:
 	tail u64
 }
 
+fn test_render_dumb_permissions(fd i32) bool {
+	commands := [u32(0xc02064b2), 0xc01064b3, 0xc00464b4]!
+	mut data := [4]u64{init: ~u64(0)}
+	for i in 0 .. commands.len {
+		command := i32(unsafe { commands[i] })
+		if C.ioctl(fd, command, &data[0]) != -1 || unsafe { *C.__errno_location() } != C.EACCES
+			|| C.ioctl(fd, command, u64(1)) != -1 || unsafe { *C.__errno_location() } != C.EFAULT {
+			return false
+		}
+	}
+	// The denied read-only map still copies the zeroed reply back.
+	return C.ioctl(fd, i32(u32(0x801864b3)), &data[0]) == -1
+		&& unsafe { *C.__errno_location() } == C.EACCES
+		&& data[0] == 0 && data[1] == 0 && data[2] == 0 && data[3] == ~u64(0)
+}
+
 fn test_dumb_buffer_transport() bool {
 	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
 	if fd < 0 { return false }
@@ -846,6 +862,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM RENDER CAPABILITIES: PASS')
 		} else {
 			C.puts(c'DRM RENDER CAPABILITIES FAIL: wrong capability reply or error')
+		}
+		if test_render_dumb_permissions(render) {
+			C.puts(c'VINIX DRM RENDER DUMB PERMISSIONS: PASS')
+		} else {
+			C.puts(c'DRM RENDER DUMB PERMISSIONS FAIL: wrong permission or copy result')
 		}
 		C.close(render)
 	}

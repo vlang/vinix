@@ -332,6 +332,7 @@ pub:
 pub const ioctl_write = u32(1)
 pub const ioctl_read = u32(2)
 pub const ioctl_no_activity = u32(1) << 31
+const ioctl_primary_only = u32(1) << 30
 const ioctl_size_shift = u32(16)
 const ioctl_size_mask = u32(0x3fff)
 const ioctl_direction_shift = u32(30)
@@ -428,6 +429,7 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 				size: u32(sizeof(ioctl.DrmModeCreateDumb))
 				direction: ioctl_write | ioctl_read
 				extensible: true
+				flags: ioctl_primary_only
 			}
 		}
 		ioctl.drm_ioctl_mode_map_dumb {
@@ -435,6 +437,7 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 				size: u32(sizeof(ioctl.DrmModeMapDumb))
 				direction: ioctl_write | ioctl_read
 				extensible: true
+				flags: ioctl_primary_only
 			}
 		}
 		ioctl.drm_ioctl_mode_destroy_dumb {
@@ -442,6 +445,7 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 				size: u32(sizeof(ioctl.DrmModeDestroyDumb))
 				direction: ioctl_write | ioctl_read
 				extensible: true
+				flags: ioctl_primary_only
 			}
 		}
 		ioctl.drm_virtgpu_map {
@@ -854,7 +858,9 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	}
 
 	update_client_process(handle)
-	ret := if layout.driver_index >= 0 {
+	ret := if this.render && layout.flags & ioctl_primary_only != 0 {
+		-int(errno.eacces)
+	} else if layout.driver_index >= 0 {
 		entry := this.dev.driver.ioctls[layout.driver_index]
 		if entry.handler == unsafe { nil } { -22 } else { entry.handler(this.dev, handle, buffer) }
 	} else { drm_ioctl(this.dev, cmd, buffer, handle) }

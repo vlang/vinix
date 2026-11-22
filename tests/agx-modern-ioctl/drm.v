@@ -16,6 +16,7 @@ pub:
 
 struct DrmNode {
 	dev &DrmDevice
+	render bool
 }
 
 fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) int {
