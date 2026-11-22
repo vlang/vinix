@@ -20,9 +20,7 @@ pub fn add_client(mut description file.Handle, opener &proc.Process) {
 		mut dev := unsafe { res.dev }
 		if dev == unsafe { nil } { return }
 
-		proc.copy_process_command(opener, unsafe { &description.drm_client_command[0] })
-		description.drm_client_tgid = opener.pid
-		description.drm_client_uid = opener.euid
+		description.drm_client_opener = proc.process_identity(opener)
 		description.drm_client_authenticated = proc.has_capability(opener, proc.cap_sys_admin)
 
 		dev.clients_lock.acquire()
@@ -59,10 +57,19 @@ fn (mut dev DrmDevice) remove_client(mut description file.Handle) {
 	dev.clients_lock.release()
 }
 
-// The fixed widths in drm_clients_info(), with up to ten digits for a u32
-// UID. Reserve the complete read before walking the list with IRQs masked.
+// The fixed widths in drm_clients_info(), including the largest u32 UID.
 const client_row_max = 20 + 1 + 5 + 1 + 3 + 3 + 1 + 4 + 1 + 1 + 10 + 1 + 10 + 1 +
 	file.drm_client_name_max_len + 1 + 20 + 1
+
+struct ClientRow {
+mut:
+	opener proc.ProcessIdentity
+	id u64
+	minor u8
+	authenticated bool
+	name [file.drm_client_name_max_len]u8
+	name_len u8
+}
 
 fn show_clients(context voidptr, mut text lib.Text) {
 	mut dev := unsafe { &DrmDevice(context) }
@@ -73,49 +80,64 @@ fn show_clients(context voidptr, mut text lib.Text) {
 	add_client_column(mut text, 'id', 20)
 	text.add_byte(`\n`)
 
-	mut reserved := 0
+	// Copy only inline data under the list lock. Looking up processes and
+	// building output afterwards keeps the list independent of their locks.
+	mut rows := []ClientRow{} @[freed]
+	defer { unsafe { rows.free() } }
 	dev.clients_lock.acquire()
-	for dev.clients_count > reserved {
-		reserved = dev.clients_count
+	for dev.clients_count > rows.len {
+		count := dev.clients_count
 		dev.clients_lock.release()
-		text.reserve(reserved * client_row_max)
+		unsafe { rows.free() }
+		rows = []ClientRow{len: count} @[freed]
 		dev.clients_lock.acquire()
 	}
 	mut description := dev.clients_first
-	for description != unsafe { nil } {
-		add_client_row(mut text, mut description)
+	count := dev.clients_count
+	for i in 0 .. count {
+		mut row := unsafe { &rows[i] }
+		row.opener = description.drm_client_opener
+		row.id = description.drm_client_id
+		row.minor = u8(description.resource.stat.rdev)
+		row.authenticated = description.drm_client_authenticated
+		description.l.acquire()
+		row.name = description.drm_client_name
+		row.name_len = description.drm_client_name_len
+		description.l.release()
 		description = description.drm_client_next
 	}
 	dev.clients_lock.release()
+	text.reserve(count * client_row_max)
+	for i in 0 .. count {
+		add_client_row(mut text, unsafe { &rows[i] })
+	}
 }
 
-fn add_client_row(mut text lib.Text, mut description file.Handle) {
+fn add_client_row(mut text lib.Text, row &ClientRow) {
+	mut comm := [16]u8{}
+	pid, uid, live := proc.copy_process_identity(row.opener, unsafe { &comm[0] })
 	mut length := 0
-	for length < description.drm_client_command.len && description.drm_client_command[length] != 0 {
+	for length < comm.len && comm[length] != 0 {
 		length++
 	}
-	command := unsafe { tos(&description.drm_client_command[0], length) }
+	command := if live { unsafe { tos(&comm[0], length) } } else { '<unknown>' }
 	add_client_column(mut text, command, 20)
 	text.add_byte(` `)
-	add_client_number(mut text, u64(description.drm_client_tgid), 5)
+	add_client_number(mut text, u64(pid), 5)
 	text.add_byte(` `)
-	add_client_number(mut text, description.resource.stat.rdev & 0xff, 3)
+	add_client_number(mut text, u64(row.minor), 3)
 	// Legacy DRM master and GET_MAGIC/AUTH_MAGIC are absent. The auth
 	// bit records the same initial CAP_SYS_ADMIN check as drm_file_alloc().
 	text.add('   n    ')
-	text.add_byte(if description.drm_client_authenticated { `y` } else { `n` })
+	text.add_byte(if row.authenticated { `y` } else { `n` })
 	text.add_byte(` `)
-	add_client_number(mut text, u64(description.drm_client_uid), 5)
+	add_client_number(mut text, u64(uid), 5)
 	text.add('          0 ')
 
-	description.l.acquire()
-	name_len := int(description.drm_client_name_len)
-	name := description.drm_client_name
-	description.l.release()
-	client_name := if name_len == 0 { '<unset>' } else { unsafe { tos(&name[0], name_len) } }
+	client_name := if row.name_len == 0 { '<unset>' } else { unsafe { tos(&row.name[0], int(row.name_len)) } }
 	add_client_column(mut text, client_name, file.drm_client_name_max_len)
 	text.add_byte(` `)
-	add_client_number(mut text, description.drm_client_id, 20)
+	add_client_number(mut text, row.id, 20)
 	text.add_byte(`\n`)
 }
 

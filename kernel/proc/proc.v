@@ -1229,11 +1229,45 @@ pub fn copy_current_command(destination voidptr) {
 	copy_command(task.process, task, destination)
 }
 
-// Copy the group leader's comm into the caller's zeroed 16-byte buffer.
-pub fn copy_process_command(process &Process, destination voidptr) {
+// A scalar reference to a process and its PID numbers. The budget generation
+// is unique per userspace process and remains stable through exec and reap.
+pub struct ProcessIdentity {
+	pid int
+	generation u64
+	pid_namespace u64
+	local_pid int
+}
+
+pub fn process_identity(process &Process) ProcessIdentity {
+	ns := process.numbered_in
+	return ProcessIdentity{
+		pid: process.pid
+		generation: process.kernel_owner.generation
+		pid_namespace: if ns == unsafe { nil } { u64(0) } else { ns.id }
+		local_pid: process.ns_pid
+	}
+}
+
+// Read an identity as the caller sees it. Only copy the command if this
+// exact process is still in the table. The caller supplies 16 zeroed bytes.
+pub fn copy_process_identity(identity ProcessIdentity, destination voidptr) (int, u32, bool) {
 	lock_table()
 	defer { unlock_table() }
-	copy_command(process, threads_by_tid[process.pid], destination)
+	viewer := current_thread().process
+	ns := viewer.numbered_in
+	pid := if !numbers_own(ns) {
+		identity.pid
+	} else if ns.id == identity.pid_namespace {
+		identity.local_pid
+	} else {
+		0
+	}
+	process := process_at(identity.pid)
+	if process == unsafe { nil } || process.kernel_owner.generation != identity.generation {
+		return pid, own_visible_id(viewer, 0, false), false
+	}
+	copy_command(process, threads_by_tid[identity.pid], destination)
+	return pid, own_visible_id(viewer, process.euid, false), true
 }
 
 fn copy_command(process &Process, task &Thread, destination voidptr) {

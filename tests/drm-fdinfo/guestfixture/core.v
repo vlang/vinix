@@ -10,6 +10,7 @@ module guestfixture
 #include <sys/prctl.h>
 #include <sys/reboot.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -28,6 +29,10 @@ fn C.strstr(voidptr, &char) &char
 fn C.strlen(&char) u64
 fn C.strcmp(&char, &char) i32
 fn C.strtoull(&char, &&char, i32) u64
+fn C.sscanf(&char, &char, ...) i32
+fn C.fopen(&char, &char) voidptr
+fn C.fgets(&char, i32, voidptr) &char
+fn C.fclose(voidptr) i32
 fn C.printf(&char, ...) i32
 fn C.puts(&char) i32
 fn C.fflush(voidptr) i32
@@ -38,10 +43,32 @@ fn C.getpid() i32
 fn C.geteuid() u32
 fn C.prctl(i32, ...) i32
 fn C.setrlimit(i32, &C.rlimit) i32
+fn C.setresuid(u32, u32, u32) i32
+fn C.socketpair(i32, i32, i32, &i32) i32
+fn C.sendmsg(i32, &C.msghdr, i32) i64
+fn C.recvmsg(i32, &C.msghdr, i32) i64
 
 struct C.rlimit {
 	rlim_cur u64
 	rlim_max u64
+}
+
+struct C.iovec {
+	iov_base voidptr
+	iov_len usize
+}
+
+struct C.cmsghdr {
+	cmsg_len usize
+	cmsg_level i32
+	cmsg_type i32
+}
+
+struct C.msghdr {
+	msg_iov &C.iovec
+	msg_iovlen usize
+	msg_control voidptr
+	msg_controllen usize
 }
 
 fn read_fdinfo(fd i32, buffer voidptr, capacity u64) bool {
@@ -174,11 +201,20 @@ fn same_client_rows(expected &char) bool {
 	return count >= 0 && C.strcmp(expected, unsafe { &char(&actual[0]) }) == 0
 }
 
-fn test_debugfs_clients() bool {
-	mut expected := [512]u8{}
-	header_len := C.snprintf(&expected[0], sizeof(expected),
+fn format_client_header(buffer voidptr, capacity u64) i32 {
+	return C.snprintf(buffer, capacity,
 		c'%20s %5s %3s master a %5s %10s %64s %20s\n',
 		c'command', c'tgid', c'dev', c'uid', c'magic', c'name', c'id')
+}
+
+fn format_client_row(buffer voidptr, capacity u64, command &char, pid i32, uid u32, name &char, id u64) i32 {
+	return C.snprintf(buffer, capacity, c'%20s %5d %3d   n    y %5u %10u %64s %20lu\n',
+		command, pid, i32(0), uid, u32(0), name, id)
+}
+
+fn test_debugfs_clients() bool {
+	mut expected := [512]u8{}
+	header_len := format_client_header(&expected[0], sizeof(expected))
 	if !same_client_rows(unsafe { &char(&expected[0]) }) { return false }
 	if C.prctl(C.PR_SET_NAME, c'vinix-clients', u64(0), u64(0), u64(0)) != 0 { return false }
 	card := c'/dev/dri/card0'
@@ -190,13 +226,11 @@ fn test_debugfs_clients() bool {
 	C.close(first)
 	name := c'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-~'
 	if set_name(second, u64(name), 64) != 0 { return false }
-	first_len := C.snprintf(unsafe { &expected[header_len] }, sizeof(expected) - u64(header_len),
-		c'%20s %5d %3d   n    y %5u %10u %64s %20lu\n', c'vinix-clients',
-		C.getpid(), i32(0), C.geteuid(), u32(0), c'<unset>', u64(client_id(alias)))
+	first_len := format_client_row(unsafe { &expected[header_len] }, sizeof(expected) - u64(header_len),
+		c'vinix-clients', C.getpid(), C.geteuid(), c'<unset>', u64(client_id(alias)))
 	second_at := header_len + first_len
-	C.snprintf(unsafe { &expected[second_at] }, sizeof(expected) - u64(second_at),
-		c'%20s %5d %3d   n    y %5u %10u %64s %20lu\n', c'vinix-clients',
-		C.getpid(), i32(0), C.geteuid(), u32(0), name, u64(client_id(second)))
+	format_client_row(unsafe { &expected[second_at] }, sizeof(expected) - u64(second_at),
+		c'vinix-clients', C.getpid(), C.geteuid(), name, u64(client_id(second)))
 	if !same_client_rows(unsafe { &char(&expected[0]) }) { return false }
 	C.close(second)
 	unsafe { expected[second_at] = 0 }
@@ -232,6 +266,103 @@ fn test_debugfs_clients() bool {
 	return row_retained && exited && empty
 }
 
+fn pass_client(socket i32, outgoing i32) i32 {
+	unsafe {
+		mut byte := u8(0)
+		mut control := [3]u64{}
+		header := &C.cmsghdr(&control[0])
+		fd := &i32(&control[2])
+		mut vector := C.iovec{iov_base: &byte, iov_len: 1}
+		mut message := C.msghdr{msg_iov: &vector, msg_iovlen: 1, msg_control: &control[0], msg_controllen: 24}
+		if outgoing >= 0 {
+			*header = C.cmsghdr{cmsg_len: 20, cmsg_level: C.SOL_SOCKET, cmsg_type: C.SCM_RIGHTS}
+			*fd = outgoing
+			return if C.sendmsg(socket, &message, C.MSG_NOSIGNAL) == 1 { outgoing } else { -1 }
+		}
+		if C.recvmsg(socket, &message, 0) != 1 || message.msg_controllen < 20
+			|| header.cmsg_len != 20 || header.cmsg_level != C.SOL_SOCKET || header.cmsg_type != C.SCM_RIGHTS {
+			return -1
+		}
+		return *fd
+	}
+}
+
+fn test_live_client_identity() bool {
+	mut sockets := [2]i32{}
+	if C.socketpair(C.AF_UNIX, C.SOCK_SEQPACKET, 0, &sockets[0]) != 0 { return false }
+	child := C.fork()
+	if child == 0 {
+		C.close(sockets[0])
+		client := C.open(c'/dev/dri/card0', C.O_RDWR)
+		if client < 0 || C.prctl(C.PR_SET_NAME, c'live-drm-opener', u64(0), u64(0), u64(0)) != 0
+			|| C.setresuid(0, 1234, 0) != 0 || C.geteuid() != 1234 || pass_client(sockets[1], client) < 0 {
+			C._exit(2)
+		}
+		mut byte := u8(0)
+		C._exit(if C.read(sockets[1], &byte, 1) == 0 { 0 } else { 3 })
+	}
+	C.close(sockets[1])
+	passed := if child > 0 { pass_client(sockets[0], -1) } else { -1 }
+	mut expected := [512]u8{}
+	header_len := format_client_header(&expected[0], sizeof(expected))
+	id := client_id(passed)
+	format_client_row(unsafe { &expected[header_len] }, sizeof(expected) - u64(header_len),
+		c'live-drm-opener', child, 1234, c'<unset>', u64(id))
+	live := id > 0 && same_client_rows(unsafe { &char(&expected[0]) })
+	C.close(sockets[0])
+	mut status := i32(0)
+	reaped := child > 0 && C.waitpid(child, &status, 0) == child && status == 0
+	format_client_row(unsafe { &expected[header_len] }, sizeof(expected) - u64(header_len),
+		c'<unknown>', child, 0, c'<unset>', u64(id))
+	gone := reaped && same_client_rows(unsafe { &char(&expected[0]) })
+	if passed >= 0 { C.close(passed) }
+	unsafe { expected[header_len] = 0 }
+	return live && gone && same_client_rows(unsafe { &char(&expected[0]) })
+}
+
+fn client_read_heap(objects &i64, capacity int) int {
+	info := C.fopen(c'/proc/slabinfo', c'r')
+	if info == unsafe { nil } { return 0 }
+	defer { C.fclose(info) }
+	mut line := [256]char{}
+	mut count := 0
+	for count < capacity && C.fgets(&line[0], line.len, info) != unsafe { nil } {
+		if C.sscanf(&line[0], c'size-%*d %*d %ld', unsafe { objects + count }) == 1 {
+			count++
+		}
+	}
+	return count
+}
+
+fn test_client_read_allocations() bool {
+	fd := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	id := client_id(fd)
+	if id <= 0 { return false }
+	mut expected := [512]u8{}
+	header_len := format_client_header(&expected[0], sizeof(expected))
+	format_client_row(unsafe { &expected[header_len] }, sizeof(expected) - u64(header_len),
+		c'vinix-clients', C.getpid(), C.geteuid(), c'<unset>', u64(id))
+	for _ in 0 .. 20 {
+		if !same_client_rows(unsafe { &char(&expected[0]) }) { return false }
+	}
+	mut before := [64]i64{}
+	mut after := [64]i64{}
+	count := client_read_heap(&before[0], before.len)
+	for _ in 0 .. 200 {
+		if !same_client_rows(unsafe { &char(&expected[0]) }) { return false }
+	}
+	if count <= 0 || client_read_heap(&after[0], after.len) != count { return false }
+	mut largest := i64(0)
+	for i in 0 .. count {
+		growth := unsafe { after[i] - before[i] }
+		if growth > largest { largest = growth }
+	}
+	C.printf(c'DRM client table: peak slab-class growth %ld over 200 reads\n', largest)
+	return largest <= 8
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	if test_open_order() {
@@ -251,6 +382,16 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM DEBUGFS CLIENTS: PASS')
 		} else {
 			C.puts(c'DRM DEBUGFS CLIENTS FAIL: unexpected rows or lifecycle')
+		}
+		if test_live_client_identity() {
+			C.puts(c'VINIX DRM LIVE CLIENT IDENTITY: PASS')
+		} else {
+			C.puts(c'DRM LIVE CLIENT IDENTITY FAIL: incorrect live or reaped opener')
+		}
+		if test_client_read_allocations() {
+			C.puts(c'VINIX DRM CLIENT READ ALLOCATIONS: PASS')
+		} else {
+			C.puts(c'DRM CLIENT READ ALLOCATIONS FAIL: table or slab usage changed')
 		}
 	}
 	C.fflush(unsafe { nil })

@@ -93,9 +93,7 @@ pub mut:
 	// set before insertion and remain valid after the opening task exits.
 	drm_client_prev &Handle = unsafe { nil }
 	drm_client_next &Handle = unsafe { nil }
-	drm_client_command [16]u8
-	drm_client_tgid int
-	drm_client_uid u32
+	drm_client_opener proc.ProcessIdentity
 	drm_client_authenticated bool
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.

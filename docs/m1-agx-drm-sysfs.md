@@ -185,18 +185,15 @@ the node used for each open, and the name and ID match that description's
 `fdinfo`. Duplicates and inherited descriptors share the row until the last
 reference goes away. Metadata-only opens have no row. [Pinned Linux client listing](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L75-L122)
 
-Vinix records the group leader's command, kernel TGID, effective UID and
-`CAP_SYS_ADMIN` check at open. The command and credentials stay associated
-with that open after the opener exits. The master and magic columns report
-`n` and `0`, respectively. Linux derives command and UID from a live task
-and maps identifiers into the reader's namespaces.
+The initial implementation recorded the group leader's command, kernel TGID,
+effective UID and `CAP_SYS_ADMIN` check at open. It kept those values after
+the opener exited.
 
 The device list borrows open descriptions until final resource close.
 Independent lifetime review and generated C confirmed that readers and
-close serialize on the list lock. The reader reserves output before taking
-the final list lock and holds it while formatting the rows. The extra inline
-fields add 48 bytes on each architecture and keep the description in the
-1536-byte slab class.
+close serialize on the list lock. The initial implementation held that lock
+while formatting the rows. Its extra inline fields added 48 bytes on each
+architecture and kept the description in the 1536-byte slab class.
 
 The DRM sysfs, wire and fdinfo sanitizer fixtures passed. Both standard
 kernels passed the client ID and name checks and the 200-cycle procfs
@@ -214,6 +211,38 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/m1-drm-clients-20261122.bpIpJS/`.
 The `bundle.tar.gz` SHA-256 is
 `62776282975bb00176acdae1d56ec99aabf901eb097d1a35af670790760fe61a`.
+
+#### Live opener identity
+
+Each row now reads the original opener's current group leader command and
+effective UID. It shows `<unknown>` and the mapped root UID after that
+process is reaped. A stored process generation prevents a recycled PID from
+supplying the old opener's command or UID. The table maps IDs using the
+current reader's PID and user namespaces. Authentication still records the
+open-time `CAP_SYS_ADMIN` check, and the master and magic columns report
+`n` and `0`. Linux can update the associated process after eligible ioctls
+and uses the debugfs opener's user namespace for UID mapping. [Pinned Linux client listing](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L75-L122) and [pinned Linux file ownership](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_file.c#L452-L480)
+
+The reader copies client rows into temporary storage under the device's
+list lock. It releases that lock before looking up processes and formatting
+the rows. Independent review and generated code confirmed the snapshot holds
+values only and is freed after each read. The open description grew by eight
+bytes on both architectures and remains in the 1536-byte slab class.
+
+ARM64 and x86-64 QEMU passed the named-device tests. The opener renamed
+itself, changed effective UID and passed its descriptor to another process.
+The descriptor kept its row after the opener was reaped, and its final
+close removed the row. The same guest rejected the previous kernel's static
+identity. Both current guests recorded zero peak live-object growth across
+200 reads of a populated table. The DRM sanitizer fixtures and 200-cycle
+procfs checks passed. The allocation scan reproduced the 150 baseline
+findings. Native M1 validation remains open.
+
+The tested base was `c16eeb48ec72f7d5e4869f6bed72cd64d8011c80` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-live-clients-20261122.aP5F6m/`.
+The `bundle.tar.gz` SHA-256 is
+`a37d84ebbff5839b8351ae07d9d17fa3d5dda07d20d9dd3996e42ba0a6da22de`.
 
 ### Global GEM names
 
