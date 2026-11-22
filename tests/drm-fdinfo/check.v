@@ -46,5 +46,9 @@ pub fn run_checks() {
 	})
 	assert every == 'drm-driver:\tvirtio_gpu\ndrm-client-id:\t1\ndrm-total-system:\t12 KiB\ndrm-shared-system:\t4 KiB\ndrm-active-system:\t1 KiB\ndrm-resident-system:\t2 KiB\ndrm-purgeable-system:\t0\n'
 
-	println('DRM fdinfo: Linux size units, client line formatting, G13 and full memory keys passed')
+	mut dma_buf := lib.new_text(64)
+	add_dma_buf_lines(mut dma_buf, 16384, 2)
+	assert lib.finish_text(dma_buf) == 'size:\t16384\ncount:\t2\nexp_name:\tdrm\n'
+
+	println('DRM fdinfo: Linux size units, client and DMA-BUF formatting, G13 and full memory keys passed')
 }

@@ -817,6 +817,31 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-fsid-20261122.vPRaNr/`. The
 `bundle.tar.gz` SHA-256 is
 `cdbc2206a1fed1a29f31fc50236b602beea5945810dcc5ddc5b7f6ba528e3a07`.
 
+#### PRIME DMA-BUF fdinfo
+
+`/proc/<pid>/fdinfo/<fd>` appends the buffer size in bytes, the open
+description's reference count and the `drm` exporter label for PRIME
+DMA-BUF descriptors. The reference count excludes the temporary reference
+taken by the procfs read. The exporter label follows Linux's common GEM
+PRIME helper, which the pinned Asahi driver uses for exports.
+[Pinned DMA-BUF fdinfo](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L573-L584)
+[Pinned PRIME exporter name](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_prime.c#L862-L876)
+[Pinned Asahi export callback](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/gem.rs#L334-L344)
+
+ARM64 and x86-64 QEMU compared all three lines with two descriptors open
+and again after closing the original descriptor and GEM handle. The
+count dropped from two to one. The same executable failed the check on
+the preceding x86-64 kernel. The fdinfo sanitizer suite and the PRIME
+filesystem, mapping and GEM reclamation probes passed. The allocation
+scan reproduced its 150 baseline findings. Native M1 validation remains
+open.
+
+The tested base was `354a342108e29f41dc22e2d892b49bea302c5527` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-fdinfo-20261122.AN3cS0/`. The
+`bundle.tar.gz` SHA-256 is
+`a65e2efb1b1a3c954a7b0d47877202ddbdf9180b73fc0bbd634340ebe448632f`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

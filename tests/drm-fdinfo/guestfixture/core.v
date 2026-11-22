@@ -840,6 +840,15 @@ fn test_prime_inode_owner_times(fd i32, before C.timespec, after C.timespec) boo
 		&& info.st_mtim.tv_sec == timestamp.tv_sec && info.st_mtim.tv_nsec == timestamp.tv_nsec
 }
 
+fn test_prime_fdinfo(fd i32, size u64, refs i32) bool {
+	mut info := [512]u8{}
+	if !read_fdinfo(fd, &info[0], sizeof(info)) { return false }
+	mut expected := [80]char{}
+	C.snprintf(&expected[0], sizeof(expected), c'\nsize:\t%lu\ncount:\t%d\nexp_name:\tdrm\n', size, refs)
+	suffix := C.strstr(&info[0], c'\nsize:\t')
+	return suffix != unsafe { nil } && C.strcmp(suffix, &expected[0]) == 0
+}
+
 fn test_prime_filesystem_type() bool {
 	mut info := C.statfs{}
 	card := C.open(c'/dev/dri/card0', C.O_RDWR)
@@ -855,10 +864,16 @@ fn test_prime_filesystem_type() bool {
 	if !export_with_filesystem_ids(card, mut export) { return false }
 	clock_ok := C.clock_gettime(C.CLOCK_REALTIME, &after) == 0
 	duplicate := C.dup(export.fd)
+	two_refs := duplicate >= 0 && test_prime_fdinfo(duplicate, create.size, 2)
 	C.close(export.fd)
 	if duplicate < 0 { return false }
 	defer { C.close(duplicate) }
 	if C.ioctl(card, i32(u32(0xc00464b4)), unsafe { &create.handle }) != 0 { return false }
+	if two_refs && test_prime_fdinfo(duplicate, create.size, 1) {
+		C.puts(c'VINIX DRM PRIME FDINFO: PASS')
+	} else {
+		C.puts(c'DRM PRIME FDINFO FAIL: incorrect size, count or exporter')
+	}
 	if test_prime_inode_metadata(duplicate, create.size) {
 		C.puts(c'VINIX DRM PRIME INODE METADATA: PASS')
 	} else {

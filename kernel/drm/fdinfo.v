@@ -8,6 +8,7 @@ module drm
 
 import file
 import drm.ioctl
+import katomic
 import lib
 import resource
 import usercopy
@@ -51,8 +52,8 @@ fn ioctl_set_client_name(handle voidptr, data voidptr) int {
 	return 0
 }
 
-// Append the DRM lines for an open description of a DRM node. The caller keeps
-// the description referenced, which keeps the driver's file state alive.
+// Append the lines for a DRM node or PRIME export. The caller keeps the
+// description referenced, which keeps the driver's file state alive.
 pub fn add_fdinfo(handle voidptr, mut text lib.Text) {
 	if handle == unsafe { nil } { return }
 	mut description := unsafe { &file.Handle(handle) }
@@ -60,6 +61,12 @@ pub fn add_fdinfo(handle voidptr, mut text lib.Text) {
 	if description.flags & resource.o_path != 0 { return }
 	mut res := description.resource
 	if res == unsafe { nil } { return }
+	if mut res is GemPrimeResource {
+		// Exclude the temporary reference held by the procfs reader.
+		refs := katomic.load(&description.refcount) - 1
+		add_dma_buf_lines(mut text, u64(res.stat.size), refs)
+		return
+	}
 	if mut res is DrmNode {
 		dev := res.dev
 		if dev == unsafe { nil } || dev.driver == unsafe { nil } || !dev.is_registered() { return }
@@ -126,4 +133,12 @@ fn add_fdinfo_size(mut text lib.Text, stat string, region string, size u64) {
 		text.add(' MiB')
 	}
 	text.add_byte(`\n`)
+}
+
+fn add_dma_buf_lines(mut text lib.Text, size u64, refs int) {
+	text.add('size:\t')
+	text.add_unsigned(size)
+	text.add('\ncount:\t')
+	text.add_decimal(i64(refs))
+	text.add('\nexp_name:\tdrm\n')
 }
