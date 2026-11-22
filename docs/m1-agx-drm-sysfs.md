@@ -796,6 +796,27 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-owner-20261122.wZqTFS/`. The
 `bundle.tar.gz` SHA-256 is
 `4d8c78948b5fd8f04bb62582326498d7236179a4cc291178f0cb8140989112aa`.
 
+#### PRIME DMA-BUF filesystem ID
+
+`fstatfs` reports the same nonzero filesystem device ID that `fstat`
+reports in `st_dev` for a PRIME DMA-BUF. The VFS writes that ID to
+`f_fsid` as two 32-bit words, low word first.
+[Pinned Linux statfs identity](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/libfs.c#L39-L47)
+[Pinned fsid word order](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/linux/statfs.h#L45-L48)
+
+ARM64 and x86-64 QEMU compared both fields on a duplicate after the
+original descriptor and GEM handle closed. The preceding x86-64 kernel
+reported a zero filesystem ID and a nonzero device ID with the same
+guest executable. The DRM wire sanitizer suite and the PRIME mapping,
+inode and filesystem-type checks passed. The allocation scan reproduced
+its 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `3da1fc67a8df576c837916dd41018208dd59cc58` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-fsid-20261122.vPRaNr/`. The
+`bundle.tar.gz` SHA-256 is
+`cdbc2206a1fed1a29f31fc50236b602beea5945810dcc5ddc5b7f6ba528e3a07`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

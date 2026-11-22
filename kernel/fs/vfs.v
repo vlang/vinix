@@ -2896,6 +2896,12 @@ fn fill_statfs_resource(mut res resource.Resource, buf u64, flags u64) bool {
 	raw[4] = info.bavail
 	raw[5] = info.files
 	raw[6] = info.ffree
+	// Linux stores f_fsid as two native 32-bit words, low word first.
+	fsid := unsafe { &u32(&raw[7]) }
+	unsafe {
+		fsid[0] = u32(info.fsid)
+		fsid[1] = u32(info.fsid >> 32)
+	}
 	raw[8] = info.namelen
 	raw[9] = info.frsize
 	raw[10] = info.flags | flags

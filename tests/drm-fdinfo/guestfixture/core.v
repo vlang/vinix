@@ -79,6 +79,7 @@ struct C.timespec {
 }
 
 struct C.stat {
+	st_dev u64
 	st_mode u32
 	st_nlink u64
 	st_uid u32
@@ -91,6 +92,9 @@ struct C.stat {
 	st_ctim C.timespec
 }
 
+@[typedef]
+struct C.fsid_t {}
+
 struct C.statfs {
 	f_type u64
 	f_bsize u64
@@ -98,6 +102,7 @@ struct C.statfs {
 	f_namelen u64
 	f_blocks u64
 	f_files u64
+	f_fsid C.fsid_t
 }
 
 struct C.pollfd {
@@ -865,6 +870,15 @@ fn test_prime_filesystem_type() bool {
 		C.puts(c'DRM PRIME INODE OWNER AND TIMES FAIL: incorrect creation metadata')
 	}
 	if C.fstatfs(duplicate, &info) != 0 { return false }
+	mut inode := C.stat{}
+	words := unsafe { &u32(&info.f_fsid) }
+	bits := unsafe { u64(words[0]) | (u64(words[1]) << 32) }
+	if C.fstat(duplicate, &inode) == 0 && bits != 0 && bits == inode.st_dev {
+		C.puts(c'VINIX DRM PRIME FILESYSTEM ID: PASS')
+	} else {
+		C.printf(c'DRM PRIME FILESYSTEM ID FAIL: filesystem id %#lx device %#lx\n',
+			bits, inode.st_dev)
+	}
 	C.printf(c'DRM PRIME fstatfs: type %#lx block %lu fragment %lu name limit %lu\n',
 		info.f_type, info.f_bsize, info.f_frsize, info.f_namelen)
 	page := u64(C.getpagesize())

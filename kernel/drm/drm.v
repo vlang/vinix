@@ -167,6 +167,7 @@ fn (mut this GemPrimeResource) filesystem_stat() resource.FileSystemStat {
 	return resource.FileSystemStat{
 		@type:   0x444d4142 // DMA_BUF_MAGIC
 		bsize:   page_size
+		fsid:    this.stat.dev
 		namelen: 255
 		frsize:  page_size
 	}

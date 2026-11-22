@@ -207,6 +207,7 @@ pub mut:
 	bavail  u64
 	files   u64
 	ffree   u64
+	fsid    u64
 	namelen u64 = 255
 	frsize  u64
 	flags   u64
