@@ -1044,6 +1044,31 @@ at `/Users/alex/.local/state/vinix/m1-drm-splice-input-20261122.vN1EQU/`. The
 `bundle.tar.gz` SHA-256 is
 `418846b9e78090408e8b91c26fbb298c9d0bd5506ec88b0129bf0259763d2913`.
 
+#### Splice file ranges
+
+When `splice` connects a pipe to a file in either direction, it checks the
+whole requested range at the selected file position. A negative position or
+a count that would cross the signed offset limit returns `EINVAL` before
+waiting on the pipe or moving data. Both explicit offsets and the file
+description's position use the checked value, and rejected ranges leave
+queued bytes and file positions intact.
+[Pinned Linux splice file paths](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1422-L1469), [pinned range validation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L425-L450)
+
+The same guest executable failed on each preceding kernel and passed on
+updated ARM64 and x86-64 QEMU kernels. It checked explicit and implicit
+offsets in both directions, counts above the signed limit, EOF at the
+boundary, and a valid retry that transferred the original pipe data. The
+previous splice regressions and DRM syncobj host suite passed. The allocation
+scan reproduced its 150 baseline findings. A backend write error after a
+valid range check can still consume source bytes. Native M1 validation
+remains open.
+
+The tested base was `af293a559e7a2f319d42b35f0afc3fd2cd25faa7` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-splice-range-20261122.GUkhvg/`.
+The `bundle.tar.gz` SHA-256 is
+`f9e268708c785ef6b600502eea0af8acb5d5e903ce712a341034dd3ba39734d1`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

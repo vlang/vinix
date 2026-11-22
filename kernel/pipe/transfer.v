@@ -120,8 +120,8 @@ pub fn syscall_splice(_ voidptr, fd_in int, off_in u64, fd_out int, off_out u64,
 		|| (sink_pipe != unsafe { nil } && off_out != 0) {
 		return errno.err, errno.espipe
 	}
-	sink_offset := read_transfer_offset(off_out) or { return errno.err, errno.efault }
-	source_offset := read_transfer_offset(off_in) or { return errno.err, errno.efault }
+	mut sink_offset := read_transfer_offset(off_out) or { return errno.err, errno.efault }
+	mut source_offset := read_transfer_offset(off_in) or { return errno.err, errno.efault }
 	if !readable(source) || !writable(sink) {
 		return errno.err, errno.ebadf
 	}
@@ -129,6 +129,18 @@ pub fn syscall_splice(_ voidptr, fd_in int, off_in u64, fd_out int, off_out u64,
 		|| (source_pipe != unsafe { nil } && voidptr(source_pipe) == voidptr(sink_pipe))
 		|| sink.handle.flags & resource.o_append != 0 {
 		return errno.err, errno.einval
+	}
+
+	// Resolve the file-side position before waiting on the pipe or moving
+	// data. The transfer uses the same position that was checked here.
+	if source_pipe == unsafe { nil } {
+		source_offset = splice_file_offset(source.handle, source_offset, length) or {
+			return errno.err, errno.einval
+		}
+	} else if sink_pipe == unsafe { nil } {
+		sink_offset = splice_file_offset(sink.handle, sink_offset, length) or {
+			return errno.err, errno.einval
+		}
 	}
 
 	return move_between(mut source, source_offset, mut sink, sink_offset, length, flags)
@@ -310,6 +322,7 @@ pub fn syscall_copy_file_range(_ voidptr, fd_in int, off_in u64, fd_out int, off
 struct TransferOffset {
 	address u64
 	value i64
+	fixed bool // The file position was resolved and range-checked for splice.
 }
 
 fn read_transfer_offset(address u64) ?TransferOffset {
@@ -318,6 +331,14 @@ fn read_transfer_offset(address u64) ?TransferOffset {
 		return none
 	}
 	return TransferOffset{address: address, value: value}
+}
+
+fn splice_file_offset(handle &file.Handle, offset TransferOffset, length u64) ?TransferOffset {
+	position := if offset.address == 0 { handle.loc } else { offset.value }
+	if position < 0 || length > u64(0x7fffffffffffffff) - u64(position) {
+		return none
+	}
+	return TransferOffset{address: offset.address, value: position, fixed: true}
 }
 
 // An explicit offset is written back instead of advancing the description.
@@ -369,7 +390,7 @@ fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.
 		}
 		buffer := memory.malloc(chunk)
 
-		read_from := if source_offset.address != 0 {
+		read_from := if source_offset.address != 0 || source_offset.fixed {
 			u64(source_offset.value) + moved
 		} else {
 			u64(source_handle.loc)
@@ -393,7 +414,7 @@ fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.
 			break
 		}
 
-		write_to := if sink_offset.address != 0 {
+		write_to := if sink_offset.address != 0 || sink_offset.fixed {
 			u64(sink_offset.value) + moved
 		} else {
 			u64(sink_handle.loc)
@@ -415,10 +436,10 @@ fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.
 
 		// Only a side without an explicit offset advances its descriptor.
 		if source_offset.address == 0 {
-			source_handle.loc += put
+			source_handle.loc = if source_offset.fixed { i64(read_from) + put } else { source_handle.loc + put }
 		}
 		if sink_offset.address == 0 {
-			sink_handle.loc += put
+			sink_handle.loc = if sink_offset.fixed { i64(write_to) + put } else { sink_handle.loc + put }
 		}
 
 		moved += u64(put)

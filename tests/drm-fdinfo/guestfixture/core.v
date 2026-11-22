@@ -1652,6 +1652,55 @@ fn test_splice_pipe_input() bool {
 		u32(C.SPLICE_F_NONBLOCK)) == 0 && offset == 3
 }
 
+fn test_splice_file_range() bool {
+	file := i32(C.syscall(C.SYS_memfd_create, c'splice-file-range', u32(C.MFD_ALLOW_SEALING)))
+	if file < 0 { return false }
+	defer { C.close(file) }
+	mut pipe := [2]i32{}
+	if C.pipe(&pipe[0]) != 0 { return false }
+	defer {
+		C.close(pipe[0])
+		C.close(pipe[1])
+	}
+	if C.fcntl(pipe[0], C.F_SETFL, C.O_NONBLOCK) != 0 || C.write(pipe[1], c'keep', 4) != 4
+		|| C.write(file, c'file', 4) != 4 || C.fcntl(file, C.F_ADD_SEALS, C.F_SEAL_GROW) != 0 {
+		return false
+	}
+
+	near_limit := i64(0x7ffffffffffffffd)
+	mut offset := near_limit
+	if C.lseek(file, near_limit, C.SEEK_SET) != near_limit
+		|| !splice_replies(pipe[0], unsafe { nil }, file, unsafe { nil }, C.EINVAL)
+		|| !splice_replies(pipe[0], unsafe { nil }, file, &offset, C.EINVAL)
+		|| !splice_replies(file, unsafe { nil }, pipe[1], unsafe { nil }, C.EINVAL)
+		|| !splice_replies(file, &offset, pipe[1], unsafe { nil }, C.EINVAL)
+		|| C.syscall(C.SYS_splice, file, &offset, pipe[1], unsafe { nil }, u64(2), u32(0)) != 0
+		|| C.lseek(file, 0, C.SEEK_CUR) != near_limit || offset != near_limit {
+		return false
+	}
+
+	oversized := u64(1) << 63
+	if C.lseek(file, 0, C.SEEK_SET) != 0
+		|| C.syscall(C.SYS_splice, pipe[0], unsafe { nil }, file, unsafe { nil }, oversized, u32(0)) != -1
+		|| unsafe { *C.__errno_location() } != C.EINVAL
+		|| C.syscall(C.SYS_splice, file, unsafe { nil }, pipe[1], unsafe { nil }, oversized, u32(0)) != -1
+		|| unsafe { *C.__errno_location() } != C.EINVAL
+		|| C.lseek(file, 0, C.SEEK_CUR) != 0 {
+		return false
+	}
+	mut data := [5]char{}
+	if C.read(file, &data[0], u64(data.len)) != 4 || C.strncmp(&data[0], c'file', 4) != 0
+		|| C.lseek(file, 2, C.SEEK_SET) != 2 {
+		return false
+	}
+	offset = 0
+	return C.syscall(C.SYS_splice, pipe[0], unsafe { nil }, file, &offset, u64(4), u32(0)) == 4
+		&& offset == 4 && C.lseek(file, 0, C.SEEK_CUR) == 2
+		&& C.read(pipe[0], &data[0], 1) == -1 && unsafe { *C.__errno_location() } == C.EAGAIN
+		&& C.lseek(file, 0, C.SEEK_SET) == 0 && C.read(file, &data[0], u64(data.len)) == 4
+		&& C.strncmp(&data[0], c'keep', 4) == 0
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1799,6 +1848,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM SPLICE PIPE INPUT: PASS')
 	} else {
 		C.puts(c'DRM SPLICE PIPE INPUT FAIL: incorrect wait, transfer or offset')
+	}
+	if test_splice_file_range() {
+		C.puts(c'VINIX DRM SPLICE FILE RANGE: PASS')
+	} else {
+		C.puts(c'DRM SPLICE FILE RANGE FAIL: incorrect range reply, pipe data or file position')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')
