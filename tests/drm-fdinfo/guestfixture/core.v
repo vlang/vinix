@@ -1533,6 +1533,69 @@ fn test_pipe_write_signal() bool {
 		&& test_partial_pipe_write_signal(signal_fd)
 }
 
+fn tee_replies(input i32, output i32, code i32) bool {
+	return C.syscall(C.SYS_tee, input, output, u64(4), u32(0)) == -1
+		&& unsafe { *C.__errno_location() } == code
+}
+
+fn test_pipe_transfer_admission(prime i32) bool {
+	mask := u64(1) << (C.SIGPIPE - 1)
+	mut previous := u64(0)
+	if C.syscall(C.SYS_rt_sigprocmask, C.SIG_BLOCK, &mask, &previous, u64(sizeof(u64))) != 0 {
+		return false
+	}
+	defer {
+		C.syscall(C.SYS_rt_sigprocmask, C.SIG_SETMASK, &previous, unsafe { nil }, u64(sizeof(u64)))
+	}
+	signal_fd := i32(C.syscall(C.SYS_signalfd4, i64(-1), &mask, u64(sizeof(u64)), C.SFD_NONBLOCK))
+	if signal_fd < 0 { return false }
+	defer { C.close(signal_fd) }
+	mut source := [2]i32{}
+	if C.pipe(&source[0]) != 0 { return false }
+	defer {
+		C.close(source[0])
+		if source[1] >= 0 { C.close(source[1]) }
+	}
+	mut sink := [2]i32{}
+	if C.pipe(&sink[0]) != 0 { return false }
+	defer {
+		if sink[0] >= 0 { C.close(sink[0]) }
+		C.close(sink[1])
+	}
+	mut data := [4096]char{}
+	capacity := C.fcntl(sink[1], C.F_SETPIPE_SZ, i32(data.len))
+	if capacity <= 0 || capacity % data.len != 0
+		|| C.fcntl(source[0], C.F_SETFL, C.O_NONBLOCK) != 0
+		|| C.fcntl(sink[1], C.F_SETFL, C.O_NONBLOCK) != 0 {
+		return false
+	}
+	for _ in 0 .. capacity / data.len {
+		if C.write(sink[1], &data[0], u64(data.len)) != data.len { return false }
+	}
+	if C.write(source[1], c'keep', 4) != 4
+		|| !splice_replies(source[0], unsafe { nil }, sink[1], unsafe { nil }, C.EAGAIN)
+		|| !tee_replies(source[0], sink[1], C.EAGAIN)
+		|| !splice_replies(source[0], unsafe { nil }, source[1], unsafe { nil }, C.EINVAL)
+		|| C.close(sink[0]) != 0 {
+		return false
+	}
+	sink[0] = -1
+	if !splice_replies(source[0], unsafe { nil }, sink[1], unsafe { nil }, C.EPIPE)
+		|| !read_pending_sigpipe(signal_fd) || !tee_replies(source[0], sink[1], C.EPIPE)
+		|| !read_pending_sigpipe(signal_fd)
+		|| C.read(source[0], &data[0], 4) != 4 || C.strncmp(&data[0], c'keep', 4) != 0
+		|| !splice_replies(source[0], unsafe { nil }, sink[1], unsafe { nil }, C.EAGAIN)
+		|| !tee_replies(source[0], sink[1], C.EAGAIN) || C.close(source[1]) != 0 {
+		return false
+	}
+	source[1] = -1
+	return splice_replies(source[0], unsafe { nil }, sink[1], unsafe { nil }, C.EPIPE)
+		&& read_pending_sigpipe(signal_fd) && tee_replies(source[0], sink[1], C.EPIPE)
+		&& read_pending_sigpipe(signal_fd)
+		&& splice_replies(prime, unsafe { nil }, sink[1], unsafe { nil }, C.EPIPE)
+		&& read_pending_sigpipe(signal_fd)
+}
+
 fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
 	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
 		&& unsafe { *C.__errno_location() } == code
@@ -1670,6 +1733,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PIPE WRITE SIGPIPE: PASS')
 	} else {
 		C.puts(c'DRM PIPE WRITE SIGPIPE FAIL: incorrect signal, write result or partial count')
+	}
+	if test_pipe_transfer_admission(export.fd) {
+		C.puts(c'VINIX DRM PIPE TRANSFER ADMISSION: PASS')
+	} else {
+		C.puts(c'DRM PIPE TRANSFER ADMISSION FAIL: incorrect error, signal or source data')
 	}
 	if test_prime_copy_range(first, export.fd) {
 		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')

@@ -20,6 +20,7 @@ import usercopy
 // there is no page stealing to ask for and nothing ever blocks on a gift — but
 // an unknown one is still refused.
 const splice_f_known = 0xf
+const splice_f_nonblock = 2
 
 // How much is moved per round trip. Bounded so that a caller asking to move a
 // gigabyte does not ask the kernel for a gigabyte of bounce buffer.
@@ -50,13 +51,16 @@ pub fn pipe_from_fd(fd &file.FD) ?&Pipe {
 }
 
 // The caller pins the writer for the entire wait and subsequent transfer.
-pub fn (mut sink Pipe) wait_sendfile_room(nonblocking bool) ?u64 {
+pub fn (mut sink Pipe) wait_transfer_room(nonblocking bool) ?u64 {
+	mut broken := false
 	sink.l.acquire()
 	defer {
 		sink.l.release()
+		if broken { queue_broken_pipe_signal() }
 	}
 	for {
 		if sink.readers == 0 {
+			broken = true
 			errno.set(errno.epipe)
 			return none
 		}
@@ -77,6 +81,13 @@ pub fn (mut sink Pipe) wait_sendfile_room(nonblocking bool) ?u64 {
 		}
 		sink.l.acquire()
 	}
+}
+
+fn (mut source Pipe) wait_transfer_input(nonblocking bool) ?u64 {
+	source.l.acquire()
+	defer { source.l.release() }
+	source.wait_readable_locked(nonblocking)?
+	return source.used
 }
 
 // splice(fd_in, off_in, fd_out, off_out, len, flags). At least one side has to
@@ -117,11 +128,12 @@ pub fn syscall_splice(_ voidptr, fd_in int, off_in u64, fd_out int, off_out u64,
 		return errno.err, errno.ebadf
 	}
 	if (source_pipe == unsafe { nil } && sink_pipe == unsafe { nil })
+		|| (source_pipe != unsafe { nil } && voidptr(source_pipe) == voidptr(sink_pipe))
 		|| sink.handle.flags & resource.o_append != 0 {
 		return errno.err, errno.einval
 	}
 
-	return move_between(mut source, source_offset, mut sink, sink_offset, length)
+	return move_between(mut source, source_offset, mut sink, sink_offset, length, flags)
 }
 
 // tee(fd_in, fd_out, len, flags): copy between two pipes and leave the source
@@ -155,13 +167,12 @@ pub fn syscall_tee(_ voidptr, fd_in int, fd_out int, length u64, flags u32) (u64
 		return errno.err, errno.einval
 	}
 
-	mut want := length
-	if want > source_pipe.available() {
-		want = source_pipe.available()
-	}
-	if want > sink_pipe.room() {
-		want = sink_pipe.room()
-	}
+	nonblocking := flags & splice_f_nonblock != 0
+		|| (source.handle.flags | sink.handle.flags) & resource.o_nonblock != 0
+	available := source_pipe.wait_transfer_input(nonblocking) or { return errno.err, errno.get() }
+	room := sink_pipe.wait_transfer_room(nonblocking) or { return errno.err, errno.get() }
+	mut want := if length < available { length } else { available }
+	if want > room { want = room }
 	if want == 0 {
 		return 0, 0
 	}
@@ -295,7 +306,7 @@ pub fn syscall_copy_file_range(_ voidptr, fd_in int, off_in u64, fd_out int, off
 		return errno.err, errno.ebadf
 	}
 
-	return move_between(mut source, source_offset, mut sink, sink_offset, length)
+	return move_between(mut source, source_offset, mut sink, sink_offset, length, 0)
 }
 
 struct TransferOffset {
@@ -312,9 +323,8 @@ fn read_transfer_offset(address u64) ?TransferOffset {
 }
 
 // An explicit offset is written back instead of advancing the description.
-fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.FD, sink_offset TransferOffset, length u64) (u64, u64) {
+fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.FD, sink_offset TransferOffset, length u64, flags u32) (u64, u64) {
 	if source_offset.value < 0 || sink_offset.value < 0
-		|| source.handle.resource is resource.NoByteIOResource
 		|| sink.handle.resource is resource.NoByteIOResource {
 		return errno.err, errno.einval
 	}
@@ -326,10 +336,31 @@ fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.
 	if length == 0 {
 		return 0, 0
 	}
+	mut source_pipe := pipe_from_fd(source) or { unsafe { nil } }
+	mut sink_pipe := pipe_from_fd(sink) or { unsafe { nil } }
+	source_without_io := source_handle.resource is resource.NoByteIOResource
+	nonblocking := flags & splice_f_nonblock != 0 || sink_handle.flags & resource.o_nonblock != 0
+		|| (source_pipe != unsafe { nil } && source_handle.flags & resource.o_nonblock != 0)
 
 	mut moved := u64(0)
 
 	for moved < length {
+		mut chunk := length - moved
+		if chunk > transfer_chunk { chunk = transfer_chunk }
+		if sink_pipe != unsafe { nil } {
+			if source_pipe != unsafe { nil } {
+				source_pipe.wait_transfer_input(nonblocking || moved != 0) or {
+					if moved != 0 { break }
+					return errno.err, errno.get()
+				}
+			}
+			room := sink_pipe.wait_transfer_room(nonblocking || moved != 0) or {
+				if moved != 0 { break }
+				return errno.err, errno.get()
+			}
+			if chunk > room { chunk = room }
+		}
+		if source_without_io { return errno.err, errno.einval }
 		// Authorize before reading a pipe: a refused disk sink must leave
 		// its input untouched. Hold the scalar reservation through the read
 		// and write so a mount cannot publish over an in-flight raw transfer.
@@ -337,11 +368,6 @@ fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.
 			if moved > 0 { break }
 			return errno.err, errno.get()
 		}
-		mut chunk := length - moved
-		if chunk > transfer_chunk {
-			chunk = transfer_chunk
-		}
-
 		buffer := memory.malloc(chunk)
 
 		read_from := if source_offset.address != 0 {

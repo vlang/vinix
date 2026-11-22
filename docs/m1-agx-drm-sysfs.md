@@ -996,6 +996,32 @@ at `/Users/alex/.local/state/vinix/m1-drm-pipe-write-sigpipe-20261122.NJrUzZ/`.
 The `bundle.tar.gz` SHA-256 is
 `8789dfc1a38abc2859db9374d2e7d997a2d01b0b29a2bc7da693644cce76e080`.
 
+#### Splice and tee pipe readiness
+
+For pipe-to-pipe transfers, `splice` and `tee` check for input or EOF
+before checking destination room. An already full nonblocking destination
+returns `EAGAIN`, and a destination with no readers returns `EPIPE` and
+queues `SIGPIPE`. Both errors preserve queued source bytes when detected
+before transfer. `splice` also rejects a move to the same pipe with
+`EINVAL`. The checks use snapshots, so concurrent I/O can still affect
+the subsequent read or write. An interrupted read wait reacquires its
+pipe lock before the deferred unlock.
+[Pinned splice preparation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L1889-L1926), [pinned tee preparation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/splice.c#L2110-L2138)
+
+ARM64 and x86-64 QEMU passed the transfer checks for full and closed
+destinations, same-pipe rejection, an empty source with and without EOF,
+and a PRIME source. The probe verified preserved source bytes and
+`SIGPIPE` delivery. The same x86-64 guest probe failed on the preceding
+kernel. Independent review checked descriptor and lock ownership. The
+DRM syncobj host suite passed, and the allocation scan reproduced its
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `cae43063d91e70517fa452b806b0c678e2225217` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-pipe-transfer-admission-20261122.S0uVKQ/`.
+The `bundle.tar.gz` SHA-256 is
+`c56be987dcb70cfb33ed3a8ea31761955bd87211f0a04664ffa982cb0e22b592`.
+
 #### PRIME DMA-BUF copy_file_range
 
 `copy_file_range` checks descriptors, explicit offset pointers, flags,

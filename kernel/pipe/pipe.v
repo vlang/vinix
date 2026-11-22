@@ -61,6 +61,14 @@ pub fn initialise(signal_hook voidptr) {
 	broken_pipe_signal_hook = signal_hook
 }
 
+fn queue_broken_pipe_signal() {
+	if broken_pipe_signal_hook == unsafe { nil } { return }
+	saved_error := errno.get()
+	signal := unsafe { BrokenPipeSignalHook(broken_pipe_signal_hook) }
+	signal()
+	errno.set(saved_error)
+}
+
 fn (mut this Pipe) poll_status(access int) int {
 	this.l.acquire()
 	defer { this.l.release() }
@@ -305,33 +313,8 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 	// (kernel-internal access); treat that as a blocking, read-only handle.
 	handle_flags := if _handle == unsafe { nil } { 0 } else { handle.flags }
 
-	// If pipe is empty, block or return if nonblock
-	for katomic.load(&this.used) == 0 {
-		// EOF begins only after the last write-side open-file description is
-		// gone. The resource refcount also includes readers, so it cannot tell
-		// this apart once shells have made more than one pipe endpoint.
-		if this.writers == 0 {
-			return 0
-		}
-		if handle_flags & resource.o_nonblock != 0 {
-			errno.set(errno.eagain)
-			return none
-		}
-		// The same event announces both new data and newly freed space. Sample
-		// its generation while the pipe lock still protects the empty state:
-		// otherwise a writer can fill the pipe after the check, and another
-		// waiter can consume that pending notification before this reader has
-		// attached. The generation change still makes await return in that case.
-		generation := event.generation(mut this.event)
-		this.l.release()
-		event.await_one_from_generation(mut this.event, true, generation) or {
-			// Nothing was read: a signal handler installed with SA_RESTART
-			// has the call run again, as on Linux, instead of failing it.
-			errno.set(proc.interrupted_errno)
-			return none
-		}
-		this.l.acquire()
-	}
+	this.wait_readable_locked(handle_flags & resource.o_nonblock != 0)?
+	if this.used == 0 { return 0 }
 
 	if this.used < count {
 		count = this.used
@@ -373,16 +356,44 @@ fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 	return i64(count)
 }
 
+// The caller holds the pipe lock and retains it on every return.
+fn (mut this Pipe) wait_readable_locked(nonblocking bool) ? {
+	for katomic.load(&this.used) == 0 {
+		// EOF begins only after the last write-side open-file description is
+		// gone. The resource refcount also includes readers, so it cannot tell
+		// this apart once shells have made more than one pipe endpoint.
+		if this.writers == 0 {
+			return
+		}
+		if nonblocking {
+			errno.set(errno.eagain)
+			return none
+		}
+		// The same event announces both new data and newly freed space. Sample
+		// its generation while the pipe lock still protects the empty state:
+		// otherwise a writer can fill the pipe after the check, and another
+		// waiter can consume that pending notification before this reader has
+		// attached. The generation change still makes await return in that case.
+		generation := event.generation(mut this.event)
+		this.l.release()
+		event.await_one_from_generation(mut this.event, true, generation) or {
+			this.l.acquire()
+			// Nothing was read: a signal handler installed with SA_RESTART
+			// has the call run again, as on Linux, instead of failing it.
+			errno.set(proc.interrupted_errno)
+			return none
+		}
+		this.l.acquire()
+	}
+}
+
 fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
 	mut broken := false
 	this.l.acquire()
 	defer {
 		this.l.release()
-		if broken && handle != unsafe { nil } && broken_pipe_signal_hook != unsafe { nil } {
-			saved_error := errno.get()
-			signal := unsafe { BrokenPipeSignalHook(broken_pipe_signal_hook) }
-			signal()
-			errno.set(saved_error)
+		if broken && handle != unsafe { nil } {
+			queue_broken_pipe_signal()
 		}
 	}
 
