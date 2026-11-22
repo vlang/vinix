@@ -77,6 +77,31 @@ archived patch. Evidence is stored at
 The `bundle.tar.gz` SHA-256 is
 `ac6e418b19e4d8182c7683df7cc77e96f82a212916f3ba3d13124e81bd1956cb`.
 
+### Platform driver binding
+
+The GPU's `driver` link resolves to `/sys/bus/platform/drivers/asahi`.
+That directory lists `206400000.gpu` as a link back to the platform
+device. AGX creates the driver-to-device link first and rolls it back
+if the device-to-driver link fails. Shutdown removes successful pairs
+while preserving the shared directories. [Pinned Linux driver binding](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/base/dd.c#L483-L525)
+
+The DRM sysfs sanitizer fixture resolved both links and found the render
+node through the driver directory. Nine collision cases covered the
+driver directory, both links and the existing AGX entries. Three controls
+caught missing rollback, publication after a reverse-link collision and
+an incorrect relative target. Independent review confirmed the link
+ownership and cleanup order.
+
+Both kernel builds used `-O1` for C compilation. The ARM64 DRM discovery
+and x86-64 debugfs permission probes passed in QEMU under TCG. The allocation
+scan reproduced the 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `2223fc6c18a63048a7cf5e3f328b65132d02ae1c` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-agx-driver-binding-20261122.rf6PeC/`.
+The `bundle.tar.gz` SHA-256 is
+`b911210fd893f76656720c953e7f7f4526fea02c9149c8467275479d428f1914`.
+
 ## DRM debugfs
 
 Linux's DRM core also gives every device a debugfs directory, named after its

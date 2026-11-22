@@ -12,6 +12,7 @@ import time
 // t8103.dtsi, which libdrm reads from the device's uevent.
 const t8103_compatible = ['apple,agx-t8103', 'apple,agx-g13g']!
 const gpu_sysfs_prefix = 'devices/platform/soc/'
+const agx_driver_sysfs_path = 'bus/platform/drivers/asahi'
 
 // The directory Linux gives the GPU's platform device, named after its node's
 // unit address: devices/platform/soc/206400000.gpu on M1.
@@ -26,7 +27,7 @@ fn gpu_sysfs_path(unit_address u64) string {
 // The platform device's own files, beside the drm directory the DRM core made
 // for its minors: Linux's uevent, modalias and subsystem link, which libdrm
 // reads to describe the device, and Asahi's agx_stats and gpu_memory. The
-// platform bus also lists the device by name.
+// platform bus lists the device and its driver binding.
 fn (mut driver AgxDriver) publish_sysfs(mgr &gpu.GpuManager) {
 	if mgr.hw_config.gpu_gen != .g13 || driver.unit_address == 0 { return }
 	for path in driver.sysfs_entries {
@@ -50,6 +51,7 @@ fn (mut driver AgxDriver) publish_sysfs(mgr &gpu.GpuManager) {
 	platform_name := unsafe { tos(directory.str + gpu_sysfs_prefix.len, directory.len - gpu_sysfs_prefix.len) }
 	bus_device := sysfs_child('bus/platform/devices/', platform_name, '')
 	bus_target := sysfs_child('../../../', directory, '')
+	driver_link, listed_link := publish_gpu_driver_links(directory, platform_name)
 	driver.sysfs_entries = [
 		owned_sysfs_path(uevent_path, fs.sysfs_text(uevent_path, uevent)),
 		owned_sysfs_path(modalias_path, fs.sysfs_text(modalias_path, modalias_line)),
@@ -57,6 +59,8 @@ fn (mut driver AgxDriver) publish_sysfs(mgr &gpu.GpuManager) {
 		owned_sysfs_path(stats, fs.sysfs_attribute(stats, 0o444, show_agx_stats, unsafe { nil }, voidptr(mgr))),
 		owned_sysfs_path(memory_path, fs.sysfs_attribute(memory_path, 0o444, show_gpu_memory, unsafe { nil }, voidptr(mgr))),
 		owned_sysfs_path(bus_device, fs.sysfs_link(bus_device, bus_target)),
+		driver_link,
+		listed_link,
 	]!
 	unsafe {
 		directory.free()
@@ -65,6 +69,25 @@ fn (mut driver AgxDriver) publish_sysfs(mgr &gpu.GpuManager) {
 		modalias_line.free()
 		bus_target.free()
 	}
+}
+
+// Publish the driver-to-device link first. Roll it back if the device-to-driver
+// link cannot be created, as the Linux driver core does.
+fn publish_gpu_driver_links(directory string, platform_name string) (string, string) {
+	if !fs.sysfs_directory(agx_driver_sysfs_path) { return '', '' }
+	listed_path := sysfs_child(agx_driver_sysfs_path, '/', platform_name)
+	listed_target := sysfs_child('../../../../', directory, '')
+	listed_link := owned_sysfs_path(listed_path, fs.sysfs_link(listed_path, listed_target))
+	unsafe { listed_target.free() }
+	if listed_link.len == 0 { return '', '' }
+	driver_path := sysfs_child(directory, '/', 'driver')
+	driver_link := owned_sysfs_path(driver_path, fs.sysfs_link(driver_path, '../../../../bus/platform/drivers/asahi'))
+	if driver_link.len == 0 {
+		fs.sysfs_remove(listed_link)
+		unsafe { listed_link.free() }
+		return '', ''
+	}
+	return driver_link, listed_link
 }
 
 fn owned_sysfs_path(path string, created bool) string {

@@ -30,8 +30,8 @@ pub mut:
 	hw_config   hw.HwConfig
 	detected    bool
 	initialized bool
-	// Paths of the platform entries AGX created. The directory is shared.
-	sysfs_entries [6]string
+	// Paths of the sysfs entries AGX created in shared directories.
+	sysfs_entries [8]string
 	// Physical base of the GPU's first register range, the ASC: its device-tree
 	// unit address, which Linux names the platform device after.
 	unit_address u64

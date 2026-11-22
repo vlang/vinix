@@ -41,7 +41,7 @@ struct GpuManager {
 struct AgxDriver {
 mut:
 	unit_address u64
-	sysfs_entries [6]string
+	sysfs_entries [8]string
 }
 
 // Follow every link in `path`, relative links from the link's own directory,
@@ -192,14 +192,31 @@ fn check_agx_sysfs_ownership() {
 	assert fs.sysfs_text(other_entry, 'another owner')
 	other_bus_entry := 'bus/platform/devices/another-device'
 	assert fs.sysfs_text(other_bus_entry, 'another device')
+	driver_dir := 'bus/platform/drivers/asahi'
+	driver_link := '${parent}/driver'
+	listed_link := '${driver_dir}/${oracle_unit}.${oracle_node}'
+	other_driver_entry := '${driver_dir}/another-device'
 	paths := ['${parent}/uevent', '${parent}/modalias', '${parent}/subsystem',
-		'${parent}/agx_stats', '${parent}/gpu_memory', 'bus/platform/devices/${oracle_unit}.${oracle_node}']!
+		'${parent}/agx_stats', '${parent}/gpu_memory', 'bus/platform/devices/${oracle_unit}.${oracle_node}',
+		driver_link, listed_link]!
+
+	assert fs.sysfs_text(driver_dir, 'occupied directory path')
+	driver.publish_sysfs(&mgr)
+	assert !fs.published(driver_link) && !fs.published(listed_link)
+	assert fs.published('${parent}/gpu_memory')
+	driver.remove_sysfs()
+	assert text_of(driver_dir) == 'occupied directory path'
+	assert fs.sysfs_remove(driver_dir)
+
+	assert fs.sysfs_text(other_driver_entry, 'another bound device')
 	for blocked_path in paths {
 		assert fs.sysfs_text(blocked_path, 'occupied')
 		driver.publish_sysfs(&mgr)
 		driver.publish_sysfs(&mgr)
 		for path in paths {
-			assert fs.published(path)
+			other_binding_link := (blocked_path == driver_link && path == listed_link)
+				|| (blocked_path == listed_link && path == driver_link)
+			assert fs.published(path) == !other_binding_link, 'partial AGX driver binding'
 		}
 		assert text_of(blocked_path) == 'occupied'
 		driver.remove_sysfs()
@@ -207,12 +224,13 @@ fn check_agx_sysfs_ownership() {
 		assert text_of(blocked_path) == 'occupied', 'AGX teardown removed an occupied path'
 		assert text_of(other_entry) == 'another owner', 'AGX teardown removed an unrelated entry'
 		assert text_of(other_bus_entry) == 'another device', 'AGX teardown removed another bus entry'
+		assert text_of(other_driver_entry) == 'another bound device', 'AGX teardown removed another driver entry'
 		for path in paths {
 			assert fs.published(path) == (path == blocked_path)
 		}
 		assert fs.sysfs_remove(blocked_path)
 	}
-	println('AGX sysfs: six collisions preserve occupied paths and unrelated entries through teardown and retry')
+	println('AGX sysfs: nine collisions preserve occupied paths and roll back incomplete driver bindings')
 }
 
 pub fn run_checks() {
@@ -233,6 +251,12 @@ pub fn run_checks() {
 	assert (readlink(bus_device) or { '' }) == '../../../${parent}'
 	assert (resolve(bus_device) or { '' }) == parent
 	assert (resolve('${bus_device}/drm/renderD129') or { '' }) == '${parent}/drm/renderD129'
+	driver_dir := 'bus/platform/drivers/asahi'
+	listed_link := '${driver_dir}/${oracle_unit}.${oracle_node}'
+	assert (readlink('${parent}/driver') or { '' }) == '../../../../${driver_dir}'
+	assert (readlink(listed_link) or { '' }) == '../../../../${parent}'
+	assert (resolve('${bus_device}/driver') or { '' }) == driver_dir
+	assert (resolve('${listed_link}/drm/renderD129') or { '' }) == '${parent}/drm/renderD129'
 
 	for minor, name in {
 		u32(1):   'card1'
@@ -385,9 +409,11 @@ pub fn run_checks() {
 	}
 	assert fs.published('${parent}/uevent')
 	assert (resolve(bus_device) or { '' }) == parent
+	assert (resolve(listed_link) or { '' }) == parent
 	agx.remove_sysfs()
 	assert fs.published(parent)
 	assert fs.published('bus/platform/devices') && !fs.published(bus_device)
+	assert fs.published(driver_dir) && !fs.published(listed_link) && !fs.published('${parent}/driver')
 	assert !fs.published('${parent}/uevent') && !fs.published('${parent}/gpu_memory')
 	assert gpu_device.sysfs_parent == '' && framebuffer.sysfs_parent == ''
 	assert gpu_device.debugfs_dir == ''
