@@ -162,6 +162,15 @@ fn (mut this GemPrimeResource) poll_status(_access int) int {
 	return this.poll_requested(file.pollin | file.pollout).status
 }
 
+fn (mut this GemPrimeResource) filesystem_stat() resource.FileSystemStat {
+	return resource.FileSystemStat{
+		@type:   0x444d4142 // DMA_BUF_MAGIC
+		bsize:   page_size
+		namelen: 255
+		frsize:  page_size
+	}
+}
+
 fn (this &GemPrimeResource) seek_offset(offset i64, whence int) ?u64 {
 	if offset == 0 {
 		if whence == fs.seek_set { return u64(0) }

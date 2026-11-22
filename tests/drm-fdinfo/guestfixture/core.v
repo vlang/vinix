@@ -14,6 +14,7 @@ module guestfixture
 #include <sys/reboot.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/statfs.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -27,6 +28,7 @@ fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
 fn C.mremap(voidptr, usize, usize, i32, ...) voidptr
 fn C.getpagesize() i32
+fn C.fstatfs(i32, &C.statfs) i32
 fn C.poll(&C.pollfd, u64, i32) i32
 fn C.__errno_location() &i32
 fn C.dup(i32) i32
@@ -61,6 +63,15 @@ fn C.recvmsg(i32, &C.msghdr, i32) i64
 struct C.rlimit {
 	rlim_cur u64
 	rlim_max u64
+}
+
+struct C.statfs {
+	f_type u64
+	f_bsize u64
+	f_frsize u64
+	f_namelen u64
+	f_blocks u64
+	f_files u64
 }
 
 struct C.pollfd {
@@ -757,6 +768,29 @@ fn test_gem_metadata_reclamation() bool {
 	return direct && prime
 }
 
+fn test_prime_filesystem_type() bool {
+	mut info := C.statfs{}
+	card := C.open(c'/dev/dri/card0', C.O_RDWR)
+	if card < 0 { return false }
+	defer { C.close(card) }
+	if C.fstatfs(card, &info) != 0 || info.f_type == 0x444d4142 { return false }
+	mut create := DumbCreateRequest{width: 1, height: 1, bpp: 32}
+	if C.ioctl(card, i32(u32(0xc02064b2)), &create) != 0 { return false }
+	mut export := ExtendedPrimeRequest{handle: create.handle, fd: -1}
+	if C.ioctl(card, i32(u32(0xc00c642d)), &export) != 0 || export.fd < 0 { return false }
+	duplicate := C.dup(export.fd)
+	C.close(export.fd)
+	if duplicate < 0 { return false }
+	defer { C.close(duplicate) }
+	if C.ioctl(card, i32(u32(0xc00464b4)), unsafe { &create.handle }) != 0 { return false }
+	if C.fstatfs(duplicate, &info) != 0 { return false }
+	C.printf(c'DRM PRIME fstatfs: type %#lx block %lu fragment %lu name limit %lu\n',
+		info.f_type, info.f_bsize, info.f_frsize, info.f_namelen)
+	page := u64(C.getpagesize())
+	return info.f_type == 0x444d4142 && info.f_bsize == page && info.f_frsize == page
+		&& info.f_namelen == 255 && info.f_blocks == 0 && info.f_files == 0
+}
+
 fn prime_mmap_rejected(fd i32, length usize, offset i64) bool {
 	result := C.mmap(unsafe { nil }, length, C.PROT_READ, C.MAP_SHARED, fd, offset)
 	if result == voidptr(C.MAP_FAILED) { return unsafe { *C.__errno_location() } == C.EINVAL }
@@ -1056,6 +1090,11 @@ pub fn run() i32 {
 			C.puts(c'VINIX DRM GEM METADATA RECLAMATION: PASS')
 		} else {
 			C.puts(c'DRM GEM METADATA RECLAMATION FAIL: objects retained after final close')
+		}
+		if test_prime_filesystem_type() {
+			C.puts(c'VINIX DRM PRIME FILESYSTEM TYPE: PASS')
+		} else {
+			C.puts(c'DRM PRIME FILESYSTEM TYPE FAIL: incorrect DMA-BUF filesystem reply')
 		}
 		if test_prime_mmap_bounds() {
 			C.puts(c'VINIX DRM PRIME MMAP BOUNDS: PASS')

@@ -721,6 +721,29 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-mmap-20261122.uf23Ew/`. The
 `bundle.tar.gz` SHA-256 is
 `9d6b856c182946b00ec5f6d60ad9b9ae814f26a546dcd15c58c290c24f740635`.
 
+#### PRIME DMA-BUF filesystem identity
+
+`fstatfs` on a PRIME DMA-BUF descriptor reports `DMA_BUF_MAGIC`
+(`0x444d4142`), one page for both block and fragment size, a
+255-byte name limit, and zero block and inode counts.
+[Pinned DMA-BUF filesystem setup](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L195-L210)
+[Pinned filesystem magic](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/include/uapi/linux/magic.h#L91-L95)
+[Pinned pseudo-filesystem stats](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/libfs.c#L39-L47)
+[Pinned fragment size fallback](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/statfs.c#L52-L65)
+
+ARM64 and x86-64 QEMU verified the reply on a duplicate after the
+original descriptor and GEM handle closed. The page-sized fields were
+16 KiB on ARM64 and 4 KiB on x86-64. The preceding x86-64 kernel returned
+type zero with the same guest executable. The PRIME mapping probe and
+DRM wire sanitizer suite passed. The allocation scan reproduced its
+150 baseline findings. Native M1 validation remains open.
+
+The tested base was `ae4e8d29723d4198aa6b63e9a9cca5ae8013a387` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-statfs-20261122.sofdzr/`. The
+`bundle.tar.gz` SHA-256 is
+`b200ff897b8ad90b7604b9854e282ed38b012f1f3a5f6f30ddf7089f585e5267`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open
