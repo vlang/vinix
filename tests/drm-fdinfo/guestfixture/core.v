@@ -1103,6 +1103,48 @@ fn test_prime_sendfile(read_write i32, read_only i32) bool {
 		&& C.strncmp(&result[0], c'ab', 2) == 0
 }
 
+fn copy_range_replies(input i32, input_offset voidptr, output i32, output_offset voidptr, length u64, flags u32, code i32) bool {
+	return C.syscall(C.SYS_copy_file_range, input, input_offset, output, output_offset, length, flags) == -1
+		&& unsafe { *C.__errno_location() } == code
+}
+
+fn test_prime_copy_range(read_write i32, read_only i32) bool {
+	input := i32(C.syscall(C.SYS_memfd_create, c'prime-copy-range-input', u32(0)))
+	if input < 0 { return false }
+	defer { C.close(input) }
+	output := i32(C.syscall(C.SYS_memfd_create, c'prime-copy-range-output', u32(0)))
+	if output < 0 { return false }
+	defer { C.close(output) }
+	path := C.open(c'/', C.O_PATH)
+	if path < 0 { return false }
+	defer { C.close(path) }
+	directory := C.open(c'/', C.O_DIRECTORY | C.O_RDONLY)
+	if directory < 0 { return false }
+	defer { C.close(directory) }
+	if C.write(input, c'abcd', 4) != 4 || C.lseek(input, 0, C.SEEK_SET) != 0 { return false }
+	mut input_offset := i64(1)
+	mut output_offset := i64(2)
+	bad := voidptr(~u64(0))
+	for index in 0 .. 2 {
+		count := u64(index * 2)
+		if !copy_range_replies(read_only, &input_offset, output, &output_offset, count, 0, C.EINVAL)
+			|| !copy_range_replies(input, &input_offset, read_write, &output_offset, count, 0, C.EINVAL)
+			|| !copy_range_replies(input, &input_offset, read_only, &output_offset, count, 0, C.EINVAL)
+			|| !copy_range_replies(read_only, &input_offset, directory, &output_offset, count, 0, C.EISDIR)
+			|| !copy_range_replies(read_only, bad, output, &output_offset, count, 1, C.EFAULT)
+			|| !copy_range_replies(input, &input_offset, read_write, bad, count, 1, C.EFAULT)
+			|| !copy_range_replies(input, bad, path, bad, count, 1, C.EBADF)
+			|| !copy_range_replies(-1, bad, read_write, bad, count, 1, C.EBADF) {
+			return false
+		}
+	}
+	upper := u64(0xfedcfedc00000000)
+	return C.syscall(C.SYS_copy_file_range, upper | u64(input), &input_offset,
+		upper | u64(output), &output_offset, u64(0), u32(0)) == 0
+		&& input_offset == 1 && output_offset == 2
+		&& C.lseek(input, 0, C.SEEK_CUR) == 0 && C.lseek(output, 0, C.SEEK_END) == 0
+}
+
 fn check_mountinfo_ids(internal_id i32, visible_id i32) bool {
 	stream := C.fopen(c'/proc/self/mountinfo', c'r')
 	if stream == unsafe { nil } { return false }
@@ -1153,6 +1195,11 @@ fn check_prime_export_pair(card i32, first i32, duplicate i32) bool {
 		C.puts(c'VINIX DRM PRIME SENDFILE: PASS')
 	} else {
 		C.puts(c'DRM PRIME SENDFILE FAIL: incorrect error, input data or cursor')
+	}
+	if test_prime_copy_range(first, export.fd) {
+		C.puts(c'VINIX DRM PRIME COPY FILE RANGE: PASS')
+	} else {
+		C.puts(c'DRM PRIME COPY FILE RANGE FAIL: incorrect error, offset or cursor')
 	}
 	return fdinfo_mount_id(export.fd) == internal_id
 		&& check_mountinfo_ids(internal_id, visible_id)

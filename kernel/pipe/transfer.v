@@ -12,6 +12,7 @@ import proc
 import memory
 import resource
 import security
+import stat
 import usercopy
 
 // splice(2)/vmsplice(2)/tee(2) flags. None of them change what happens here —
@@ -233,24 +234,29 @@ pub fn syscall_vmsplice(_ voidptr, fdnum int, iov u64, nr_segs u64, flags u32) (
 // copy_file_range(fd_in, off_in, fd_out, off_out, len, flags): copy between two
 // files without the bytes passing through the caller.
 pub fn syscall_copy_file_range(_ voidptr, fd_in int, off_in u64, fd_out int, off_out u64, length u64, flags u32) (u64, u64) {
-	if flags != 0 {
-		return errno.err, errno.einval
-	}
-	if length == 0 {
-		return 0, 0
-	}
-
-	mut source := file.fd_from_fdnum(unsafe { nil }, fd_in) or { return errno.err, errno.ebadf }
+	mut source := file.fd_from_fdnum(unsafe { nil }, int(i32(fd_in))) or { return errno.err, errno.ebadf }
 	defer {
 		source.unref()
 	}
-	mut sink := file.fd_from_fdnum(unsafe { nil }, fd_out) or { return errno.err, errno.ebadf }
+	mut sink := file.fd_from_fdnum(unsafe { nil }, int(i32(fd_out))) or { return errno.err, errno.ebadf }
 	defer {
 		sink.unref()
 	}
+	if (source.handle.flags | sink.handle.flags) & resource.o_path != 0 {
+		return errno.err, errno.ebadf
+	}
+	source_offset := read_transfer_offset(off_in) or { return errno.err, errno.efault }
+	sink_offset := read_transfer_offset(off_out) or { return errno.err, errno.efault }
+	if flags != 0 {
+		return errno.err, errno.einval
+	}
 
-	// Both sides must be ordinary files; a pipe is splice(2)'s business.
-	if pipe_from_fd(source) != none || pipe_from_fd(sink) != none {
+	source_mode := source.handle.resource.stat.mode
+	sink_mode := sink.handle.resource.stat.mode
+	if stat.isdir(source_mode) || stat.isdir(sink_mode) {
+		return errno.err, errno.eisdir
+	}
+	if !stat.isreg(source_mode) || !stat.isreg(sink_mode) {
 		return errno.err, errno.einval
 	}
 	// As on Linux, an O_APPEND file cannot be written at an offset this way.
@@ -258,9 +264,6 @@ pub fn syscall_copy_file_range(_ voidptr, fd_in int, off_in u64, fd_out int, off
 		return errno.err, errno.ebadf
 	}
 
-	source_offset := read_transfer_offset(off_in) or { return errno.err, errno.efault }
-	if source_offset.value < 0 { return errno.err, errno.einval }
-	sink_offset := read_transfer_offset(off_out) or { return errno.err, errno.efault }
 	return move_between(mut source, source_offset, mut sink, sink_offset, length)
 }
 
@@ -289,6 +292,9 @@ fn move_between(mut source file.FD, source_offset TransferOffset, mut sink file.
 	mut sink_handle := sink.handle
 	source_handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 	sink_handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
+	if length == 0 {
+		return 0, 0
+	}
 
 	mut moved := u64(0)
 

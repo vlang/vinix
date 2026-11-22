@@ -766,6 +766,30 @@ at `/Users/alex/.local/state/vinix/m1-drm-prime-sendfile-20261122.rVaAAS/`.
 The `bundle.tar.gz` SHA-256 is
 `7fa5c34593a95316db9b44f9e4d13bc58f325a620ed18e3b3bdd3ce2cec22413`.
 
+#### PRIME DMA-BUF copy_file_range
+
+`copy_file_range` checks descriptors, explicit offset pointers, flags,
+file types and access before accepting a zero length. Invalid or `O_PATH`
+descriptors return `EBADF`, unreadable offsets return `EFAULT`, and a
+directory endpoint returns `EISDIR`. PRIME DMA-BUFs lack regular-file type
+bits, so either direction returns `EINVAL` for a valid request, including
+when the destination export is read-only. An admitted zero-length copy
+leaves file positions and explicit offsets untouched.
+[Pinned syscall](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1649-L1703), [pinned file type checks](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/read_write.c#L1785-L1801), [anonymous inode mode](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/fs/libfs.c#L1680-L1687)
+
+ARM64 and x86-64 QEMU passed the PRIME error and position checks at zero and
+positive lengths. The same x86-64 guest probe failed on the preceding kernel.
+The existing ordinary positioned copy and PRIME byte I/O, splice and sendfile
+checks also passed on both updated kernels. The DRM syncobj host suite passed,
+independent review confirmed descriptor ownership, and the allocation scan
+reproduced its 150 baseline findings. Native M1 validation remains open.
+
+The tested base was `17a27585e2a84959b22ec1a6b59713038adee7c7` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored
+at `/Users/alex/.local/state/vinix/m1-drm-prime-copy-range-20261122.On063L/`.
+The `bundle.tar.gz` SHA-256 is
+`6c0566e22b95ce9377ea44c0655f07d965558f993ac2bcc71cfa0037873fbdb9`.
+
 #### GEM metadata reclamation
 
 Final GEM release frees the metadata after unlinking the object and
