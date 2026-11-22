@@ -296,6 +296,10 @@ fn pass_fd(socket i32, outgoing i32) i32 {
 
 fn test_client_ioctl_handoff(fd i32, previous &char, id u64) bool {
 	// Admission failures leave the previous process associated with the file.
+	if C.ioctl(fd, i32(0x78ff), u64(0)) != -1 || unsafe { *C.__errno_location() } != C.ENOTTY
+		|| !same_client_rows(previous) {
+		return false
+	}
 	if C.ioctl(fd, i32(0x64ff), u64(0)) != -1 || unsafe { *C.__errno_location() } != C.EINVAL
 		|| !same_client_rows(previous) {
 		return false

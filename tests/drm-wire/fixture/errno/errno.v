@@ -8,6 +8,7 @@ pub const efault = u64(14)
 pub const ebusy = u64(16)
 pub const eexist = u64(17)
 pub const enotdir = u64(20)
+pub const enotty = u64(25)
 
 __global last_error = u64(0)
 

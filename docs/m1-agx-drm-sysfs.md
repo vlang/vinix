@@ -272,6 +272,30 @@ archived patch and the simple DRM named-device fixture. Evidence is stored at
 The `bundle.tar.gz` SHA-256 is
 `b7baa16697d6915a30aba3b0e218c523454db19580380f10501923912a1a2e69`.
 
+#### Ioctl admission errors
+
+The DRM dispatcher returns `ENODEV` for an inactive device before it
+validates the request type. On an active device, a foreign type returns
+`ENOTTY` and an unknown DRM command returns `EINVAL`. These checks run
+before input copy and client attribution. [Pinned Linux DRM ioctl admission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L848-L856)
+
+The sanitizer fixture exercised both request types with the device
+active and inactive. The preceding dispatcher failed the active
+foreign-type case. A control that checked type first returned
+`ENOTTY` for the inactive foreign-type case.
+
+The ARM64 and x86-64 QEMU guests verified both active-device errors
+through the ioctl syscall and checked that client attribution stayed
+intact. The DRM wire and fdinfo sanitizer suites passed. The allocation
+scan reproduced the 150 baseline findings. Native M1 validation remains
+open.
+
+The tested base was `81b9da473e6c1a4e4d044c9871b9c30d9643420a` plus the
+archived patch. The QEMU build used the simple DRM named-device fixture.
+Evidence is stored at `/Users/alex/.local/state/vinix/m1-drm-ioctl-type-20261122.mPaR32/`.
+The `bundle.tar.gz` SHA-256 is
+`3271c5aae18a49a85f7dd8c4696b01c86c2610e36e47e762d6c62b955906140d`.
+
 #### UID mapping across descriptor transfer
 
 Opening `clients` retains the opener's user namespace on its open

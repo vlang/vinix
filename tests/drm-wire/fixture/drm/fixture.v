@@ -213,6 +213,14 @@ fn check_node_transport() {
 	bytes[0] = 7
 	bytes[31] = 0xab
 	base := u64(0x41) | (u64(`d`) << 8) | (u64(32) << 16)
+	foreign := (base & ~u64(0xff00)) | (u64(`x`) << 8)
+	unknown := (base & ~u64(0xff)) | u64(0xff)
+	expect_error(mut node, foreign, unsafe { nil }, errno.enotty)
+	expect_error(mut node, unknown, unsafe { nil }, errno.einval)
+	inactive := DrmDevice{driver: &driver, registered: false}
+	mut detached := DrmNode{dev: &inactive}
+	expect_error(mut detached, foreign, unsafe { nil }, errno.enodev)
+	expect_error(mut detached, unknown, unsafe { nil }, errno.enodev)
 	handler_status = -22
 	expect_error(mut node, base | (u64(3) << 30), unsafe { &bytes[0] }, 22)
 	assert handler_input == 7 && bytes[1] == 1 && bytes[31] == 0xab

@@ -790,18 +790,18 @@ fn (mut this DrmNode) write(_handle voidptr, _buf voidptr, _loc u64, count u64) 
 }
 
 fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	if this.dev == unsafe { nil } || this.dev.driver == unsafe { nil } || !this.dev.is_registered() {
+		errno.set(errno.enodev)
+		return none
+	}
 	cmd := decode_ioctl_cmd(request) or {
-		errno.set(errno.einval)
+		errno.set(errno.enotty)
 		return none
 	}
 
 	raw := u32(request & 0xffffffff)
 	request_size := (raw >> ioctl_size_shift) & ioctl_size_mask
 	request_direction := (raw >> ioctl_direction_shift) & ioctl_direction_mask
-	if this.dev == unsafe { nil } || this.dev.driver == unsafe { nil } || !this.dev.is_registered() {
-		errno.set(errno.enodev)
-		return none
-	}
 	abi := if this.dev.driver.ioctl_abi != unsafe { nil } { this.dev.driver.ioctl_abi(this.dev, handle) } else { u32(0) }
 	layout := ioctl_layout(this.dev, cmd, request_size, request_direction, abi) or {
 		errno.set(errno.einval)
