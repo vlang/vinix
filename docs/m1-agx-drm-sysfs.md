@@ -303,6 +303,28 @@ archived patch and the simple DRM named-device fixture. Evidence is stored at
 The `bundle.tar.gz` SHA-256 is
 `4a5724bc049046c96b62a60d70139d8b6880a51a8dedc3c01428482662a2be6f`.
 
+#### Signed UID formatting
+
+The UID column formats mapped IDs as signed 32-bit decimal with a minimum
+width of five. The formatter widens the signed value before taking its
+magnitude, so `2147483648` renders as `-2147483648` and `4294967294`
+renders as a right-aligned `-2`. UID mapping retains its full unsigned
+range. [Pinned Linux client formatter](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_debugfs.c#L100-L117)
+
+The ARM64 and x86-64 named-device guests compared the full row for both
+mappings before and after transferring the debugfs descriptor. The
+ordinary mapped UID `1234`, overflow UID `65534`, and initial UID `0`
+also passed. The preceding ARM64 kernel failed both signed cases.
+The DRM wire and fdinfo sanitizer suites passed, the allocation scan
+reproduced the 150 baseline findings, and both guests measured zero slab
+growth over 200 populated-table reads. Native M1 validation remains open.
+
+The tested base was `17e6e32fbc04dd2bb7e635a2e194722e34fc716d` plus the
+archived patch and the simple DRM named-device fixture. Evidence is stored at
+`/Users/alex/.local/state/vinix/m1-drm-signed-uid-20261122.1ITjgJ/`.
+The `bundle.tar.gz` SHA-256 is
+`3c8adda570144a62e723dc6af23319eeb726e2126809969d7e01450bc851c39b`.
+
 ### Global GEM names
 
 `gem_names` presents the legacy global GEM name table through the DRM

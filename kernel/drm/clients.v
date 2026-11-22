@@ -69,8 +69,8 @@ fn (mut dev DrmDevice) remove_client(mut description file.Handle) {
 	dev.clients_lock.release()
 }
 
-// The fixed widths in drm_clients_info(), including the largest u32 UID.
-const client_row_max = 20 + 1 + 5 + 1 + 3 + 3 + 1 + 4 + 1 + 1 + 10 + 1 + 10 + 1 +
+// The fixed widths in drm_clients_info(), including an 11-byte signed UID.
+const client_row_max = 20 + 1 + 5 + 1 + 3 + 3 + 1 + 4 + 1 + 1 + 11 + 1 + 10 + 1 +
 	file.drm_client_name_max_len + 1 + 20 + 1
 
 struct ClientRow {
@@ -143,7 +143,7 @@ fn add_client_row(mut text lib.Text, row &ClientRow, user_namespace &proc.Namesp
 	text.add('   n    ')
 	text.add_byte(if row.authenticated { `y` } else { `n` })
 	text.add_byte(` `)
-	add_client_number(mut text, u64(uid), 5)
+	add_client_uid(mut text, uid)
 	text.add('          0 ')
 
 	client_name := if row.name_len == 0 { '<unset>' } else { unsafe { tos(&row.name[0], int(row.name_len)) } }
@@ -159,6 +159,23 @@ fn add_client_column(mut text lib.Text, value string, width int) {
 }
 
 fn add_client_number(mut text lib.Text, value u64, width int) {
+	pad_client_number(mut text, value, width)
+	text.add_unsigned(value)
+}
+
+// Linux prints the mapped uid_t with %5d. Widen before taking its magnitude
+// so that INT32_MIN fits.
+fn add_client_uid(mut text lib.Text, uid u32) {
+	value := i64(i32(uid))
+	if value < 0 {
+		pad_client_number(mut text, u64(-value), 4)
+	} else {
+		pad_client_number(mut text, u64(value), 5)
+	}
+	text.add_decimal(value)
+}
+
+fn pad_client_number(mut text lib.Text, value u64, width int) {
 	mut padding := width - 1
 	mut rest := value
 	for rest >= 10 {
@@ -166,5 +183,4 @@ fn add_client_number(mut text lib.Text, value u64, width int) {
 		padding--
 	}
 	for _ in 0 .. padding { text.add_byte(` `) }
-	text.add_unsigned(value)
 }

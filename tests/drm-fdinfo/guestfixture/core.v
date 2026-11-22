@@ -215,8 +215,8 @@ fn format_client_header(buffer voidptr, capacity u64) i32 {
 }
 
 fn format_client_row(buffer voidptr, capacity u64, command &char, pid i32, uid u32, name &char, id u64) i32 {
-	return C.snprintf(buffer, capacity, c'%20s %5d %3d   n    y %5u %10u %64s %20lu\n',
-		command, pid, i32(0), uid, u32(0), name, id)
+	return C.snprintf(buffer, capacity, c'%20s %5d %3d   n    y %5d %10u %64s %20lu\n',
+		command, pid, i32(0), i32(uid), u32(0), name, id)
 }
 
 fn test_debugfs_clients() bool {
@@ -359,7 +359,7 @@ fn test_live_client_identity() bool {
 	return live && gone && same_client_rows(unsafe { &char(&expected[0]) })
 }
 
-fn test_client_user_namespace() bool {
+fn test_client_user_namespace(mapping &char, uid u32) bool {
 	client := C.open(c'/dev/dri/card0', C.O_RDWR)
 	if client < 0 { return false }
 	defer { C.close(client) }
@@ -390,11 +390,10 @@ fn test_client_user_namespace() bool {
 		if !match_client_rows(own, unsafe { &char(&expected[0]) }) { C._exit(5) }
 
 		// The open description retains the namespace and observes its new map.
-		mapping := c'1234 0 1\n'
 		map_fd := C.open(c'/proc/self/uid_map', C.O_WRONLY)
 		if map_fd < 0 || C.write(map_fd, mapping, C.strlen(mapping)) != i64(C.strlen(mapping)) { C._exit(6) }
 		C.close(map_fd)
-		format_client_row(row, capacity, command, pid, 1234, c'<unset>', u64(id))
+		format_client_row(row, capacity, command, pid, uid, c'<unset>', u64(id))
 		if C.lseek(own, 0, C.SEEK_SET) != 0 || !match_client_rows(own, unsafe { &char(&expected[0]) }) {
 			C._exit(7)
 		}
@@ -414,7 +413,7 @@ fn test_client_user_namespace() bool {
 		return false
 	}
 	// Read in the initial user namespace after the mapped namespace's task exited.
-	format_client_row(row, capacity, command, pid, 1234, c'<unset>', u64(id))
+	format_client_row(row, capacity, command, pid, uid, c'<unset>', u64(id))
 	mapped := match_client_rows(received, unsafe { &char(&expected[0]) })
 	C.close(received)
 	return mapped
@@ -488,10 +487,17 @@ pub fn run() i32 {
 		} else {
 			C.puts(c'DRM LIVE CLIENT IDENTITY FAIL: incorrect live or reaped opener')
 		}
-		if test_client_user_namespace() {
+		if test_client_user_namespace(c'1234 0 1\n', 1234) {
 			C.puts(c'VINIX DRM CLIENT USER NAMESPACE: PASS')
 		} else {
 			C.puts(c'DRM CLIENT USER NAMESPACE FAIL: incorrect UID mapping')
+		}
+		min_uid := test_client_user_namespace(c'2147483648 0 1\n', u32(0x80000000))
+		short_uid := test_client_user_namespace(c'4294967294 0 1\n', u32(0xfffffffe))
+		if min_uid && short_uid {
+			C.puts(c'VINIX DRM CLIENT SIGNED UID: PASS')
+		} else {
+			C.puts(c'DRM CLIENT SIGNED UID FAIL: wrong sign or padding')
 		}
 		if test_client_read_allocations() {
 			C.puts(c'VINIX DRM CLIENT READ ALLOCATIONS: PASS')
