@@ -653,6 +653,33 @@ The paired inputs, release fixture logs and focused controls are in
 Its SHA-256 is `87f3e90b43ffec25d6d630ee595e38bbcde26894584cae2143299a91659422e7`.
 All 1,272 entries in the extracted `qualification.sha256` passed.
 
+### Release tag availability checks
+
+At `e7d03f0e9`, the driver lists releases before building and checks
+the exact tags of drafts and published releases visible to the caller.
+Automatic tag selection also checks Git refs. The driver refreshes the
+release list immediately before tag and draft creation. An API or
+response parsing failure stops the run at either check.
+[GitHub release listing](https://docs.github.com/en/rest/releases/releases#list-releases)
+
+All 70 release fixtures passed with signed inputs for both architectures,
+compiled host helpers and local GitHub stubs. An existing draft, a
+published release and an initial listing failure all stopped before
+building. A release that appeared during the build and a late listing
+failure both stopped before tag or draft creation. The baseline at
+`823c49670` proceeded to create a tag and publish in the listing-failure
+fixture.
+
+Loopback checks with the installed GitHub CLI verified a two-page listing
+and refusal of an object instead of an array, a tag containing a newline
+and an HTTP 503 on a later page. The HTTP failure produced partial stdout
+and a failed exit status, which the driver checks before using the list.
+
+The paired inputs, baseline and updated runs, and loopback checks are in
+`~/.local/state/vinix/r14-release-tag-preflight-THmQqW/qualification.tar.gz`.
+Its SHA-256 is `e9d6c1471b7e5af803c2b088fa5800405deb2e2636e9615c15520496b9bcfff3`.
+All 1,334 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
