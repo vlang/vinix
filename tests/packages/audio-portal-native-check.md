@@ -395,3 +395,31 @@ source patches are in
 `~/.local/state/vinix/r14-apple-speaker-m40hNS/qualification.tar.gz`.
 Its SHA-256 is `93cc72d9f7c97b0ebcf7471924e2844b7464859f61d51082bb3de1ebbbe1094b`.
 The extracted files passed all 42 entries in `qualification.sha256`.
+
+## Apple speaker write fault reporting
+
+At `2e6b17586`, the Apple OSS driver holds the stream lock from PCM
+reservation through the bounded copy and commit. The buffer is already
+in kernel memory. A writer waiting for ring space releases the lock so
+playback and protection can continue.
+
+The `apple-speaker-write` scenario boots AArch64 QEMU with
+`VFLAGS=-d apple_speaker_drain_fixture` and uses a 16-byte simulated ring.
+On `6e2501155` with the same injection, protection acquired the lock
+between reserve and copy. The driver still reported 16 bytes written
+after shutdown. With the fix applied to that base, the copy and commit
+completed under the lock before protection could run. A fault while
+waiting for more room returned exactly the committed 16-byte prefix
+of a 24-byte write. The eight samples matched, the reservation was
+cleared and a subsequent write returned `EIO` with shutdown still latched.
+
+The fixed write and drain scenarios and the ordinary `devices` boot
+passed. The ordinary kernel contained no fixture symbols. All fourteen
+hardware harness host suites passed, as did the J313 model's parity,
+sanitizer and allocation checks. Physical speaker validation remains open.
+
+The build and boot logs, kernel ELFs, generated C, model results and
+source patches are in
+`~/.local/state/vinix/r14-apple-pcm-r5NmNW/qualification.tar.gz`.
+Its SHA-256 is `04d53a637ea46ec2d62b676d0f0104054b05af421cdfa4e793b8abf926174d81`.
+The extracted files passed all 48 entries in `qualification.sha256`.

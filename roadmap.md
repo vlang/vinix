@@ -935,7 +935,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     pass exact stereo waveforms, seat switching and cleanup on both targets.
     The [HD Audio stall check](tests/packages/audio-portal-native-check.md#hd-audio-stall-and-close-recovery)
     verifies bounded write and drain failures and successful reuse after close.
-    Independently reviewed kernel seals and other stalled devices remain open.
+    The [VirtIO stall check](tests/packages/audio-portal-native-check.md#virtio-sound-stall-recovery)
+    verifies playback recovery after an acknowledged device reset. The
+    Apple speaker [drain](tests/packages/audio-portal-native-check.md#apple-speaker-drain-fault-reporting)
+    and [write checks](tests/packages/audio-portal-native-check.md#apple-speaker-write-fault-reporting)
+    verify `EIO`, exact partial writes and a latched protection shutdown in
+    QEMU. Independently reviewed audio kernel seals and physical Apple speaker
+    validation remain open.
   - [x] [Ordinary-account graphical sessions](tests/packages/software-session-check.md)
     use the effective account's home and child environment, inherited console
     descriptors, private readiness and shared numeric broker/framebuffer paths.
