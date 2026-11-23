@@ -602,9 +602,12 @@ publisher's public key, signed index digest and sequence. Keep the reviewed
 plan files as emitted. Pass the directory to the release driver with
 `--package-review=reviewed-package-plans`. It requires a populated, identical
 plan for every requested target before it checks out the release source.
-With or without that option, a release with package inputs builds
-`SHA256SUMS` from the verified ISO and receipt digests and checks the staged
-files against it after boot testing and again just before publication.
+Before boot testing, the driver records `SHA256SUMS` for the complete asset
+list, including X11 and iOS payloads and their checksum sidecars. It checks
+each sidecar against its payload and carries the verified ISO and package
+receipt digests into the list. The driver rechecks the assets after boot
+testing and just before publication, when it also compares the public checksum
+list with the recorded copy.
 Set `TMPDIR` to a filesystem with room for ISO extraction and signed bundle
 verification when the system temporary filesystem is small.
 

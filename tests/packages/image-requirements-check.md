@@ -261,6 +261,38 @@ The paired fixture ISOs, plans, receipts and logs are in
 `qualification.sha256` is
 `2df1f66944c0dcd98b18350059c514b480b47fe72435a1d39ec384f4a220e293`.
 
+### Complete release asset checksums
+
+At `27674e1a3`, the driver records the image, bundle, sidecar and receipt digests
+before boot testing. The manifest retains the digests supplied by the package
+receipt verifier and checks each X11 and iOS checksum sidecar against its
+payload. It checks every asset again after boot testing and at upload handoff,
+alongside an exact comparison of the public `SHA256SUMS` and its private copy.
+
+The real driver passed eight fixture scenarios with local build, boot and
+GitHub stubs. The paired releases with and without package inputs had exact
+checksum and upload lists. A bad build-time sidecar stopped before boot testing.
+Changes to the X11 archive, to the iOS payload and its regenerated sidecar, or
+to a package receipt during the boot step stopped the release. Changes to a
+sidecar or the public checksum list at handoff also stopped it before upload.
+The amd64 build-only path emitted all three asset checksums. The manifest
+helper passed an ASan/UBSan round trip and refused missing verified assets.
+
+Build and run the fixture driver with the matching case directories generated
+by `iso-package-receipt-check` for each architecture:
+
+```sh
+v -backend c -prod -cc cc -o /tmp/iso-release-assets-check \
+  tests/packages/iso-release-assets-check.v
+/tmp/iso-release-assets-check "$PWD" /path/to/new-state \
+  /path/to/x86_64-controls/match /path/to/aarch64-controls/match
+```
+
+Source, fixture inputs, checksums, upload argument logs and refusal diagnostics
+are archived in `~/.local/state/vinix/r14-release-asset-manifest-Pv8dR8/qualification.tar.gz`.
+Its SHA-256 is `514f7ddf2779eb023090f46382148abc81e57443cf6ebdc6a7986104298ebebf`.
+All 129 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
