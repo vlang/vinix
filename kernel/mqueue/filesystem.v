@@ -165,11 +165,12 @@ fn create_queue_file(parent &vfs.VFSNode, name string, mode u32, apply_umask boo
 	root := unsafe { &Queue(parent.resource) }
 	process := proc.current_thread().process
 	final_mode := if apply_umask { mode & ~process.umask } else { mode }
+	account := quota_owner(process)
 	mq_lock.acquire()
 	code := if !root.linked { u64(errno.eacces) } else if find_locked(root.ipc_ns, name) != unsafe { nil } {
 		u64(errno.eexist)
 	} else {
-		create_locked(mut spare, process, root.ipc_ns, name, final_mode, unsafe { nil })
+		create_locked(mut spare, process, account, root.ipc_ns, name, final_mode, unsafe { nil })
 	}
 	node := spare.node
 	mq_lock.release()

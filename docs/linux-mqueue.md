@@ -321,6 +321,39 @@ Hashes are SHA-256 prefixes. The archive is
 `~/.cache/vinix-r15/mq-notification-receive-space/qualification.tar.zst`, with
 SHA-256 `ecff5ca603fa2782806e04b1efd1fbd06b013b320a8584dee4c30ed9580edd93`.
 
+### Queue quota across user namespaces
+
+`RLIMIT_MSGQUEUE` charges the creating process's real UID in its current
+user namespace. Each ancestor is charged to the effective UID that created
+the child namespace. The caller's current soft limit applies to its own
+account. The soft limit captured at namespace creation caps each step into
+the parent. A queue retains all of its charges until the last reference is
+released, including after unlink. Pathname creation in mqueuefs uses the
+same accounting. [Linux queue quota accounting](https://github.com/gregkh/linux/blob/v6.12.51/ipc/mqueue.c#L355) [Linux namespace quota limits](https://github.com/gregkh/linux/blob/v6.12.51/kernel/user_namespace.c#L125) [Linux ancestor accounting](https://github.com/gregkh/linux/blob/v6.12.51/kernel/ucount.c#L246)
+
+The probe adds two checks. One runs a nested and a sibling user namespace
+with the same global UID, fills their shared ancestor account, and checks
+that unlinked queues remain charged until their final close. The other
+creates a namespace with different real and effective UIDs and checks which
+initial account gets charged. The tests set dumpability before opening their
+own Linux procfs ID maps after changing credentials.
+
+Optimized Vinix kernels from `2569bd1bb` plus this change and Linux 6.12.51
+passed all 301 + 16 checks using the same probe ELF per architecture. The
+previous x86-64 kernel refused the first child namespace's queue because the
+initial namespace had already used that UID's allowance. `userns` passed on
+both Vinix kernels, including the 100-cycle storage checks. The allocation
+checker's site counts and existing failures matched the baseline.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `276f66fd0e5dc6b1` | `21f73b6abcc4b68a` | `ddf55779ea21e0f9` | `493d60053c0e3ebb` |
+| x86-64 | `7528ee2e4808d04b` | `67bcb35f737e009a` | `1be359fcd70127d3` | `79697bd81cd2d7dc` |
+
+Hashes are SHA-256 prefixes. The archive is
+`~/.cache/vinix-r15/mq-user-namespace-quota/qualification.tar.zst`, with SHA-256
+`4aa8a18db11f7dabc459e114a0c97695a7d68f52bb3f791c01ef92aaf6092052`.
+
 ## Limits
 
 - Retired queue nodes keep their references through the VFS grace period.
@@ -333,9 +366,7 @@ SHA-256 `ecff5ca603fa2782806e04b1efd1fbd06b013b320a8584dee4c30ed9580edd93`.
   redirects use the VFS's shared-node behavior across mount aliases.
 - Ordinary priority inheritance follows Vinix's scheduler. The probe covers
   nice values, FIFO and arrival ties.
-- RLIMIT_MSGQUEUE is charged per real uid across all user namespaces; Linux
-  charges per user namespace up its hierarchy.
 - mq_open can still fail after making a queue if the open file's kernel budget
   runs out; the queue is then removed again.
-- Creating a queue walks every live queue to count the namespace's queues and
-  the user's bytes, under the queues' lock.
+- Creating a queue walks the live queue registry under its lock to count IPC
+  namespace queues and charge the matching user namespace accounts.

@@ -212,6 +212,8 @@ fn replace_namespace(process &proc.Process, mut old proc.Namespace) &proc.Namesp
 			ns.parent_user = if proc.is_initial_namespace(old) { proc.user_namespace_of(unsafe { nil }) } else { old.id }
 			ns.owner_user = ns.parent_user
 			ns.user_depth = if proc.is_initial_namespace(old) { 1 } else { old.user_depth + 1 }
+			ns.user_owner_uid = process.euid
+			ns.user_msgqueue_limit = proc.soft_limit(process, proc.rlimit_msgqueue)
 			// Ids map through the parent's extent. A parent that denied setgroups
 			// passes that on (Linux copies the flag), so a nested gid map needs no
 			// second "deny": bubblewrap writes none.
@@ -598,9 +600,6 @@ pub fn chrooted(process &proc.Process) bool {
 	return effective == unsafe { nil } || voidptr(effective) != voidptr(top)
 }
 
-// Linux's limit on nested user namespaces.
-const max_user_namespace_depth = 32
-
 // Whether the calling process may create the namespaces `flags` name, or the
 // errno refusing them. A new user namespace needs no privilege: its creator
 // holds every capability in it, and it owns the other namespaces created in
@@ -613,7 +612,7 @@ pub fn namespace_creation_failure(process &proc.Process, flags u64) u64 {
 	}
 	if requested & proc.clone_newuser != 0 {
 		user := process.ns.user
-		if user != unsafe { nil } && user.user_depth >= max_user_namespace_depth {
+		if user != unsafe { nil } && user.user_depth >= proc.max_user_namespace_depth {
 			return errno.eusers
 		}
 		// Unprivileged callers only: the limit is against exhausting memory.

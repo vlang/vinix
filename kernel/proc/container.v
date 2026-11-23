@@ -84,6 +84,9 @@ pub mut:
 	parent_user    u64
 	parent_ns      voidptr
 	user_depth     int
+	// The parent's quota account and ceiling for charges from this subtree.
+	user_owner_uid u32
+	user_msgqueue_limit u64
 	uid_inside     i64 = -1
 	uid_global     i64 = -1
 	gid_inside     i64 = -1
@@ -160,6 +163,7 @@ __global (
 // only), so this bounds how many any user can make after boot, and the
 // memory they keep. Linux's user.max_user_namespaces bounds live ones.
 pub const max_user_namespaces = u64(256)
+pub const max_user_namespace_depth = 32
 
 pub fn count_user_namespace() {
 	katomic.inc(mut &user_namespaces_made)

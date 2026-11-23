@@ -130,8 +130,9 @@ mut:
 	name_len      int
 	ipc_ns        u64
 	linked        bool
-	// The creator's real uid and what the queue counts against its
-	// RLIMIT_MSGQUEUE until it is freed.
+	// The creator's leaf quota account. User namespace ancestry is immutable
+	// and retained by the namespace implementation even after the tasks exit.
+	user_ns &proc.Namespace = unsafe { nil }
 	user    u32
 	charged u64
 	maxmsg  i64
@@ -293,17 +294,72 @@ fn queue_bytes(maxmsg i64, msgsize i64) u64 {
 	return count * message_overhead + nodes * tree_node_size + count * u64(msgsize)
 }
 
-// Every queue counts until it is freed, unlinked ones too, as on Linux.
-fn user_bytes_locked(uid u32) u64 {
-	mut total := u64(0)
+struct QueueQuota {
+mut:
+	user_ns &proc.Namespace = unsafe { nil }
+	uid u32
+	remaining u64
+}
+
+struct QuotaOwner {
+	user_ns &proc.Namespace = unsafe { nil }
+	uid u32
+	soft_limit u64
+}
+
+fn quota_owner(process &proc.Process) QuotaOwner {
+	proc.lock_table()
+	defer { proc.unlock_table() }
+	user_ns := process.ns.user
+	return QuotaOwner{
+		user_ns: if proc.is_initial_namespace(user_ns) { unsafe { nil } } else { user_ns }
+		uid: process.uid
+		soft_limit: proc.soft_limit(process, proc.rlimit_msgqueue)
+	}
+}
+
+fn quota_depth(user_ns &proc.Namespace) int {
+	return if user_ns == unsafe { nil } { 0 } else { user_ns.user_depth }
+}
+
+// The calling task's soft limit applies to its own real uid in the leaf.
+// Each climb uses the namespace creator's effective uid in the parent and
+// the soft limit captured when that namespace was created. nil is the root.
+// Keep the registry as the source of live charges, including unlinked queues.
+fn quota_fits_locked(user_ns &proc.Namespace, uid u32, soft_limit u64, bytes u64) bool {
+	mut quotas := [proc.max_user_namespace_depth + 1]QueueQuota{}
+	leaf_depth := quota_depth(user_ns)
+	mut ns := unsafe { user_ns }
+	mut owner := uid
+	// Linux reserves LONG_MAX as the local accounting failure result.
+	mut limit := if soft_limit < u64(max_i64) { soft_limit } else { u64(max_i64) - 1 }
+	for depth := leaf_depth; depth >= 0; depth-- {
+		if bytes > limit { return false }
+		quotas[depth] = QueueQuota{user_ns: ns, uid: owner, remaining: limit - bytes}
+		if depth != 0 {
+			owner = ns.user_owner_uid
+			limit = if ns.user_msgqueue_limit < u64(max_i64) { ns.user_msgqueue_limit } else { u64(max_i64) }
+			ns = unsafe { &proc.Namespace(ns.parent_ns) }
+		}
+	}
 	mut queue := mq_queues
 	for queue != unsafe { nil } {
-		if queue.user == uid {
-			total += queue.charged
+		ns = queue.user_ns
+		owner = queue.user
+		for depth := quota_depth(ns); depth >= 0; depth-- {
+			if depth <= leaf_depth && voidptr(quotas[depth].user_ns) == voidptr(ns)
+				&& quotas[depth].uid == owner {
+				if queue.charged > quotas[depth].remaining { return false }
+				quotas[depth].remaining -= queue.charged
+			}
+			if depth != 0 {
+				owner = ns.user_owner_uid
+				ns = unsafe { &proc.Namespace(ns.parent_ns) }
+			}
 		}
 		queue = queue.all_next
 	}
-	return total
+	return true
 }
 
 fn namespace_queues_locked(ns u64) int {
@@ -881,7 +937,7 @@ fn writable(handle &file.Handle) bool {
 
 // Create a queue in `spare` under mq_lock: mqueue_create_attr() and
 // mqueue_get_inode(). 0 or the errno.
-fn create_locked(mut spare Queue, process &proc.Process, ns u64, name string, mode u32, attr &Attr) u64 {
+fn create_locked(mut spare Queue, process &proc.Process, account QuotaOwner, ns u64, name string, mode u32, attr &Attr) u64 {
 	privileged := capable(process, proc.cap_sys_resource)
 	if namespace_queues_locked(ns) >= queues_max && !privileged {
 		return errno.enospc
@@ -899,9 +955,7 @@ fn create_locked(mut spare Queue, process &proc.Process, ns u64, name string, mo
 		return errno.einval
 	}
 	bytes := queue_bytes(maxmsg, msgsize)
-	limit := proc.soft_limit(process, proc.rlimit_msgqueue)
-	used := user_bytes_locked(process.uid)
-	if bytes > limit || used > limit - bytes {
+	if !quota_fits_locked(account.user_ns, account.uid, account.soft_limit, bytes) {
 		return errno.emfile
 	}
 	if mq_device == 0 {
@@ -924,7 +978,8 @@ fn create_locked(mut spare Queue, process &proc.Process, ns u64, name string, mo
 	spare.name_len = name.len
 	spare.ipc_ns = ns
 	spare.linked = true
-	spare.user = process.uid
+	spare.user_ns = account.user_ns
+	spare.user = account.uid
 	spare.charged = bytes
 	spare.maxmsg = maxmsg
 	spare.msgsize = msgsize
@@ -971,8 +1026,10 @@ pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, a
 	}
 	process := proc.current_thread().process
 	mut spare := &Queue(unsafe { nil })
+	mut account := QuotaOwner{}
 	if oflag & resource.o_creat != 0 {
 		spare = allocate_queue() or { return errno.err, errno.get() }
+		account = quota_owner(process)
 	}
 	mut result := u64(0)
 	mut created := false
@@ -999,7 +1056,7 @@ pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, a
 	} else if root != unsafe { nil } && !permitted(process, root, 3) {
 		result = errno.eacces
 	} else {
-		result = create_locked(mut spare, process, ns_id, name, mode & ~process.umask, attr)
+		result = create_locked(mut spare, process, account, ns_id, name, mode & ~process.umask, attr)
 		if result == 0 {
 			queue = spare
 			spare = unsafe { nil }

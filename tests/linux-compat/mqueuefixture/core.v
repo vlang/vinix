@@ -137,6 +137,7 @@ const sock_raw = 3
 const sock_stream = 1
 const rlimit_msgqueue = 12
 const clone_newipc = 0x08000000
+const clone_newuser = 0x10000000
 const notification_ready_fd = 100
 const notification_proceed_fd = 101
 const notification_queue_fd = 102
@@ -1431,6 +1432,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		notifications(mut s)
 		notification_exec(mut s)
 		notification_buffer(mut s)
+		namespace_quota(mut s)
 		unprivileged(mut s)
 		namespaces(mut s)
 		mount_view(mut s)

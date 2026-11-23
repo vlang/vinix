@@ -2702,6 +2702,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   failed registration. See
   [the cookie reservation receipts](docs/linux-mqueue.md#receive-space-for-thread-notification-cookies).
 
+- [x] Account for `RLIMIT_MSGQUEUE` in the creating user namespace and its
+  ancestors. Qualify independent leaf allowances, inherited ceilings,
+  effective UID attribution, and reuse after the last queue reference. See
+  [the queue quota receipts](docs/linux-mqueue.md#queue-quota-across-user-namespaces).
+
 - [x] Implement native futex2 vector waits, masked waits and wakes, and
   compare-requeue. Qualify 128-entry waits, shared and private keys, absolute
   deadlines, signal restart, and legacy futex interoperability on AArch64 and
