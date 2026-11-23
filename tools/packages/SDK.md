@@ -612,8 +612,11 @@ private ISO copies. The driver rechecks the public assets and checksum list
 before publication. When both package verification and boot testing are
 skipped, the driver prepares verified copies at publication. GitHub reads the
 verified assets, the recorded checksum list, and the generated release notes
-from the private directory. Allow space under `build-release/work` for a second
-copy of the assets while verifying, boot testing, or publishing.
+from the private directory. Before capture or upload staging, the driver
+compares the bytes it needs to copy with the space available under
+`build-release/work`. Keep additional free space for filesystem overhead,
+package receipt verification and boot testing. Copy and flush errors still
+stop the release if available space changes during staging.
 The driver holds an exclusive lock on `build-release/work` through publication
 or build-only completion. A second invocation in the same workspace exits
 before creating its tag output directory. Use a workspace filesystem that

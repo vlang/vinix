@@ -97,32 +97,56 @@ fn check_assets(directory string, manifest string) ! {
 	}
 }
 
-fn copy_asset(directory string, destination string, name string) !string {
+fn copy_asset(directory string, destination string, name string, maximum u64) !string {
 	path := os.join_path(destination, name)
-	pkgcore.copy_file(os.join_path(directory, name), path, 0, ~u64(0))!
+	pkgcore.copy_file(os.join_path(directory, name), path, 0, maximum)!
 	os.chmod(path, 0o400)!
 	return path
 }
 
-fn capture_assets(directory string, destination string, names []string) ! {
-	os.mkdir(destination, mode: 0o700)!
-	mut seen := map[string]bool{}
-	for name in names {
-		if !valid_asset_name(name) || name in seen {
-			return error('invalid or repeated release asset name: ' + name)
-		}
-		seen[name] = true
-		copy_asset(directory, destination, name)!
+fn require_staging_space(directory string, needed u64) ! {
+	if needed == 0 { return }
+	available := pkgcore.free_bytes(directory)!
+	if needed > available {
+		return error('insufficient disk space for release staging in ${directory} (${needed} bytes needed, ${available} bytes available)')
 	}
 }
 
-fn stage_assets(directory string, manifest string, destination string, uploaded []string) ! {
+fn prepare_staging(directory string, destination string, names []string, metadata_bytes u64) !map[string]u64 {
+	mut sizes := map[string]u64{}
+	mut needed := metadata_bytes
+	for name in names {
+		if !valid_asset_name(name) || name in sizes {
+			return error('invalid or repeated release asset name: ' + name)
+		}
+		path := os.join_path(directory, name)
+		info := os.lstat(path) or { return error('cannot inspect release asset ${path}: ${err}') }
+		if info.get_filetype() != .regular { return error('release asset must be a regular file: ' + path) }
+		if info.size > ~u64(0) - needed { return error('release staging size overflows') }
+		sizes[name] = info.size
+		needed += info.size
+	}
+	require_staging_space(os.dir(destination), needed)!
+	os.mkdir(destination, mode: 0o700)!
+	return sizes
+}
+
+fn capture_assets(directory string, destination string, names []string) ! {
+	sizes := prepare_staging(directory, destination, names, 0)!
+	for name in names {
+		copy_asset(directory, destination, name, sizes[name])!
+	}
+}
+
+fn stage_assets(directory string, manifest string, destination string, uploaded []string, metadata_bytes u64) ! {
 	entries := read_manifest(manifest)!
 	if entries.len == 0 { return error('release checksum manifest is empty') }
-	os.mkdir(destination, mode: 0o700)!
+	sizes := prepare_staging(directory, destination, entries.keys().filter(it !in uploaded), metadata_bytes)!
 	for name, digest in entries {
-		path := if name in uploaded { os.join_path(directory, name) } else {
-			copy_asset(directory, destination, name)!
+		path := if size := sizes[name] {
+			copy_asset(directory, destination, name, size)!
+		} else {
+			os.join_path(directory, name)
 		}
 		if pkgcore.hash_file(path)! != digest {
 			return error('release asset changed after verification: ' + name)
@@ -248,14 +272,21 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 	if !draft.draft { return error('GitHub release is already published') }
 	endpoint := upload_endpoint(draft, repo)!
 	names := missing_assets(directory, draft.assets)!
-	if original != '' {
-		manifest := os.join_path(directory, 'SHA256SUMS')
-		if names.len == 0 { return check_assets(original, manifest) }
-		stage_assets(original, manifest, stage, draft.assets.map(it.name))!
+	manifest := os.join_path(directory, 'SHA256SUMS')
+	if names.len == 0 {
+		if original != '' { check_assets(original, manifest)! }
+		return
 	}
-	if names.len == 0 { return }
-	if 'SHA256SUMS' in names { copy_asset(directory, stage, 'SHA256SUMS')! }
-	copy_asset(directory, stage, 'RELEASE_NOTES.md')!
+	upload_manifest := 'SHA256SUMS' in names
+	checksum_bytes := if upload_manifest { os.lstat(manifest)!.size } else { u64(0) }
+	metadata_bytes := u64(notes.len) + checksum_bytes
+	if original != '' {
+		stage_assets(original, manifest, stage, draft.assets.map(it.name), metadata_bytes)!
+	} else {
+		require_staging_space(stage, metadata_bytes)!
+	}
+	if upload_manifest { copy_asset(directory, stage, 'SHA256SUMS', checksum_bytes)! }
+	copy_asset(directory, stage, 'RELEASE_NOTES.md', u64(notes.len))!
 	gh := os.find_abs_path_of_executable('gh')!
 	eprintln('Uploading assets to GitHub draft ${draft.id}')
 	for start := 0; start < names.len; start += 5 {
@@ -302,7 +333,7 @@ fn run() ! {
 		return check_assets(os.args[2], os.args[3])
 	}
 	if os.args.len == 5 && os.args[1] == 'stage' {
-		return stage_assets(os.args[2], os.args[3], os.args[4], [])
+		return stage_assets(os.args[2], os.args[3], os.args[4], [], 0)
 	}
 	if os.args.len == 8 && os.args[1] == 'prepare-creation' {
 		return prepare_creation(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
