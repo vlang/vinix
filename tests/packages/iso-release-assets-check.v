@@ -62,6 +62,11 @@ struct FixturePreparedVerification {
 	assets          []FixtureVerifiedAsset
 }
 
+struct FixtureDraftVerification {
+	draft_id string
+	release FixturePreparedVerification
+}
+
 struct FixtureRecoverySummary {
 	repo string
 	draft_id string
@@ -551,7 +556,7 @@ fn run_stub(name string) !int {
 		}
 		'gh' {
 			if scenario in ['prepared', 'prepared-recovery']! || scenario.starts_with('verify-prepared')
-				|| scenario.starts_with('inspect-recovery') {
+				|| scenario.starts_with('inspect-recovery') || scenario.starts_with('verify-draft') {
 				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
 				os.write_file(remote + '/unexpected-gh', os.args[1..].join('\n'))!
 				return error('local prepared release operation invoked GitHub')
@@ -764,7 +769,70 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 	}
 }
 
+fn check_saved_draft_verification(root string, work string, out string, remote string, environment map[string]string) ! {
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	record := root + '/build-release/work/draft-' + id + '.json'
+	saved := os.read_file(record)!
+	metadata := json2.decode[FixtureCreation](saved)!
+	verify := ['--verify-draft=' + id]
+	recovery_attempt(root, work, environment, 'verify-draft', verify, '')!
+	report_text := os.read_file(work + '/verify-draft.log')!
+	report := json2.decode[FixtureDraftVerification](report_text)!
+	release := report.release
+	if report.draft_id != id || release.tag != metadata.tag || release.repo != metadata.repo
+		|| release.commit != metadata.commit || release.prerelease != metadata.prerelease
+		|| release.manifest_sha256 != sha256.hexhash(metadata.manifest)
+		|| release.notes_sha256 != sha256.hexhash(metadata.notes) {
+		return error('draft verification did not report the saved metadata')
+	}
+	mut lines := metadata.manifest.split_into_lines()
+	lines.sort(a.all_after('  ') < b.all_after('  '))
+	if release.assets.map(it.sha256 + '  ' + it.name) != lines {
+		return error('draft verification reported the wrong asset set or order')
+	}
+	for asset in release.assets {
+		if asset.bytes != os.file_size(out + '/' + asset.name) {
+			return error('draft verification reported the wrong byte count: ' + asset.name)
+		}
+	}
+	manifest := os.read_file(out + '/SHA256SUMS')!
+	notes := os.read_file(out + '/RELEASE_NOTES.md')!
+	os.write_file(out + '/SHA256SUMS', 'edited public checksums')!
+	os.write_file(out + '/RELEASE_NOTES.md', 'edited public notes')!
+	recovery_attempt(root, work, environment, 'verify-draft-saved-metadata', verify, '')!
+	if os.read_file(work + '/verify-draft-saved-metadata.log')! != report_text
+		|| os.read_file(out + '/SHA256SUMS')! != 'edited public checksums'
+		|| os.read_file(out + '/RELEASE_NOTES.md')! != 'edited public notes' {
+		return error('draft verification read or rewrote the public metadata')
+	}
+	os.write_file(out + '/SHA256SUMS', manifest)!
+	os.write_file(out + '/RELEASE_NOTES.md', notes)!
+	recovery_attempt(root, work, environment, 'verify-draft-wrong-repo', [...verify, '--repo=local/other'],
+		'belongs to local/fixture')!
+	recovery_attempt(root, work, environment, 'verify-draft-missing', ['--verify-draft=99995'],
+		'cannot read release draft recovery record')!
+	iso := out + '/vinix-amd64.iso'
+	original := os.read_file(iso)!
+	os.write_file(iso, 'edited draft ISO')!
+	recovery_attempt(root, work, environment, 'verify-draft-changed-asset', verify,
+		'release asset changed after verification')!
+	os.rm(iso)!
+	alias_target := work + '/verify-draft-original.iso'
+	os.write_file(alias_target, original)!
+	os.symlink(alias_target, iso)!
+	recovery_attempt(root, work, environment, 'verify-draft-linked-asset', verify,
+		'release asset must be a regular file')!
+	os.rm(iso)!
+	os.mv(alias_target, iso)!
+	os.write_file(record, json2.encode(FixtureCreation{...metadata, tag: '../escape'}) + '\n')!
+	recovery_attempt(root, work, environment, 'verify-draft-invalid-tag', verify,
+		'invalid Git tag in recovery record')!
+	os.write_file(record, saved)!
+	if os.exists(remote + '/unexpected-gh') { return error('local draft verification invoked GitHub') }
+}
+
 fn check_resume(root string, work string, out string, remote string, environment map[string]string) ! {
+	check_saved_draft_verification(root, work, out, remote, environment)!
 	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
 	record := root + '/build-release/work/draft-' + id + '.json'
 	recovery := os.read_file(record)!

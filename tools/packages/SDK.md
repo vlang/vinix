@@ -727,6 +727,13 @@ prerelease setting, and the SHA-256 digests of the recorded checksum manifest
 and notes. An empty `records` array means there are no matching local records.
 `--repo=OWNER/NAME` filters the report. Recovery still verifies
 the original files and remote release.
+Run `./scripts/deploy-iso.sh --verify-draft=ID` to check the original files
+against a saved draft ID record before resuming. Its JSON includes the
+`draft_id` string and a `release` report with the saved destination, commit,
+metadata digests, and verified asset names, sizes and digests. It uses the
+manifest and notes from the saved record and leaves the local files untouched.
+Use `--repo=OWNER/NAME` to check the recorded destination. Remote checks run
+during recovery.
 Draft adoption uses the exact creation record captured before the GitHub
 request or lookup. If that record changes during the attempt, the driver
 stops and preserves the changed file for inspection.

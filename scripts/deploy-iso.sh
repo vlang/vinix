@@ -18,6 +18,7 @@
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
 #   --resume-create=TAG  recover a release by tag using local recovery records
 #   --inspect-recovery=TAG  show local recovery records for the tag as JSON
+#   --verify-draft=ID  verify the local assets for a saved draft as JSON
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
 #   --repo=OWNER/NAME  GitHub.com repository (default: the repository gh discovers)
@@ -68,6 +69,7 @@ PACKAGE_REVIEW=''
 RESUME_DRAFT=''
 RESUME_CREATE=''
 INSPECT_RECOVERY=''
+VERIFY_DRAFT=''
 BUILD_OPTIONS=0
 
 usage() {
@@ -109,6 +111,12 @@ for arg in "$@"; do
         --inspect-recovery=*)
             INSPECT_RECOVERY="${arg#*=}"
             [ -n "$INSPECT_RECOVERY" ] || { echo "ERROR: --inspect-recovery requires a tag" >&2; exit 1; }
+            ;;
+        --verify-draft=*)
+            VERIFY_DRAFT="${arg#*=}"
+            case "$VERIFY_DRAFT" in
+                ''|0*|*[!0-9]*) echo "ERROR: --verify-draft requires a numeric draft ID" >&2; exit 1 ;;
+            esac
             ;;
         --package-review=*)
             BUILD_OPTIONS=1
@@ -174,7 +182,7 @@ if [ -n "$PREPARED_REVIEW" ]; then
 fi
 cd "$SCRIPT_DIR"
 post_build=0
-for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" "$INSPECT_RECOVERY"; do
+for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" "$INSPECT_RECOVERY" "$VERIFY_DRAFT"; do
     if [ -n "$action" ]; then
         [ "$post_build" -eq 0 ] || die "choose one verification, publication or recovery action"
         post_build=1
@@ -233,7 +241,7 @@ fi
 
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true
-if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED" ]; then
+if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED$VERIFY_DRAFT" ]; then
     build_release_assets
     if [ -n "$PUBLISH_PREPARED" ]; then
         git check-ref-format "refs/tags/$PUBLISH_PREPARED" || die "invalid prepared release tag: $PUBLISH_PREPARED"
@@ -250,12 +258,18 @@ if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED" ]; then
             RESUME_CREATE=''
         fi
     else
-        recovery="$("$ASSET_WORK/release-assets" restore-draft "$WORK" "$RESUME_DRAFT" "$ASSET_WORK")"
+        recovery="$("$ASSET_WORK/release-assets" restore-draft "$WORK" "${RESUME_DRAFT:-$VERIFY_DRAFT}" "$ASSET_WORK")"
     fi
     IFS=$'\t' read -r recovery_repo TAG COMMIT prerelease <<< "$recovery"
     [ -z "$REPO" ] || [ "$REPO" = "$recovery_repo" ] || die "release $TAG belongs to $recovery_repo"
     REPO="$recovery_repo"
     SHORT="${COMMIT:0:10}"
+fi
+
+if [ -n "$VERIFY_DRAFT" ]; then
+    git check-ref-format "refs/tags/$TAG" || die "invalid Git tag in recovery record: $TAG"
+    "$ASSET_WORK/release-assets" verify-draft "$SCRIPT_DIR/build-release/$TAG" "$ASSET_WORK" "$VERIFY_DRAFT"
+    exit 0
 fi
 
 github_api() {
