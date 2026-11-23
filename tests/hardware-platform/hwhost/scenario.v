@@ -1180,6 +1180,19 @@ pub const scenarios = [
 		timeout:  70
 	},
 	Scenario{
+		name:     'apple-speaker-drain'
+		about:    'Apple speaker OSS drain reports inactive faults and faults during the drain tail'
+		arches:   ['aarch64']
+		define:   'apple_speaker_drain_fixture'
+		required: ['HWTEST START apple-speaker-drain',
+			'apple-speakers drain test: healthy idle and empty playback drained',
+			'apple-speakers drain test: inactive fault returned EIO',
+			'apple-speakers drain test: tail fault returned EIO and shutdown stayed latched',
+			'HWTEST PASS apple-speaker-drain']
+		ending:   .poweroff
+		timeout:  60
+	},
+	Scenario{
 		name:     'drivers-sleep'
 		about:    'HD Audio and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM'
 		arches:   ['x86_64']

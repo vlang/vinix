@@ -1019,6 +1019,9 @@ fn nap(ns i64) Nap {
 		unsafe { free(timer) }
 	}
 	event.await_one(mut timer.event, true) or { return pending_signal() }
+	$if apple_speaker_drain_fixture ? {
+		fault_during_drain_tail(ns)
+	}
 	return .slept
 }
 
@@ -1188,6 +1191,11 @@ fn (mut s SpeakerStream) wait_until_empty() ? {
 		katomic.store(mut &speaker_caller_phase, phase_none)
 	}
 	s.lock()
+	if C.vinix_apple_speakers_faulted() != 0 {
+		s.unlock()
+		errno.set(errno.eio)
+		return none
+	}
 	if C.vinix_apple_speakers_active() == 0 {
 		s.unlock()
 		return
@@ -1225,6 +1233,10 @@ fn (mut s SpeakerStream) wait_until_empty() ? {
 	katomic.store(mut &speaker_caller_phase, phase_stop)
 	s.lock()
 	C.vinix_apple_speakers_stop()
+	// Protection can trip while the FIFO and amplifiers finish playing.
+	if C.vinix_apple_speakers_faulted() != 0 {
+		failure = errno.eio
+	}
 	s.unlock()
 	if failure != 0 {
 		errno.set(failure)
