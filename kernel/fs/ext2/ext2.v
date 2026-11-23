@@ -124,6 +124,10 @@ pub mut:
 	box &resource_mod.Resource = unsafe { nil }
 }
 
+fn (this &EXT2Resource) text_access_volume() u64 {
+	return this.filesystem.text_volume_id
+}
+
 fn (mut this EXT2Resource) attribute_bits() u32 {
 	return katomic.load(&this.attr_bits)
 }
@@ -556,6 +560,8 @@ pub mut:
 	can_mmap bool
 
 	dev_id u64
+	// All mounted views of this backend use one executable write domain.
+	text_volume_id u64
 
 	superblock &EXT2Superblock
 	root_inode &EXT2Inode
@@ -756,6 +762,7 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 		journal: bro.journal
 		read_only: bro.read_only
 		descriptor_size: bro.descriptor_size
+		text_volume_id: bro.text_volume_id
 	}
 
 	this.block_size = bro.block_size
@@ -1461,6 +1468,7 @@ fn init_volume(backing_device &vfs.VFSNode, ext4 bool) (&EXT2Filesystem, bool) {
 	}
 	if !register_mapped_writeback()
 		|| !new_filesystem.register_volume_cache() { return unsafe { nil }, false }
+	new_filesystem.text_volume_id = resource_mod.create_dev_id()
 	vfs.register_block_filesystem(kind, backing_device, new_filesystem.as_filesystem(),
 		new_filesystem.block_identity())
 	ready = true

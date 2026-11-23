@@ -16,7 +16,8 @@ remain available for durability.
 
 The shared lifetime applies to one mounted tree, including its bind mounts.
 Separately mounted views of the same block device still build separate trees
-and have independent inode state.
+and have independent inode state. Their executable write claims are shared
+when the views use the same registered backend. [Executable write exclusion](linux-etxtbsy.md)
 
 ## Qualification
 

@@ -2691,6 +2691,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   tree. Qualify mapped data, metadata and inode reuse after the last link to a
   running executable is removed. See [the lifetime receipts](docs/linux-ext2-hardlinks.md).
 
+- [x] Enforce executable write exclusion across independent ext2 and VJFS
+  mounts of the same block backend. See [the cross-mount receipts](docs/linux-etxtbsy.md#independent-mounts).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -44,6 +44,7 @@ fn C.puts(&char) i32
 fn C.pwrite(i32, voidptr, usize, i64) isize
 fn C.read(i32, voidptr, usize) isize
 fn C.rename(&char, &char) i32
+fn C.rmdir(&char) i32
 fn C.sleep(u32) u32
 fn C.strcmp(&char, &char) i32
 fn C.sync()
@@ -284,6 +285,28 @@ fn unlinked_executable(image &char, alias &char, child Group) {
 		&& C.close(reused) == 0, c'inode can be reused after executable exit')
 }
 
+fn mounted_views(device &char, image &char) {
+	other_image := &char(c'/textbusy-view/textbusy-links/image')
+	require(C.mkdir(c'/textbusy-view', 0o755) == 0
+		&& C.mount(device, c'/textbusy-view', c'ext2', 0, unsafe { nil }) == 0, c'mount second view of the same volume')
+	writer := C.open(other_image, C.O_WRONLY)
+	require(writer >= 0, c'open writer through the second mount')
+	expect_exec_error(image, -1, C.ETXTBSY, c'second mount writer blocks exec through first mount')
+	require(C.close(writer) == 0, c'close writer through the second mount')
+	child := launch(other_image)
+	expect_open(image, C.O_RDONLY, c'first mount allows read of executing image')
+	expect_open_error(image, C.O_WRONLY, C.ETXTBSY, c'second mount executable blocks writer through first mount')
+	expect_open_error(image, C.O_RDWR | C.O_TRUNC, C.ETXTBSY, c'second mount executable blocks truncating open')
+	unsafe {
+		require(C.truncate(image, 0) == -1 && *C.__errno_location() == C.ETXTBSY,
+			c'second mount executable blocks pathname truncate')
+	}
+	finish(child, false)
+	expect_open(image, C.O_WRONLY, c'first mount writer allowed after second mount image exits')
+	require(C.umount(c'/textbusy-view') == 0 && C.rmdir(c'/textbusy-view') == 0, c'unmount second view')
+	C.puts(c'LINUX TEXTBUSY DISK: cross-mount write exclusion passed')
+}
+
 fn persisted_hardlinks(device &char) {
 	image := &char(c'/tmp/textbusy-image')
 	alias := &char(c'/tmp/textbusy-links/image')
@@ -305,6 +328,7 @@ fn persisted_hardlinks(device &char) {
 	expect_open_error(alias, C.O_WRONLY, C.ETXTBSY, c'persisted hardlink executable blocks writer')
 	finish(child, false)
 	expect_open(alias, C.O_WRONLY, c'persisted hardlink writer released on exit')
+	mounted_views(device, image)
 	check_data_aliases(data, data_alias)
 	unlinked_executable(image, alias, launch(image))
 	C.sync()

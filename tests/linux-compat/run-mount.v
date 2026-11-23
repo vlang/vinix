@@ -97,7 +97,10 @@ fn run_guest(state string, arch string, name string, source string, disk string,
   markers << ['LINUX SETID TMPFS: 30 privileged and 30 unprivileged operations passed',
    'LINUX SETID DISK: 30 privileged and 30 unprivileged operations and remount passed']
  }
- if name == 'textbusy' { markers << 'LINUX TEXTBUSY DISK: persisted hardlink checks passed' }
+ if name == 'textbusy' {
+  markers << ['LINUX TEXTBUSY DISK: cross-mount write exclusion passed',
+   'LINUX TEXTBUSY DISK: persisted hardlink checks passed']
+ }
  positive, negative := guesthost.verdict_policy(markers, [label + ' FAIL'], false)
  return guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 }

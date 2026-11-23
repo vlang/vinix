@@ -4,8 +4,14 @@ Vinix now returns `ETXTBSY` when a native exec opens a regular file held
 by a writable open description. The inverse applies to writable opens,
 `O_TRUNC` and pathname `truncate` while the file is executing. Read-only
 opens and `O_PATH` remain usable. A hard link conflicts using the same
-device and inode numbers. This follows [Linux 6.12.51 exec](https://github.com/gregkh/linux/blob/v6.12.51/fs/exec.c)
-and [its inode write-access checks](https://github.com/gregkh/linux/blob/v6.12.51/include/linux/fs.h).
+backing inode. Independent ext2 and VJFS mounts from the same registered
+block backend share the volume ID used for these claims. Their mount IDs
+and per-mount policy still follow each attachment. Linux ext2 also shares
+the backing inode when a block device is mounted in multiple places.
+[Linux exec](https://github.com/gregkh/linux/blob/v6.12.51/fs/exec.c),
+[inode write access](https://github.com/gregkh/linux/blob/v6.12.51/include/linux/fs.h),
+[ext2 mount](https://github.com/gregkh/linux/blob/v6.12.51/fs/ext2/super.c),
+[block-device superblocks](https://github.com/gregkh/linux/blob/v6.12.51/fs/super.c)
 
 A writable open description is shared by descriptor copies and stays alive
 through mappings that retain it. Denial for the main executable belongs to
@@ -44,6 +50,32 @@ The `execown`, `open` and `mmap` regressions passed on both final kernels.
 The `execown` runs kept slab objects and large pages flat over 200 cycles
 each as root and UID 1000. Their receipts are in `{arm,x86}-regress`.
 
+### Independent mounts
+
+The disk probe also opens a persisted hard link through a second mount of the
+same volume. It checks both directions of `ETXTBSY`, checks truncating opens
+and pathname truncation, and verifies that read-only opens still work and that
+write access returns after the last image owner exits. The x86-64 baseline
+kernel from `43130af0f` executed the image while the second mount held a writer.
+
+Optimized kernels from `43130af0f` plus the cross-mount change passed on
+AArch64 and x86-64 with both disk formats. The same boot images were reused
+with fresh VJFS disks. The ext2 disks and clean VJFS exports passed
+`e2fsck -fn`. The existing mount regression passed on both kernels. The
+allocation checker's site counts and existing allow-list failures match the
+baseline.
+
+| Architecture | Probe ELF | Vinix kernel | Ext2 serial log | VJFS serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `69fbe5c42422465b` | `5d14ffb28d4bea18` | `cf46cd3cffd99285` | `02be087b2f79dd74` |
+| x86-64 | `0765387841d72987` | `84ddc606c6719d65` | `d4762606a45458c2` | `a36effdd51596e82` |
+
+These are SHA-256 prefixes. The checksums and disk checks are under
+`~/.cache/vinix-r15/ext2-mount-write/{arm-ext2-final,x86-ext2}` and
+`{arm,x86}-vjfs-reused-iso`. The baseline and mount regression receipts are
+in `x86-baseline-retry` and `{arm,x86}-mount`. The checker output is in
+`allocs.log` under the same parent directory.
+
 ## Limits
 
 The coverage here concerns the backing inode of a native image. Overlayfs
@@ -51,8 +83,10 @@ metadata copy-up may change the backing inode of an overlay name while its
 previous inode is in use. Translated payloads keep a temporary claim during
 handoff to the native interpreter. Remote mutations are outside local inode
 accounting. Ext2 shares inode ownership among hard links within a mounted tree,
-including after a remount. Independently mounted views of a device still build
-separate inode state. [Hard-link lifetime qualification](linux-ext2-hardlinks.md)
+including after a remount. Independently mounted views still build separate
+trees with independent namespace, cached metadata and final-unlink lifetime.
+An unlink in one tree can free an inode that the other tree still references.
+[Hard-link lifetime qualification](linux-ext2-hardlinks.md)
 
 Set-ID exec credential transitions and Chromium's packaged sandbox still
 need separate implementation and qualification.

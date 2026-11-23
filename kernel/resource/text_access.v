@@ -26,16 +26,35 @@ mut:
 
 __global (text_access_table [text_access_buckets]TextAccessBucket)
 
+pub interface TextAccessVolume {
+	text_access_volume() u64
+}
+
+struct TextAccessVolumeCall {
+mut:
+	volume TextAccessVolume
+}
+
+fn text_access_device(mut res Resource) u64 {
+	if res is TextAccessVolume {
+		// Keep optional interface dispatch off the manualfree heap.
+		mut call := unsafe { &TextAccessVolumeCall(C.vinix_stack_alloc(sizeof(TextAccessVolumeCall))) }
+		unsafe { call.volume = TextAccessVolume(res) }
+		return call.volume.text_access_volume()
+	}
+	return res.stat.dev
+}
+
 fn text_access_index(device u64, inode u64) int {
 	return int((device ^ inode ^ (inode >> 9)) & (text_access_buckets - 1))
 }
 
-// Match persistent hard links even when a filesystem has instantiated two
-// resources for their shared on-disk inode. Unnumbered synthetic files fall
-// back to their resource identity, independent of the interface box.
+// Match hard links and filesystem views by their backing inode. Unnumbered
+// synthetic files fall back to their resource identity, independent of the box.
 pub fn (mut claim TextAccess) acquire(res &Resource, executing bool) ? {
 	stable_inode := res.stat.dev != 0 && res.stat.ino != 0
-	device := if stable_inode { res.stat.dev } else { u64(0) }
+	mut file := unsafe { res }
+	device := if stable_inode { text_access_device(mut file) } else { u64(0) }
 	inode := if stable_inode { res.stat.ino } else { unsafe { u64(&res.refcount) } }
 	mut bucket := unsafe { &text_access_table[text_access_index(device, inode)] }
 	bucket.lock.acquire()
