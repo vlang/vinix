@@ -949,6 +949,26 @@ The paired inputs, native report, run logs and sanitizer checks are in
 Its SHA-256 is `297546a9cc02b0026cb4d90a6b8726390c9b8238c0d0db589f961f0aee3b9d89`.
 All 1,517 entries in the extracted `qualification.sha256` passed.
 
+### Remote draft inspection by ID
+
+At `995e2ff92`, `--inspect-draft=ID` checks the recorded release against
+its remote tag, release metadata, and asset digests. Its JSON distinguishes
+draft and published releases and lists the uploaded and missing assets.
+
+All 152 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. Inspection reported a partial draft, a complete
+draft and a published release. It refused a digest mismatch, an unexpected
+repository, missing assets on a published release, and a moved tag. The
+native run reported the sole missing ISO with no local asset directory
+and preserved the existing uploads and saved record. ASan/UBSan checked
+duplicate assets, incomplete uploads, and mismatched release endpoints
+and IDs.
+
+The paired inputs, native report, run logs and sanitizer checks are in
+`~/.local/state/vinix/r14-release-inspect-draft-IIr9Iq/qualification.tar.gz`.
+Its SHA-256 is `fdbf9b18ea683fde5d08f32dd78550eb643ec7773efad2023cc746abc004bb5a`.
+All 1,542 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
