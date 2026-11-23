@@ -85,7 +85,7 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 	mut reply := authclient.ask_root(socket_path, run_request.code, ...run_request.fields)!
 	defer { reply.close() }
 	check_approval(reply, nonce)!
-	fd := unsafe { &listener }.accept_root()!
+	fd := listener.accept_root()!
 	defer { C.close(fd) }
 	return receive_output(fd, request)
 }

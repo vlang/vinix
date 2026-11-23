@@ -50,9 +50,7 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 		return error('the account service refused the isolated application launch')
 	}
 	if !reply_invitation(reply, nonce) { return error('the account service returned another launch invitation') }
-	// accept_root borrows this local only for its synchronous poll/accept.
-	// An explicit stack borrow avoids V retaining a promoted Listener wrapper.
-	fd := unsafe { &listener }.accept_root()!
+	fd := listener.accept_root()!
 	defer { C.close(fd) }
 	send_request(fd, request)!
 	send_streams(fd, [i32(0), 1, 2]!)!
