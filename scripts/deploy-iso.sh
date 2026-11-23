@@ -19,6 +19,7 @@
 #   --resume-create=TAG  recover a release by tag using local recovery records
 #   --inspect-recovery=TAG  show local recovery records for the tag as JSON
 #   --verify-draft=ID  verify the local assets for a saved draft as JSON
+#   --verify-creation=TAG  verify the local assets for a pending creation record as JSON
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
 #   --repo=OWNER/NAME  GitHub.com repository (default: the repository gh discovers)
@@ -70,6 +71,7 @@ RESUME_DRAFT=''
 RESUME_CREATE=''
 INSPECT_RECOVERY=''
 VERIFY_DRAFT=''
+VERIFY_CREATION=''
 BUILD_OPTIONS=0
 
 usage() {
@@ -117,6 +119,10 @@ for arg in "$@"; do
             case "$VERIFY_DRAFT" in
                 ''|0*|*[!0-9]*) echo "ERROR: --verify-draft requires a numeric draft ID" >&2; exit 1 ;;
             esac
+            ;;
+        --verify-creation=*)
+            VERIFY_CREATION="${arg#*=}"
+            [ -n "$VERIFY_CREATION" ] || { echo "ERROR: --verify-creation requires a tag" >&2; exit 1; }
             ;;
         --package-review=*)
             BUILD_OPTIONS=1
@@ -182,7 +188,8 @@ if [ -n "$PREPARED_REVIEW" ]; then
 fi
 cd "$SCRIPT_DIR"
 post_build=0
-for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" "$INSPECT_RECOVERY" "$VERIFY_DRAFT"; do
+for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" \
+    "$INSPECT_RECOVERY" "$VERIFY_DRAFT" "$VERIFY_CREATION"; do
     if [ -n "$action" ]; then
         [ "$post_build" -eq 0 ] || die "choose one verification, publication or recovery action"
         post_build=1
@@ -228,6 +235,14 @@ if [ -n "$VERIFY_PREPARED" ]; then
     git check-ref-format "refs/tags/$VERIFY_PREPARED" || die "invalid prepared release tag: $VERIFY_PREPARED"
     build_release_assets
     "$ASSET_WORK/release-assets" verify-prepared "$SCRIPT_DIR/build-release/$VERIFY_PREPARED" "$VERIFY_PREPARED" "$REPO"
+    exit 0
+fi
+
+if [ -n "$VERIFY_CREATION" ]; then
+    git check-ref-format "refs/tags/$VERIFY_CREATION" || die "invalid recovery tag: $VERIFY_CREATION"
+    build_release_assets
+    "$ASSET_WORK/release-assets" verify-creation \
+        "$SCRIPT_DIR/build-release/$VERIFY_CREATION" "$VERIFY_CREATION" "$REPO"
     exit 0
 fi
 

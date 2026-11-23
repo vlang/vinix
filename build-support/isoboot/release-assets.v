@@ -425,6 +425,13 @@ fn verify_prepared(output string, tag string, repo string) !PreparedVerification
 	return verify_original_assets(output, metadata, os.join_path(output, 'SHA256SUMS'))
 }
 
+fn verify_creation(output string, tag string, repo string) !PreparedVerification {
+	path := creation_path(output)
+	creation := parse_creation(read_recovery_text(path)!, path, tag)!
+	if repo != '' && repo != creation.repo { return error('release ${tag} belongs to ${creation.repo}') }
+	return verify_original_assets(output, creation, path)
+}
+
 fn verify_saved_draft(output string, directory string, id string) !DraftVerification {
 	metadata := read_recovery(creation_path(directory))!
 	report := verify_original_assets(output, metadata, os.join_path(directory, 'SHA256SUMS'))!
@@ -653,6 +660,10 @@ fn run() ! {
 		println(json2.encode(verify_saved_draft(os.args[2], os.args[3], os.args[4])!))
 		return
 	}
+	if os.args.len == 5 && os.args[1] == 'verify-creation' {
+		println(json2.encode(verify_creation(os.args[2], os.args[3], os.args[4])!))
+		return
+	}
 	if os.args.len == 9 && os.args[1] == 'stage-reviewed' {
 		return stage_reviewed(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
 			os.args[8] == 'true')
@@ -700,7 +711,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | verify-draft | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | inspect-recovery | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | verify-draft | verify-creation | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | inspect-recovery | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
 }
 
 fn main() {

@@ -734,6 +734,13 @@ metadata digests, and verified asset names, sizes and digests. It uses the
 manifest and notes from the saved record and leaves the local files untouched.
 Use `--repo=OWNER/NAME` to check the recorded destination. Remote checks run
 during recovery.
+If a draft ID has yet to be saved, run
+`./scripts/deploy-iso.sh --verify-creation=TAG`. It checks the local assets
+against `.draft-creation.json` and reports the recorded destination, commit,
+metadata digests, and verified asset names, sizes and digests as JSON.
+It uses the manifest and notes in the creation record. Pass
+`--repo=OWNER/NAME` to check the destination. Once the creation record has
+been removed, use `--verify-draft=ID`.
 Draft adoption uses the exact creation record captured before the GitHub
 request or lookup. If that record changes during the attempt, the driver
 stops and preserves the changed file for inspection.

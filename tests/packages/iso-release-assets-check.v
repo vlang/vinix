@@ -556,7 +556,8 @@ fn run_stub(name string) !int {
 		}
 		'gh' {
 			if scenario in ['prepared', 'prepared-recovery']! || scenario.starts_with('verify-prepared')
-				|| scenario.starts_with('inspect-recovery') || scenario.starts_with('verify-draft') {
+				|| scenario.starts_with('inspect-recovery') || scenario.starts_with('verify-draft')
+				|| scenario.starts_with('verify-creation') {
 				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
 				os.write_file(remote + '/unexpected-gh', os.args[1..].join('\n'))!
 				return error('local prepared release operation invoked GitHub')
@@ -736,6 +737,7 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 		return
 	}
 	if scenario == 'create-delayed' {
+		check_creation_verification(root, work, out, remote, environment, intent)!
 		recovery_attempt(root, work, environment, 'resume-create-record-changed', options,
 			'draft creation record changed during publication')!
 		check_changed_creation(out, remote, recovery_path, intent)!
@@ -767,6 +769,68 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 		|| os.exists(remote + '/publish-attempt') || os.read_file(remote + '/release-attempt')! != attempt {
 		return error('recovery did not complete the original draft')
 	}
+	if scenario == 'create-delayed' {
+		recovery_attempt(root, work, environment, 'verify-creation-retired', ['--verify-creation=' + tag],
+			'cannot read release draft recovery record')!
+	}
+}
+
+fn check_local_release_report(out string, metadata FixtureCreation, release FixturePreparedVerification) ! {
+	if release.tag != metadata.tag || release.repo != metadata.repo
+		|| release.commit != metadata.commit || release.prerelease != metadata.prerelease
+		|| release.manifest_sha256 != sha256.hexhash(metadata.manifest)
+		|| release.notes_sha256 != sha256.hexhash(metadata.notes) {
+		return error('verification did not report the saved release metadata')
+	}
+	mut lines := metadata.manifest.split_into_lines()
+	lines.sort(a.all_after('  ') < b.all_after('  '))
+	if release.assets.map(it.sha256 + '  ' + it.name) != lines {
+		return error('verification reported the wrong asset set or order')
+	}
+	for asset in release.assets {
+		if asset.bytes != os.file_size(out + '/' + asset.name) {
+			return error('verification reported the wrong byte count: ' + asset.name)
+		}
+	}
+}
+
+fn check_creation_verification(root string, work string, out string, remote string, environment map[string]string, intent string) ! {
+	metadata := json2.decode[FixtureCreation](intent)!
+	verify := ['--verify-creation=' + metadata.tag]
+	recovery_attempt(root, work, environment, 'verify-creation', verify, '')!
+	text := os.read_file(work + '/verify-creation.log')!
+	check_local_release_report(out, metadata, json2.decode[FixturePreparedVerification](text)!)!
+	checksums := out + '/SHA256SUMS'
+	manifest := os.read_file(checksums)!
+	os.write_file(checksums, 'edited public checksums')!
+	recovery_attempt(root, work, environment, 'verify-creation-saved-metadata', verify, '')!
+	if os.read_file(work + '/verify-creation-saved-metadata.log')! != text
+		|| os.read_file(checksums)! != 'edited public checksums' {
+		return error('creation verification read or rewrote the public manifest')
+	}
+	os.write_file(checksums, manifest)!
+	recovery_attempt(root, work, environment, 'verify-creation-wrong-repo', [...verify, '--repo=local/other'],
+		'belongs to local/fixture')!
+	intent_path := out + '/.draft-creation.json'
+	os.write_file(intent_path, json2.encode(FixtureCreation{...metadata, notes: 'missing draft marker'}) + '\n')!
+	recovery_attempt(root, work, environment, 'verify-creation-invalid-record', verify,
+		'invalid release draft creation record')!
+	os.rm(intent_path)!
+	os.symlink(remote + '/creation-record', intent_path)!
+	recovery_attempt(root, work, environment, 'verify-creation-linked-record', verify,
+		'metadata must be a bounded regular file')!
+	if !os.is_link(intent_path) { return error('creation verification modified a linked record') }
+	os.rm(intent_path)!
+	os.write_file(intent_path, intent)!
+	iso := out + '/vinix-amd64.iso'
+	original := os.read_file(iso)!
+	os.write_file(iso, 'edited creation ISO')!
+	recovery_attempt(root, work, environment, 'verify-creation-changed-asset', verify,
+		'release asset changed after verification')!
+	os.write_file(iso, original)!
+	if os.read_file(intent_path)! != intent || os.exists(remote + '/unexpected-gh') {
+		return error('local verification changed the creation record or contacted GitHub')
+	}
 }
 
 fn check_saved_draft_verification(root string, work string, out string, remote string, environment map[string]string) ! {
@@ -778,23 +842,8 @@ fn check_saved_draft_verification(root string, work string, out string, remote s
 	recovery_attempt(root, work, environment, 'verify-draft', verify, '')!
 	report_text := os.read_file(work + '/verify-draft.log')!
 	report := json2.decode[FixtureDraftVerification](report_text)!
-	release := report.release
-	if report.draft_id != id || release.tag != metadata.tag || release.repo != metadata.repo
-		|| release.commit != metadata.commit || release.prerelease != metadata.prerelease
-		|| release.manifest_sha256 != sha256.hexhash(metadata.manifest)
-		|| release.notes_sha256 != sha256.hexhash(metadata.notes) {
-		return error('draft verification did not report the saved metadata')
-	}
-	mut lines := metadata.manifest.split_into_lines()
-	lines.sort(a.all_after('  ') < b.all_after('  '))
-	if release.assets.map(it.sha256 + '  ' + it.name) != lines {
-		return error('draft verification reported the wrong asset set or order')
-	}
-	for asset in release.assets {
-		if asset.bytes != os.file_size(out + '/' + asset.name) {
-			return error('draft verification reported the wrong byte count: ' + asset.name)
-		}
-	}
+	if report.draft_id != id { return error('verification reported the wrong draft ID') }
+	check_local_release_report(out, metadata, report.release)!
 	manifest := os.read_file(out + '/SHA256SUMS')!
 	notes := os.read_file(out + '/RELEASE_NOTES.md')!
 	os.write_file(out + '/SHA256SUMS', 'edited public checksums')!
