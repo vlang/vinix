@@ -580,6 +580,10 @@ notes and `SHA256SUMS` include the receipts. The check also runs with
 `--no-test` and `--no-publish`. The host helper uses `xorriso` and links
 libarchive and zlib.
 
+The verifier checks the exact repository member names in the archive before
+creating the host scratch tree. Publisher IDs, index and signature filenames,
+and lowercase object digests follow the existing signed repository layout.
+
 To require an independently reviewed selection, build the host helper and
 generate one plan per target with the candidate package input environment.
 

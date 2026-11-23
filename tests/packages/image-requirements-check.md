@@ -329,6 +329,26 @@ references to the retained ISO inputs are in
 Its SHA-256 is `a02456b88fb2cfecd2b8f0ecb014a79e31e58be42a3e60a9507cfcb2fc805b02`.
 All 202 entries in the extracted `qualification.sha256` passed.
 
+### Exact repository names
+
+At `32fbcf46f`, ISO verification checks repository entry names before creating
+the scratch tree. It admits the existing publisher identifier grammar, the
+literal `index.json`, `index.sig` and `objects` names, and lowercase SHA-256
+object filenames.
+
+The baseline issued receipts for ISOs with an extra `Index.json` or uppercase
+object digest on case-insensitive HFS+ and refused those same ISOs on
+case-sensitive HFS+.
+The fixed verifier refused both variants on both filesystems. All 27 host
+controls passed per target plan on each filesystem, along with the ASan/UBSan
+runs on case-insensitive HFS+. The mixed-catalog and configuration-only
+fixtures reproduced their receipts byte for byte.
+
+The fixtures, diagnostics and build logs are in
+`~/.local/state/vinix/r14-iso-repository-names-ClY7eX/qualification.tar.gz`.
+Its SHA-256 is `3d0bb1dc4a3060393740829425e925d69a2c5be7b327757ed4806b6b39f54ed2`.
+All 383 entries in the extracted `qualification.sha256` passed.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
