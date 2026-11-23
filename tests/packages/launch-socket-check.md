@@ -98,3 +98,32 @@ Retained evidence uses the `launch-socket-` prefix in
 - [AArch64 baseline EOF failure](results/2026-10-16/launch-socket-aarch64.eof-before.serial.txt), [final EOF pass](results/2026-10-16/launch-socket-aarch64.eof-after.serial.txt), [transport receipt](results/2026-10-16/launch-socket-aarch64.stress.json)
 - [x86-64 baseline EOF failure](results/2026-10-16/launch-socket-x86_64.eof-before.serial.txt), [final EOF pass](results/2026-10-16/launch-socket-x86_64.eof-after.serial.txt), [transport receipt](results/2026-10-16/launch-socket-x86_64.stress.json)
 - [AArch64 resource recovery](results/2026-10-16/launch-socket-aarch64.candidate.serial.txt), [x86-64 resource recovery](results/2026-10-16/launch-socket-x86_64.candidate.serial.txt), [V probe](results/2026-10-16/launch-socket-probe.v), [probe controller](results/2026-10-16/launch-socket-probe-controller.v)
+
+## Interrupted launch socket waits
+
+At `8ab0abd4e`, request and descriptor readiness checks retry `poll()`
+after `EINTR`. Each retry computes the remaining time from the same
+monotonic deadline. The final fractional millisecond rounds up.
+
+The stream fixture sends real `SIGUSR1` signals before the request and
+again before the three standard-stream descriptors. It verifies the
+request identity and close-on-exec protection. A separate partial read
+preserves its first two bytes and expires at its original 150 ms deadline
+while signals continue. Both checks passed in normal and ASan/UBSan host
+builds. On `fc07465c2`, the request failed with a false timeout. A host
+control that renewed the timeout on each interrupt waited until the peer
+closed and produced the wrong error.
+
+The same fixture reproduced the false timeout on AArch64 and x86-64 QEMU
+with the old code. With the fix, both guests passed those checks and the
+existing EOF, simultaneous shutdown and descriptor tests. All four boots
+ended with a guest-initiated poweroff.
+
+The maintained audio portal host suite passed all 52 checks using the final
+production code and the initial test callback declaration. The focused host
+and guest runs also passed with the final C-compatible callback declaration.
+
+Raw streams build logs, serial and QMP logs, host results, and input inventories
+are in `~/.local/state/vinix/r14-launch-signal-OTwBuw/qualification.tar.gz`.
+Its SHA-256 is `1ba42173ef629dcdc9d4e0856bb1415e54016db96ca2cd5f7b37f5e7093c0f74`.
+All 67 entries in the extracted `qualification.sha256` passed.
