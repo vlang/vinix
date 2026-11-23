@@ -192,7 +192,7 @@ fn test_admin_approval_errors_own_their_diagnostics_after_reply_retirement() {
 }
 fn admin_fixture_accept(listener int) !int {
 	mut readiness := Poll{ fd: i32(listener), events: 1 }
-	if C.vinix_package_admin_poll(unsafe { &readiness }, 1, 30000) <= 0 { return error('fixture accept timeout') }
+	if C.vinix_package_admin_poll(voidptr(&readiness), 1, 30000) <= 0 { return error('fixture accept timeout') }
 	fd := C.accept(listener, unsafe { nil }, unsafe { nil })
 	if fd < 0 { return error('fixture accept failed') }
 	return fd
@@ -287,7 +287,7 @@ fn test_root_service_exercises_complete_ordinary_administration_callers() {
 	path := root + '/auth.sock'; defer { unsafe { path.free() } }
 	location := address(path)!; listener := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0); assert listener >= 0
 	defer { C.close(listener) }
-	assert C.bind(listener, unsafe { &location }, u32(sizeof(C.vinix_package_admin_address))) == 0
+	assert C.bind(listener, voidptr(&location), u32(sizeof(C.vinix_package_admin_address))) == 0
 	assert C.listen(listener, 8) == 0; os.chmod(path, 0o666)!
 	arguments := ['--progress', '--offline', 'policy-apply', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '/etc/a space; $literal "quote" \\ 💡.json']
 	defer { unsafe { (&array(&arguments)).free() } }

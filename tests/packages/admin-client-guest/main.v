@@ -12,21 +12,20 @@ fn C.fork() int
 fn C.setgroups(usize, voidptr) int
 fn C.setgid(u32) int
 fn C.setuid(u32) int
-fn C.execv(&char, &&char) int
+fn C.execl(&char, &char, ...voidptr) int
 fn C._exit(int)
 fn C.waitpid(int, &i32, int) int
 fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn actor(path string, ordinary bool) bool {
-	argv := [c'admin-client-fixture', &char(unsafe { nil })]!
 	pid := C.fork()
 	if pid < 0 { return false }
 	if pid == 0 {
 		if ordinary {
 			if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(90) }
 		}
-		C.execv(path.str, unsafe { &argv[0] })
+		C.execl(path.str, c'admin-client-fixture', voidptr(0))
 		C._exit(91)
 	}
 	mut status := i32(0)

@@ -22,9 +22,9 @@ fn suite(baseline bool) hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkgadmin/protocol_test.v', path: 'usr/share/package-fixtures/protocol' },
 			hwhost.Program{ source: 'tools/packages/pkgadmin/ownership_test.v', path: 'usr/share/package-fixtures/streams' },
 			hwhost.Program{ source: 'tools/packages/pkgadmin/socket_test.v', path: 'usr/share/package-fixtures/admin-socket' },
-			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd' },
-			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session' },
-			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package' },
+			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd', flags: ['-enable-globals'] },
+			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session', flags: ['-enable-globals'] },
+			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package', flags: ['-enable-globals'] },
 		]
 		scenarios: [hwhost.Scenario{ name: 'packages-admin-client', arches: ['aarch64', 'x86_64'],
 			about: 'complete administrator callers, owned password/authentication inputs and approval failure cleanup',

@@ -90,7 +90,7 @@ fn run_with_socket(arguments []string, socket_path string) !int {
 	return receive_output(fd, request)
 }
 
-fn check_approval(reply authproto.Frame, nonce string) ! {
+fn check_approval(reply &authproto.Frame, nonce string) ! {
 	if reply.code == authproto.status_wait {
 		seconds := reply.text(0)
 		defer { unsafe { seconds.free() } }
@@ -118,7 +118,7 @@ fn reply_invitation(reply authproto.Frame, nonce string) bool {
 	return true
 }
 
-fn receive_output(fd int, request Request) !int {
+fn receive_output(fd int, request &Request) !int {
 	mut pending := []u8{cap: 16384}
 	unsafe { pending.flags |= .noslices }
 	defer { unsafe { pending.free() } }
