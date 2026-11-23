@@ -122,6 +122,7 @@ fn pledge_needs(nr u64, a [6]u64) u64 {
 		289, 290 { pledge_stdio } // pkey_alloc, pkey_free
 		291 { pledge_stdio } // statx: judged once the file is found
 		293 { pledge_stdio } // rseq
+		428 { if a[2] & 1 == 0 { pledge_stdio } else { pledge_never } } // open_tree with path policy
 		435 { pledge_unsupported } // clone3
 		436 { pledge_stdio } // close_range
 		437, 439 { pledge_stdio } // openat2, faccessat2: judged once the file is found

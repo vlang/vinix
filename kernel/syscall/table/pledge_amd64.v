@@ -113,6 +113,7 @@ fn pledge_needs(nr u64, a [6]u64) u64 {
 		// pkey_free.
 		324...328, 330, 331 { pledge_stdio }
 		334 { pledge_stdio } // rseq
+		428 { if a[2] & 1 == 0 { pledge_stdio } else { pledge_never } } // open_tree with path policy
 		435 { pledge_unsupported } // clone3
 		436, 441 { pledge_stdio } // close_range, epoll_pwait2
 		444, 445, 446 { pledge_stdio } // landlock: only narrows

@@ -1083,10 +1083,12 @@ fn (mut this PtyMaster) unref(_handle voidptr) ? {
 
 fn (mut this PtySlave) unref(handle voidptr) ? {
 	mut pair := this.pair
+	closed_description := handle != unsafe { nil }
+		&& unsafe { &file.Handle(handle) }.flags & resource.o_path == 0
 	pair.l.acquire()
 	pair.slave_closers++
 	katomic.dec(mut &this.refcount)
-	if handle != unsafe { nil } && pair.slave_open_count > 0 {
+	if closed_description && pair.slave_open_count > 0 {
 		pair.slave_open_count--
 	}
 	pair.refresh_status_locked()
@@ -1100,7 +1102,7 @@ fn (mut this PtySlave) unref(handle voidptr) ? {
 		// re-enters unref with a nil handle. This callback's closer hold keeps
 		// the pair alive until pathname removal finishes.
 		fs.devtmpfs_remove_device(pair.path, this.box)
-	} else if handle != unsafe { nil } {
+	} else if closed_description {
 		// A temporary resource pin (including an epoll snapshot) changes no
 		// open count or readiness. Waking it here makes the next epoll scan
 		// wake itself indefinitely, even after a finite timeout expires.

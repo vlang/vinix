@@ -938,7 +938,7 @@ fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, acces
 	return target_node
 }
 
-fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity &lib.MountContext, created bool) ?int {
+fn fd_create_from_node(mut node VFSNode, flags int, identity &lib.MountContext, created bool) ?&file.FD {
 	current_process := proc.current_thread().process
 	if node.seat && !proc.seat_may_open() {
 		security.event(security.event_seat, true, 0, node.name)
@@ -1010,12 +1010,7 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
 	if fd.handle.mac_device {
 		drm.add_client(mut fd.handle, current_process)
 	}
-	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific) or {
-		// In particular, roll back a /dev/ptmx allocation or slave-open count if
-		// the process descriptor table is full.
-		fd.unref()
-		return none
-	}
+	return fd
 }
 
 // PATH_MAX: the longest path a syscall takes, its terminator included.
@@ -1430,7 +1425,13 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 		mut res := node.resource
 		res.grow(unsafe { nil }, 0) or { return errno.err, errno.get() }
 	}
-	fdnum := fdnum_create_from_node(mut node, flags, 0, false, open_mount, created) or { return errno.err, errno.get() }
+	mut fd := fd_create_from_node(mut node, flags, open_mount, created) or { return errno.err, errno.get() }
+	fdnum := file.fdnum_create_from_fd(process, fd, 0, false) or {
+		// Roll back a device open if the descriptor table could not publish it.
+		failure := errno.get()
+		fd.unref()
+		return errno.err, failure
+	}
 	inotify_emit(node, '', in_open, 0)
 
 	return u64(fdnum), 0

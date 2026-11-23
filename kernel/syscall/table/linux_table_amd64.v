@@ -470,6 +470,7 @@ pub fn init_syscall_table() {
 	syscall_table[328] = voidptr(syscall_linux_pwritev2) // pwritev2
 	syscall_table[332] = voidptr(syscall_linux_statx) // statx
 	syscall_table[436] = voidptr(file.syscall_close_range) // close_range
+	syscall_table[428] = voidptr(fs.syscall_open_tree) // open_tree
 	syscall_table[437] = voidptr(syscall_linux_openat2) // openat2
 	syscall_table[439] = voidptr(syscall_linux_faccessat2) // faccessat2
 	syscall_table[440] = voidptr(syscall_linux_process_madvise) // process_madvise

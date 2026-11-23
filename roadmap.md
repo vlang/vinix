@@ -2795,6 +2795,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   attachment metadata, bind roots and mountpoints, and the effects of moves,
   detach, and chroot on both architectures. See [the statmount receipts](docs/linux-statmount.md).
 
+- [x] Implement native `open_tree` path references. Qualify mount identity,
+  descriptor reservation, and metadata-only pipe and terminal references on
+  both architectures. See [the open_tree receipts](docs/linux-open-tree.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

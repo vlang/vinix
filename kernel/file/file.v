@@ -169,7 +169,12 @@ fn (mut this Handle) unref() {
 	release_description_locks(this, false)
 	this.text_writer.release()
 	mut res := this.resource
-	res.unref(voidptr(this)) or {}
+	if this.flags & resource.o_path != 0 && stat.isifo(res.stat.mode) {
+		// An O_PATH pipe description owns a reference, with no read or write end.
+		resource.release_resource(mut res)
+	} else {
+		res.unref(voidptr(this)) or {}
+	}
  if this.origin_resource != unsafe { nil } {
   mut origin := this.origin_resource
   resource.release_resource(mut origin)
@@ -1954,6 +1959,10 @@ pub fn adopt_passed_handle(handle &Handle) ?&FD {
 }
 
 fn release_unopened_resource(mut res resource.Resource, flags int) {
+	if flags & resource.o_path != 0 && stat.isifo(res.stat.mode) {
+		resource.release_resource(mut res)
+		return
+	}
 	// FIFO open counted an end and an owned device open may have side effects.
 	// Use caller-stack Handle storage while returning that adopted reference.
 	handle := unsafe { &Handle(C.vinix_stack_alloc(sizeof(Handle))) }

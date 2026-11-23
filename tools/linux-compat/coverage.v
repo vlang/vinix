@@ -220,6 +220,7 @@ fn coverage(root string) !Coverage {
 		'kernel/socket/unix/unix.v', 'kernel/pipe/pipe.v', 'kernel/pipe/usercopy.v', 'kernel/fs/vfs.v', 'kernel/fs/mount_policy.v',
 		'kernel/fs/stat.v',
 		'kernel/fs/mount_query.v',
+		'kernel/fs/open_tree.v',
 		'kernel/fs/statmount.v',
 		'kernel/fs/mount.v', 'kernel/fs/tmpfs.v', 'kernel/fs/procfs.v', 'kernel/fs/memfd_policy.v',
 		'kernel/fs/cachestat.v',
