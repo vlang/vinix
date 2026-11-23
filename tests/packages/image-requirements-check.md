@@ -680,6 +680,32 @@ The paired inputs, baseline and updated runs, and loopback checks are in
 Its SHA-256 is `e9d6c1471b7e5af803c2b088fa5800405deb2e2636e9615c15520496b9bcfff3`.
 All 1,334 entries in the extracted `qualification.sha256` passed.
 
+### Prepared ISO release publication
+
+At `22fff4ace`, `--prepare-only` runs the selected build checks and
+saves the repository, tag, commit, prerelease setting, checksums and
+notes with the output. `--publish-prepared=TAG` verifies the saved
+metadata and the staged asset copies before using the ordinary draft
+workflow. The saved record prevents a second build at that tag from
+overwriting the verified assets.
+
+All 79 release fixtures passed with signed inputs for both architectures,
+compiled host helpers and local GitHub stubs. The prepared build ran the
+package receipt verifier and boot fixture with GitHub access disabled.
+After the fixture advanced the checkout's HEAD, publication used the
+recorded commit and prerelease setting, both signed package receipts and
+the same ISO digests recorded at boot. Changed notes, checksums or asset
+bytes, a different repository and an embedded tag override each refused.
+
+ASan/UBSan controls restored the exact metadata and refused a record
+overwrite, an unexpected tag and a record carrying a draft ID.
+
+The paired inputs, prepared record, fixture revisions, run logs and
+sanitizer controls are in
+`~/.local/state/vinix/r14-release-prepared-boyKOD/qualification.tar.gz`.
+Its SHA-256 is `ca98c64f43e2d1429b187cef2cb646e4e5a43a0e5dd92aa2774a12f2c800606f`.
+All 1,329 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
