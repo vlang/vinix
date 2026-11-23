@@ -367,3 +367,31 @@ The raw scenario outputs, build logs and selected digests are in
 `~/.local/state/vinix/r14-virtio-sound-stall-HAaRJd/qualification.tar.gz`.
 Its SHA-256 is `fa04a042e05e17a5ad5fa404ad82f9f45eb1f328e40bf01f19ad65b76a708b16`.
 The extracted files passed every entry in `qualification.sha256`.
+
+## Apple speaker drain fault reporting
+
+At `47865336e`, the Apple OSS stream checks for a latched protection fault
+before returning success for an inactive stream and again after the final
+drain wait. A detected fault returns `EIO`. The protection shutdown stays
+latched when the stream stops or a caller tries to configure it again.
+
+The `apple-speaker-drain` scenario runs the real kernel drain path on
+AArch64 QEMU with `VFLAGS=-d apple_speaker_drain_fixture`. The fixture
+provides a simulated amplifier shutdown pin and injects a fault before
+drain and at the end of the 20 ms drain wait. Both drains returned
+success on the `514bc9a65` baseline with the same injection. The fixed
+kernel returned `EIO` in both cases, drained healthy idle and empty
+streams, kept the shutdown pin asserted, and refused reconfiguration
+after the fault. Both guests powered off normally.
+
+The ordinary AArch64 kernel contained no fixture symbols and passed the
+`devices` scenario. All fourteen hardware harness host suites passed.
+The existing J313 model passed its original/V goldens, C ABI, ASan/UBSan
+and allocation checks. Physical Apple speaker qualification and
+independently reviewed audio kernel seals remain open.
+
+The raw build and boot logs, kernel ELFs, generated C, model results and
+source patches are in
+`~/.local/state/vinix/r14-apple-speaker-m40hNS/qualification.tar.gz`.
+Its SHA-256 is `93cc72d9f7c97b0ebcf7471924e2844b7464859f61d51082bb3de1ebbbe1094b`.
+The extracted files passed all 42 entries in `qualification.sha256`.
