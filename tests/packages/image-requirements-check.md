@@ -872,6 +872,26 @@ The paired inputs, before and after runs, and recovery records are in
 Its SHA-256 is `59df1fd954178f36887d550aa67545ce9e7b8ccbe3c899c00a4a4602fba2c7ff`.
 All 1,494 entries in the extracted `qualification.sha256` passed.
 
+### Tag recovery from saved draft records
+
+At `6922643d3`, `--resume-create=TAG` can resume by ID when the creation
+record has already been removed. The lookup requires an exact tag and a
+unique valid record with a matching filename and embedded ID. An explicit
+repository narrows the lookup. A present creation record takes precedence.
+
+All 127 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. Published releases were confirmed by saved ID and
+by tag with a repository filter. Missing records, ambiguous records, a
+different repository and a linked creation record all failed. A native
+run resumed the partial draft and uploaded only the missing ISO. The same
+fixture failed under the previous driver. ASan/UBSan checked the lookup
+and creation record precedence.
+
+The paired inputs, before and after runs, and sanitizer checks are in
+`~/.local/state/vinix/r14-release-saved-tag-1l0Vnu/qualification.tar.gz`.
+Its SHA-256 is `5b134701a991b849274925affdde55c1acc7997e98ce9d2bdaa7f663a7ffde1d`.
+All 1,523 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
