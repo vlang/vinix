@@ -17,7 +17,7 @@ import sysdisk.disklayout
 pub enum Outcome {
 	in_memory // no disk used: the image is still to be unpacked into RAM
 	booted // an installed, up-to-date system is the root
-	installed // the image was just unpacked onto a blank disk
+	installed // the image was just unpacked onto a newly formatted disk
 	updated // the image was just unpacked over an older installed one
 }
 
@@ -32,6 +32,7 @@ pub enum Mode {
 	none
 	live
 	install
+	erase
 	installed
 	legacy
 	auto
@@ -41,6 +42,7 @@ pub fn mode() Mode {
 	return match devcore.boot_option('vinix.disk=') or { '' } {
 		'live' { .live }
 		'install' { .install }
+		'erase' { .erase }
 		'installed' { .installed }
 		'legacy' { .legacy }
 		'auto' { .auto }
@@ -50,7 +52,7 @@ pub fn mode() Mode {
 
 pub fn mount_or_install(boot Mode) Outcome {
 	return match boot {
-		.install { install_bootable() }
+		.install, .erase { install_bootable(boot == .erase) }
 		.installed { mount_bootable() }
 		.auto, .legacy { mount_legacy(boot == .auto) }
 		else { .in_memory }

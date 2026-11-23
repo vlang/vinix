@@ -51,16 +51,19 @@ machine options are required. Without a disk, changes are lost on restart.
 
 ### Install Vinix on a disk
 
-1. Boot the ISO or USB installer with one empty, writable disk of at least
+1. Boot the ISO or USB installer with one writable disk of at least
    4 GiB. Use 16 GiB or more for apps and at least 4 GiB of RAM in a VM.
-2. Select **Install Vinix on an empty disk** in the boot menu. Wait for the
-   desktop to start, then shut down and remove the USB stick or eject the ISO.
-3. Start the machine from the installed disk. Vinix keeps users, settings,
-   files and installed apps across boots.
+2. For a blank disk, select **Install Vinix on an empty disk**. To replace an
+   older OS, back up the target and disconnect other drives. Select **Erase a
+   disk and install Vinix**, then **Confirm erase of the only target disk**.
+   This replaces all partitions and files on the target.
+3. Wait for the desktop to start, then shut down and remove the USB stick or
+   eject the ISO. Start from the installed disk to keep users, settings, files
+   and installed apps across boots.
 
-The installer uses the whole target disk and checks that it is empty. It
-supports disks with 512-byte logical sectors on IDE or SATA in amd64 (BIOS or
-UEFI), and VirtIO block disks in arm64 (UEFI). **Try Vinix** is the default
+The installer uses the whole target disk and requires 512-byte logical sectors.
+It supports IDE or SATA on amd64 (BIOS or UEFI) and VirtIO block disks on arm64
+(UEFI). **Try Vinix** is the default
 and runs a temporary session in memory. For a disk created by an older ISO,
 choose **Boot or update a legacy Vinix disk** and keep the ISO attached.
 

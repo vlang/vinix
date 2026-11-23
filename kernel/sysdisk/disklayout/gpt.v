@@ -98,6 +98,10 @@ pub fn header_lba(sectors u64, backup bool) u64 {
 	return if backup { sectors - 1 } else { u64(1) }
 }
 
+pub fn (hdr &Header) matches_disk(id Guid) bool {
+	return hdr.signature == gpt_signature && !id.matches(Guid{}) && hdr.disk.matches(id)
+}
+
 pub fn header(table &Table, sectors u64, disk Guid, backup bool) Header {
 	mut hdr := Header{
 		signature:   gpt_signature

@@ -8,6 +8,7 @@ import resource
 import lib
 import fs
 import errno
+import katomic
 
 const gpt_signature = u64(0x5452415020494645)
 
@@ -121,8 +122,8 @@ fn (mut this Partition) discard(offset u64, bytes u64) ? {
 	resource.discard_resource(mut this.parent_device, this.device_offset + offset, bytes)?
 }
 
-fn (mut this Partition) unref(handle voidptr) ? {
-	return this.parent_device.unref(handle)
+fn (mut this Partition) unref(_handle voidptr) ? {
+	katomic.dec(mut &this.refcount)
 }
 
 fn (mut this Partition) link(_handle voidptr) ? {
@@ -153,6 +154,7 @@ fn publish(parent &resource.Resource, name string, first u64, count u64) {
 	mut parent_device := unsafe { parent }
 	sector := u64(parent_device.stat.blksize)
 	mut part := &Partition{
+		refcount: 1
 		device_offset: first * sector
 		sector_cnt: count
 		parent_device: unsafe { parent }
@@ -165,6 +167,25 @@ fn publish(parent &resource.Resource, name string, first u64, count u64) {
 	part.stat.rdev = resource.create_dev_id()
 	part.stat.mode = 0o600 | stat.ifblk
 	fs.devtmpfs_add_device(part, name)
+}
+
+// The ISO installer replaces the table before any process can open these
+// nodes. Drop the old extents before publishing nodes from the new table.
+pub fn remove_boot_partitions(disk &fs.VFSNode) bool {
+	dev := fs.devtmpfs_get_root()
+	mut old := []&fs.VFSNode{} @[freed]
+	defer { unsafe { old.free() } }
+	for _, node in dev.children {
+		if node.resource == unsafe { nil } { continue }
+		part := node.resource
+		if part is Partition && voidptr(part.parent_device) == voidptr(disk.resource) {
+			old << node
+		}
+	}
+	for node in old {
+		if !fs.devtmpfs_remove_device(node.name, node.resource) { return false }
+	}
+	return true
 }
 
 // Publish an extent from a table the caller has already validated. The disk

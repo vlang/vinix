@@ -12,6 +12,8 @@ fn test_gpt_encoding_and_validation() {
 		entries(table, sectors, id, pending)
 		for backup in [false, true]! {
 			hdr := header(table, sectors, id.disk, backup)
+			assert hdr.matches_disk(id.disk)
+			assert !hdr.matches_disk(Guid{})
 			result := inspect(hdr, table, sectors, backup) or { panic('valid table rejected') }
 			assert result.pending == pending
 			assert result.id.disk.matches(id.disk)

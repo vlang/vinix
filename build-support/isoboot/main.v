@@ -57,6 +57,9 @@ fn build(root string, efi string, limine string, bios_sys string, extra string) 
 	os.write_file(os.join_path(boot, 'limine.conf'), 'timeout: 8\nserial: yes\nverbose: yes\n\n' +
 		'/Try Vinix\n${live}    cmdline: vinix.disk=live${args}\n\n' +
 		'/Install Vinix on an empty disk\n${live}${install}    cmdline: vinix.disk=install${args}\n\n' +
+		'/Erase a disk and install Vinix\n    comment: Disconnect all drives except the installer and the intended target.\n' +
+		'//Confirm erase of the only target disk\n    comment: All partitions and files on the target disk will be lost.\n' +
+		'${live}${install}    cmdline: vinix.disk=erase${args}\n\n' +
 		'/Boot or update a legacy Vinix disk\n${live}    cmdline: vinix.disk=legacy${args}\n')!
 }
 
