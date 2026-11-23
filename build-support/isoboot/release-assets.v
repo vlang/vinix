@@ -12,9 +12,11 @@ const attempt_marker_prefix = '\n<!-- Vinix release attempt: '
 const attempt_marker_bytes = 16
 
 struct UploadedAsset {
+	id     u64
 	name   string
 	state  string
-	digest string
+	digest ?string
+	size   ?u64
 }
 
 struct Release {
@@ -69,6 +71,19 @@ struct DraftUploadStatus {
 	state string
 	uploaded []string
 	missing []string
+	incomplete []IncompleteUpload
+}
+
+struct IncompleteUpload {
+	name string
+	asset_id string
+}
+
+struct DraftAssets {
+mut:
+	uploaded []string
+	missing []string
+	incomplete []IncompleteUpload
 }
 
 struct RecoverySummary {
@@ -585,19 +600,38 @@ fn retire_resumed_creation(output string, directory string) ! {
 	}
 }
 
-fn missing_assets(directory string, assets []UploadedAsset) ![]string {
+fn is_empty_starter(asset UploadedAsset) bool {
+	size := asset.size or { return false }
+	return asset.state == 'starter' && asset.id != 0 && size == 0 && (asset.digest or { '' }) == ''
+}
+
+fn check_draft_assets(directory string, assets []UploadedAsset, allow_incomplete bool) !DraftAssets {
 	manifest := os.join_path(directory, 'SHA256SUMS')
 	mut expected := read_manifest(manifest)!
 	if expected.len == 0 { return error('release checksum manifest is empty') }
 	expected['SHA256SUMS'] = pkgcore.hash_file(manifest)!
+	mut uploaded := []string{}
+	mut incomplete := []IncompleteUpload{}
+	mut seen_ids := map[u64]bool{}
 	for asset in assets {
 		digest := expected[asset.name] or { return error('unexpected GitHub draft asset: ' + asset.name) }
-		if asset.state != 'uploaded' || asset.digest != 'sha256:' + digest {
+		if asset.id != 0 {
+			if asset.id in seen_ids { return error('repeated GitHub asset ID: ${asset.id}') }
+			seen_ids[asset.id] = true
+		}
+		if is_empty_starter(asset) {
+			if !allow_incomplete {
+				return error('incomplete GitHub draft asset: ${asset.name} (asset ID ${asset.id})')
+			}
+			incomplete << IncompleteUpload{name: asset.name, asset_id: asset.id.str()}
+		} else if asset.state == 'uploaded' && (asset.digest or { '' }) == 'sha256:' + digest {
+			uploaded << asset.name
+		} else {
 			return error('GitHub draft asset differs from the verified upload: ' + asset.name)
 		}
 		expected.delete(asset.name)
 	}
-	return expected.keys()
+	return DraftAssets{uploaded: uploaded, missing: expected.keys(), incomplete: incomplete}
 }
 
 fn inspect_saved_draft(directory string, response string, id string, recorded bool) !DraftUploadStatus {
@@ -608,13 +642,13 @@ fn inspect_saved_draft(directory string, response string, id string, recorded bo
 		if !release.draft { return error('published GitHub release ${id} has no saved draft recovery record') }
 		if release.assets.len != 0 { return error('new GitHub draft already contains assets') }
 	}
-	mut missing := missing_assets(directory, release.assets)!
-	missing.sort()
-	if !release.draft && missing.len > 0 {
-		return error('missing GitHub draft assets: ' + missing.join(', '))
+	mut assets := check_draft_assets(directory, release.assets, release.draft)!
+	assets.missing.sort()
+	if !release.draft && assets.missing.len > 0 {
+		return error('missing GitHub draft assets: ' + assets.missing.join(', '))
 	}
-	mut uploaded := release.assets.map(it.name)
-	uploaded.sort()
+	assets.uploaded.sort()
+	assets.incomplete.sort(a.name < b.name)
 	return DraftUploadStatus{
 		draft_id: id
 		repo: saved.repo
@@ -622,8 +656,9 @@ fn inspect_saved_draft(directory string, response string, id string, recorded bo
 		commit: saved.commit
 		prerelease: saved.prerelease
 		state: if release.draft { 'draft' } else { 'published' }
-		uploaded: uploaded
-		missing: missing
+		uploaded: assets.uploaded
+		missing: assets.missing
+		incomplete: assets.incomplete
 	}
 }
 
@@ -632,7 +667,8 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 	draft := read_release(response, id, tag, notes, prerelease)!
 	if !draft.draft { return error('GitHub release is already published') }
 	endpoint := upload_endpoint(draft, repo)!
-	names := missing_assets(directory, draft.assets)!
+	assets := check_draft_assets(directory, draft.assets, false)!
+	names := assets.missing
 	manifest := os.join_path(directory, 'SHA256SUMS')
 	if names.len == 0 {
 		if original != '' { check_assets(original, manifest)! }
@@ -642,7 +678,7 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 	checksum_bytes := if upload_manifest { os.lstat(manifest)!.size } else { u64(0) }
 	metadata_bytes := u64(notes.len) + checksum_bytes
 	if original != '' {
-		stage_assets(original, read_manifest(manifest)!, stage, draft.assets.map(it.name), metadata_bytes)!
+		stage_assets(original, read_manifest(manifest)!, stage, assets.uploaded, metadata_bytes)!
 	} else {
 		asset_sizes(stage, names.filter(it != 'SHA256SUMS'), true)!
 		require_staging_space(stage, metadata_bytes)!
@@ -683,7 +719,7 @@ fn verify_release(directory string, response string, repo string, id string, tag
 	if published && release.draft { return error('GitHub release ${id} is still a draft') }
 	if !published && !release.draft { return error('GitHub release ${id} is already published') }
 	upload_endpoint(release, repo)!
-	missing := missing_assets(directory, release.assets)!
+	missing := check_draft_assets(directory, release.assets, false)!.missing
 	if missing.len > 0 { return error('missing GitHub draft assets: ' + missing.join(', ')) }
 	return release.html_url
 }

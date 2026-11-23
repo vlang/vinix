@@ -27,9 +27,11 @@ const release_list_refusals = ['release-list-failed', 'release-already-draft', '
 	'release-appears-before-create', 'release-list-fails-before-create']
 
 struct FixtureAsset {
+	id u64
 	name string
 	state string
 	digest string
+	size ?u64
 }
 
 struct FixtureUpload {
@@ -77,6 +79,12 @@ struct FixtureDraftUploadStatus {
 	state string
 	uploaded []string
 	missing []string
+	incomplete []FixtureIncompleteUpload
+}
+
+struct FixtureIncompleteUpload {
+	name string
+	asset_id string
 }
 
 struct FixtureRecoverySummary {
@@ -393,6 +401,15 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			'draft-incomplete-asset' { draft.assets[0] = FixtureAsset{...first, state: 'starter'} }
 			'draft-missing-asset', 'inspect-draft-published-missing' { draft.assets.delete(0) }
 			'draft-extra-asset' { draft.assets << FixtureAsset{...first, name: 'extra.iso'} }
+			'inspect-draft-starter', 'resume-starter' {
+				draft.assets << FixtureAsset{id: 12345, name: 'vinix-amd64.iso', state: 'starter', size: u64(0)}
+			}
+			'inspect-draft-nonempty-starter' {
+				draft.assets << FixtureAsset{id: 12345, name: 'vinix-amd64.iso', state: 'starter', size: u64(1)}
+			}
+			'inspect-draft-published-starter' {
+				draft.assets[0] = FixtureAsset{id: 12345, name: first.name, state: 'starter', size: u64(0)}
+			}
 			else {}
 		}
 		if !draft.draft && scenario in ['publish-changed-asset', 'resume-published-bad-digest',
@@ -987,7 +1004,7 @@ fn check_draft_inspection_report(work string, remote string, scenario string, id
 	missing := names.sorted().filter(it !in uploaded)
 	if report.draft_id != id || report.repo != saved.repo || report.tag != saved.tag
 		|| report.commit != saved.commit || report.prerelease != saved.prerelease || report.state != state
-		|| report.uploaded != uploaded || report.missing != missing {
+		|| report.uploaded != uploaded || report.missing != missing || report.incomplete.len != 0 {
 		return error('inspection did not report the verified remote state: ' + scenario)
 	}
 }
@@ -1006,6 +1023,18 @@ fn check_resume(root string, work string, out string, remote string, environment
 	mut before := os.ls(remote + '/uploads')!
 	before.sort()
 	check_draft_inspection(root, work, remote, environment, 'inspect-draft-partial', 'draft')!
+	recovery_attempt(root, work, environment, 'inspect-draft-starter', inspect, '')!
+	partial := json2.decode[FixtureDraftUploadStatus](os.read_file(work + '/inspect-draft-partial.log')!)!
+	with_starter := json2.decode[FixtureDraftUploadStatus](os.read_file(work + '/inspect-draft-starter.log')!)!
+	if with_starter.draft_id != id || with_starter.state != 'draft' || with_starter.uploaded != partial.uploaded
+		|| with_starter.missing != partial.missing.filter(it != 'vinix-amd64.iso')
+		|| with_starter.incomplete != [FixtureIncompleteUpload{name: 'vinix-amd64.iso', asset_id: '12345'}] {
+		return error('inspection did not distinguish the incomplete upload from saved and missing assets')
+	}
+	recovery_attempt(root, work, environment, 'inspect-draft-nonempty-starter', inspect,
+		'GitHub draft asset differs from the verified upload')!
+	resume_attempt(root, work, environment, 'resume-starter', [],
+		'incomplete GitHub draft asset: vinix-amd64.iso (asset ID 12345)')!
 	recovery_attempt(root, work, environment, 'inspect-draft-bad-digest', inspect,
 		'GitHub draft asset differs from the verified upload')!
 	recovery_attempt(root, work, environment, 'inspect-draft-wrong-repo', [...inspect, '--repo=local/other'],
@@ -1063,6 +1092,8 @@ fn check_resume(root string, work string, out string, remote string, environment
 	if os.exists(intent_path) { return error('publication kept a matching creation record') }
 	os.write_file(intent_path, intent)!
 	check_draft_inspection(root, work, remote, environment, 'inspect-draft-published', 'published')!
+	recovery_attempt(root, work, environment, 'inspect-draft-published-starter', inspect,
+		'incomplete GitHub draft asset')!
 	recovery_attempt(root, work, environment, 'inspect-draft-published-missing', inspect,
 		'missing GitHub draft assets')!
 	resume_attempt(root, work, environment, 'resume-published-with-draft', ['--draft'], 'is already published')!

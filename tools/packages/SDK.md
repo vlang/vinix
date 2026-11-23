@@ -742,7 +742,11 @@ against the saved record. The JSON reports whether it is a `draft` or
 `published` and lists verified `uploaded` and `missing` asset names in
 sorted order, including `SHA256SUMS`. Inspection verifies the remote tag
 and refuses unexpected assets, digest mismatches, or missing assets on a
-published release. It makes read requests only. Use `--verify-draft=ID`
+published release. On a draft, it puts empty GitHub `starter` assets in the
+`incomplete` list with their names and asset IDs. These entries block upload
+recovery until removed from GitHub. See the
+[GitHub release asset documentation](https://docs.github.com/en/rest/releases/assets#upload-a-release-asset).
+Inspection makes read requests only. Use `--verify-draft=ID`
 to check the local files.
 While `.draft-creation.json` is present, `--inspect-creation=TAG` can find
 the release by tag and produce the same report without adopting it. It
