@@ -19,6 +19,7 @@ fn C.dprintf(i32, &char, ...) i32
 fn C.fflush(voidptr) i32
 fn C.fork() i32
 fn C.fstat(i32, &C.stat) i32
+fn C.ftruncate(i32, i64) i32
 fn C.lseek(i32, i64, i32) i64
 fn C.madvise(voidptr, u64, i32) i32
 fn C.mkdir(&char, u32) i32
@@ -32,11 +33,14 @@ fn C.pause() i32
 fn C.pwrite(i32, voidptr, u64, i64) i64
 fn C.puts(&char) i32
 fn C.read(i32, voidptr, u64) i64
+fn C.rmdir(&char) i32
 fn C.setuid(u32) i32
 fn C.strcmp(&char, &char) i32
 fn C.strlen(&char) u64
 fn C.syscall(i64, ...) i64
 fn C.sysconf(i32) i64
+fn C.umount(&char) i32
+fn C.unlink(&char) i32
 fn C.waitpid(i32, &i32, i32) i32
 fn C.write(i32, voidptr, u64) i64
 
@@ -48,6 +52,7 @@ const address_flag = u64(2)
 const allowed_flag = u64(4)
 
 struct C.stat {
+	st_ino u64
 	st_mode u32
 	st_size i64
 }
@@ -288,6 +293,61 @@ fn check_policies(page u64, other bool) {
 	if other { set_weight(1, c'0') }
 }
 
+fn check_shared_file(fd i32, page u64, other bool) {
+	unsafe {
+		mut info := C.stat{}
+		need(fd >= 0 && C.fstat(fd, &info) == 0, c'get shared backing inode')
+		need(C.ftruncate(fd, i64(18 * page)) == 0, c'create sparse shared backing')
+		whole := u64(C.mmap(nil, 18 * page, C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, 0))
+		alias := u64(C.mmap(nil, 15 * page, C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, i64(2 * page)))
+		need(whole != ~u64(0) && alias != ~u64(0), c'map shared file at two offsets')
+
+		set_weight(0, c'3')
+		if other { set_weight(1, c'2') }
+		mask := if other { u64(3) } else { u64(1) }
+		need(set_policy(weighted_mode, mask) == 0, c'select a weighted policy for shared faults')
+		for step in 0 .. 15 {
+			index := u64(step * 7 % 15)
+			want := if !other || (info.st_ino + index + 2) % 5 < 3 { i32(0) } else { i32(1) }
+			need(fault(alias + index * page) == want, c'shared fault follows inode and file page index')
+			address := whole + (index + 2) * page
+			need(*(&u8(address)) == 28, c'alias sees the shared bytes')
+			node, _ := get_policy(address, node_flag | address_flag)
+			need(node == want, c'alias sees the same physical page')
+		}
+
+		const_page := u64(17)
+		set_weight(0, c'1')
+		byte := u8(71)
+		need(C.pwrite(fd, &byte, 1, i64(const_page * page)) == 1, c'write into a hole using updated weights')
+		need(set_policy(default_mode, 0) == 0, c'clear task policy before mapping the written page')
+		address := whole + const_page * page
+		need(*(&u8(address)) == byte, c'shared mapping sees the previously written byte')
+		want := if !other || (info.st_ino + const_page) % 3 == 0 { i32(0) } else { i32(1) }
+		node, _ := get_policy(address, node_flag | address_flag)
+		need(node == want, c'sparse write places the same backing page as a weighted fault')
+
+		need(C.munmap(voidptr(alias), 15 * page) == 0 && C.munmap(voidptr(whole), 18 * page) == 0
+			&& C.close(fd) == 0, c'release shared backing and aliases')
+		set_weight(0, c'0')
+		if other { set_weight(1, c'0') }
+	}
+}
+
+fn check_shared_placement(page u64, other bool) {
+	unsafe {
+		check_shared_file(i32(C.syscall(i64(C.SYS_memfd_create), c'weighted', u64(0))), page, other)
+		path := c'/tmp/vinix-weighted'
+		need(C.mkdir(path, 0o755) == 0, c'create tmpfs mountpoint')
+		need(C.mount(c'tmpfs', path, c'tmpfs', 0, nil) == 0, c'mount tmpfs for shared file')
+		file := c'/tmp/vinix-weighted/backing'
+		check_shared_file(C.open(file, C.O_RDWR | C.O_EXCL | C.O_CREAT, u32(0o600)), page, other)
+		need(C.unlink(file) == 0 && C.umount(path) == 0 && C.rmdir(path) == 0,
+			c'remove the tmpfs and its mountpoint')
+		C.puts(c'LINUX WEIGHTED SHMEM: PASS')
+	}
+}
+
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
@@ -303,6 +363,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		other := allowed & 2 != 0
 		check_weights(u64(page), other)
 		check_policies(u64(page), other)
+		check_shared_placement(u64(page), other)
 		if other { C.puts(c'LINUX WEIGHTED NUMA: PASS') }
 		C.puts(c'LINUX WEIGHTED SUMMARY: sysfs=checked placement=checked')
 		C.puts(if reference { c'LINUX WEIGHTED REFERENCE: PASS' } else { c'LINUX WEIGHTED: PASS' })

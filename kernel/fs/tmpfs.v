@@ -7,6 +7,7 @@ import errno
 import klock
 import memory
 import memory.mmap
+import numa
 import resource
 import lib
 import event.eventstruct
@@ -316,11 +317,20 @@ fn (mut this TmpFSResource) lazy_shared_mapping() bool {
 // One taken for a shared mapping of a file nothing names is the mapping
 // process' own memory, as an anonymous page would be, and running out is
 // that process' to answer for.
-fn tmpfs_page(file_data bool) voidptr {
-	if file_data {
-		return memory.pmm_alloc_file(1)
+fn tmpfs_page(file_data bool, preferred_node int) voidptr {
+	if preferred_node < 0 {
+		return if file_data { memory.pmm_alloc_file(1) } else { memory.pmm_alloc_user(1) }
 	}
-	return memory.pmm_alloc_user(1)
+	if file_data {
+		if !memory.file_room(1) { return unsafe { nil } }
+	} else if !memory.user_room(1) {
+		return unsafe { nil }
+	}
+	page := memory.pmm_alloc_on_node(1, preferred_node, false)
+	if !file_data && page == unsafe { nil } {
+		memory.note_exhaustion()
+	}
+	return page
 }
 
 // Whether a page a shared mapping takes is file data all the same: the file
@@ -347,7 +357,7 @@ fn (mut this TmpFSResource) ensure_paged_locked(file_data bool) bool {
 	mut pages := []u64{cap: int(page_count)} @[freed]
 	size := u64(this.stat.size)
 	for i := u64(0); i < page_count; i++ {
-		phys := tmpfs_page(file_data)
+		phys := tmpfs_page(file_data, -1)
 		if phys == unsafe { nil } {
 			for allocated in pages {
 				memory.pmm_free(voidptr(allocated), 1)
@@ -405,7 +415,8 @@ fn (mut this TmpFSResource) materialize_page_locked(index int, file_data bool) b
 	if this.pages[index] != 0 {
 		return true
 	}
-	phys := tmpfs_page(file_data)
+	node := numa.weighted_task_node(this.stat.ino + u64(index))
+	phys := tmpfs_page(file_data, node)
 	if phys == unsafe { nil } {
 		return false
 	}

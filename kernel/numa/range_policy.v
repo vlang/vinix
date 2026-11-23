@@ -48,6 +48,17 @@ fn weighted_interleave_node(mask u64, index u64) int {
 	return first_node_in(mask)
 }
 
+// Shared-memory pages use an inode-relative index supplied by the filesystem.
+// Other task policies keep the filesystem's ordinary allocation path.
+pub fn weighted_task_node(index u64) int {
+	if !numa_multinode { return -1 }
+	caller := proc.current_thread()
+	if caller == unsafe { nil } || caller.numa_policy.mode != mpol_weighted_interleave {
+		return -1
+	}
+	return weighted_interleave_node(caller.numa_policy.mask, index)
+}
+
 // The native Linux memory policy syscalls read maxnode-1 bits.
 pub fn import_nodemask(address u64, maxnode u64) ?u64 {
 	if address == 0 || maxnode == 1 { return u64(0) }

@@ -2819,6 +2819,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   positioned offsets on both architectures.
   See [the guarded-write receipts](docs/linux-weighted-interleave.md#guarded-write-buffers).
 
+- [x] Apply weighted task policies to sparse tmpfs and memfd pages. Qualify
+  inode-relative placement, shared aliases, and sparse writes with live
+  weights on both architectures.
+  See [the shared-memory receipts](docs/linux-weighted-interleave.md#sparse-shared-memory).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

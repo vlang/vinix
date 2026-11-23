@@ -19,8 +19,8 @@ An oversized write consumes at most one native page. The I/O layer bounds
 the payload copy for scalar, positioned, and vectored writes. The no-address
 `MPOL_F_NODE` query returns the first node in the weighted mask for the
 indexed subset. The allocation-order cursor for kernel and page-cache
-allocations, shared mapping phase, optional mode flags, and translated or
-32-bit policy calls remain open.
+allocations, shared anonymous mapping phase, explicit shared range policies,
+optional mode flags, and translated or 32-bit policy calls remain open.
 
 ## Qualification
 
@@ -87,3 +87,37 @@ checker reproduced the baseline failures and the same 307 AArch64 and
 The restored and verified archive is
 `~/.cache/vinix-r15/weight-store/qualification.tar.zst`, with SHA-256
 `f7d2ce17f0e23ccdee7564c463991f5af876ab7845b1fcf3c44f783c26153bb8`.
+
+## Sparse shared memory
+
+With a weighted task policy, a sparse tmpfs or memfd page allocated by a
+shared fault or a write uses the inode number plus the page's file offset
+in pages. Aliases with different mapping bases and offsets see the same
+physical page once it exists. Weight changes affect future allocations.
+Named file data and mapper-owned pages retain their existing memory reserve
+rules. Contiguous tmpfs storage and conversion of existing file data keep
+their ordinary placement. [Linux 6.12.51 shared-memory allocation](https://github.com/gregkh/linux/blob/v6.12.51/mm/shmem.c)
+
+The weighted fixture faults memfd and mounted tmpfs pages out of order
+through an offset alias. It checks the resulting nodes and shared bytes,
+changes a weight, writes into another hole, and checks where that page was
+placed after clearing the task policy.
+
+Both production kernels were built from `ad0bc958f` plus the archived
+source patch. The same fixture ELF per architecture passed on Vinix and
+Linux 6.12.51 in single- and two-node guests. The previous Vinix kernels
+failed the inode-relative placement check in both two-node guests.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `ed57cacad9b522ab` | `32e3d3ab74c08dd0` |
+| x86-64 | `0acc51bb812eabce` | `0ebba782cf72652d` |
+
+The `memfdcreate`, `memfdseals`, and `shmabi` regressions passed on both
+architectures. Independent review checked page ownership, reserve
+accounting, and lock ordering. The allocation checker reproduced the
+baseline failures and the same 307 AArch64 and 255 x86-64 allocation sites.
+
+The restored and verified archive is
+`~/.cache/vinix-r15/weighted-shmem/qualification.tar.zst`, with SHA-256
+`9baf409ba1a58898d0eb9e8fd63e6a88d4763023abd7ef2ef641e46f03ea5042`.
