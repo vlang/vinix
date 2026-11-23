@@ -808,6 +808,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Release ISO package receipts](tests/packages/image-requirements-check.md#release-iso-package-receipts)
     bind finished ISOs with selected package inputs to their configuration,
     authenticated offline bundles and deployment declaration before publication.
+    [Verified upload staging](tests/packages/image-requirements-check.md#verified-upload-staging)
+    keeps the complete verified asset set independent of the build output
+    during upload.
     [Image catalog declarations](tests/packages/image-catalog-check.md) carry the
     exact lock into normal staging. Software discovers it for a full-set review
     with separate confirmation; matching trust and signed offline bundles remain

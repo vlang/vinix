@@ -293,6 +293,27 @@ are archived in `~/.local/state/vinix/r14-release-asset-manifest-Pv8dR8/qualific
 Its SHA-256 is `514f7ddf2779eb023090f46382148abc81e57443cf6ebdc6a7986104298ebebf`.
 All 129 entries in the extracted `qualification.sha256` passed.
 
+### Verified upload staging
+
+At `6ac3d03d6`, the driver copies release assets to a private staging
+directory and checks the copied bytes against the recorded digests before
+invoking GitHub. It supplies the recorded checksum list and generated notes
+from that directory and removes the directory on exit.
+
+All ten release-driver cases passed using local build, boot and GitHub stubs.
+The new case overwrote the public amd64 ISO, X11 bundle, checksum list and
+release notes in place after the uploader started. The uploader still read
+every verified asset and the original notes and checksum list. The existing
+refusals and the single-architecture build-only path passed. The staging
+helper also passed ASan/UBSan checks for a verified copy, a source digest
+mismatch and refusal to reuse an existing staging directory.
+
+The paired fixture inputs, run logs, observed upload digests and source
+revision are in
+`~/.local/state/vinix/r14-release-upload-copy-ohWRaq/qualification.tar.gz`.
+Its SHA-256 is `7b5559ee4e51c0cd0ba00f737561ebdd688b5e802f02b66c6209046f2fc7ce54`.
+All 163 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
