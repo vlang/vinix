@@ -364,7 +364,7 @@ fn async_signal_entry() {
 }
 
 pub fn dispatch_a_signal(context &cpulocal.GPRState) {
-	dispatch_a_signal_with_fault(context, false, 0, 0)
+	dispatch_a_signal_with_fault(context, false, 0, 0, 0)
 }
 
 // Native signal frames lack SIMD state, so the asynchronous trampoline only
@@ -430,7 +430,8 @@ pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
 // Linux SA_SIGINFO handlers need the fault address and a usable ucontext. QEMU
 // user mode depends on both: translated memory accesses deliberately fault in
 // the host and its SIGSEGV handler turns that host context into a guest fault.
-fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fault_address u64, fault_esr u64) {
+fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool,
+	fault_address u64, fault_esr u64, fault_code i32) {
 	job_boundary()
 	mut t := unsafe { proc.current_thread() }
 	restarting := t.restarting_syscall
@@ -582,6 +583,8 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			*&i32(info_base) = i32(which)
 			*&i32(info_base + 8) = if timer_info.found {
 				i32(timer_info.code)
+			} else if fault_code != 0 {
+				fault_code
 			} else if synchronous && (fault_esr & 0x3f) >= 0x0c {
 				2 // SEGV_ACCERR
 			} else if synchronous {
@@ -687,20 +690,21 @@ pub fn dispatch_sync_signal(context &cpulocal.GPRState, signal u8) bool {
 	}
 	original_pc := context.pc
 	katomic.bts(mut &current_thread.pending_signals, signal - 1)
-	dispatch_a_signal_with_fault(context, true, context.pc, 0)
+	dispatch_a_signal_with_fault(context, true, context.pc, 0, 0)
 	return context.pc != original_pc
 }
 
 // Deliver a synchronous memory fault with the host address and ESR preserved
 // for an SA_SIGINFO handler.
-pub fn dispatch_sync_fault(context &cpulocal.GPRState, fault_address u64, fault_esr u64) bool {
+pub fn dispatch_sync_fault(context &cpulocal.GPRState, fault_address u64, fault_esr u64,
+	signal u8, fault_code i32) bool {
 	mut current_thread := proc.current_thread()
 	if current_thread == unsafe { nil } {
 		return false
 	}
 	original_pc := context.pc
-	katomic.bts(mut &current_thread.pending_signals, u8(sigsegv - 1))
-	dispatch_a_signal_with_fault(context, true, fault_address, fault_esr)
+	katomic.bts(mut &current_thread.pending_signals, signal - 1)
+	dispatch_a_signal_with_fault(context, true, fault_address, fault_esr, fault_code)
 	return context.pc != original_pc
 }
 

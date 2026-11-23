@@ -486,12 +486,12 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	}
 	offset := page * page_size
 	file_size := u64(this.stat.size)
+	if offset >= file_size { return resource.mapping_eof }
 	is_shared := flags & mmap.map_shared != 0
 
-	// A shared mapping past EOF has no backing. Private mappings of
-	// borrowed initramfs data keep copying only the pages they touch.
-	if is_shared && offset >= file_size { return unsafe { nil } }
-	if offset < file_size && (is_shared || this.paged || this.storage_owned) {
+	// Private mappings of borrowed initramfs data copy only the pages
+	// they touch.
+	if is_shared || this.paged || this.storage_owned {
 		file_data := this.outlives_mappers()
 		if !this.ensure_paged_locked(file_data) {
 			return unsafe { nil }
@@ -507,20 +507,14 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 		return physical
 	}
 
-	copy_page := if offset < file_size {
-		numa.alloc_range_page(this.numa_policy_at(offset), this.stat.ino + page, true)
-	} else {
-		memory.pmm_alloc_user(1)
-	}
+	copy_page := numa.alloc_range_page(this.numa_policy_at(offset), this.stat.ino + page, true)
 	if copy_page == unsafe { nil } {
 		return unsafe { nil }
 	}
-	if offset < file_size {
-		copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
-		if this.storage != unsafe { nil } {
-			unsafe {
-				C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[offset], copy_size)
-			}
+	copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
+	if this.storage != unsafe { nil } {
+		unsafe {
+			C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[offset], copy_size)
 		}
 	}
 

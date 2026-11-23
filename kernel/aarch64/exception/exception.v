@@ -290,14 +290,21 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 		}
 		0x20, 0x24 { // Instruction or Data Abort from a lower EL: userspace
 			exhausted := memory.exhaustions()
-			mmap.pf_handler(gpr_state) or {
+			fault := mmap.pf_handler(gpr_state) or {
 				if memory.exhaustions() != exhausted && out_of_memory(gpr_state) {
 					return
 				}
-				if userland.dispatch_sync_fault(gpr_state, far, esr) {
+				if userland.dispatch_sync_fault(gpr_state, far, esr, u8(userland.sigsegv), 0) {
 					return
 				}
 				terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigsegv))
+				return
+			}
+			if fault != .resolved {
+				signal := if fault == .beyond_eof { u8(userland.sigbus) } else { u8(userland.sigsegv) }
+				// BUS_ADRERR and SEGV_ACCERR both have code 2.
+				if userland.dispatch_sync_fault(gpr_state, far, esr, signal, 2) { return }
+				terminate_faulting_process(ec, esr, far, gpr_state, signal)
 			}
 		}
 		0x21, 0x25 { // Instruction or Data Abort from the same EL: the kernel
@@ -310,12 +317,14 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			// so the report itself faulted and the original branch was never
 			// named. The exception class already says which EL faulted.
 			exhausted := memory.exhaustions()
-			mmap.pf_handler(gpr_state) or {
+			fault := mmap.pf_handler(gpr_state) or {
 				if memory.exhaustions() != exhausted && out_of_memory(gpr_state) {
 					return
 				}
 				fault_handler(ec, esr, far, gpr_state)
+				return
 			}
+			if fault != .resolved { fault_handler(ec, esr, far, gpr_state) }
 		}
 		0x15 { // SVC from AArch64 (syscall)
 			// Handled separately

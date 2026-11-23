@@ -2858,6 +2858,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   descriptor close on both architectures.
   See [the private read receipts](docs/linux-weighted-interleave.md#private-tmpfs-and-memfd-read-faults).
 
+- [x] Report `SIGBUS` on missing tmpfs and memfd mapping pages beyond EOF.
+  Qualify partial last pages, private and shared faults, protection
+  precedence, and changes in the available extent on both architectures.
+  See [the EOF fault receipts](docs/linux-tmpfs-eof.md).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

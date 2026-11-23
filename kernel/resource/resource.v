@@ -36,6 +36,10 @@ pub const file_status_flags_mask = ~(file_creation_flags_mask | file_descriptor_
 // and O_DSYNC from the original open; F_SETFL cannot change durability.
 pub const file_settable_flags_mask = o_append | o_nonblock
 
+// mmap callbacks can refuse a whole page past EOF separately from an
+// allocation failure. No physical frame can have this value.
+pub const mapping_eof = voidptr(-1)
+
 pub interface Resource {
 mut:
 	stat     stat.Stat

@@ -76,17 +76,19 @@ fn pf_handler(num u32, mut gpr_state cpulocal.GPRState) {
 		// trap. Unknown direct kernel faults retain the existing fatal path;
 		// Linux exception-table recovery is not supplied by this guard.
 		if memory.fault_resolution_disabled() {
-			exception_handler_at(num, mut gpr_state, fault_addr)
+			exception_handler_at(num, mut gpr_state, fault_addr, .resolved)
 			return
 		}
 	}
 	exhausted := memory.exhaustions()
-	mmap.pf_handler(gpr_state) or {
+	fault := mmap.pf_handler(gpr_state) or {
 		if memory.exhaustions() != exhausted && out_of_memory(gpr_state) {
 			return
 		}
-		exception_handler_at(num, mut gpr_state, fault_addr)
+		exception_handler_at(num, mut gpr_state, fault_addr, .resolved)
+		return
 	}
+	if fault != .resolved { exception_handler_at(num, mut gpr_state, fault_addr, fault) }
 }
 
 // The page a fault needed could not be had, for lack of memory rather than of
@@ -171,11 +173,12 @@ fn fix_msr_access(num u32, mut gpr_state cpulocal.GPRState) bool {
 }
 
 fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
-	exception_handler_at(num, mut gpr_state, if num == 14 { cpu.read_cr2() } else { u64(0) })
+	exception_handler_at(num, mut gpr_state, if num == 14 { cpu.read_cr2() } else { u64(0) },
+		.resolved)
 }
 
 // `cr2` is the faulting address of a page fault, read on entry.
-fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
+fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64, fault mmap.PageFault) {
 	// Userspace is any code segment of privilege 3: an LDT can give a process
 	// others than the GDT's.
 	if gpr_state.cs & 3 == 3 {
@@ -201,6 +204,7 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 				lib.kpanic(gpr_state, exception_names[num])
 			}
 		}
+		if fault == .beyond_eof { signal = userland.sigbus }
 
 		// Preserve both pieces of x86 exception state in the existing frame.
 		// Hardware error codes occupy the low bits and the vector the high half;
@@ -212,7 +216,10 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 			0 { 1 } // FPE_INTDIV
 			1 { 2 } // TRAP_TRACE
 			3 { 1 } // TRAP_BRKPT
-			14 { if gpr_state.err & 1 != 0 { 2 } else { 1 } } // SEGV_ACCERR / SEGV_MAPERR
+			14 {
+				// BUS_ADRERR and SEGV_ACCERR are 2, SEGV_MAPERR is 1.
+				if fault != .resolved || gpr_state.err & 1 != 0 { 2 } else { 1 }
+			}
 			else { 128 } // SI_KERNEL
 		}
 		// A CPU exception arrives with interrupts off, and everything past this

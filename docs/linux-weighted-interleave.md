@@ -358,8 +358,8 @@ in-memory write path.
 Private faults on borrowed initramfs storage still copy only the pages
 they touch. Cold cache faults follow the existing tmpfs allocation
 path, whose task-policy fallback supports weighted interleave.
-Beyond-EOF private faults and truncation of already mapped pages remain
-outside this qualification.
+Faults on missing pages beyond EOF have their own qualification.
+[Tmpfs and memfd EOF faults](linux-tmpfs-eof.md)
 
 Production kernels built from `e070f0fad` plus the archived patch passed
 the same probe ELFs as Linux 6.12.51 on two-node AArch64 and x86-64

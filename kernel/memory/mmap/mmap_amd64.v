@@ -95,7 +95,7 @@ fn serial_hex(before &u8, value u64) {
 	serial_text(unsafe { &digits[start - 2] })
 }
 
-pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
+pub fn pf_handler(gpr_state &cpulocal.GPRState) ?PageFault {
 	// CR2 is read before interrupts go back on. Once they are, the scheduler
 	// can switch this thread out, and another one's page fault on this CPU
 	// overwrites CR2: the handler then looked up the other thread's address in
@@ -128,7 +128,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 				mut state := &cpulocal.GPRState(gpr_state)
 				state.rflags |= rflags_ac
 			}
-			return
+			return .resolved
 		}
 		// A write-protection fault on a fork-shared private page is the normal
 		// COW path, not a process fault.
@@ -143,7 +143,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 				cli
 			}
 			if resolved {
-				return
+				return .resolved
 			}
 		}
 		// It was a protection violation, crash
@@ -173,8 +173,12 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// another thread that faulted on it too; retrying the access is all this
 	// one needs.
 	mut pagemap := current_thread.process.pagemap
-	page_in(mut pagemap, addr, true, false)?
-	if gpr_state.cs & 3 == 3 { sched.park_for_cgroup() }
+	user_fault := gpr_state.cs & 3 == 3
+	access := if !user_fault { 0 } else if gpr_state.err & pf_instruction != 0 { prot_exec }
+		else if gpr_state.err & pf_write != 0 { prot_write } else { prot_read | prot_write | prot_exec }
+	result := page_in(mut pagemap, addr, true, false, access)?
+	if result == .resolved && user_fault { sched.park_for_cgroup() }
+	return result
 }
 
 // x86 keeps the instruction cache coherent with stores.

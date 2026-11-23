@@ -132,14 +132,34 @@ fn (source RangePageSource) give_back_cow(physical voidptr) {
 	memory.pmm_free(physical, 1)
 }
 
+fn (source RangePageSource) matches(current &MmapRangeLocal, file_page u64) bool {
+	return voidptr(current) == source.local_identity && current.global.serial == source.global_serial
+		&& current.generation == source.local_generation && file_page == source.file_page
+		&& current.flags == source.flags
+		&& (current.shared_anonymous() || current.policy == source.policy)
+}
+
 // One call owns exactly one source pin. Keeping the defer out of population
 // loops also keeps thousands of faults from retaining pins until mmap returns.
 fn fill_range_page(mut pagemap memory.Pagemap, _source RangePageSource,
-	virt u64, file_page u64) ? {
+	virt u64, file_page u64) ?PageFault {
 	mut source := _source
 	for _ in 0 .. 8 {
 		if !source.prepare() { source.close(); return none }
 		page := acquire_range_page(source, file_page) or { source.close(); return none }
+		if page == resource.mapping_eof {
+			pagemap.l.acquire()
+			current, _, current_page := addr2range(&pagemap, virt) or {
+				pagemap.l.release()
+				source.close()
+				return none
+			}
+			same := source.matches(current, current_page)
+			pagemap.l.release()
+			source.close()
+			// A replacement at this address needs its own fault.
+			return if same { .beyond_eof } else { .resolved }
+		}
 		install_range_page(mut pagemap, source, virt, file_page, page) or {
 			failure := errno.get()
 			source.close()
@@ -156,7 +176,7 @@ fn fill_range_page(mut pagemap memory.Pagemap, _source RangePageSource,
 			continue
 		}
 		source.close()
-		return
+		return .resolved
 	}
 	source.close()
 	errno.set(errno.eagain)
@@ -176,6 +196,7 @@ fn acquire_range_page(source RangePageSource, file_page u64) ?voidptr {
 	mut res := source.resource
 	mut page := res.mmap(source.handle, file_page, source.flags)
 	if page == unsafe { nil } { return none }
+	if page == resource.mapping_eof { return page }
 	if source.data_begin != 0 || source.data_end < page_size {
 		// ELF edge zero-fill belongs to this segment, not the cached vnode
 		// page or another segment/process mapping the same file page.

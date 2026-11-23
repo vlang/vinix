@@ -3,10 +3,17 @@ module mmap
 import memory
 import proc
 
+pub enum PageFault {
+	resolved
+	beyond_eof
+	protection
+}
+
 // Page in the page holding `addr` from the mapping it belongs to. With
 // `present_is_done`, a page that is mapped by the time the lock is held is left
 // as it is.
-fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool, require_readable bool) ? {
+fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool,
+	require_readable bool, fault_access int) ?PageFault {
 	pagemap.l.acquire()
 
 	mut range_local, memory_page, file_page := addr2range(pagemap, addr) or {
@@ -17,11 +24,15 @@ fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool, require_r
 		pagemap.l.release()
 		return none
 	}
+	if fault_access != 0 && range_local.prot & fault_access == 0 {
+		pagemap.l.release()
+		return .protection
+	}
 
 	if present_is_done {
 		if _ := pagemap.virt2phys(memory_page * page_size) {
 			pagemap.l.release()
-			return
+			return .resolved
 		}
 	}
 	source := range_page_source(range_local, memory_page * page_size)
@@ -29,9 +40,11 @@ fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool, require_r
 	pagemap.l.release()
 	virt := memory_page * page_size
 	read_before := proc.current_disk_read_bytes()
-	fill_range_page(mut pagemap, source, virt, file_page)?
+	result := fill_range_page(mut pagemap, source, virt, file_page)?
+	if result != .resolved { return result }
 	proc.account_page_fault(pagemap, proc.current_disk_read_bytes() != read_before)
 	note_anonymous_fault(pagemap, source.flags)
+	return .resolved
 }
 
 // Anonymous memory that is filled in on demand -- a large mapping, or any
@@ -72,15 +85,15 @@ fn resolve_missing_with_access(_pagemap &memory.Pagemap, address u64, require_re
 	mut pagemap := unsafe { _pagemap }
 	for {
 		exhausted := memory.exhaustions()
-		page_in(mut pagemap, address, true, require_readable) or {
+		result := page_in(mut pagemap, address, true, require_readable, 0) or {
 			if out_of_memory_since(exhausted, false) {
 				continue
 			}
 			return false
 		}
-		break
+		return result == .resolved
 	}
-	return true
+	return false
 }
 
 // Whether what just failed did so for lack of memory -- memory.exhaustions()

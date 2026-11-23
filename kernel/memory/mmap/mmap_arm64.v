@@ -7,7 +7,7 @@ import memory
 import proc
 import sched
 
-pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
+pub fn pf_handler(gpr_state &cpulocal.GPRState) ?PageFault {
 	esr := cpu.read_esr_el1()
 	// ESR_EL1 ISS field for data aborts: bits [5:0] = DFSC
 	// Permission fault: DFSC = 0b0011xx (0x0C-0x0F)
@@ -20,7 +20,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		pm.l.acquire()
 		referenced := pm.reference_file_page_unlocked(address)
 		pm.l.release()
-		if referenced { return }
+		if referenced { return .resolved }
 		return none
 	}
 	if dfsc >= 0x0c && dfsc <= 0x0f {
@@ -45,14 +45,14 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 				mut state := &cpulocal.GPRState(gpr_state)
 				state.pstate &= ~cpu.pstate_pan
 			}
-			return
+			return .resolved
 		}
 		previous_interrupt_state := cpu.interrupt_toggle(true)
 		resolved := wnr != 0 && addr < higher_half && current != unsafe { nil }
 			&& resolve_cow_fault(current.process.pagemap, addr)
 		cpu.interrupt_toggle(previous_interrupt_state)
 		if resolved {
-			return
+			return .resolved
 		}
 		// A protection violation. The caller reports it: as a kernel fault,
 		// or to the process as SIGSEGV. Nothing is printed here, because for
@@ -110,8 +110,14 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// a copy-on-write fault resolved on another CPU. Retrying the access is all
 	// it needs. Paging the range's page in again would map a page still shared
 	// with a fork child writable, behind copy-on-write's back.
-	page_in(mut pagemap, addr, dfsc >= 0x04 && dfsc <= 0x07, false)?
-	if user_fault { sched.park_for_cgroup() }
+	readable := prot_read | prot_write | if memory.execute_only_supported() { 0 } else { prot_exec }
+	// Cache maintenance can set WnR even on a readable page.
+	write_fault := esr & 0x140 == 0x40
+	access := if !user_fault { 0 } else if (esr >> 26) & 0x3f == 0x20 { prot_exec }
+		else if write_fault { prot_write } else { readable }
+	result := page_in(mut pagemap, addr, dfsc >= 0x04 && dfsc <= 0x07, false, access)?
+	if result == .resolved && user_fault { sched.park_for_cgroup() }
+	return result
 }
 
 // One line for each kernel path the audit finds, with the return addresses

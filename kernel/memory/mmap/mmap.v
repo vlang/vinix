@@ -1036,11 +1036,7 @@ fn install_range_page(mut pagemap memory.Pagemap, source RangePageSource, virt u
 	}
 	// Split since, by an mprotect(): the address is still mapped, so the access
 	// is only retried, and faults again against the range as it is now.
-	if voidptr(current) != source.local_identity || current.global.serial != source.global_serial
-		|| current.generation != source.local_generation
-		|| current_file_page != source.file_page || file_page != source.file_page
-		|| current.flags != source.flags
-		|| (!current.shared_anonymous() && current.policy != source.policy) {
+	if !source.matches(current, current_file_page) || file_page != source.file_page {
 		pagemap.l.release()
 		source.give_back(file_page, page)
 		return
