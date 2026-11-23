@@ -752,6 +752,24 @@ are in `~/.local/state/vinix/r14-release-prepared-review-EsOTdN/qualification.ta
 Its SHA-256 is `2c83e59b450a95a4507d1fbbad953f44351060048f15a3766fb738a489aa02e8`.
 All 1,402 entries in the extracted `qualification.sha256` passed.
 
+### Prepared handoff preservation
+
+At `637febd8a`, prepared publication preserves the local release notes
+covered by `--verify-prepared`. The GitHub draft and both recovery records
+carry the attempt marker. The previous driver reproduced a notes mismatch
+immediately after publishing the prepared handoff.
+
+All 97 release fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. The verification report reproduced byte for byte after
+direct publication, a lost draft creation response, draft recovery by tag and
+publication by the original draft ID. The recovery path made one creation
+request and retained the original draft notes through the final readback.
+
+The before and after logs, paired inputs, prepared outputs and recovery records
+are in `~/.local/state/vinix/r14-release-preserve-prepared-gVwFxV/qualification.tar.gz`.
+Its SHA-256 is `8cce71bb9db5d32c9d125aa7897ab542c3700adae5e2090a6a6155a9c838caaf`.
+All 1,505 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
