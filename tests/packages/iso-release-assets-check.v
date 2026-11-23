@@ -249,7 +249,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			return error('expected releases POST with notes')
 		}
 		body := args[12]
-		prerelease := scenario == 'draft-only'
+		prerelease := scenario in ['draft-only', 'publish-prepared']!
 		if args[3..17] != ['--method', 'POST', '-f', 'tag_name=' + tag, '-f',
 			'target_commitish=' + commit, '-f', 'name=Vinix ' + tag, '-F', body, '-F',
 			'draft=true', '-F', 'prerelease=' + prerelease.str()]
@@ -493,6 +493,11 @@ fn run_stub(name string) !int {
 			println('fixture size')
 		}
 		'gh' {
+			if scenario == 'prepared' {
+				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
+				os.write_file(remote + '/unexpected-gh', os.args[1..].join('\n'))!
+				return error('prepared build invoked GitHub')
+			}
 			if os.args[1] == 'auth' {
 				if os.args[2..] != ['status', '--hostname=github.com'] {
 					return error('GitHub auth check did not select GitHub.com')
@@ -594,7 +599,8 @@ fn verify_handoff(out string, with_packages bool, scenario string) ! {
 	uploaded.sort()
 	if uploaded != listed { return error('release handoff bytes differ from the verified assets') }
 	upload_images := os.read_lines(out + '/fixture-upload')!.filter(it.starts_with('/') && it.ends_with('.iso'))
-	if with_packages && os.read_lines(out + '/fixture-receipt-isos')! != upload_images {
+	if with_packages && scenario != 'publish-prepared'
+		&& os.read_lines(out + '/fixture-receipt-isos')! != upload_images {
 		return error('package verifier and uploader used different ISO copies')
 	}
 	if scenario in ['publish-no-test', 'packages-no-test']! {
@@ -608,7 +614,7 @@ fn verify_handoff(out string, with_packages bool, scenario string) ! {
 	if boot_digests != uploaded.filter(it.ends_with('.iso')) {
 		return error('boot test read different ISO bytes from the uploader')
 	}
-	if os.read_lines(out + '/fixture-boot')! != upload_images {
+	if scenario != 'publish-prepared' && os.read_lines(out + '/fixture-boot')! != upload_images {
 		return error('boot test and uploader used different ISO copies')
 	}
 }
@@ -723,6 +729,61 @@ fn check_resume(root string, work string, out string, remote string, environment
 	}
 }
 
+fn check_prepared_release(root string, work string, out string, remote string, environment map[string]string) ! {
+	tag := environment['VINIX_ASSET_TEST_TAG']
+	commit := environment['VINIX_ASSET_TEST_COMMIT']
+	record_path := out + '/.prepared-release.json'
+	record := os.read_file(record_path)!
+	prepared := json2.decode[FixtureCreation](record)!
+	if prepared.id != 0 || prepared.repo != 'local/fixture' || prepared.tag != tag
+		|| prepared.commit != commit || !prepared.prerelease || os.ls(remote)!.len != 0
+		|| prepared.notes != os.read_file(out + '/RELEASE_NOTES.md')!
+		|| prepared.manifest != os.read_file(out + '/SHA256SUMS')!
+		|| !prepared.notes.contains('### Tested before release') {
+		return error('prepared release lost its verified metadata or contacted GitHub')
+	}
+	recovery_attempt(root, work, environment, 'prepared-rebuild', ['--tag=' + tag, '--prepare-only',
+		'--repo=local/fixture'], 'prepared release record already exists')!
+	mut wrong_tag := environment.clone()
+	wrong_tag['VINIX_RELEASE'] = 'fixture-development'
+	recovery_attempt(root, work, wrong_tag, 'prepared-embedded-tag', ['--tag=' + tag + '-other',
+		'--prepare-only', '--repo=local/fixture'], 'prepared builds require VINIX_RELEASE to match the release tag')!
+	args := ['--publish-prepared=' + tag]
+	recovery_attempt(root, work, environment, 'prepared-wrong-repo', [...args, '--repo=local/other'],
+		'belongs to local/fixture')!
+	for note, name in {'prepared-checksums-changed': 'SHA256SUMS',
+		'prepared-notes-changed': 'RELEASE_NOTES.md', 'prepared-asset-changed': 'vinix-amd64.iso'} {
+		file := out + '/' + name
+		contents := os.read_file(file)!
+		os.write_file(file, 'changed prepared output')!
+		diagnostic := match name {
+			'SHA256SUMS' { 'prepared SHA256SUMS changed' }
+			'RELEASE_NOTES.md' { 'prepared release notes changed' }
+			else { 'release asset changed after verification' }
+		}
+		recovery_attempt(root, work, environment, note, args, diagnostic) or {
+			os.write_file(file, contents)!
+			return err
+		}
+		os.write_file(file, contents)!
+	}
+	if os.exists(remote + '/create-tag') || os.exists(remote + '/release-attempt')
+		|| os.exists(out + '/.draft-creation.json') || os.read_file(record_path)! != record {
+		return error('refused publication changed the prepared release')
+	}
+	git(root, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+		'-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null',
+		'commit', '--allow-empty', '-qm', 'Advance HEAD after preparing the release'])!
+	recovery_attempt(root, work, environment, 'publish-prepared', args, '')!
+	verify_handoff(out, true, 'publish-prepared')!
+	published := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	if !published.prerelease || published.draft || !published.body.starts_with(prepared.notes)
+		|| os.read_file(tag_file(remote, tag))! != commit || os.read_file(record_path)! != record
+		|| !os.exists(remote + '/publish-attempt') {
+		return error('publication did not use the prepared release metadata')
+	}
+}
+
 fn run() ! {
 	if os.args.len != 5 { return error('usage: iso-release-assets-check VINIX_REPO NEW_STATE AMD64_MATCH_CASE ARM64_MATCH_CASE') }
 	repository := os.real_path(os.args[1])
@@ -735,7 +796,7 @@ fn run() ! {
 	mut base := os.environ()
 	for symbol in base.keys() {
 		if symbol.starts_with('VINIX_PACKAGE_IMAGE_') || symbol.starts_with('VINIX_IOS_RELEASE_RUNTIME')
-			|| symbol.starts_with('BASH_FUNC_') || symbol == 'BASH_ENV' {
+			|| symbol.starts_with('BASH_FUNC_') || symbol in ['BASH_ENV', 'VINIX_RELEASE']! {
 			base.delete(symbol)
 		}
 	}
@@ -767,10 +828,10 @@ fn run() ! {
 		'public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
 		'bad-build-sidecar', 'boot-copy-changed', 'x11-after-boot', 'ios-pair-after-boot',
 		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff', 'build-only',
-		'publish-no-test', 'packages-no-test']
+		'publish-no-test', 'packages-no-test', 'prepared']
 	for index, scenario in scenarios {
 		with_packages := scenario in ['packages', 'receipt-after-boot', 'output-change-during-upload',
-			'public-iso-during-boot', 'public-iso-during-receipt', 'packages-no-test']!
+			'public-iso-during-boot', 'public-iso-during-receipt', 'packages-no-test', 'prepared']!
 		mut environment := base.clone()
 		if with_packages {
 			for arch, dir in {'X86_64': am, 'AARCH64': arm} {
@@ -782,6 +843,7 @@ fn run() ! {
 		tag := match scenario {
 			'tag-existing' { 'release/fixture-tag+existing' }
 			'create-delayed' { 'release/fixture-create-delayed' }
+			'prepared' { 'release/fixture+prepared' }
 			'tag-auto' { default_tag + '-3' }
 			else { 'fixture-' + scenario }
 		}
@@ -820,6 +882,7 @@ fn run() ! {
 		}
 		if scenario != 'tag-auto' { args << '--tag=' + tag }
 		if scenario == 'draft-only' { args << ['--draft', '--prerelease'] }
+		if scenario == 'prepared' { args << ['--prepare-only', '--prerelease'] }
 		if scenario == 'build-only' { args << ['--arch=amd64', '--no-publish'] }
 		if scenario in ['publish-no-test', 'packages-no-test', 'oversize-no-test']! { args << ['--no-test'] }
 		code, log := command('/bin/bash', args, root, environment)
@@ -853,6 +916,11 @@ fn run() ! {
 					return error('release workspace retry failed\n' + retry_log)
 				}
 			}
+		} else if scenario == 'prepared' {
+			if code != 0 || !log.contains('Saved prepared release ' + tag) {
+				return error('could not prepare a release\n' + log)
+			}
+			check_prepared_release(root, work, out, remote, environment)!
 		} else if scenario in release_list_refusals {
 			after_build := scenario in ['release-appears-before-create', 'release-list-fails-before-create']!
 			diagnostic := if scenario in ['release-list-failed', 'release-list-fails-before-create']! {
@@ -909,6 +977,8 @@ fn run() ! {
 			if expected != os.read_lines(out + '/SHA256SUMS')! {
 				return error('build-only checksums differ from the output assets')
 			}
+			recovery_attempt(root, work, environment, 'prepared-record-required', ['--publish-prepared=' + tag],
+				'cannot read release draft recovery record')!
 		} else {
 			diagnostic := match scenario {
 				'bad-build-sidecar' { 'release bundle checksum differs from its payload' }

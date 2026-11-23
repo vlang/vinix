@@ -641,6 +641,21 @@ It rechecks the tag's commit after upload and publishes that draft by ID.
 `--draft` keeps the verified release as a draft. An upload or verification
 failure leaves the draft available for inspection.
 
+To separate building and publishing, run
+`./scripts/deploy-iso.sh --prepare-only --tag=TAG --repo=OWNER/NAME`.
+The driver runs the selected checks and saves the commit, repository, tag,
+prerelease setting, checksums and notes in
+`build-release/TAG/.prepared-release.json`. The saved destination defaults
+to `vlang/vinix` on GitHub.com. The embedded release tag must match the
+selected tag.
+
+Run `./scripts/deploy-iso.sh --publish-prepared=TAG` from the same checkout.
+The driver verifies the saved metadata and original assets and checks
+the recorded commit and tag on GitHub. It uploads private copies of the
+verified assets and uses the original release notes. Pass `--draft` to
+keep the verified release as a draft. The saved record protects the
+output directory from a second build with that tag.
+
 To resume an interrupted upload, run
 `./scripts/deploy-iso.sh --resume-draft=ID` from the same checkout. Before the
 first upload the driver saves the repository, tag, commit, checksum manifest,

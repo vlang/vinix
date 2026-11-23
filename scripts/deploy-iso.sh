@@ -11,6 +11,8 @@
 #   --prerelease       mark the release as a pre-release
 #   --no-test          do not boot-test the images first
 #   --no-publish       build (and test) only
+#   --prepare-only    build and save a handoff for later publication
+#   --publish-prepared=TAG  verify and publish a saved handoff
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
 #   --resume-create=TAG  recover a draft whose creation response was lost
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
@@ -53,6 +55,8 @@ DRAFT=0
 PRERELEASE=0
 RUN_TESTS=1
 PUBLISH=1
+PREPARE_ONLY=0
+PUBLISH_PREPARED=''
 ASSUME_YES=0
 REPO=''
 PACKAGE_REVIEW=''
@@ -73,6 +77,11 @@ for arg in "$@"; do
         --prerelease) PRERELEASE=1; BUILD_OPTIONS=1 ;;
         --no-test) RUN_TESTS=0; BUILD_OPTIONS=1 ;;
         --no-publish) PUBLISH=0; BUILD_OPTIONS=1 ;;
+        --prepare-only) PREPARE_ONLY=1; PUBLISH=0; BUILD_OPTIONS=1 ;;
+        --publish-prepared=*)
+            PUBLISH_PREPARED="${arg#*=}"
+            [ -n "$PUBLISH_PREPARED" ] || { echo "ERROR: --publish-prepared requires a tag" >&2; exit 1; }
+            ;;
         --resume-draft=*)
             RESUME_DRAFT="${arg#*=}"
             case "$RESUME_DRAFT" in
@@ -139,10 +148,12 @@ file_size() {
 
 need git cc
 cd "$SCRIPT_DIR"
-if [ -n "$RESUME_DRAFT$RESUME_CREATE" ]; then
+if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED" ]; then
     [ -z "$RESUME_DRAFT" ] || [ -z "$RESUME_CREATE" ] ||
         die "choose one of --resume-draft and --resume-create"
-    [ "$BUILD_OPTIONS" -eq 0 ] || die "release recovery accepts --repo, --draft and --yes"
+    [ -z "$PUBLISH_PREPARED" ] || [ -z "$RESUME_DRAFT$RESUME_CREATE" ] ||
+        die "choose either --publish-prepared or a recovery option"
+    [ "$BUILD_OPTIONS" -eq 0 ] || die "prepared publication and recovery accept --repo, --draft and --yes"
 else
     need curl clang ld.lld xorriso rsync mformat mmd mcopy
     COMMIT="$(git rev-parse --verify "$REF^{commit}")" || die "no such commit: $REF"
@@ -177,9 +188,15 @@ build_release_assets() {
         -o "$ASSET_WORK/release-assets" "$SCRIPT_DIR/build-support/isoboot/release-assets.v"
 }
 
-if [ -n "$RESUME_DRAFT$RESUME_CREATE" ]; then
+prerelease=false
+[ "$PRERELEASE" -eq 1 ] && prerelease=true
+if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED" ]; then
     build_release_assets
-    if [ -n "$RESUME_CREATE" ]; then
+    if [ -n "$PUBLISH_PREPARED" ]; then
+        git check-ref-format "refs/tags/$PUBLISH_PREPARED" || die "invalid prepared release tag: $PUBLISH_PREPARED"
+        OUT="$SCRIPT_DIR/build-release/$PUBLISH_PREPARED"
+        recovery="$("$ASSET_WORK/release-assets" restore-prepared "$OUT" "$PUBLISH_PREPARED" "$ASSET_WORK")"
+    elif [ -n "$RESUME_CREATE" ]; then
         git check-ref-format "refs/tags/$RESUME_CREATE" || die "invalid recovery tag: $RESUME_CREATE"
         OUT="$SCRIPT_DIR/build-release/$RESUME_CREATE"
         recovery="$("$ASSET_WORK/release-assets" restore-creation "$OUT" "$RESUME_CREATE" "$ASSET_WORK")"
@@ -205,10 +222,16 @@ if [ "$PUBLISH" -eq 1 ]; then
             *) die "the checkout's repository is on a different host. Pass --repo=OWNER/NAME for GitHub.com." ;;
         esac
     fi
+elif [ "$PREPARE_ONLY" -eq 1 ]; then
+    REPO="${REPO:-vlang/vinix}"
+fi
+if [ "$PUBLISH" -eq 1 ] || [ "$PREPARE_ONLY" -eq 1 ]; then
     if [[ ! "$REPO" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+$ ]] ||
         [ "${REPO#*/}" = . ] || [ "${REPO#*/}" = .. ]; then
         die "expected a GitHub.com repository in OWNER/NAME form"
     fi
+fi
+if [ "$PUBLISH" -eq 1 ]; then
     gh auth status --hostname=github.com >/dev/null 2>&1 ||
         die "gh is not logged in to GitHub.com. Run gh auth login --hostname github.com."
     # A release is created at a commit GitHub already has. Pushing is left to
@@ -340,11 +363,19 @@ check_pending_creation() {
     fi
 }
 
+check_build_output() {
+    local tag="$1" record="$SCRIPT_DIR/build-release/$1/.prepared-release.json"
+    check_pending_creation "$tag"
+    if [ -e "$record" ] || [ -L "$record" ]; then
+        die "prepared release record already exists. Use --publish-prepared=$tag or choose another tag."
+    fi
+}
+
 if [ -n "$TAG" ]; then
-    if [ "$PUBLISH" -eq 1 ]; then
+    if [ "$PUBLISH" -eq 1 ] || [ "$PREPARE_ONLY" -eq 1 ]; then
         git check-ref-format "refs/tags/$TAG" || die "invalid Git tag: $TAG"
     fi
-    check_pending_creation "$TAG"
+    if [ -z "$PUBLISH_PREPARED" ]; then check_build_output "$TAG"; fi
 fi
 if [ "$PUBLISH" -eq 1 ]; then
     refresh_release_tags
@@ -355,6 +386,46 @@ refuse_existing_release() {
         die "release $TAG already exists on $REPO"
     fi
 }
+
+check_tag_commit() {
+    local tag_commit
+    tag_commit="$("$ASSET_WORK/release-tag" resolve "$REPO" "$TAG")"
+    [ -z "$tag_commit" ] || [ "$tag_commit" = "$COMMIT" ] ||
+        die "GitHub tag $TAG points to $tag_commit, expected $COMMIT"
+}
+
+publish_staged_assets() {
+    local candidate_id=''
+    refresh_release_tags
+    refuse_existing_release
+    "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
+    "$ASSET_WORK/release-assets" prepare-creation "$OUT" "$ASSET_WORK" "$REPO" \
+        "$TAG" "$COMMIT" "$prerelease"
+    cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
+    mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
+    echo "  If draft creation is interrupted, retry with --resume-create=$TAG"
+    if ! github_api "$release_api" --method POST -f "tag_name=$TAG" \
+        -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
+        -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"; then
+        echo "Draft creation request failed. Looking for the draft on GitHub." >&2
+        candidate_id="$(find_created_draft)"
+        github_api "$release_api/$candidate_id" > "$ASSET_WORK/created-draft.json"
+    fi
+    finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"
+}
+
+if [ -n "$PUBLISH_PREPARED" ]; then
+    check_pending_creation "$TAG"
+    refuse_existing_release
+    check_tag_commit
+    step "Publishing prepared release $TAG from $SHORT to github.com/$REPO"
+    confirm_publish
+    cmp -s "$ASSET_WORK/SHA256SUMS" "$OUT/SHA256SUMS" || die "prepared SHA256SUMS changed"
+    cmp -s "$ASSET_WORK/RELEASE_NOTES.md" "$OUT/RELEASE_NOTES.md" || die "prepared release notes changed"
+    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
+    publish_staged_assets
+    exit 0
+fi
 
 if [ -z "$TAG" ]; then
     base_tag="iso-$(date +%Y-%m-%d)"
@@ -368,14 +439,15 @@ if [ -z "$TAG" ]; then
         TAG="$base_tag-$n"
         n=$((n + 1))
     done
-    check_pending_creation "$TAG"
+    check_build_output "$TAG"
 elif [ "$PUBLISH" -eq 1 ]; then
     refuse_existing_release
-    tag_commit="$("$ASSET_WORK/release-tag" resolve "$REPO" "$TAG")"
-    [ -z "$tag_commit" ] || [ "$tag_commit" = "$COMMIT" ] ||
-        die "GitHub tag $TAG points to $tag_commit, expected $COMMIT"
+    check_tag_commit
 fi
 
+if [ "$PREPARE_ONLY" -eq 1 ] && [ "${VINIX_RELEASE-$TAG}" != "$TAG" ]; then
+    die "prepared builds require VINIX_RELEASE to match the release tag"
+fi
 OUT="$SCRIPT_DIR/build-release/$TAG"
 mkdir -p "$OUT" "$CACHE"
 
@@ -576,7 +648,7 @@ fi
 ASSET_DIRECTORY="$OUT"
 build_release_assets
 capture=capture-upload
-if [ "$PUBLISH" -eq 0 ]; then
+if [ "$PUBLISH" -eq 0 ] && [ "$PREPARE_ONLY" -eq 0 ]; then
     capture=capture
     "$ASSET_WORK/release-assets" check-upload-sizes "$OUT" "${IMAGES[@]##*/}"
 fi
@@ -585,7 +657,7 @@ if [ "$RUN_TESTS" -eq 1 ] || [ -n "$PACKAGE_WORK" ]; then
     "$ASSET_WORK/release-assets" "$capture" "$OUT" "$ASSET_STAGE" \
         "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}"
     ASSET_DIRECTORY="$ASSET_STAGE"
-elif [ "$PUBLISH" -eq 1 ]; then
+elif [ "$PUBLISH" -eq 1 ] || [ "$PREPARE_ONLY" -eq 1 ]; then
     "$ASSET_WORK/release-assets" check-upload-sizes "$OUT" "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}"
 fi
 
@@ -750,6 +822,12 @@ describe_boot() {
 cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
 mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
 
+if [ "$PREPARE_ONLY" -eq 1 ]; then
+    "$ASSET_WORK/release-assets" save-prepared "$OUT" "$ASSET_WORK" "$REPO" "$TAG" "$COMMIT" "$prerelease"
+    step "Saved prepared release $TAG"
+    echo "Publish these assets with --publish-prepared=$TAG"
+    exit 0
+fi
 if [ "$PUBLISH" -eq 0 ]; then
     step "Done; not publishing (--no-publish)"
     echo "Images and notes are in $OUT"
@@ -781,22 +859,4 @@ else
     step "Preparing verified release copies"
     "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
 fi
-refresh_release_tags
-refuse_existing_release
-"$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
-prerelease=false
-[ "$PRERELEASE" -eq 1 ] && prerelease=true
-"$ASSET_WORK/release-assets" prepare-creation "$OUT" "$ASSET_WORK" "$REPO" \
-    "$TAG" "$COMMIT" "$prerelease"
-cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
-mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
-echo "  If draft creation is interrupted, retry with --resume-create=$TAG"
-candidate_id=''
-if ! github_api "$release_api" --method POST -f "tag_name=$TAG" \
-    -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
-    -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"; then
-    echo "Draft creation request failed. Looking for the draft on GitHub." >&2
-    candidate_id="$(find_created_draft)"
-    github_api "$release_api/$candidate_id" > "$ASSET_WORK/created-draft.json"
-fi
-finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"
+publish_staged_assets

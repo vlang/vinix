@@ -189,21 +189,30 @@ fn creation_path(output string) string {
 	return os.join_path(output, '.draft-creation.json')
 }
 
-fn prepare_creation(output string, directory string, repo string, tag string, commit string, prerelease bool) ! {
-	manifest := pkgcore.read_metadata(os.join_path(directory, 'SHA256SUMS'))!
-	notes_path := os.join_path(directory, 'RELEASE_NOTES.md')
-	original_notes := pkgcore.read_metadata(notes_path)!
-	marker := rand.bytes(16)!.hex()
-	notes := original_notes + '\n<!-- Vinix release attempt: ${marker} ${sha256.hexhash(manifest)} -->\n'
-	os.write_file(notes_path, notes)!
-	pkgcore.atomic_write_new(creation_path(output), json2.encode(DraftRecovery{
+fn release_metadata(directory string, repo string, tag string, commit string, prerelease bool) !DraftRecovery {
+	return DraftRecovery{
 		repo: repo
 		tag: tag
 		commit: commit
 		prerelease: prerelease
-		manifest: manifest
-		notes: notes
-	}) + '\n')!
+		manifest: pkgcore.read_metadata(os.join_path(directory, 'SHA256SUMS'))!
+		notes: pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
+	}
+}
+
+fn save_prepared(output string, directory string, repo string, tag string, commit string, prerelease bool) ! {
+	metadata := release_metadata(directory, repo, tag, commit, prerelease)!
+	pkgcore.atomic_write_new(os.join_path(output, '.prepared-release.json'),
+		json2.encode(metadata) + '\n')!
+}
+
+fn prepare_creation(output string, directory string, repo string, tag string, commit string, prerelease bool) ! {
+	metadata := release_metadata(directory, repo, tag, commit, prerelease)!
+	marker := rand.bytes(16)!.hex()
+	notes := metadata.notes + '\n<!-- Vinix release attempt: ${marker} ${sha256.hexhash(metadata.manifest)} -->\n'
+	os.write_file(os.join_path(directory, 'RELEASE_NOTES.md'), notes)!
+	pkgcore.atomic_write_new(creation_path(output),
+		json2.encode(DraftRecovery{...metadata, notes: notes}) + '\n')!
 }
 
 fn read_recovery(path string) !DraftRecovery {
@@ -254,6 +263,13 @@ fn restore_metadata(recovery DraftRecovery, directory string) ! {
 	os.write_file(os.join_path(directory, 'SHA256SUMS'), recovery.manifest)!
 	os.write_file(os.join_path(directory, 'RELEASE_NOTES.md'), recovery.notes)!
 	println('${recovery.repo}\t${recovery.tag}\t${recovery.commit}\t${recovery.prerelease}')
+}
+
+fn restore_prepared(output string, tag string, directory string) ! {
+	path := os.join_path(output, '.prepared-release.json')
+	metadata := read_recovery(path)!
+	if metadata.id != 0 || metadata.tag != tag { return error('invalid prepared release record: ' + path) }
+	restore_metadata(metadata, directory)!
 }
 
 fn restore_draft(work string, id string, directory string) ! {
@@ -353,6 +369,12 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'stage' {
 		return stage_assets(os.args[2], os.args[3], os.args[4], [], 0)
 	}
+	if os.args.len == 8 && os.args[1] == 'save-prepared' {
+		return save_prepared(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
+	}
+	if os.args.len == 5 && os.args[1] == 'restore-prepared' {
+		return restore_prepared(os.args[2], os.args[3], os.args[4])
+	}
 	if os.args.len == 8 && os.args[1] == 'prepare-creation' {
 		return prepare_creation(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
 	}
@@ -382,7 +404,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
 }
 
 fn main() {
