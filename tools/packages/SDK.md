@@ -741,6 +741,11 @@ sorted order, including `SHA256SUMS`. Inspection verifies the remote tag
 and refuses unexpected assets, digest mismatches, or missing assets on a
 published release. It makes read requests only. Use `--verify-draft=ID`
 to check the local files.
+While `.draft-creation.json` is present, `--inspect-creation=TAG` can find
+the release by tag and produce the same report without adopting it. It
+checks the recorded destination and metadata, requires a unique match, and
+requires a matching saved ID record if the release is published or has
+uploads. After the creation record has been removed, use `--inspect-draft=ID`.
 If a draft ID has yet to be saved, run
 `./scripts/deploy-iso.sh --verify-creation=TAG`. It checks the local assets
 against `.draft-creation.json` and reports the recorded destination, commit,

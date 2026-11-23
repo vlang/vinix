@@ -582,10 +582,14 @@ fn missing_assets(directory string, assets []UploadedAsset) ![]string {
 	return expected.keys()
 }
 
-fn inspect_saved_draft(directory string, response string, id string) !DraftUploadStatus {
+fn inspect_saved_draft(directory string, response string, id string, recorded bool) !DraftUploadStatus {
 	saved := read_recovery(creation_path(directory))!
 	release := read_release(response, id, saved.tag, saved.notes, saved.prerelease)!
 	upload_endpoint(release, saved.repo)!
+	if !recorded {
+		if !release.draft { return error('published GitHub release ${id} has no saved draft recovery record') }
+		if release.assets.len != 0 { return error('new GitHub draft already contains assets') }
+	}
 	mut missing := missing_assets(directory, release.assets)!
 	missing.sort()
 	if !release.draft && missing.len > 0 {
@@ -694,8 +698,9 @@ fn run() ! {
 		println(json2.encode(verify_saved_draft(os.args[2], os.args[3], os.args[4])!))
 		return
 	}
-	if os.args.len == 5 && os.args[1] == 'inspect-draft' {
-		println(json2.encode(inspect_saved_draft(os.args[2], os.args[3], os.args[4])!))
+	if os.args.len in [5, 6]! && os.args[1] == 'inspect-draft' {
+		recorded := os.args.len == 5 || os.args[5] == 'true'
+		println(json2.encode(inspect_saved_draft(os.args[2], os.args[3], os.args[4], recorded)!))
 		return
 	}
 	if os.args.len == 5 && os.args[1] == 'verify-creation' {

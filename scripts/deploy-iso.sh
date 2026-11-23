@@ -20,6 +20,7 @@
 #   --inspect-recovery=TAG  show local recovery records for the tag as JSON
 #   --verify-draft=ID  verify the local assets for a saved draft as JSON
 #   --inspect-draft=ID  compare a GitHub release with its saved record as JSON
+#   --inspect-creation=TAG  inspect the GitHub release for a pending creation record
 #   --verify-creation=TAG  verify the local assets for a pending creation record as JSON
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
@@ -73,6 +74,7 @@ RESUME_CREATE=''
 INSPECT_RECOVERY=''
 VERIFY_DRAFT=''
 INSPECT_DRAFT=''
+INSPECT_CREATION=''
 VERIFY_CREATION=''
 BUILD_OPTIONS=0
 
@@ -127,6 +129,10 @@ for arg in "$@"; do
             case "$INSPECT_DRAFT" in
                 ''|0*|*[!0-9]*) echo "ERROR: --inspect-draft requires a numeric draft ID" >&2; exit 1 ;;
             esac
+            ;;
+        --inspect-creation=*)
+            INSPECT_CREATION="${arg#*=}"
+            [ -n "$INSPECT_CREATION" ] || { echo "ERROR: --inspect-creation requires a tag" >&2; exit 1; }
             ;;
         --verify-creation=*)
             VERIFY_CREATION="${arg#*=}"
@@ -197,7 +203,7 @@ fi
 cd "$SCRIPT_DIR"
 post_build=0
 for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" \
-    "$INSPECT_RECOVERY" "$VERIFY_DRAFT" "$VERIFY_CREATION" "$INSPECT_DRAFT"; do
+    "$INSPECT_RECOVERY" "$VERIFY_DRAFT" "$VERIFY_CREATION" "$INSPECT_DRAFT" "$INSPECT_CREATION"; do
     if [ -n "$action" ]; then
         [ "$post_build" -eq 0 ] || die "choose one verification, publication or recovery action"
         post_build=1
@@ -264,13 +270,17 @@ fi
 
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true
-if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED$VERIFY_DRAFT$INSPECT_DRAFT" ]; then
+if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED$VERIFY_DRAFT$INSPECT_DRAFT$INSPECT_CREATION" ]; then
     build_release_assets
     if [ -n "$PUBLISH_PREPARED" ]; then
         git check-ref-format "refs/tags/$PUBLISH_PREPARED" || die "invalid prepared release tag: $PUBLISH_PREPARED"
         OUT="$SCRIPT_DIR/build-release/$PUBLISH_PREPARED"
         recovery="$("$ASSET_WORK/release-assets" restore-prepared "$OUT" "$PUBLISH_PREPARED" \
             "$ASSET_WORK" "$PREPARED_REVIEW")"
+    elif [ -n "$INSPECT_CREATION" ]; then
+        git check-ref-format "refs/tags/$INSPECT_CREATION" || die "invalid recovery tag: $INSPECT_CREATION"
+        OUT="$SCRIPT_DIR/build-release/$INSPECT_CREATION"
+        recovery="$("$ASSET_WORK/release-assets" restore-creation "$OUT" "$INSPECT_CREATION" "$ASSET_WORK")"
     elif [ -n "$RESUME_CREATE" ]; then
         git check-ref-format "refs/tags/$RESUME_CREATE" || die "invalid recovery tag: $RESUME_CREATE"
         OUT="$SCRIPT_DIR/build-release/$RESUME_CREATE"
@@ -335,13 +345,6 @@ if [ "$PUBLISH" -eq 1 ]; then
     release_api="repos/$REPO/releases"
 fi
 
-if [ -n "$INSPECT_DRAFT" ]; then
-    github_api "$release_api/$INSPECT_DRAFT" > "$ASSET_WORK/inspect-draft.json"
-    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
-    "$ASSET_WORK/release-assets" inspect-draft "$ASSET_WORK" "$ASSET_WORK/inspect-draft.json" "$INSPECT_DRAFT"
-    exit 0
-fi
-
 confirm_publish() {
     if [ "$ASSUME_YES" -ne 1 ]; then
         [ -t 0 ] || die "not a terminal; pass --yes to publish without asking"
@@ -399,11 +402,11 @@ confirm_published_release() {
 }
 
 find_creation_candidate() {
-    local kind="$1" selection='.[]' candidate_id candidate_tag release_id=''
+    local kind="$1" action="${2:---resume-create}" selection='.[]' candidate_id candidate_tag release_id=''
     if [ "$kind" = draft ]; then selection='.[] | select(.draft == true)'; fi
     github_api "$release_api?per_page=100" --paginate \
         --jq "$selection | [.id, .tag_name] | @tsv" > "$ASSET_WORK/release-list" ||
-        die "cannot list GitHub ${kind}s for $TAG. Retry with --resume-create=$TAG"
+        die "cannot list GitHub ${kind}s for $TAG. Retry with $action=$TAG"
     while IFS=$'\t' read -r candidate_id candidate_tag; do
         [ "$candidate_tag" = "$TAG" ] || continue
         case "$candidate_id" in
@@ -412,9 +415,26 @@ find_creation_candidate() {
         [ -z "$release_id" ] || die "multiple GitHub ${kind}s use $TAG"
         release_id="$candidate_id"
     done < "$ASSET_WORK/release-list"
-    [ -n "$release_id" ] || die "no GitHub $kind found for $TAG. Retry with --resume-create=$TAG"
+    [ -n "$release_id" ] || die "no GitHub $kind found for $TAG. Retry with $action=$TAG"
     echo "$release_id"
 }
+
+if [ -n "$INSPECT_DRAFT$INSPECT_CREATION" ]; then
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    candidate_id="$INSPECT_DRAFT"
+    if [ -n "$INSPECT_CREATION" ]; then
+        candidate_id="$(find_creation_candidate release --inspect-creation)"
+    fi
+    github_api "$release_api/$candidate_id" > "$ASSET_WORK/inspect-draft.json"
+    saved_draft=true
+    if [ -n "$INSPECT_CREATION" ]; then
+        saved_draft="$("$ASSET_WORK/release-assets" has-saved-creation-draft \
+            "$WORK" "$OUT" "$ASSET_WORK" "$TAG" "$candidate_id")"
+    fi
+    "$ASSET_WORK/release-assets" inspect-draft "$ASSET_WORK" "$ASSET_WORK/inspect-draft.json" \
+        "$candidate_id" "$saved_draft"
+    exit 0
+fi
 
 finish_creation() {
     local response="$1" candidate_id="$2" release_id

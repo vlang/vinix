@@ -292,11 +292,11 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			return error('expected paginated creation lookup')
 		}
 		println('99900\t${tag}-other')
-		if os.exists(local) && scenario !in ['create-delayed', 'publish-prepared-delayed']! {
+		if os.exists(local) && scenario !in ['create-delayed', 'publish-prepared-delayed', 'inspect-creation-not-visible']! {
 			candidate := json2.decode[FixtureRelease](os.read_file(local)!)!
 			if include_published || candidate.draft {
 				println('${draft_id}\t${tag}')
-				if scenario == 'resume-create-ambiguous' { println('99901\t${tag}') }
+				if scenario in ['resume-create-ambiguous', 'inspect-creation-ambiguous']! { println('99901\t${tag}') }
 			}
 		}
 		return 0
@@ -365,7 +365,8 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			return 1
 		}
 		draft.assets = read_uploaded_assets(os.getenv('VINIX_ASSET_TEST_OUT'), remote + '/uploads',
-			scenario.starts_with('resume-') || scenario.starts_with('inspect-draft'))!
+			scenario.starts_with('resume-') || scenario.starts_with('inspect-draft')
+			|| scenario.starts_with('inspect-creation'))!
 		first := if draft.assets.len > 0 { draft.assets[0] } else { FixtureAsset{} }
 		match scenario {
 			'draft-bad-digest', 'resume-bad-remote', 'resume-create-saved-bad-remote', 'inspect-draft-bad-digest' {
@@ -381,7 +382,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)}
 		}
 		if scenario == 'draft-changed' { draft = FixtureRelease{...draft, tag_name: tag + '-changed'} }
-		if scenario == 'resume-create-unrelated' {
+		if scenario in ['resume-create-unrelated', 'inspect-creation-unrelated']! {
 			println(json2.encode(FixtureRelease{...draft, body: 'unrelated draft notes'}))
 			return 0
 		}
@@ -749,6 +750,19 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 	}
 	if scenario == 'create-delayed' {
 		check_creation_verification(root, work, out, remote, environment, intent)!
+		inspect := ['--inspect-creation=' + tag]
+		recovery_attempt(root, work, environment, 'inspect-creation-not-visible', inspect,
+			'no GitHub release found for ${tag}. Retry with --inspect-creation=${tag}')!
+		recovery_attempt(root, work, environment, 'inspect-creation-ambiguous', inspect,
+			'multiple GitHub releases use')!
+		recovery_attempt(root, work, environment, 'inspect-creation-unrelated', inspect,
+			'GitHub draft metadata changed after creation')!
+		recovery_attempt(root, work, environment, 'inspect-creation-pending', inspect, '')!
+		check_draft_inspection_report(work, remote, 'inspect-creation-pending', id,
+			json2.decode[FixtureCreation](intent)!, 'draft')!
+		if os.exists(recovery_path) || os.read_file(intent_path)! != intent {
+			return error('remote inspection adopted or rewrote the pending draft')
+		}
 		recovery_attempt(root, work, environment, 'resume-create-record-changed', options,
 			'draft creation record changed during publication')!
 		check_changed_creation(out, remote, recovery_path, intent)!
@@ -782,6 +796,8 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 	}
 	if scenario == 'create-delayed' {
 		recovery_attempt(root, work, environment, 'verify-creation-retired', ['--verify-creation=' + tag],
+			'cannot read release draft recovery record')!
+		recovery_attempt(root, work, environment, 'inspect-creation-retired', ['--inspect-creation=' + tag],
 			'cannot read release draft recovery record')!
 	}
 }
@@ -897,6 +913,11 @@ fn check_draft_inspection(root string, work string, remote string, environment m
 	record := os.read_file(path)!
 	saved := json2.decode[FixtureCreation](record)!
 	recovery_attempt(root, work, environment, scenario, ['--inspect-draft=' + id], '')!
+	check_draft_inspection_report(work, remote, scenario, id, saved, state)!
+	if os.read_file(path)! != record { return error('inspection modified the saved draft record') }
+}
+
+fn check_draft_inspection_report(work string, remote string, scenario string, id string, saved FixtureCreation, state string) ! {
 	report := json2.decode[FixtureDraftUploadStatus](os.read_file(work + '/' + scenario + '.log')!)!
 	mut uploaded := os.ls(remote + '/uploads')!
 	uploaded.sort()
@@ -905,7 +926,7 @@ fn check_draft_inspection(root string, work string, remote string, environment m
 	missing := names.sorted().filter(it !in uploaded)
 	if report.draft_id != id || report.repo != saved.repo || report.tag != saved.tag
 		|| report.commit != saved.commit || report.prerelease != saved.prerelease || report.state != state
-		|| report.uploaded != uploaded || report.missing != missing || os.read_file(path)! != record {
+		|| report.uploaded != uploaded || report.missing != missing {
 		return error('inspection did not report the verified remote state: ' + scenario)
 	}
 }
@@ -1010,7 +1031,10 @@ fn check_tag_upload_recovery(root string, work string, out string, remote string
 	expected := os.read_lines(out + '/SHA256SUMS')!.len + 1
 	if before.len == 0 || before.len >= expected { return error('fixture draft is not partially uploaded') }
 	options := ['--resume-create=' + tag, '--draft']
+	inspect := ['--inspect-creation=' + tag]
 	os.rm(record)!
+	recovery_attempt(root, work, environment, 'inspect-creation-unrecorded-upload', inspect,
+		'new GitHub draft already contains assets')!
 	recovery_attempt(root, work, environment, 'resume-create-no-saved-upload', options,
 		'new GitHub draft already contains assets')!
 	if os.exists(record) { return error('unrecorded partial draft gained a recovery record') }
@@ -1021,6 +1045,8 @@ fn check_tag_upload_recovery(root string, work string, out string, remote string
 		'conflicting recovery record for GitHub draft ' + id)!
 	if os.read_file(record)! != conflict { return error('refused recovery rewrote the conflicting ID record') }
 	os.write_file(record, saved)!
+	recovery_attempt(root, work, environment, 'inspect-creation-recorded-upload', inspect, '')!
+	check_draft_inspection_report(work, remote, 'inspect-creation-recorded-upload', id, metadata, 'draft')!
 	recovery_attempt(root, work, environment, 'resume-create-saved-bad-remote', options,
 		'GitHub draft asset differs from the verified upload')!
 	mut after := os.ls(remote + '/uploads')!
@@ -1042,6 +1068,7 @@ fn check_tag_upload_recovery(root string, work string, out string, remote string
 fn check_tag_publication_recovery(root string, work string, out string, remote string, environment map[string]string) ! {
 	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
 	options := ['--resume-create=' + environment['VINIX_ASSET_TEST_TAG']]
+	inspect := ['--inspect-creation=' + environment['VINIX_ASSET_TEST_TAG']]
 	record := root + '/build-release/work/draft-' + id + '.json'
 	saved := os.read_file(record)!
 	intent_path := out + '/.draft-creation.json'
@@ -1061,10 +1088,15 @@ fn check_tag_publication_recovery(root string, work string, out string, remote s
 	recovery_attempt(root, work, environment, 'resume-create-published-with-draft', [...options, '--draft'],
 		'is already published')!
 	os.rm(record)!
+	recovery_attempt(root, work, environment, 'inspect-creation-unrecorded-published', inspect,
+		'has no saved draft recovery record')!
 	recovery_attempt(root, work, environment, 'resume-create-published-without-record', options,
 		'has no saved draft recovery record')!
 	if os.exists(record) { return error('confirmation wrote a missing draft record') }
 	os.write_file(record, saved)!
+	recovery_attempt(root, work, environment, 'inspect-creation-recorded-published', inspect, '')!
+	check_draft_inspection_report(work, remote, 'inspect-creation-recorded-published', id,
+		json2.decode[FixtureCreation](saved)!, 'published')!
 	recovery_attempt(root, work, environment, 'resume-create-published-bad-digest', options,
 		'GitHub draft asset differs from the verified upload')!
 	iso := out + '/vinix-amd64.iso'
