@@ -132,12 +132,39 @@ fn change_gzip(path string, scenario string) ! {
 	}
 }
 
+fn append_case_shadow(archive string, root string, work string, scenario string) ! {
+	publisher := os.ls(root + '/' + repositories)!
+	if publisher.len != 1 { return error('case-shadow fixture requires one signed repository') }
+	repository := repositories + '/' + publisher[0]
+	mut original := repository + '/index.json'
+	mut shadow := repository + '/Index.json'
+	if scenario == 'case-shadow-object' {
+		objects := os.ls(root + '/' + repository + '/objects')!
+		hash := objects.filter(it != it.to_upper())[0] or {
+			return error('case-shadow fixture requires an object digest with letters')
+		}
+		original = repository + '/objects/' + hash
+		shadow = repository + '/objects/' + hash.to_upper()
+	}
+	// A separate source directory keeps the two tar spellings distinct even
+	// when the filesystem used to assemble the fixture folds case.
+	aliases := work + '/aliases'
+	path := aliases + '/' + shadow
+	os.mkdir_all(os.dir(path))!
+	os.cp(root + '/' + original, path)!
+	os.chmod(path, 0o644)!
+	checked(['tar', '-rf', archive, '-C', aliases, './' + shadow])!
+}
+
 fn make_iso(root string, work string, scenario string) !string {
 	tree := work + '/iso'
 	os.mkdir_all(tree + '/boot')!
 	archive := work + '/initramfs.tar'
 	checked(['tar', '--format=ustar', '-cf', archive, '-C', root, '.'])!
 	if scenario == 'duplicate' { checked(['tar', '-rf', archive, '-C', root, config])! }
+	if scenario in ['case-shadow-index', 'case-shadow-object']! {
+		append_case_shadow(archive, root, work, scenario)!
+	}
 	if scenario in ['missing-parent', 'late-parent', 'legacy-file', 'contiguous-file', 'pax-path',
 		'non-ustar-header', 'spaced-size']! { rewrite_archive(archive, scenario)! }
 	if scenario == 'wrong-compression' { checked(['bzip2', '-z', archive])! }
@@ -207,7 +234,7 @@ fn run() ! {
 		'alias', 'duplicate', 'blocked-parent', 'search-only-parent', 'missing-parent', 'late-parent', 'legacy-file',
 		'contiguous-file', 'pax-path', 'non-ustar-header', 'spaced-size', 'wrong-compression', 'nested-compression',
 		'concatenated-gzip-prefix', 'concatenated-gzip-suffix', 'trailing-gzip-bytes', 'bad-gzip-crc',
-		'bad-gzip-size', 'truncated-gzip-trailer']! {
+		'bad-gzip-size', 'truncated-gzip-trailer', 'case-shadow-index', 'case-shadow-object']! {
 		work := out + '/' + scenario
 		root := work + '/root'
 		os.mkdir_all(root)!
@@ -273,6 +300,7 @@ fn run() ! {
 			}
 			'bad-gzip-crc', 'bad-gzip-size' { diagnostic = 'invalid ISO initramfs gzip stream' }
 			'truncated-gzip-trailer' { diagnostic = 'truncated ISO initramfs gzip stream' }
+			'case-shadow-index', 'case-shadow-object' { diagnostic = 'invalid ISO repository member' }
 			else {}
 		}
 		iso := make_iso(root, work, scenario)!

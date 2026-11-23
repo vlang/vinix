@@ -88,6 +88,38 @@ fn archive_path(name string) !string {
 	return '/' + path
 }
 
+enum PackageMemberKind {
+	unrelated
+	directory
+	file
+}
+
+fn package_member_kind(path string) !PackageMemberKind {
+	if path in ['/', '/etc', '/etc/vinix-packages', '/usr', '/usr/share',
+		'/usr/share/vinix-packages', repository_path]! {
+		return .directory
+	}
+	if path in [config_path, declaration_path]! { return .file }
+	if !path.starts_with(repository_path + '/') { return .unrelated }
+	// Check the archive spelling before creating anything on the host. The
+	// scratch filesystem can fold names that Vinix stores as distinct entries.
+	parts := path[repository_path.len + 1..].split('/')
+	if pkgcore.identifier(parts[0]) {
+		match parts.len {
+			1 { return .directory }
+			2 {
+				if parts[1] == 'objects' { return .directory }
+				if parts[1] in ['index.json', 'index.sig']! { return .file }
+			}
+			3 {
+				if parts[1] == 'objects' && pkgcore.digest_valid(parts[2]) { return .file }
+			}
+			else {}
+		}
+	}
+	return error('invalid ISO repository member: ' + path)
+}
+
 fn capture_package_members(archive string, root string, expected Selection) ! {
 	mut reader := tarstream.open_boot_ustar(archive)!
 	defer { reader.close() }
@@ -103,18 +135,16 @@ fn capture_package_members(archive string, root string, expected Selection) ! {
 			return err
 		}
 		path := archive_path(member.name)!
-		parent := path in ['/', '/etc', '/etc/vinix-packages', '/usr', '/usr/share',
-			'/usr/share/vinix-packages', repository_path]!
-		if !parent && path !in [config_path, declaration_path]! && !path.starts_with(repository_path + '/') { continue }
+		kind := package_member_kind(path)!
+		if kind == .unrelated { continue }
 		if path in seen { return error('duplicate ISO package member: ' + path) }
 		directory := os.dir(path)
 		if directory != '/' && !seen[directory] {
 			return error('ISO package directory must precede its members: ' + directory)
 		}
-		is_directory := member.kind == `5`
-		seen[path] = is_directory
-		if parent || (path.starts_with(repository_path + '/') && is_directory) {
-			if !is_directory || member.mode & 0o022 != 0 || (path != '/' && member.mode & 0o555 != 0o555) {
+		seen[path] = kind == .directory
+		if kind == .directory {
+			if member.kind != `5` || member.mode & 0o022 != 0 || (path != '/' && member.mode & 0o555 != 0o555) {
 				return error('invalid ISO package directory: ' + path)
 			}
 			if path != '/' { os.mkdir(root + path, mode: 0o755)! }
