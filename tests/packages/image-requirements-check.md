@@ -367,6 +367,29 @@ are in `~/.local/state/vinix/r14-release-receipt-capture-uonSbh/qualification.ta
 Its SHA-256 is `82b815920dbd0edc6a22cf0367549dd6a3bc14e0de59774b2e613593e013ced3`.
 All 1,366 entries in the extracted `qualification.sha256` passed.
 
+### Shared release workspace lock
+
+At `344350575`, the driver takes an exclusive directory lock on
+`build-release/work` before tag selection, source checkout or tag output
+creation. The driver retains the lock through the upload or build-only exit.
+
+All 16 release-driver fixtures passed using local build, boot and GitHub stubs.
+The prior driver at `428a55e54` let a competing release reuse the source
+worktree and finish writing its checksums while the first run was still
+preparing dependencies. The updated driver refused contenders at dependency
+preparation and upload, before either contender created its tag output. A
+retry after the first release finished produced its checksums.
+
+On the HFS+ test volume, ASan/UBSan checks confirmed exclusion on one
+directory, independent locks on separate workspaces, successful unlock and
+refusal when the descriptor was missing. An APFS check confirmed that another
+process could acquire the lock after the only holder was killed.
+
+The fixtures, baseline and updated run logs, and source revisions are in
+`~/.local/state/vinix/r14-release-workspace-lock-tMtPt9/qualification.tar.gz`.
+Its SHA-256 is `bb089a99d910cabff72d37fbf0fb261ee065d46416e1df3569d934d3accf0698`.
+All 291 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
