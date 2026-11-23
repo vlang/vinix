@@ -5,9 +5,24 @@ module userland
 // What exec does the same on both architectures.
 
 import errno
+import fs
 import kbudget
 import proc
 import resource
+
+struct ExecImage {
+mut:
+	target fs.PathTarget
+	access resource.TextAccess
+}
+
+fn (mut image ExecImage) release() {
+	failure := errno.get()
+	image.access.release()
+	fs.release_path_target(image.target)
+	image.target = fs.PathTarget{}
+	errno.set(failure)
+}
 
 // Free an owned string through a synchronous stack header. Taking an
 // implicit mutable receiver can move the caller's header to the heap under

@@ -633,6 +633,9 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool, pid int) ? {
 				C.kprintf(c'exec[gpu]/vm: ERROR unmapping old range %llu\n', u64(range_index))
 			}
 			pagemap.l.release()
+			failure := errno.get()
+			release_executable(mut pagemap)
+			errno.set(failure)
 			return none
 		}
 		if pagemap.mmap_ranges.len >= old_len {
@@ -641,6 +644,7 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool, pid int) ? {
 					u64(range_index))
 			}
 			pagemap.l.release()
+			release_executable(mut pagemap)
 			errno.set(errno.einval)
 			return none
 		}
@@ -667,6 +671,8 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool, pid int) ? {
 		println('exec[gpu]/vm: old top-level table freed; freeing page-map object')
 	}
 	charge := pagemap.kernel_charge
+	// Release the embedded executable token before freeing its storage.
+	release_executable(mut pagemap)
 	unsafe { free(pagemap) }
 	kbudget.release(charge)
 	if trace {
@@ -862,6 +868,9 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 
 	}
 
+	if old_pagemap.executable != unsafe { nil } {
+		retain_executable(mut new_pagemap, old_pagemap.executable, old_pagemap.executable_node)?
+	}
 	completed = true
 	return new_pagemap
 }

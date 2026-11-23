@@ -82,7 +82,12 @@ fn pinned(node &VFSNode) bool {
 		|| node.mountpoint != unsafe { nil }
 }
 
-// Called with a handle's node as the handle is freed.
+fn retain_handle_node(node voidptr) {
+	mut n := unsafe { &VFSNode(node) }
+	katomic.inc(mut &n.handles)
+}
+
+// Called when a handle or executable mapping drops its node.
 fn release_handle_node(node voidptr) {
 	mut n := unsafe { &VFSNode(node) }
 	if !katomic.dec(mut &n.handles) && n.orphan {

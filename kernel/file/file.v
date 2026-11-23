@@ -104,6 +104,7 @@ pub mut:
 	mount         lib.MountContext
 	// One writer pin belongs to this shared open description, not each FD.
 	mount_writer  voidptr
+	text_writer   resource.TextAccess
 	// One actual-attachment pin for this description's entire retained lifetime.
 	// Dup/fork, in-flight lookups, mappings and queued rights share the pin.
 	mount_description voidptr
@@ -165,6 +166,7 @@ fn (mut this Handle) unref() {
 
 	kbudget.release(this.kernel_charge)
 	release_description_locks(this, false)
+	this.text_writer.release()
 	mut res := this.resource
 	res.unref(voidptr(this)) or {}
  if this.origin_resource != unsafe { nil } {
@@ -1041,6 +1043,16 @@ fn fd_create_adopting_resource(mut res resource.Resource, flags int) ?&FD {
 	new_handle.resource = unsafe { res }
 	new_handle.refcount = 1
 	new_handle.flags = flags & resource.file_status_flags_mask
+	access := flags & resource.o_accmode
+	if stat.isreg(res.stat.mode) && (access == resource.o_wronly || access == resource.o_rdwr) {
+		new_handle.text_writer.acquire(new_handle.resource, false) or {
+			failure := errno.get()
+			kbudget.release(fd_charge)
+			new_handle.unref()
+			errno.set(failure)
+			return none
+		}
+	}
 
 	mut new_fd := &FD{kernel_charge: fd_charge}
 	new_fd.handle = new_handle

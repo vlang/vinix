@@ -2679,6 +2679,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and persistence after remount on both native architectures. See
   [the set-ID write receipts](docs/linux-setid-write.md).
 
+- [x] Implement native `ETXTBSY` between executable images and writable
+  descriptions or truncations. Qualify descriptor and mapping lifetimes,
+  replacement, fork and ext2 hard links after remount on both architectures.
+  See [the executable write-exclusion receipts](docs/linux-etxtbsy.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -6,6 +6,7 @@ import resource
 import stat
 import katomic
 import klock
+import memory.mmap
 import proc
 import file
 import drm
@@ -164,6 +165,7 @@ pub fn add_filesystem(filesystem &FileSystem, identifier string) {
 pub fn initialise() {
 	vfs_root = create_node(&TmpFS(unsafe { nil }), &VFSNode(unsafe { nil }), '', false)
 	file.on_handle_released(release_handle_node)
+	mmap.on_executable_node(retain_handle_node, release_handle_node)
 	proc.on_directory_released(directory_releasing)
 	file.on_mount_flags(raw_mount_flags)
 	file.on_mount_writer_released(release_mount_writer)
@@ -1362,11 +1364,42 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 		retain_mount_writer(open_mount) or { return errno.err, errno.get() }
 	} else { unsafe { nil } }
 	defer { release_mount_writer(write_mount) }
+	// Copy-up and O_TRUNC can mutate before the open description exists.
+	// Keep a write claim on the original inode through either operation.
+	mut before := unsafe { &resource.TextAccess(C.vinix_stack_alloc(sizeof(resource.TextAccess))) }
+	unsafe { *before = resource.TextAccess{} }
+	mut original := &resource.Resource(unsafe { nil })
+	defer {
+		if original != unsafe { nil } {
+			before.release()
+			resource.release_resource(mut original)
+		}
+	}
+	if flags & resource.o_path == 0 && stat.isreg(node.resource.stat.mode)
+		&& (flags & resource.o_trunc != 0 || (node.overlay != unsafe { nil } && flags & 3 != 0)) {
+		original = node.resource
+		resource.retain_resource(mut original)
+		before.acquire(original, false) or { return errno.err, errno.get() }
+	}
 	// A file on an overlay opened to be written is copied up first, so the
 	// writes land in the upper layer.
 	if node.overlay != unsafe { nil } && stat.isreg(node.resource.stat.mode)
 		&& flags & resource.o_path == 0 && ((flags & 3) != 0 || flags & resource.o_trunc != 0) {
 		overlay_copy_up(node) or { return errno.err, errno.get() }
+	}
+	mut upper := unsafe { &resource.TextAccess(C.vinix_stack_alloc(sizeof(resource.TextAccess))) }
+	unsafe { *upper = resource.TextAccess{} }
+	mut upper_resource := &resource.Resource(unsafe { nil })
+	defer {
+		if upper_resource != unsafe { nil } {
+			upper.release()
+			resource.release_resource(mut upper_resource)
+		}
+	}
+	if original != unsafe { nil } && node.resource != original {
+		upper_resource = node.resource
+		resource.retain_resource(mut upper_resource)
+		upper.acquire(upper_resource, false) or { return errno.err, errno.get() }
 	}
 	if flags & resource.o_trunc != 0 && stat.isreg(node.resource.stat.mode) {
 		mut res := node.resource
@@ -2750,7 +2783,22 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	mut res := node.resource
 
 	check_access(node, access_write, true) or { return errno.err, errno.get() }
+	mut original := unsafe { &resource.TextAccess(C.vinix_stack_alloc(sizeof(resource.TextAccess))) }
+	unsafe { *original = resource.TextAccess{} }
+	original.acquire(held.res, false) or { return errno.err, errno.get() }
+	defer { original.release() }
 	res = resource_to_change(node) or { return errno.err, errno.get() }
+	mut upper := unsafe { &resource.TextAccess(C.vinix_stack_alloc(sizeof(resource.TextAccess))) }
+	unsafe { *upper = resource.TextAccess{} }
+	changed := res != held.res
+	if changed { resource.retain_resource(mut res) }
+	defer {
+		if changed {
+			upper.release()
+			resource.release_resource(mut res)
+		}
+	}
+	if changed { upper.acquire(res, false) or { return errno.err, errno.get() } }
 
 	res.grow(unsafe { nil }, u64(length)) or { return errno.err, errno.get() }
 

@@ -53,18 +53,28 @@ pub fn check_access(node &VFSNode, requested u32, effective bool) ? {
 		errno.set(errno.eacces)
 		return none
 	}
+	check_access_on_resource(node, node.resource, requested, effective)?
+}
+
+// An executable loader holds a snapshot of the file, even if an overlay
+// lookup now reaches a different backing inode.
+pub fn check_exec_access(target PathTarget) ? {
+	check_access_on_resource(target.node, target.res, access_exec, true)?
+}
+
+fn check_access_on_resource(node &VFSNode, target &resource.Resource, requested u32, effective bool) ? {
 	if requested == 0 { return }
 	mut mandatory := u32(0)
 	if requested & access_read != 0 { mandatory |= proc.mac_read }
 	if requested & access_write != 0 { mandatory |= proc.mac_write }
 	if requested & access_exec != 0 {
-		mandatory |= if stat.isdir(node.resource.stat.mode) { proc.mac_search } else { proc.mac_execute }
+		mandatory |= if stat.isdir(target.stat.mode) { proc.mac_search } else { proc.mac_execute }
 	}
 	mac_node(node, mandatory)?
 	process := proc.current_thread().process
 	uid := if effective { process.fsuid } else { process.uid }
 	gid := if effective { process.fsgid } else { process.gid }
-	mut res := unsafe { node.resource }
+	mut res := unsafe { target }
 	mut acl := []u8{} @[freed]
 	acl.flags |= .noslices
 	defer { unsafe { acl.free() } }

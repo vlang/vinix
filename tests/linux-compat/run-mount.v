@@ -26,9 +26,9 @@ fn main() {
   hosttest.Option{name: '--kernel-dir', value: true},
   hosttest.Option{name: '--state-dir', value: true},
   hosttest.Option{name: '--timeout', value: true},
-  hosttest.Option{name: '--case', value: true, choices: ['mount', 'setid']},
+  hosttest.Option{name: '--case', value: true, choices: ['mount', 'setid', 'textbusy']},
   hosttest.Option{name: '--journal'},
- ], [], 'Usage: run-mount.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case mount|setid] [--journal] [--timeout SECONDS]')!
+ ], [], 'Usage: run-mount.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case mount|setid|textbusy] [--journal] [--timeout SECONDS]')!
  for key in ['--arch', '--kernel-dir', '--state-dir'] {
   if !options.has(key) { eprintln('missing ' + key); exit(2) }
  }
@@ -97,6 +97,7 @@ fn run_guest(state string, arch string, name string, source string, disk string,
   markers << ['LINUX SETID TMPFS: 30 privileged and 30 unprivileged operations passed',
    'LINUX SETID DISK: 30 privileged and 30 unprivileged operations and remount passed']
  }
+ if name == 'textbusy' { markers << 'LINUX TEXTBUSY DISK: persisted hardlink checks passed' }
  positive, negative := guesthost.verdict_policy(markers, [label + ' FAIL'], false)
  return guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 }

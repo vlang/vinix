@@ -225,6 +225,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	proc.preserve_peak_rss(current_process, old_pagemap)
 	proc.forget_cgroup_memory_locked(mut current_process)
 	current_process.pagemap = unsafe { nil }
+	proc.set_executable_fs(mut current_process, unsafe { nil }, unsafe { nil })
 	proc.unlock_table()
 
 	for i := 0; i < current_process.fds.len; i++ {

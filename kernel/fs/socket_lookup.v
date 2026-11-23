@@ -39,7 +39,8 @@ pub fn resolve_socket_target(parent &VFSNode, path string) ?&resource.Resource {
 
 // Path metadata operations can now enter a socket's slow backing callbacks.
 // Hold both identities through backend errors and notification, like an FD.
-struct PathTarget {
+pub struct PathTarget {
+pub:
 	node &VFSNode = unsafe { nil }
 	res &resource.Resource = unsafe { nil }
 }
@@ -48,26 +49,36 @@ fn retain_path_target(parent &VFSNode, path string, follow bool) ?PathTarget {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
 	mut node := get_node(parent, path, follow)?
-	katomic.inc(mut &node.handles)
-	mut res := node.resource
-	resource.retain_resource(mut res)
-	return PathTarget{node, res}
+	return pin_path_target(node, node.resource)
 }
 
 // The caller supplies a saved starting route and receives the resolved one.
 // Keep the existing node/resource pins without extending PathTarget's layout.
-fn retain_path_target_on_mount(parent &VFSNode, path string, follow bool,
+pub fn retain_path_target_on_mount(parent &VFSNode, path string, follow bool,
 	identity &lib.MountContext) ?PathTarget {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
 	mut node := get_node_on_mount(parent, path, follow, identity)?
+	return pin_path_target(node, node.resource)
+}
+
+pub fn retain_path_target_and_mount(parent &VFSNode, path string, identity &lib.MountContext) ?PathTarget {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	node := get_node_and_mount(parent, path, true, identity)?
+	return pin_path_target(node, node.resource)
+}
+
+// The caller holds the namespace lock or an open description naming node.
+pub fn pin_path_target(_node &VFSNode, _res &resource.Resource) PathTarget {
+	mut node := unsafe { _node }
 	katomic.inc(mut &node.handles)
-	mut res := node.resource
+	mut res := unsafe { _res }
 	resource.retain_resource(mut res)
 	return PathTarget{node, res}
 }
 
-fn release_path_target(target PathTarget) {
+pub fn release_path_target(target PathTarget) {
 	if target.node == unsafe { nil } { return }
 	mut res := target.res
 	resource.release_resource(mut res)

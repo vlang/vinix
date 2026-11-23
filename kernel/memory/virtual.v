@@ -7,6 +7,7 @@ import limine
 import klock
 import event.eventstruct
 import katomic
+import resource
 
 fn C.text_start()
 
@@ -138,6 +139,10 @@ pub mut:
 	// Process owners, including non-thread CLONE_VM children. Inspection pins
 	// are separate: only the final process release may destroy this map.
 	owners      u64 = 1
+	// The main executable's write denial belongs to the shared address space.
+	executable &resource.Resource = unsafe { nil }
+	executable_access resource.TextAccess
+	executable_node voidptr
 	// The program break belongs to the address space, not a process sharing it.
 	mapping_busy    bool
 	mapping_changed eventstruct.Event
