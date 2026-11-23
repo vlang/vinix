@@ -259,3 +259,29 @@ portal:
   writes to `/dev/com1`, which is not one. The guest's marker files still prove
   each step.
 - The runs are unsealed, so there is no qualification receipt to admit.
+
+## Isolated payload serial relay
+
+At `14e7ca67e`, the guest captures each ordinary package session's stdout and
+stderr in a private root-owned file. PID 1 relays the bounded output after
+the session is reaped, preserving the payload's actual lines and the seat
+permission checks. C generation writes `generate.log` and target linking
+writes `build.log`, so the existing link-input verifier receives a clean trace.
+
+The basic, lifecycle and seat scenarios passed on both architectures with
+the retained `7c10afe81` kernels and QEMU 11.1.3. All six runs initiated their
+own shutdown. The exact ordered serial checker passed on the raw logs,
+including the payload identity and direct-device refusal markers. The 37
+diagnostic host controls passed, including five altered serial refusals.
+All 14 hardware harness host test files passed.
+
+Run `audio-portal-retain --diagnostic-serial basic SERIAL_LOG` to reproduce the
+serial check. Substitute `lifecycle` or `seat` for the other scenarios. The
+full qualification still requires sealed kernel evidence and finalized audio
+recordings. All six recordings have unset RIFF lengths. The strict raw basic
+diagnostic reached waveform admission and refused the unfinished recording.
+
+The raw scenario outputs, checks and selected source, kernel and tool digests
+are in `~/.local/state/vinix/r14-audio-serial-rB8qLx/qualification.tar.gz`.
+Its SHA-256 is `22be99a5cf96f64f3ca06e1b801d4d20dbaab21a3cc98d9ac782cf1e8c1fa0d2`.
+The extracted tree passed every entry in its `qualification.sha256` manifest.
