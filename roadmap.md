@@ -2799,6 +2799,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   exec, and nodemask validation on both architectures.
   See [the task policy receipts](docs/linux-task-mempolicy.md).
 
+- [x] Support native `MPOL_PREFERRED_MANY` in thread and private anonymous
+  range policies. Qualify placement on two preferred nodes and fallback
+  under pressure on both architectures.
+  See [the preferred-many receipts](docs/linux-preferred-many.md).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

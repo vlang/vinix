@@ -14,9 +14,10 @@ and an empty preferred mask selects `MPOL_LOCAL`.
 
 The native mask import uses `maxnode - 1` bits and distinguishes a bad
 pointer from an invalid mask. Failed requests leave the caller's policy
-intact. The qualified scope covers the five classic modes. Exact shared
-anonymous interleave phase, extended mode flags, and Linux's interleave
-query through `MPOL_F_NODE` without `MPOL_F_ADDR` remain open.
+intact. This qualification covers the five classic modes. Preferred-many
+policy has [separate placement and fallback coverage](linux-preferred-many.md).
+Exact shared anonymous interleave phase, extended mode flags, and Linux's
+interleave query through `MPOL_F_NODE` without `MPOL_F_ADDR` remain open.
 
 ## Qualification
 

@@ -225,6 +225,11 @@ fn discharge_node_page(page u64) {
 // Scan the ranges of one node only. Resumes from the node's hint and wraps
 // once within each range, which is what the global scan does across the bitmap.
 fn alloc_within_node(count u64, node int) voidptr {
+	used := pmm_node_used[node]
+	total := pmm_node_total[node]
+	if used >= total || count > total - used {
+		return unsafe { nil }
+	}
 	for i := 0; i < pmm_node_range_count; i++ {
 		if pmm_node_range_node[i] != node {
 			continue
@@ -313,9 +318,18 @@ pub fn pmm_alloc_nozero_on_node(count u64, node int, strict bool) voidptr {
 }
 
 pub fn pmm_alloc_on_node(count u64, node int, strict bool) voidptr {
-	ret := pmm_alloc_nozero_on_node(count, node, strict)
+	return zero_node_pages(pmm_alloc_nozero_on_node(count, node, strict), count)
+}
+
+// Try the requested node once, with no reclaim or fallback.
+pub fn pmm_try_alloc_on_node(count u64, node int, zero bool) voidptr {
+	ret := try_alloc_on_node_nozero(count, node, true)
+	return if zero { zero_node_pages(ret, count) } else { ret }
+}
+
+fn zero_node_pages(ret voidptr, count u64) voidptr {
 	if ret == unsafe { nil } {
-		return unsafe { nil }
+		return ret
 	}
 	// Pages are always handed out zeroed, for the same reason as pmm_alloc.
 	word_count := (count * page_size) / 8

@@ -61,7 +61,8 @@ pub const mpol_preferred = 1
 pub const mpol_bind = 2
 pub const mpol_interleave = 3
 pub const mpol_local = 4
-pub const mpol_max = 5
+pub const mpol_preferred_many = 5
+pub const mpol_max = 6
 
 // get_mempolicy(2) flags.
 pub const mpol_f_node = 1

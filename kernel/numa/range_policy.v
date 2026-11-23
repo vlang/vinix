@@ -69,20 +69,10 @@ pub fn alloc_range_page(range_policy proc.NumaPolicy, index u64, zero bool) void
 	if !memory.user_room(1) { return unsafe { nil } }
 	home := current_node()
 	match policy.mode {
-		mpol_bind {
-			mut remaining := policy.mask
-			for remaining != 0 {
-				mut nearest := first_node_in(remaining)
-				for node in 0 .. node_count() {
-					if remaining & (u64(1) << node) != 0 && distance(home, node) < distance(home, nearest) {
-						nearest = node
-					}
-				}
-				page := alloc_policy_node(nearest, true, zero)
-				if page != unsafe { nil } { return page }
-				remaining &= ~(u64(1) << nearest)
-			}
-			return unsafe { nil }
+		mpol_bind, mpol_preferred_many {
+			strict := policy.mode == mpol_bind
+			page := alloc_from_policy_mask(home, policy.mask, strict, zero)
+			if strict || page != unsafe { nil } { return page }
 		}
 		mpol_interleave {
 			mut count := u64(0)
@@ -102,6 +92,28 @@ pub fn alloc_range_page(range_policy proc.NumaPolicy, index u64, zero bool) void
 		else {}
 	}
 	return alloc_policy_node(home, false, zero)
+}
+
+fn alloc_from_policy_mask(home int, mask u64, strict bool, zero bool) voidptr {
+	mut remaining := mask
+	for remaining != 0 {
+		mut nearest := first_node_in(remaining)
+		for node in 0 .. node_count() {
+			if remaining & (u64(1) << node) != 0 && distance(home, node) < distance(home, nearest) {
+				nearest = node
+			}
+		}
+		// Preferred-many tries only immediately available memory in its mask.
+		// The unrestricted second pass can use normal allocator reclaim.
+		page := if strict {
+			alloc_policy_node(nearest, true, zero)
+		} else {
+			memory.pmm_try_alloc_on_node(1, nearest, zero)
+		}
+		if page != unsafe { nil } { return page }
+		remaining &= ~(u64(1) << nearest)
+	}
+	return unsafe { nil }
 }
 
 fn alloc_policy_node(node int, strict bool, zero bool) voidptr {

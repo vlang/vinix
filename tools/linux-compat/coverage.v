@@ -219,6 +219,7 @@ fn coverage(root string) !Coverage {
 		'kernel/syscall/table/move_pages.v', 'kernel/memory/mmap/page_location.v',
 		'kernel/syscall/table/mempolicy.v', 'kernel/numa/numa.v',
 		'kernel/memory/mmap/mempolicy.v', 'kernel/numa/range_policy.v',
+		'kernel/memory/physical_numa.v',
 		'kernel/memory/mmap/page_in.v', 'kernel/memory/mmap/mmap_amd64.v',
 		'kernel/memory/mmap/page_source.v',
 		'kernel/file/file.v', 'kernel/resource/resource.v', 'kernel/resource/cache.v',
