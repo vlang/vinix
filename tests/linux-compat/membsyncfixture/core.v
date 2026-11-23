@@ -43,6 +43,7 @@ fn C.strcmp(&char, &char) i32
 
 const sync_core = u64(1 << 5)
 const register_sync_core = u64(1 << 6)
+const get_registrations = u64(1 << 9)
 const high_word = u64(0x7fffa5a5) << 32
 const iterations = 200
 
@@ -165,18 +166,22 @@ fn check_registration_lifetime() {
 		pid := C.fork()
 		need(pid >= 0, c'fork registered process')
 		if pid == 0 {
-			need(barrier(sync_core, 0) == 0, c'fork inherits registration')
+			need(barrier(get_registrations, 0) == i64(all_registrations)
+				&& barrier(sync_core, 0) == 0 && barrier(private_expedited, 0) == 0,
+				c'fork inherits all registrations')
 			args := [&char(c'membsync'), &char(c'--exec-check'), &char(nil)]!
 			env := [&char(nil)]!
 			need(C.execve(c'/tmp/no-membsync-image', &args[0], &env[0]) == -1
-				&& *C.__errno_location() == C.ENOENT && barrier(sync_core, 0) == 0,
+				&& *C.__errno_location() == C.ENOENT
+				&& barrier(get_registrations, 0) == i64(all_registrations) && barrier(sync_core, 0) == 0,
 				c'failed exec retains registration')
 			C.execve(c'/proc/self/exe', &args[0], &env[0])
 			need(false, c'exec probe image')
 		}
 		mut status := i32(-1)
 		need(C.waitpid(pid, &status, 0) == pid && status == 0, c'exec starts with a fresh registration')
-		need(barrier(sync_core, 0) == 0, c'parent registration survives child exit')
+		need(barrier(get_registrations, 0) == i64(all_registrations) && barrier(sync_core, 0) == 0,
+			c'parent registration survives child exit')
 	}
 }
 
@@ -184,20 +189,38 @@ fn check_registration_lifetime() {
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
 		if argc > 1 && C.strcmp(argv[1], c'--exec-check') == 0 {
-			need(barrier(sync_core, 0) == -C.EPERM, c'successful exec restores unregistered state')
+			need(barrier(get_registrations, 0) == 0 && barrier(sync_core, 0) == -C.EPERM
+				&& barrier(private_expedited, 0) == -C.EPERM,
+				c'successful exec restores unregistered state')
 			return 0
 		}
 		reference := argc > 1 && C.strcmp(argv[1], c'--reference') == 0
 		C.syscall(isize(C.SYS_mount), c'proc', c'/proc', c'proc', 0, nil)
 		supported := barrier(0, 0)
-		need(supported >= 0 && (u64(supported) & (sync_core | register_sync_core)) == (sync_core | register_sync_core),
-			c'query advertises sync-core and registration')
+		required := global_barrier | global_expedited | private_expedited | sync_core | all_registrations | get_registrations
+		need(supported >= 0 && u64(supported) & required == required,
+			c'query advertises memory and instruction barriers and registration')
 		need(barrier(high_word, high_word) == supported, c'Linux narrows command and flags to 32 bits')
 		need(barrier(0, 1) == -C.EINVAL && barrier(sync_core, 1) == -C.EINVAL, c'reject unsupported flags')
 		need(barrier(high_word | sync_core, 0) == -C.EPERM, c'invocation requires registration')
+		need(barrier(get_registrations, 1) == -C.EINVAL && barrier(global_barrier | private_expedited, 0) == -C.EINVAL,
+			c'reject nonzero query flags and combined commands')
+		need(barrier(get_registrations, 0) == 0, c'initial address space has no registrations')
+		memory_order(global_barrier)
+		memory_order(global_expedited)
+		need(barrier(get_registrations, 0) == 0, c'global callers need no registration')
 		need(barrier(high_word | register_sync_core, 0) == 0 && barrier(register_sync_core, 0) == 0,
 			c'register narrowed command and repeat registration')
 		need(barrier(sync_core, 0) == 0, c'synchronize the calling CPU')
+		need(barrier(get_registrations, 0) == i64(register_private | register_sync_core)
+			&& barrier(private_expedited, 0) == -C.EPERM,
+			c'sync-core contributes the private query bit but leaves plain private inactive')
+		need(barrier(high_word | register_private, 0) == 0, c'register private expedited')
+		memory_order(private_expedited)
+		need(barrier(register_global, 0) == 0 && barrier(register_global, 0) == 0
+			&& barrier(get_registrations, 0) == i64(all_registrations),
+			c'query all registrations after repeated registration')
+		C.printf(c'LINUX MEMBSYNC MEMORY: commands=3 rounds=%d\n', memory_rounds)
 		check_registration_lifetime()
 		exercise_cores()
 		C.puts(if reference { c'LINUX MEMBSYNC REFERENCE: PASS' } else { c'LINUX MEMBSYNC: PASS' })

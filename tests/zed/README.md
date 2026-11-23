@@ -15,11 +15,10 @@ therefore does not supply this tested runtime. First boot recognizes
 The launcher sets a same-size 60 Hz RandR mode because Xvfb's default mode has
 zero timing fields, which this Zed release divides by. Its WebAssembly engine
 also requires `MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE`. Vinix implements
-that command with an acknowledged GICv3 SGI rendezvous on ARM64. Each CPU
-executes DSB/ISB before acknowledging. Registration belongs to the shared page
-map; unregistered callers receive EPERM, and unsupported platforms advertise
-zero through QUERY. The Apple AIC and x86 paths remain unsupported for this
-particular command.
+that command on ARM64 with GICv3 and on x86-64. Each CPU serializes its
+instruction stream before acknowledging. Registration belongs to the shared
+page map. Unregistered callers receive `EPERM`. The Apple AIC path omits the
+sync-core bits from `QUERY`. [Instruction synchronization qualification](../../docs/linux-membarrier-sync-core.md)
 
 Use an ARM64 macOS host with V, LLVM, QEMU, mtools and the existing native
 `build-aarch64-userland/staging`, `build-aarch64-x11/staging`, Limine and UEFI

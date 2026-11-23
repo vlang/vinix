@@ -693,7 +693,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 	new_pagemap.l.acquire()
 	new_pagemap.brk_base = old_pagemap.brk_base
 	new_pagemap.brk_current = old_pagemap.brk_current
-	new_pagemap.membarrier_sync_core_registered = katomic.load(&old_pagemap.membarrier_sync_core_registered)
+	new_pagemap.membarrier_registrations = katomic.load(&old_pagemap.membarrier_registrations)
 	defer {
 		new_pagemap.l.release()
 		old_pagemap.l.release()

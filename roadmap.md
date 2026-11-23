@@ -2728,6 +2728,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and fork and exec registration on both native architectures. See
   [the instruction synchronization receipts](docs/linux-membarrier-sync-core.md).
 
+- [x] Implement the global, global expedited, and private expedited
+  `membarrier` commands and registration queries. Qualify cross-CPU memory
+  ordering between threads and processes on both native architectures. See
+  [the data-memory barrier receipts](docs/linux-membarrier-memory.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

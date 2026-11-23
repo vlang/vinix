@@ -49,5 +49,5 @@ Hashes are SHA-256 prefixes. The archive is
 
 On x86-64, the rendezvous covers all online CPUs, including CPUs currently
 running unrelated processes. AArch64 uses the existing GIC implementation
-where it can target all CPUs. The global, plain expedited, and rseq commands
-remain unavailable.
+where it can target all CPUs. The subsequent [data-memory barrier change](linux-membarrier-memory.md)
+adds the global and plain expedited commands. The rseq variants remain unavailable.

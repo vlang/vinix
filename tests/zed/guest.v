@@ -23,11 +23,12 @@ fn barrier_worker() {
 }
 
 fn check_sync_core() {
-	assert C.syscall(283, 0, 0, 0) == 96
+	commands := C.syscall(283, 0, 0, 0)
+	assert commands >= 0 && commands & 96 == 96
 	assert C.syscall(283, 0, 1, 0) == -1 && C.errno == 22
 	assert C.syscall(283, 32, 0, 0) == -1 && C.errno == 1
 	assert C.syscall(283, 64, 0, 0) == 0
-	assert C.syscall(283, 1, 0, 0) == -1 && C.errno == 22
+	assert C.syscall(283, 3, 0, 0) == -1 && C.errno == 22
 	mut workers := []thread{}
 	for _ in 0 .. 4 { workers << spawn barrier_worker() }
 	workers.wait()

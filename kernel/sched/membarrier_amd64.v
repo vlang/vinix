@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module sched
 
-pub fn sync_core_supported() bool {
+pub fn membarrier_supported() bool {
 	return tlb_vector != 0 && cpu_locals.len > 0 && cpu_locals.len <= max_tlb_cpus
 }
 
@@ -22,4 +22,8 @@ fn serialize_instruction_stream() {
 
 pub fn synchronize_core() {
 	cpu_rendezvous(0, 0, .sync_core)
+}
+
+pub fn synchronize_memory() {
+	cpu_rendezvous(0, 0, .memory_barrier)
 }

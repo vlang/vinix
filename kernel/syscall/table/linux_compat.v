@@ -260,24 +260,53 @@ fn syscall_linux_bpf(_ voidptr, _cmd int, _attr u64, _size u32) (u64, u64) {
 	return errno.err, errno.enosys
 }
 
-// Advertise only the instruction synchronization commands the platform can
-// execute. Wasmtime uses these before publishing newly compiled ARM64 code.
+const mb_global = i32(1 << 0)
+const mb_global_expedited = i32(1 << 1)
+const mb_register_global_bit = u8(2)
+const mb_register_global = i32(1 << mb_register_global_bit)
+const mb_private_expedited = i32(1 << 3)
+const mb_register_private_bit = u8(4)
+const mb_register_private = i32(1 << mb_register_private_bit)
+const mb_sync_core = i32(1 << 5)
+const mb_register_sync_core_bit = u8(6)
+const mb_register_sync_core = i32(1 << mb_register_sync_core_bit)
+const mb_get_registrations = i32(1 << 9)
+const mb_rendezvous_commands = mb_global | mb_global_expedited | mb_register_global | mb_private_expedited |
+	mb_register_private | mb_sync_core | mb_register_sync_core
+
 fn syscall_linux_membarrier(_ voidptr, command_word u64, flags u32, _cpu_id int) (u64, u64) {
 	command := i32(u32(command_word))
 	if flags != 0 { return errno.err, errno.einval }
 	if command == 0 {
-		return if sched.sync_core_supported() { u64(32 | 64) } else { u64(0) }, 0
+		available := if sched.membarrier_supported() { mb_rendezvous_commands } else { i32(0) }
+		return u64(mb_get_registrations | available), 0
 	}
-	if !sched.sync_core_supported() { return errno.err, errno.einval }
 	mut pagemap := proc.current_thread().process.pagemap
-	if command == 64 { // MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE
-		katomic.store(mut &pagemap.membarrier_sync_core_registered, true)
-		return 0, 0
+	if command == mb_get_registrations {
+		mut mask := katomic.load(&pagemap.membarrier_registrations)
+		// Linux reports the base private flag even for a sync-core-only
+		// registration, which leaves plain private invocation unauthorized.
+		if mask & u32(mb_register_sync_core) != 0 { mask |= u32(mb_register_private) }
+		return u64(mask), 0
 	}
-	if command == 32 { // MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE
-		if !katomic.load(&pagemap.membarrier_sync_core_registered) { return errno.err, errno.eperm }
-		sched.synchronize_core()
-		return 0, 0
+	if !sched.membarrier_supported() { return errno.err, errno.einval }
+	match command {
+		mb_register_global { katomic.bts(mut &pagemap.membarrier_registrations, mb_register_global_bit) }
+		mb_register_private { katomic.bts(mut &pagemap.membarrier_registrations, mb_register_private_bit) }
+		mb_register_sync_core { katomic.bts(mut &pagemap.membarrier_registrations, mb_register_sync_core_bit) }
+		mb_global, mb_global_expedited, mb_private_expedited {
+			if command == mb_private_expedited && katomic.load(&pagemap.membarrier_registrations) & u32(mb_register_private) == 0 {
+				return errno.err, errno.eperm
+			}
+			sched.synchronize_memory()
+		}
+		mb_sync_core {
+			if katomic.load(&pagemap.membarrier_registrations) & u32(mb_register_sync_core) == 0 {
+				return errno.err, errno.eperm
+			}
+			sched.synchronize_core()
+		}
+		else { return errno.err, errno.einval }
 	}
-	return errno.err, errno.einval
+	return 0, 0
 }

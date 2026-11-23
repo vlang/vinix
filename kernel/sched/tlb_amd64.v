@@ -3,10 +3,10 @@
 @[has_globals]
 module sched
 
-// TLB shootdowns and instruction-stream synchronization both wait for other
-// CPUs to finish a local operation. See memory/virtual_amd64.v for TLB users.
+// TLB shootdowns and membarrier wait for other CPUs to finish a local
+// operation. See memory/virtual_amd64.v for TLB users.
 //
-// The CPU asking holds its page map's lock with interrupts off and waits for
+// A CPU requesting a TLB shootdown can hold its page map's lock and waits for
 // every answer. A CPU that cannot take the IPI because its own interrupts are
 // off is spinning -- for a lock, or for its turn to ask -- and answers from
 // that loop instead; otherwise it would wait for the lock the asking CPU
@@ -30,6 +30,7 @@ enum RendezvousKind {
 	tlb
 	tlb_everywhere
 	sync_core
+	memory_barrier
 }
 
 __global (
@@ -67,10 +68,10 @@ fn answer_tlb_shootdown() {
 	if me >= max_tlb_cpus || katomic.load(&tlb_pending[me]) == 0 {
 		return
 	}
-	if tlb_request_kind == .sync_core {
-		serialize_instruction_stream()
-	} else {
-		memory.invalidate_local_tlb(tlb_request_cr3, tlb_request_virt, tlb_request_kind == .tlb_everywhere)
+	match tlb_request_kind {
+		.sync_core { serialize_instruction_stream() }
+		.memory_barrier { katomic.sync() }
+		else { memory.invalidate_local_tlb(tlb_request_cr3, tlb_request_virt, tlb_request_kind == .tlb_everywhere) }
 	}
 	katomic.store(mut &tlb_pending[me], u32(0))
 }
@@ -133,7 +134,11 @@ fn cpu_rendezvous(cr3 u64, virt u64, kind RendezvousKind) {
 		}
 	}
 
-	if kind == .sync_core { serialize_instruction_stream() }
+	match kind {
+		.sync_core { serialize_instruction_stream() }
+		.memory_barrier { katomic.sync() }
+		else {}
+	}
 	katomic.dec(mut &tlb_in_flight)
 	tlb_lock.release()
 }
