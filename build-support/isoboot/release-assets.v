@@ -24,6 +24,16 @@ struct DraftRelease {
 	assets     []UploadedAsset
 }
 
+struct DraftRecovery {
+	id         u64
+	repo       string
+	tag        string
+	commit     string
+	prerelease bool
+	manifest   string
+	notes      string
+}
+
 fn valid_asset_name(name string) bool {
 	if name == '' || name[0] in [u8(`.`), `-`]! { return false }
 	if name in ['SHA256SUMS', 'RELEASE_NOTES.md']! { return false }
@@ -117,17 +127,80 @@ fn stage_assets(directory string, manifest string, destination string) ! {
 	}
 }
 
-fn upload_draft(directory string, manifest string, response string, repo string, tag string) !u64 {
-	draft := json2.decode[DraftRelease](pkgcore.read_metadata(response)!)!
+fn upload_endpoint(draft DraftRelease, repo string) !string {
 	endpoint := 'https://uploads.github.com/repos/${repo}/releases/${draft.id}/assets'
-	if draft.id == 0 || !draft.draft || draft.tag_name != tag || draft.assets.len != 0
-		|| draft.upload_url.to_lower() != endpoint.to_lower() + '{?name,label}' {
+	if draft.id == 0 || draft.upload_url.to_lower() != endpoint.to_lower() + '{?name,label}' {
 		return error('GitHub returned an invalid draft upload destination')
 	}
-	entries := read_manifest(manifest)!
-	if entries.len == 0 { return error('release checksum manifest is empty') }
-	mut names := entries.keys()
-	names << 'SHA256SUMS'
+	return endpoint
+}
+
+fn read_draft(response string, id string, tag string, notes string, prerelease bool) !DraftRelease {
+	draft := json2.decode[DraftRelease](pkgcore.read_metadata(response)!)!
+	if draft.id == 0 || (id != '' && draft.id.str() != id) || !draft.draft
+		|| draft.tag_name != tag || draft.name != 'Vinix ' + tag || draft.body != notes
+		|| draft.prerelease != prerelease || draft.html_url == '' {
+		return error('GitHub draft metadata changed after creation')
+	}
+	return draft
+}
+
+fn record_draft(work string, directory string, response string, repo string, tag string, commit string, prerelease bool) !u64 {
+	manifest := pkgcore.read_metadata(os.join_path(directory, 'SHA256SUMS'))!
+	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
+	draft := read_draft(response, '', tag, notes, prerelease)!
+	upload_endpoint(draft, repo)!
+	if draft.assets.len != 0 { return error('new GitHub draft already contains assets') }
+	path := os.join_path(work, 'draft-${draft.id}.json')
+	pkgcore.atomic_write_new(path, json2.encode(DraftRecovery{
+		id: draft.id
+		repo: repo
+		tag: tag
+		commit: commit
+		prerelease: prerelease
+		manifest: manifest
+		notes: notes
+	}) + '\n')!
+	return draft.id
+}
+
+fn restore_draft(work string, id string, directory string) ! {
+	if id == '' || id.bytes().any(!it.is_digit()) { return error('invalid draft recovery ID') }
+	path := os.join_path(work, 'draft-${id}.json')
+	recovery := json2.decode[DraftRecovery](pkgcore.read_metadata(path) or {
+		return error('cannot read release draft recovery record: ${err}')
+	})!
+	if recovery.id.str() != id || recovery.repo == '' || recovery.tag == ''
+		|| recovery.commit.len != 40 || recovery.commit.bytes().any(it !in '0123456789abcdef'.bytes())
+		|| [recovery.repo, recovery.tag].any(it.contains_any('\t\r\n')) {
+		return error('invalid release draft recovery record: ' + path)
+	}
+	os.write_file(os.join_path(directory, 'SHA256SUMS'), recovery.manifest)!
+	os.write_file(os.join_path(directory, 'RELEASE_NOTES.md'), recovery.notes)!
+	println('${recovery.repo}\t${recovery.tag}\t${recovery.commit}\t${recovery.prerelease}')
+}
+
+fn missing_assets(directory string, assets []UploadedAsset) ![]string {
+	manifest := os.join_path(directory, 'SHA256SUMS')
+	mut expected := read_manifest(manifest)!
+	if expected.len == 0 { return error('release checksum manifest is empty') }
+	expected['SHA256SUMS'] = pkgcore.hash_file(manifest)!
+	for asset in assets {
+		digest := expected[asset.name] or { return error('unexpected GitHub draft asset: ' + asset.name) }
+		if asset.state != 'uploaded' || asset.digest != 'sha256:' + digest {
+			return error('GitHub draft asset differs from the verified upload: ' + asset.name)
+		}
+		expected.delete(asset.name)
+	}
+	return expected.keys()
+}
+
+fn upload_draft(stage string, directory string, response string, repo string, id string, tag string, prerelease bool) ! {
+	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
+	draft := read_draft(response, id, tag, notes, prerelease)!
+	endpoint := upload_endpoint(draft, repo)!
+	names := missing_assets(directory, draft.assets)!
+	if names.len == 0 { return }
 	gh := os.find_abs_path_of_executable('gh')!
 	eprintln('Uploading assets to GitHub draft ${draft.id}')
 	for start := 0; start < names.len; start += 5 {
@@ -137,7 +210,7 @@ fn upload_draft(directory string, manifest string, response string, repo string,
 		for name in batch {
 			mut child := os.new_process(gh)
 			child.set_args(['api', endpoint, '--method', 'POST', '-H', 'Content-Type: application/octet-stream',
-				'-f', 'name=' + name, '--input', os.join_path(directory, name), '--silent'])
+				'-f', 'name=' + name, '--input', os.join_path(stage, name), '--silent'])
 			child.run()
 			children << child
 		}
@@ -149,28 +222,13 @@ fn upload_draft(directory string, manifest string, response string, repo string,
 		}
 		if failed.len > 0 { return error('upload failed for GitHub draft ${draft.id}: ' + failed.join(', ')) }
 	}
-	return draft.id
 }
 
 fn verify_draft(directory string, response string, id string, tag string, prerelease bool) !string {
-	draft := json2.decode[DraftRelease](pkgcore.read_metadata(response)!)!
 	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
-	if draft.id.str() != id || !draft.draft || draft.tag_name != tag || draft.name != 'Vinix ' + tag
-		|| draft.body != notes || draft.prerelease != prerelease || draft.html_url == '' {
-		return error('GitHub draft metadata changed after creation')
-	}
-	manifest := os.join_path(directory, 'SHA256SUMS')
-	mut expected := read_manifest(manifest)!
-	if expected.len == 0 { return error('release checksum manifest is empty') }
-	expected['SHA256SUMS'] = pkgcore.hash_file(manifest)!
-	for asset in draft.assets {
-		digest := expected[asset.name] or { return error('unexpected GitHub draft asset: ' + asset.name) }
-		if asset.state != 'uploaded' || asset.digest != 'sha256:' + digest {
-			return error('GitHub draft asset differs from the verified upload: ' + asset.name)
-		}
-		expected.delete(asset.name)
-	}
-	if expected.len > 0 { return error('missing GitHub draft assets: ' + expected.keys().join(', ')) }
+	draft := read_draft(response, id, tag, notes, prerelease)!
+	missing := missing_assets(directory, draft.assets)!
+	if missing.len > 0 { return error('missing GitHub draft assets: ' + missing.join(', ')) }
 	return draft.html_url
 }
 
@@ -187,15 +245,24 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'stage' {
 		return stage_assets(os.args[2], os.args[3], os.args[4])
 	}
-	if os.args.len == 7 && os.args[1] == 'upload-draft' {
-		println(upload_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])!)
+	if os.args.len == 9 && os.args[1] == 'record-draft' {
+		println(record_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
+			os.args[8] == 'true')!)
+		return
+	}
+	if os.args.len == 5 && os.args[1] == 'restore-draft' {
+		return restore_draft(os.args[2], os.args[3], os.args[4])
+	}
+	if os.args.len == 9 && os.args[1] == 'upload-draft' {
+		upload_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
+			os.args[8] == 'true')!
 		return
 	}
 	if os.args.len == 7 && os.args[1] == 'verify-draft' && os.args[6] in ['true', 'false']! {
 		println(verify_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6] == 'true')!)
 		return
 	}
-	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | capture DIRECTORY NEW_DESTINATION ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NEW_DESTINATION | upload-draft DIRECTORY MANIFEST RESPONSE REPO TAG | verify-draft DIRECTORY RESPONSE ID TAG PRERELEASE')
+	return error('usage: release-assets record | capture | check | stage | record-draft | restore-draft | upload-draft | verify-draft')
 }
 
 fn main() {

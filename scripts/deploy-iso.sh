@@ -11,6 +11,7 @@
 #   --prerelease       mark the release as a pre-release
 #   --no-test          do not boot-test the images first
 #   --no-publish       build (and test) only
+#   --resume-draft=ID  continue a draft from the original local build outputs
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
 #   --repo=OWNER/NAME  GitHub repository (default: the one gh picks for this checkout)
@@ -54,6 +55,8 @@ PUBLISH=1
 ASSUME_YES=0
 REPO=''
 PACKAGE_REVIEW=''
+RESUME_DRAFT=''
+BUILD_OPTIONS=0
 
 usage() {
     sed -n '2,/^set -/s/^# \{0,1\}//p' "$0" | sed '$d'
@@ -61,14 +64,21 @@ usage() {
 
 for arg in "$@"; do
     case "$arg" in
-        --tag=*) TAG="${arg#*=}" ;;
-        --ref=*) REF="${arg#*=}" ;;
-        --arch=*) ARCHES="${arg#*=}" ;;
+        --tag=*) TAG="${arg#*=}"; BUILD_OPTIONS=1 ;;
+        --ref=*) REF="${arg#*=}"; BUILD_OPTIONS=1 ;;
+        --arch=*) ARCHES="${arg#*=}"; BUILD_OPTIONS=1 ;;
         --draft) DRAFT=1 ;;
-        --prerelease) PRERELEASE=1 ;;
-        --no-test) RUN_TESTS=0 ;;
-        --no-publish) PUBLISH=0 ;;
+        --prerelease) PRERELEASE=1; BUILD_OPTIONS=1 ;;
+        --no-test) RUN_TESTS=0; BUILD_OPTIONS=1 ;;
+        --no-publish) PUBLISH=0; BUILD_OPTIONS=1 ;;
+        --resume-draft=*)
+            RESUME_DRAFT="${arg#*=}"
+            case "$RESUME_DRAFT" in
+                ''|0*|*[!0-9]*) echo "ERROR: --resume-draft requires a numeric draft ID" >&2; exit 1 ;;
+            esac
+            ;;
         --package-review=*)
+            BUILD_OPTIONS=1
             PACKAGE_REVIEW="${arg#*=}"
             if [ ! -d "$PACKAGE_REVIEW" ]; then
                 echo "ERROR: --package-review requires an existing directory" >&2
@@ -121,12 +131,17 @@ file_size() {
 
 # ── What to build ──────────────────────────────────────────────────────────
 
-need git curl clang ld.lld xorriso cc rsync mformat mmd mcopy
+need git cc
 cd "$SCRIPT_DIR"
-COMMIT="$(git rev-parse --verify "$REF^{commit}")" || die "no such commit: $REF"
-SHORT="$(git rev-parse --short=10 "$COMMIT")"
-if [ "$REF" = HEAD ] && [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-    echo "NOTE: this checkout has uncommitted changes; the release is built from $SHORT without them."
+if [ -n "$RESUME_DRAFT" ]; then
+    [ "$BUILD_OPTIONS" -eq 0 ] || die "--resume-draft accepts --repo, --draft and --yes"
+else
+    need curl clang ld.lld xorriso rsync mformat mmd mcopy
+    COMMIT="$(git rev-parse --verify "$REF^{commit}")" || die "no such commit: $REF"
+    SHORT="$(git rev-parse --short=10 "$COMMIT")"
+    if [ "$REF" = HEAD ] && [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+        echo "NOTE: this checkout has uncommitted changes; the release is built from $SHORT without them."
+    fi
 fi
 
 WORK="$SCRIPT_DIR/build-release/work"
@@ -135,6 +150,7 @@ SRC="$WORK/src"
 mkdir -p "$WORK"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 ASSET_WORK="$(mktemp -d "$WORK/release-assets.XXXXXX")"
+ASSET_STAGE="$ASSET_WORK/upload"
 trap 'rm -rf "$ASSET_WORK"' EXIT
 "$V" -backend c -prod -cc cc -o "$ASSET_WORK/release-lock" \
     "$SCRIPT_DIR/build-support/isoboot/release-lock.v"
@@ -146,6 +162,21 @@ cleanup_release() {
     rm -rf "$ASSET_WORK"
 }
 trap cleanup_release EXIT
+
+build_release_assets() {
+    "$V" -backend c -prod -cc cc \
+        -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/tools/accounts" \
+        -o "$ASSET_WORK/release-assets" "$SCRIPT_DIR/build-support/isoboot/release-assets.v"
+}
+
+if [ -n "$RESUME_DRAFT" ]; then
+    build_release_assets
+    recovery="$("$ASSET_WORK/release-assets" restore-draft "$WORK" "$RESUME_DRAFT" "$ASSET_WORK")"
+    IFS=$'\t' read -r recovery_repo TAG COMMIT prerelease <<< "$recovery"
+    [ -z "$REPO" ] || [ "$REPO" = "$recovery_repo" ] || die "draft $RESUME_DRAFT belongs to $recovery_repo"
+    REPO="$recovery_repo"
+    SHORT="${COMMIT:0:10}"
+fi
 
 if [ "$PUBLISH" -eq 1 ]; then
     need gh
@@ -160,6 +191,52 @@ if [ "$PUBLISH" -eq 1 ]; then
     fi
     "$V" -backend c -prod -cc cc -o "$ASSET_WORK/release-tag" \
         "$SCRIPT_DIR/build-support/isoboot/release-tag.v"
+    release_api="repos/$REPO/releases"
+fi
+
+confirm_publish() {
+    if [ "$ASSUME_YES" -ne 1 ]; then
+        [ -t 0 ] || die "not a terminal; pass --yes to publish without asking"
+        local answer
+        read -r -p "Publish? [y/N] " answer
+        case "$answer" in
+            y|Y|yes|YES) ;;
+            *) echo "Not published. Everything is in $OUT"; exit 0 ;;
+        esac
+    fi
+}
+
+finish_draft() {
+    local release_id="$1" response="$2" draft_url release_url
+    cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
+    "$ASSET_WORK/release-assets" upload-draft "$ASSET_STAGE" "$ASSET_WORK" \
+        "$response" "$REPO" "$release_id" "$TAG" "$prerelease"
+    gh api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
+    draft_url="$("$ASSET_WORK/release-assets" verify-draft "$ASSET_WORK" "$ASSET_WORK/draft.json" \
+        "$release_id" "$TAG" "$prerelease")"
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    if [ "$DRAFT" -eq 1 ]; then
+        step "Saved verified draft"
+        echo "$draft_url"
+    else
+        release_url="$(gh api "$release_api/$release_id" --method PATCH -F draft=false \
+            --jq 'select(.draft == false) | .html_url')"
+        [ -n "$release_url" ] || die "GitHub did not confirm publication of draft $release_id"
+        step "Published"
+        echo "$release_url"
+    fi
+}
+
+if [ -n "$RESUME_DRAFT" ]; then
+    git check-ref-format "refs/tags/$TAG" || die "invalid Git tag in recovery record: $TAG"
+    OUT="$SCRIPT_DIR/build-release/$TAG"
+    step "Resuming GitHub draft $RESUME_DRAFT for $TAG at $SHORT"
+    confirm_publish
+    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    gh api "$release_api/$RESUME_DRAFT" > "$ASSET_WORK/resume-draft.json"
+    finish_draft "$RESUME_DRAFT" "$ASSET_WORK/resume-draft.json"
+    exit 0
 fi
 
 release_exists() {
@@ -385,11 +462,8 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
 fi
 
 [ "${#IMAGES[@]}" -gt 0 ] || die "nothing was built"
-ASSET_STAGE="$ASSET_WORK/upload"
 ASSET_DIRECTORY="$OUT"
-"$V" -backend c -prod -cc cc \
-    -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/tools/accounts" \
-    -o "$ASSET_WORK/release-assets" "$SCRIPT_DIR/build-support/isoboot/release-assets.v"
+build_release_assets
 if [ "$RUN_TESTS" -eq 1 ] || [ -n "$PACKAGE_WORK" ]; then
     step "Capturing release assets"
     "$ASSET_WORK/release-assets" capture "$OUT" "$ASSET_STAGE" \
@@ -581,16 +655,7 @@ echo "    SHA256SUMS"
 for bundle in ${BUNDLES[@]+"${BUNDLES[@]}"}; do
     echo "    $(basename "$bundle") ($(human_size "$(file_size "$bundle")"))"
 done
-if [ "$ASSUME_YES" -ne 1 ]; then
-    if [ ! -t 0 ]; then
-        die "not a terminal; pass --yes to publish without asking"
-    fi
-    read -r -p "Publish? [y/N] " answer
-    case "$answer" in
-        y|Y|yes|YES) ;;
-        *) echo "Not published. Everything is in $OUT"; exit 0 ;;
-    esac
-fi
+confirm_publish
 
 cmp -s "$ASSET_WORK/SHA256SUMS" "$OUT/SHA256SUMS" ||
     die "SHA256SUMS changed after verification"
@@ -600,29 +665,13 @@ else
     step "Preparing verified release copies"
     "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
 fi
-cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
-
 "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true
-release_api="repos/$REPO/releases"
 gh api "$release_api" --method POST -f "tag_name=$TAG" \
-    -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_STAGE/RELEASE_NOTES.md" \
+    -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
     -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"
-release_id="$("$ASSET_WORK/release-assets" upload-draft "$ASSET_STAGE" "$ASSET_WORK/SHA256SUMS" \
-    "$ASSET_WORK/created-draft.json" "$REPO" "$TAG")"
-gh api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
-draft_url="$("$ASSET_WORK/release-assets" verify-draft "$ASSET_WORK" "$ASSET_WORK/draft.json" \
-    "$release_id" "$TAG" "$prerelease")"
-"$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
-
-if [ "$DRAFT" -eq 1 ]; then
-    step "Saved verified draft"
-    echo "$draft_url"
-else
-    release_url="$(gh api "$release_api/$release_id" --method PATCH -F draft=false \
-        --jq 'select(.draft == false) | .html_url')"
-    [ -n "$release_url" ] || die "GitHub did not confirm publication of draft $release_id"
-    step "Published"
-    echo "$release_url"
-fi
+release_id="$("$ASSET_WORK/release-assets" record-draft "$WORK" "$ASSET_WORK" \
+    "$ASSET_WORK/created-draft.json" "$REPO" "$TAG" "$COMMIT" "$prerelease")"
+echo "  Recovery record: $WORK/draft-$release_id.json"
+finish_draft "$release_id" "$ASSET_WORK/created-draft.json"

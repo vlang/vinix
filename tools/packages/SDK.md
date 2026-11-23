@@ -630,6 +630,19 @@ set of uploaded assets against the local SHA-256 digests, including
 It rechecks the tag's commit after upload and publishes that draft by ID.
 `--draft` keeps the verified release as a draft. An upload or verification
 failure leaves the draft available for inspection.
+
+To resume an interrupted upload, run
+`./scripts/deploy-iso.sh --resume-draft=ID` from the same checkout. Before the
+first upload the driver saves the repository, tag, commit, checksum manifest,
+and notes in `build-release/work/draft-ID.json`. Keep that record and the
+original asset files under `build-release/TAG`. Resume verifies those files
+against the saved manifest and checks the draft and tag again. It skips
+already uploaded assets with matching digests and uploads the missing files
+to the same draft ID. An unexpected asset, an incomplete upload, or a digest
+mismatch stops the run for inspection. Use `--draft` to finish the uploads
+while keeping the release unpublished. A complete draft can also be published
+with the same resume command.
+
 Set `TMPDIR` to a filesystem with room for ISO extraction and signed bundle
 verification when the system temporary filesystem is small. Standalone
 `package-receipt verify` also keeps its private ISO copy in that filesystem.

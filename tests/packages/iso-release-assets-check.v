@@ -12,9 +12,7 @@ const ios = 'vinix-ios-runtime-arm64'
 const upload_changes = ['vinix-amd64.iso', x11, 'SHA256SUMS', 'RELEASE_NOTES.md']
 const changed_during_upload = 'changed during upload\n'
 const other_commit = '1234567890123456789012345678901234567890'
-const draft_id = u64(71439)
 const release_url = 'https://example.invalid/fixture'
-const upload_endpoint = 'https://uploads.github.com/repos/local/fixture/releases/71439/assets'
 const draft_refusals = ['draft-tag-rebound', 'draft-wrong-upload-url',
 	'tag-moved-during-upload', 'tag-removed-during-upload', 'draft-bad-digest',
 	'draft-incomplete-asset', 'draft-missing-asset', 'draft-extra-asset', 'draft-changed', 'upload-interrupted']
@@ -31,13 +29,13 @@ struct FixtureUpload {
 }
 
 struct FixtureRelease {
-	id u64 = draft_id
+	id u64
 	tag_name string
 	name string
 	html_url string = release_url
 	body string
 	prerelease bool
-	upload_url string = upload_endpoint + '{?name,label}'
+	upload_url string
 mut:
 	draft bool = true
 	assets []FixtureAsset
@@ -45,6 +43,10 @@ mut:
 
 fn tag_file(remote string, tag string) string {
 	return remote + '/' + sha256.hexhash(tag)
+}
+
+fn fixture_upload_endpoint(id string) string {
+	return 'https://uploads.github.com/repos/local/fixture/releases/${id}/assets'
 }
 
 fn command(program string, args []string, root string, environment map[string]string) (int, string) {
@@ -124,13 +126,14 @@ fn capture_public_output(out string, scenario string) ! {
 	}
 }
 
-fn read_uploaded_assets(out string, directory string) ![]FixtureAsset {
+fn read_uploaded_assets(out string, directory string, resumed bool) ![]FixtureAsset {
 	mut names := os.ls(directory)!
 	names.sort()
 	mut uploads := []FixtureUpload{}
 	for name in names {
 		uploads << json2.decode[FixtureUpload](os.read_file(directory + '/' + name)!)!
 	}
+	if resumed { return uploads.map(it.asset) }
 	if uploads.len == 0 { return error('draft has no recorded uploads') }
 	files := uploads.map(it.path)
 	stage := os.dir(files[0])
@@ -191,6 +194,8 @@ fn extract_iso(out string, scenario string) !int {
 fn github_release_api(remote string, path string, scenario string) !int {
 	tag := os.getenv('VINIX_ASSET_TEST_TAG')
 	commit := os.getenv('VINIX_ASSET_TEST_COMMIT')
+	draft_id := os.getenv('VINIX_ASSET_TEST_DRAFT_ID')
+	upload_endpoint := fixture_upload_endpoint(draft_id)
 	local := remote + '/draft.json'
 	if path == 'releases' {
 		os.write_file(remote + '/release-attempt', os.args[1..].join('\n') + '\n')!
@@ -207,26 +212,28 @@ fn github_release_api(remote string, path string, scenario string) !int {
 			return error('draft created before checking the exact remote tag commit')
 		}
 		draft := FixtureRelease{
+			id: draft_id.u64()
 			tag_name: tag
 			name: 'Vinix ' + tag
 			body: os.read_file(body[6..])!
 			prerelease: prerelease
 			upload_url: if scenario == 'draft-wrong-upload-url' {
-				upload_endpoint.replace('/71439/', '/71440/') + '{?name,label}'
+				fixture_upload_endpoint((draft_id.u64() + 1).str()) + '{?name,label}'
 			} else { upload_endpoint + '{?name,label}' }
 		}
 		os.mkdir(remote + '/uploads')!
 		os.write_file(local, json2.encode(draft))!
-		println(if legacy { draft_id.str() } else { json2.encode(draft) })
+		println(if legacy { draft_id } else { json2.encode(draft) })
 		return 0
 	}
-	if path != 'releases/' + draft_id.str() { return error('unexpected draft release ID') }
+	if path != 'releases/' + draft_id { return error('unexpected draft release ID') }
 	mut draft := json2.decode[FixtureRelease](os.read_file(local)!)!
 	if os.args.len == 3 {
-		draft.assets = read_uploaded_assets(os.getenv('VINIX_ASSET_TEST_OUT'), remote + '/uploads')!
-		first := draft.assets[0]
+		draft.assets = read_uploaded_assets(os.getenv('VINIX_ASSET_TEST_OUT'), remote + '/uploads',
+			scenario.starts_with('resume-'))!
+		first := if draft.assets.len > 0 { draft.assets[0] } else { FixtureAsset{} }
 		match scenario {
-			'draft-bad-digest' { draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)} }
+			'draft-bad-digest', 'resume-bad-remote' { draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)} }
 			'draft-incomplete-asset' { draft.assets[0] = FixtureAsset{...first, state: 'starter'} }
 			'draft-missing-asset' { draft.assets.delete(0) }
 			'draft-extra-asset' { draft.assets << FixtureAsset{...first, name: 'extra.iso'} }
@@ -253,6 +260,7 @@ fn upload_fixture(out string, remote string, scenario string) !int {
 	if os.args.len != 12 { return error('unexpected draft upload request') }
 	file := os.args[10]
 	name := os.file_name(file)
+	upload_endpoint := fixture_upload_endpoint(os.getenv('VINIX_ASSET_TEST_DRAFT_ID'))
 	if os.args[2..] != [upload_endpoint, '--method', 'POST', '-H', 'Content-Type: application/octet-stream',
 		'-f', 'name=' + name, '--input', file, '--silent'] {
 		return error('unexpected draft upload request')
@@ -263,7 +271,7 @@ fn upload_fixture(out string, remote string, scenario string) !int {
 	}
 	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if !draft.draft || draft.tag_name != tag { return error('upload does not target the draft') }
-	if name == 'vinix-amd64.iso' {
+	if name == 'vinix-amd64.iso' && !scenario.starts_with('resume-') {
 		capture_public_output(out, scenario)!
 		match scenario {
 			'tag-moved-during-upload' { os.write_file(tag_file(remote, tag), other_commit)! }
@@ -275,8 +283,10 @@ fn upload_fixture(out string, remote string, scenario string) !int {
 			else {}
 		}
 	}
+	target := remote + '/uploads/' + name
+	if os.exists(target) { return error('fixture duplicate upload: ' + name) }
 	digest := checksum_line(file)![..64]
-	os.write_file(remote + '/uploads/' + name, json2.encode(FixtureUpload{
+	os.write_file(target, json2.encode(FixtureUpload{
 		path: file
 		asset: FixtureAsset{name: name, state: 'uploaded', digest: 'sha256:' + digest}
 	}))!
@@ -474,6 +484,60 @@ fn verify_handoff(out string, with_packages bool, scenario string) ! {
 	}
 }
 
+fn resume_attempt(root string, work string, environment map[string]string, scenario string, options []string, expected_error string) ! {
+	mut env := environment.clone()
+	env['VINIX_ASSET_TEST_CASE'] = scenario
+	mut args := [root + '/scripts/deploy-iso.sh', '--yes',
+		'--resume-draft=' + env['VINIX_ASSET_TEST_DRAFT_ID']]
+	args << options
+	code, log := command('/bin/bash', args, root, env)
+	os.write_file(work + '/' + scenario + '.log', log)!
+	if (code == 0) != (expected_error == '') || !log.contains(expected_error)
+		|| log.contains('Building the amd64 image') || log.contains('Boot-testing the images') {
+		return error('unexpected recovery outcome for ${scenario}\n${log}')
+	}
+	println('ISO release assets ${scenario} PASS')
+}
+
+fn check_resume(root string, work string, out string, remote string, environment map[string]string) ! {
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	record := root + '/build-release/work/draft-' + id + '.json'
+	recovery := os.read_file(record)!
+	created := os.read_file(remote + '/release-attempt')!
+	mut before := os.ls(remote + '/uploads')!
+	before.sort()
+	iso := out + '/vinix-amd64.iso'
+	original := os.read_file(iso)!
+	os.write_file(iso, 'changed release ISO')!
+	resume_attempt(root, work, environment, 'resume-stale-local', [], 'release asset changed after verification') or {
+		os.write_file(iso, original)!
+		return err
+	}
+	os.write_file(iso, original)!
+	resume_attempt(root, work, environment, 'resume-bad-remote', [], 'GitHub draft asset differs from the verified upload')!
+	resume_attempt(root, work, environment, 'resume-wrong-repo', ['--repo=local/other'], 'belongs to local/fixture')!
+	mut after_refusals := os.ls(remote + '/uploads')!
+	after_refusals.sort()
+	if after_refusals != before || os.exists(remote + '/publish-attempt') {
+		return error('refused recovery changed the draft')
+	}
+	expected := os.read_lines(out + '/SHA256SUMS')!.len + 1
+	// The saved metadata is authoritative even if someone changes the public copy.
+	os.write_file(out + '/SHA256SUMS', 'changed public checksum list')!
+	resume_attempt(root, work, environment, 'resume-complete-draft', ['--draft'], '')!
+	finished := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	if !finished.draft || finished.assets.len != expected || os.exists(remote + '/publish-attempt') {
+		return error('recovery did not complete the retained draft')
+	}
+	resume_attempt(root, work, environment, 'resume-publish', [], '')!
+	resume_attempt(root, work, environment, 'resume-already-published', [], 'GitHub draft metadata changed after creation')!
+	published := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	if published.draft || !os.exists(remote + '/publish-attempt')
+		|| os.read_file(record)! != recovery || os.read_file(remote + '/release-attempt')! != created {
+		return error('recovery did not publish the original draft')
+	}
+}
+
 fn run() ! {
 	if os.args.len != 5 { return error('usage: iso-release-assets-check VINIX_REPO NEW_STATE AMD64_MATCH_CASE ARM64_MATCH_CASE') }
 	repository := os.real_path(os.args[1])
@@ -511,7 +575,7 @@ fn run() ! {
 		'bad-build-sidecar', 'boot-copy-changed', 'x11-after-boot', 'ios-pair-after-boot',
 		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff', 'build-only',
 		'publish-no-test', 'packages-no-test']
-	for scenario in scenarios {
+	for index, scenario in scenarios {
 		with_packages := scenario in ['packages', 'receipt-after-boot', 'output-change-during-upload',
 			'public-iso-during-boot', 'public-iso-during-receipt', 'packages-no-test']!
 		mut environment := base.clone()
@@ -541,6 +605,7 @@ fn run() ! {
 		out := root + '/build-release/' + tag
 		environment['VINIX_ASSET_TEST_TAG'] = tag
 		environment['VINIX_ASSET_TEST_REMOTE'] = remote
+		environment['VINIX_ASSET_TEST_DRAFT_ID'] = (71439 + index).str()
 		environment['VINIX_ASSET_TEST_OUT'] = out
 		environment['VINIX_ASSET_TEST_CASE'] = scenario
 		mut args := [root + '/scripts/deploy-iso.sh', '--yes',
@@ -620,6 +685,7 @@ fn run() ! {
 			if os.exists(out + '/fixture-boot') != (!early && scenario != 'bad-build-sidecar') {
 				return error('unexpected boot test handoff: ' + scenario)
 			}
+			if scenario == 'upload-interrupted' { check_resume(root, work, out, remote, environment)! }
 		}
 		println('ISO release assets ${scenario} PASS')
 	}
