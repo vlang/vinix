@@ -15,11 +15,11 @@ fn C.waitpid(int, &i32, int) int
 fn C.reboot(int) int
 fn C.usleep(u32) int
 
-fn check() bool {
+fn check(executable &char, name &char) bool {
 	pid := C.fork()
 	if pid < 0 { return false }
 	if pid == 0 {
-		C.execl(c'/usr/share/package-fixtures/streams', c'streams', voidptr(0))
+		C.execl(executable, name, voidptr(0))
 		C._exit(91)
 	}
 	mut status := i32(0)
@@ -31,9 +31,11 @@ fn main() {
 	fd := C.open(console.str, C.O_WRONLY)
 	if fd >= 0 { C.dup2(fd, 1); C.dup2(fd, 2); if fd > 2 { C.close(fd) } }
 	println('HWTEST START packages-launch-socket')
-	passed := check()
-	if passed { println('LAUNCH SOCKET EOF and descriptor regressions PASS') }
-	println(if passed { 'HWTEST PASS packages-launch-socket' } else { 'HWTEST FAIL packages-launch-socket' })
+	streams := check(c'/usr/share/package-fixtures/streams', c'streams')
+	if streams { println('LAUNCH SOCKET EOF and descriptor regressions PASS') }
+	admin := check(c'/usr/share/package-fixtures/admin-socket', c'admin-socket')
+	if admin { println('ADMIN SOCKET interrupted waits PASS') }
+	println(if streams && admin { 'HWTEST PASS packages-launch-socket' } else { 'HWTEST FAIL packages-launch-socket' })
 	C.reboot(0x4321fedc)
 	for { C.usleep(1_000_000) }
 }

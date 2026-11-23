@@ -38,6 +38,18 @@ pub mut:
 	path string
 }
 
+fn socket_ready(fd int, events i16, deadline u64) bool {
+	mut readiness := Poll{ fd: i32(fd), events: events }
+	for {
+		now := time.sys_mono_now()
+		if now >= deadline { return false }
+		timeout := int((deadline - now + 999_999) / 1_000_000)
+		result := C.vinix_package_admin_poll(voidptr(&readiness), 1, timeout)
+		if result > 0 { return true }
+		if result == 0 || C.errno != C.EINTR { return false }
+	}
+}
+
 fn peer(fd int) !u32 {
 	$if linux {
 		mut credentials := Credentials{}
@@ -112,10 +124,9 @@ pub fn connect_private(directory string, uid u32, nonce string) !int {
 	if flags < 0 || C.fcntl(fd, C.F_SETFL, flags | C.O_NONBLOCK) != 0 { return error('cannot bound package administrator connection time') }
 	if C.connect(fd, voidptr(&location), u32(sizeof(C.vinix_package_admin_address))) != 0 {
 		if C.errno !in [C.EINPROGRESS, C.EAGAIN] { return error('the requesting package client is unavailable') }
-		mut readiness := Poll{ fd: i32(fd), events: 4 }
 		mut failure := i32(0)
 		mut length := u32(sizeof(i32))
-		if C.vinix_package_admin_poll(voidptr(&readiness), 1, 5000) <= 0
+		if !socket_ready(fd, 4, time.sys_mono_now() + 5_000_000_000)
 			|| C.getsockopt(fd, C.SOL_SOCKET, C.SO_ERROR, &failure, &length) != 0 || failure != 0 { return error('the requesting package client is unavailable') }
 	}
 	if peer(fd)! != uid { return error('package administrator destination belongs to another account') }
@@ -126,14 +137,12 @@ pub fn connect_private(directory string, uid u32, nonce string) !int {
 
 pub fn (listener &Listener) accept_root() !int {
 	deadline := time.sys_mono_now() + 10_000_000_000
-	for _ in 0 .. 8 {
-		now := time.sys_mono_now()
-		if now >= deadline { break }
-		remaining := deadline - now
-		mut readiness := Poll{ fd: i32(listener.fd), events: 1 }
-		if C.vinix_package_admin_poll(voidptr(&readiness), 1, int(remaining / 1_000_000)) <= 0 { break }
+	mut peers := 0
+	for peers < 8 && socket_ready(listener.fd, 1, deadline) {
 		fd := C.accept(listener.fd, unsafe { nil }, unsafe { nil })
+		if fd < 0 && C.errno == C.EINTR { continue }
 		if fd < 0 { return error('cannot accept package administrator worker') }
+		peers++
 		identity := peer(fd) or { C.close(fd); return err }
 		if identity == 0 { return fd }
 		C.close(fd)
