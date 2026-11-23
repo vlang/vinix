@@ -44,7 +44,11 @@ fn coordination_command(binary string, arguments []string) !Reply {
 	return Reply{ code: process.code, text: process.stdout_slurp() }
 }
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.link(&char, &char) int
 
 fn qualify_coordination_files(binary string, root string) ! {
