@@ -4,7 +4,8 @@ The controller builds signed `tone` and `noaudio` packages, real
 account/session/package CLIs and an isolated payload. Three scenarios cover
 ordinary active-seat playback, refusal controls, process cleanup and seat
 changes. Every guest check remains active in production builds.
-**Real guest audio acceptance is pending.**
+The [paired QEMU recording checks](#finalized-qemu-waveform-capture) pass.
+Full sealed qualification remains open.
 
 Production base: `df766e9e446ffe0cbe6f5fa446c1c0278a789da9`;
 strict socket-address C boundary fix: `f50041955`.
@@ -285,3 +286,29 @@ The raw scenario outputs, checks and selected source, kernel and tool digests
 are in `~/.local/state/vinix/r14-audio-serial-rB8qLx/qualification.tar.gz`.
 Its SHA-256 is `22be99a5cf96f64f3ca06e1b801d4d20dbaab21a3cc98d9ac782cf1e8c1fa0d2`.
 The extracted tree passed every entry in its `qualification.sha256` manifest.
+
+## Finalized QEMU waveform capture
+
+At `d8f27b46c`, the controller starts QEMU's monitor capture at the guest
+start marker and stops it after the final pass marker, while QEMU can still
+finish the WAV header. QEMU 11.1.3 exposes these monitor commands as
+deprecated. The signed tone fixture submits 1.25 seconds of silent PCM on
+each side of every tone through the ordinary audio portal. The controller
+requires a finalized WAV and the retainer checks its original stereo samples,
+ordered serial markers and guest-initiated shutdown.
+
+All six final recordings from the basic, lifecycle and seat scenarios pass
+the strict checker on AArch64 VirtIO sound and x86-64 HD Audio. It verifies
+the expected tone sequences, frequency, amplitude, duration and quiet
+intervals. The checker still refuses both earlier basic recordings because
+their RIFF lengths are unset. The host checks passed 19 waveform controls
+and 40 diagnostic controls. The strict evidence matrix passed 35 controls
+per architecture. Native qualification still requires an independently
+reviewed seal for the retained `7c10afe81` kernels used in these runs.
+
+Run `audio-portal-retain --diagnostic-recording basic SCENARIO_DIRECTORY`
+against the original scenario directory, or select `lifecycle` or `seat`.
+The raw WAVs, QMP and serial logs, verdicts and selected input digests are in
+`~/.local/state/vinix/r14-audio-waveform-nlujq3/qualification.tar.gz`.
+Its SHA-256 is `477675c493322ecbc372d246c5f5ca0bbfe8db826d4f6f839a80f313eedf7fc3`.
+The extracted files passed every entry in `qualification.sha256`.

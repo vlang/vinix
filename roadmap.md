@@ -931,9 +931,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     labels before account isolation. Applications receive no raw sound-device
     path. All 52 host checks pass, including allocation ownership, refusal and
     production C generation for both targets. The
-    [guest serial checks](tests/packages/audio-portal-native-check.md#isolated-payload-serial-relay)
-    pass playback, seat switching and cleanup markers on both QEMU targets.
-    Sealed waveform and stalled-driver acceptance remain open.
+    [paired QEMU checks](tests/packages/audio-portal-native-check.md#finalized-qemu-waveform-capture)
+    pass exact stereo waveforms, seat switching and cleanup on both targets.
+    Independently reviewed kernel seals and stalled-driver acceptance remain open.
   - [x] [Ordinary-account graphical sessions](tests/packages/software-session-check.md)
     use the effective account's home and child environment, inherited console
     descriptors, private readiness and shared numeric broker/framebuffer paths.
