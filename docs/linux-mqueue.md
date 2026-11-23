@@ -252,6 +252,14 @@ Hashes are SHA-256 prefixes. The archive is
 `~/.cache/vinix-r15/mq-file-bind-lifetime/qualification.tar.zst`, with SHA-256
 `f8df1cf4828691af73b9b28ef593a7aa0f686e6602db1ea3dcacb69c95636e56`.
 
+The AArch64 desktop regression on `1e8d2c20a` completed `idle`, `apps`,
+`drag`, `churn` and `ops` using a cached userspace image. Each of the 36
+`ops` cohorts ran 200 operations and reported zero bytes retained per
+operation. Four `churn` programs completed 300 runs each. The largest
+positive retained-memory change was 16 KiB over the `sleep` cohort. The
+archive in the same directory is `desktop-regression.tar.zst`, with SHA-256
+`2c13b7a1ffbb829844351a2fa8877d50ec07e467558c91abb8043a56e3a2afc8`.
+
 ### Signal notifications across exec
 
 `SIGEV_SIGNAL` registrations record the current process image. A failed
