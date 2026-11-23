@@ -18,6 +18,7 @@ const draft_refusals = ['draft-tag-rebound', 'draft-wrong-upload-url',
 	'draft-incomplete-asset', 'draft-missing-asset', 'draft-extra-asset', 'draft-changed', 'upload-interrupted']
 const publish_refusals = ['publish-readback-lost', 'publish-still-draft',
 	'publish-changed-asset', 'publish-tag-moved']
+const repo_refusals = ['repo-foreign', 'repo-invalid', 'repo-dotdot']
 
 struct FixtureAsset {
 	name string
@@ -193,21 +194,21 @@ fn extract_iso(out string, scenario string) !int {
 	return code
 }
 
-fn github_release_api(remote string, path string, scenario string) !int {
+fn github_release_api(args []string, remote string, path string, scenario string) !int {
 	tag := os.getenv('VINIX_ASSET_TEST_TAG')
 	commit := os.getenv('VINIX_ASSET_TEST_COMMIT')
 	draft_id := os.getenv('VINIX_ASSET_TEST_DRAFT_ID')
 	upload_endpoint := fixture_upload_endpoint(draft_id)
 	local := remote + '/draft.json'
 	if path == 'releases' {
-		os.write_file(remote + '/release-attempt', os.args[1..].join('\n') + '\n')!
-		legacy := os.args.len == 19 && os.args[17..] == ['--jq', '.id']
-		if (!legacy && os.args.len != 17) || !os.args[12].starts_with('body=@') {
+		os.write_file(remote + '/release-attempt', args[1..].join('\n') + '\n')!
+		legacy := args.len == 19 && args[17..] == ['--jq', '.id']
+		if (!legacy && args.len != 17) || !args[12].starts_with('body=@') {
 			return error('expected releases POST with notes')
 		}
-		body := os.args[12]
+		body := args[12]
 		prerelease := scenario == 'draft-only'
-		if os.args[3..17] != ['--method', 'POST', '-f', 'tag_name=' + tag, '-f',
+		if args[3..17] != ['--method', 'POST', '-f', 'tag_name=' + tag, '-f',
 			'target_commitish=' + commit, '-f', 'name=Vinix ' + tag, '-F', body, '-F',
 			'draft=true', '-F', 'prerelease=' + prerelease.str()]
 			|| os.read_file(tag_file(remote, tag))! != commit {
@@ -230,7 +231,7 @@ fn github_release_api(remote string, path string, scenario string) !int {
 	}
 	if path != 'releases/' + draft_id { return error('unexpected draft release ID') }
 	mut draft := json2.decode[FixtureRelease](os.read_file(local)!)!
-	if os.args.len == 3 {
+	if args.len == 3 {
 		if !draft.draft && scenario == 'publish-readback-lost' {
 			eprintln('fixture could not read published release')
 			return 1
@@ -256,10 +257,10 @@ fn github_release_api(remote string, path string, scenario string) !int {
 	if !draft.draft || os.exists(remote + '/publish-attempt') {
 		return error('unexpected draft publish request')
 	}
-	os.write_file(remote + '/publish-attempt', os.args[1..].join('\n') + '\n')!
-	legacy := os.args[3..] == ['--method', 'PATCH', '-F', 'draft=false', '--jq',
+	os.write_file(remote + '/publish-attempt', args[1..].join('\n') + '\n')!
+	legacy := args[3..] == ['--method', 'PATCH', '-F', 'draft=false', '--jq',
 		'select(.draft == false) | .html_url']
-	if !legacy && os.args[3..] != ['--method', 'PATCH', '-F', 'draft=false', '--silent'] {
+	if !legacy && args[3..] != ['--method', 'PATCH', '-F', 'draft=false', '--silent'] {
 		return error('unexpected draft publish request')
 	}
 	if scenario == 'publish-still-draft' {
@@ -277,13 +278,13 @@ fn github_release_api(remote string, path string, scenario string) !int {
 	return 0
 }
 
-fn upload_fixture(out string, remote string, scenario string) !int {
+fn upload_fixture(args []string, out string, remote string, scenario string) !int {
 	tag := os.getenv('VINIX_ASSET_TEST_TAG')
-	if os.args.len != 12 { return error('unexpected draft upload request') }
-	file := os.args[10]
+	if args.len != 12 { return error('unexpected draft upload request') }
+	file := args[10]
 	name := os.file_name(file)
 	upload_endpoint := fixture_upload_endpoint(os.getenv('VINIX_ASSET_TEST_DRAFT_ID'))
-	if os.args[2..] != [upload_endpoint, '--method', 'POST', '-H', 'Content-Type: application/octet-stream',
+	if args[2..] != [upload_endpoint, '--method', 'POST', '-H', 'Content-Type: application/octet-stream',
 		'-f', 'name=' + name, '--input', file, '--silent'] {
 		return error('unexpected draft upload request')
 	}
@@ -315,19 +316,19 @@ fn upload_fixture(out string, remote string, scenario string) !int {
 	return 0
 }
 
-fn github_api(scenario string) !int {
+fn github_api(args []string, scenario string) !int {
 	remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
 	commit := os.getenv('VINIX_ASSET_TEST_COMMIT')
-	path := os.args[2]
+	path := args[2]
 	prefix := 'repos/local/fixture/'
 	if path.starts_with('https://') {
-		return upload_fixture(os.getenv('VINIX_ASSET_TEST_OUT'), remote, scenario)
+		return upload_fixture(args, os.getenv('VINIX_ASSET_TEST_OUT'), remote, scenario)
 	}
 	if path.starts_with(prefix + 'releases') {
-		return github_release_api(remote, path[prefix.len..], scenario)
+		return github_release_api(args, remote, path[prefix.len..], scenario)
 	}
-	if path == prefix + 'commits/' + commit && '--silent' in os.args { return 0 }
-	if path.starts_with(prefix + 'git/matching-refs/tags/') && os.args[3..] == ['--jq', '.[].ref'] {
+	if path == prefix + 'commits/' + commit && '--silent' in args { return 0 }
+	if path.starts_with(prefix + 'git/matching-refs/tags/') && args[3..] == ['--jq', '.[].ref'] {
 		if scenario == 'tag-read-failed' {
 			eprintln('fixture GitHub tag lookup failed')
 			return 1
@@ -338,19 +339,19 @@ fn github_api(scenario string) !int {
 		println('refs/tags/' + tag + '-another')
 		return 0
 	}
-	if path.starts_with(prefix + 'commits/refs/tags/') && os.args[3..] == ['--jq', '.sha'] {
+	if path.starts_with(prefix + 'commits/refs/tags/') && args[3..] == ['--jq', '.sha'] {
 		tag := urllib.query_unescape(path.all_after('/commits/refs/tags/'))!
 		println(os.read_file(tag_file(remote, tag))!)
 		return 0
 	}
 	tag := os.getenv('VINIX_ASSET_TEST_TAG')
-	if path != prefix + 'git/refs' || os.args[3..] != ['--method', 'POST', '-f',
+	if path != prefix + 'git/refs' || args[3..] != ['--method', 'POST', '-f',
 		'ref=refs/tags/' + tag, '-f', 'sha=' + commit, '--silent'] {
-		return error('unexpected fixture GitHub API invocation: ' + os.args[1..].join(' '))
+		return error('unexpected fixture GitHub API invocation: ' + args[1..].join(' '))
 	}
 	file := tag_file(remote, tag)
 	if os.exists(file) { return error('fixture attempted to create an existing tag') }
-	os.write_file(remote + '/create-tag', os.args[2..].join('\n') + '\n')!
+	os.write_file(remote + '/create-tag', args[2..].join('\n') + '\n')!
 	if scenario == 'tag-create-failed' {
 		eprintln('fixture tag creation failed')
 		return 1
@@ -408,10 +409,32 @@ fn run_stub(name string) !int {
 			println('fixture size')
 		}
 		'gh' {
-			if os.args[1] == 'auth' { return 0 }
-			if os.args[1] == 'api' { return github_api(scenario) }
+			if os.args[1] == 'auth' {
+				if os.args[2..] != ['status', '--hostname=github.com'] {
+					return error('GitHub auth check did not select GitHub.com')
+				}
+				return 0
+			}
+			if os.args[1] == 'api' {
+				if os.args[2] != '--hostname=github.com' {
+					return error('GitHub API request did not select GitHub.com')
+				}
+				return github_api([os.args[0], os.args[1], ...os.args[3..]], scenario)
+			}
+			if os.args[1..] == ['repo', 'view', '--json', 'url', '--jq', '.url'] {
+				repo_url := if scenario == 'repo-foreign' {
+					'https://enterprise.invalid/local/fixture'
+				} else { 'https://github.com/local/fixture' }
+				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
+				os.write_file(remote + '/repo-discovery', repo_url + '\n')!
+				println(repo_url)
+				return 0
+			}
 			upload := out + '/fixture-upload'
 			if os.args[1..3] == ['release', 'view'] {
+				if os.args[3..6] != ['--repo', 'github.com/local/fixture', '--'] {
+					return error('release lookup did not select GitHub.com')
+				}
 				reserved := os.getenv('VINIX_ASSET_TEST_RESERVED_RELEASE')
 				if reserved != '' && os.args.last() == reserved { return 0 }
 				if !os.exists(upload) { return 1 }
@@ -579,6 +602,7 @@ fn run() ! {
 		}
 	}
 	base['PATH'] = root + '/fake-bin:' + os.getenv('PATH')
+	base['GH_HOST'] = 'enterprise.invalid'
 	base['VINIX_ASSET_TEST_XORRISO'] = os.find_abs_path_of_executable('xorriso')!
 	base['VINIX_ASSET_TEST_ROOT'] = root
 	base['VINIX_UI2_SOURCE'] = root + '/ui2'
@@ -592,9 +616,10 @@ fn run() ! {
 	date_code, date_output := command('/bin/date', ['+%Y-%m-%d'], root, base)
 	if date_code != 0 { return error('cannot resolve fixture date: ' + date_output) }
 	default_tag := 'iso-' + date_output.trim_space()
-	mut scenarios := draft_refusals.clone()
+	mut scenarios := repo_refusals.clone()
+	scenarios << draft_refusals
 	scenarios << publish_refusals
-	scenarios << 'publish-response-lost'
+	scenarios << ['publish-response-lost', 'repo-inferred']
 	scenarios << ['draft-only', 'tag-mismatch', 'tag-existing', 'tag-auto', 'tag-moved', 'tag-raced',
 		'tag-raced-match', 'tag-create-failed', 'tag-read-failed', 'workspace-lock',
 		'public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
@@ -634,8 +659,13 @@ fn run() ! {
 		environment['VINIX_ASSET_TEST_DRAFT_ID'] = (71439 + index).str()
 		environment['VINIX_ASSET_TEST_OUT'] = out
 		environment['VINIX_ASSET_TEST_CASE'] = scenario
-		mut args := [root + '/scripts/deploy-iso.sh', '--yes',
-			'--repo=local/fixture']
+		mut args := [root + '/scripts/deploy-iso.sh', '--yes']
+		match scenario {
+			'repo-foreign', 'repo-inferred' {}
+			'repo-invalid' { args << '--repo=enterprise.invalid/local/fixture' }
+			'repo-dotdot' { args << '--repo=local/..' }
+			else { args << '--repo=local/fixture' }
+		}
 		if scenario != 'tag-auto' { args << '--tag=' + tag }
 		if scenario == 'draft-only' { args << ['--draft', '--prerelease'] }
 		if scenario == 'build-only' { args << ['--arch=amd64', '--no-publish'] }
@@ -646,7 +676,7 @@ fn run() ! {
 			return error('release left a private staging directory: ' + scenario)
 		}
 		draft_refusal := scenario in draft_refusals
-		expect_create := draft_refusal || scenario in publish_refusals || scenario in ['publish-response-lost', 'draft-only', 'tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
+		expect_create := draft_refusal || scenario in publish_refusals || scenario in ['publish-response-lost', 'repo-inferred', 'draft-only', 'tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
 			'workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test']!
 		if os.exists(remote + '/create-tag') != expect_create {
@@ -654,7 +684,7 @@ fn run() ! {
 		}
 		if scenario in ['workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test', 'tag-existing', 'tag-auto',
-			'tag-raced-match', 'draft-only', 'publish-response-lost']! {
+			'tag-raced-match', 'draft-only', 'publish-response-lost', 'repo-inferred']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
 			verify_handoff(out, with_packages, scenario)!
 			draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
@@ -668,6 +698,14 @@ fn run() ! {
 				if retry_code != 0 || !os.is_file(root + '/build-release/fixture-lock-build/SHA256SUMS') {
 					return error('release workspace retry failed\n' + retry_log)
 				}
+			}
+		} else if scenario in repo_refusals {
+			diagnostic := if scenario == 'repo-foreign' {
+				"the checkout's repository is on a different host"
+			} else { 'expected a GitHub.com repository in OWNER/NAME form' }
+			expected_files := if scenario == 'repo-foreign' { ['repo-discovery'] } else { []string{} }
+			if code == 0 || !log.contains(diagnostic) || os.exists(out) || os.ls(remote)! != expected_files {
+				return error('release preflight accepted an invalid repository: ' + scenario + '\n' + log)
 			}
 		} else if scenario in publish_refusals {
 			diagnostic := match scenario {

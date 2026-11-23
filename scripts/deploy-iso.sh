@@ -14,7 +14,7 @@
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
-#   --repo=OWNER/NAME  GitHub repository (default: the one gh picks for this checkout)
+#   --repo=OWNER/NAME  GitHub.com repository (default: the repository gh discovers)
 #
 # The images are built from a clean checkout of REF in build-release/work/src,
 # so uncommitted changes in this tree never end up in a release. What is not
@@ -178,15 +178,28 @@ if [ -n "$RESUME_DRAFT" ]; then
     SHORT="${COMMIT:0:10}"
 fi
 
+github_api() {
+    gh api --hostname=github.com "$@"
+}
+
 if [ "$PUBLISH" -eq 1 ]; then
     need gh
-    gh auth status >/dev/null 2>&1 || die "gh is not logged in; run: gh auth login"
     if [ -z "$REPO" ]; then
-        REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)" || die "cannot tell which GitHub repository this is; pass --repo"
+        repo_url="$(gh repo view --json url --jq .url)" || die "cannot determine the checkout's repository. Pass --repo=OWNER/NAME."
+        case "$repo_url" in
+            https://github.com/*) REPO="${repo_url#https://github.com/}" ;;
+            *) die "the checkout's repository is on a different host. Pass --repo=OWNER/NAME for GitHub.com." ;;
+        esac
     fi
+    if [[ ! "$REPO" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9._-]+$ ]] ||
+        [ "${REPO#*/}" = . ] || [ "${REPO#*/}" = .. ]; then
+        die "expected a GitHub.com repository in OWNER/NAME form"
+    fi
+    gh auth status --hostname=github.com >/dev/null 2>&1 ||
+        die "gh is not logged in to GitHub.com. Run gh auth login --hostname github.com."
     # A release is created at a commit GitHub already has. Pushing is left to
     # whoever runs this.
-    if ! gh api "repos/$REPO/commits/$COMMIT" --silent >/dev/null 2>&1; then
+    if ! github_api "repos/$REPO/commits/$COMMIT" --silent >/dev/null 2>&1; then
         die "$SHORT is not on github.com/$REPO yet; push it first"
     fi
     "$V" -backend c -prod -cc cc -o "$ASSET_WORK/release-tag" \
@@ -219,15 +232,15 @@ finish_draft() {
     cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
     "$ASSET_WORK/release-assets" upload-draft "$ASSET_STAGE" "$ASSET_WORK" \
         "$response" "$REPO" "$release_id" "$TAG" "$prerelease"
-    gh api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
+    github_api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
     release_url="$(verify_release "$release_id" "$ASSET_WORK/draft.json" draft)"
     if [ "$DRAFT" -eq 1 ]; then
         step "Saved verified draft"
     else
-        if ! gh api "$release_api/$release_id" --method PATCH -F draft=false --silent; then
+        if ! github_api "$release_api/$release_id" --method PATCH -F draft=false --silent; then
             echo "Publish request failed. Checking GitHub for release $release_id." >&2
         fi
-        gh api "$release_api/$release_id" > "$ASSET_WORK/published.json" ||
+        github_api "$release_api/$release_id" > "$ASSET_WORK/published.json" ||
             die "cannot read back release $release_id; retry with --resume-draft=$release_id"
         release_url="$(verify_release "$release_id" "$ASSET_WORK/published.json" published)"
         step "Published"
@@ -240,7 +253,7 @@ if [ -n "$RESUME_DRAFT" ]; then
     OUT="$SCRIPT_DIR/build-release/$TAG"
     step "Resuming GitHub draft $RESUME_DRAFT for $TAG at $SHORT"
     "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
-    gh api "$release_api/$RESUME_DRAFT" > "$ASSET_WORK/resume-draft.json"
+    github_api "$release_api/$RESUME_DRAFT" > "$ASSET_WORK/resume-draft.json"
     release_state="$("$ASSET_WORK/release-assets" release-state "$ASSET_WORK/resume-draft.json")"
     if [ "$release_state" = published ]; then
         [ "$DRAFT" -eq 0 ] || die "GitHub release $RESUME_DRAFT is already published"
@@ -257,7 +270,7 @@ if [ -n "$RESUME_DRAFT" ]; then
 fi
 
 release_exists() {
-    gh release view --repo "$REPO" -- "$1" >/dev/null 2>&1
+    gh release view --repo "github.com/$REPO" -- "$1" >/dev/null 2>&1
 }
 
 if [ -z "$TAG" ]; then
@@ -687,7 +700,7 @@ fi
 "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true
-gh api "$release_api" --method POST -f "tag_name=$TAG" \
+github_api "$release_api" --method POST -f "tag_name=$TAG" \
     -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
     -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"
 release_id="$("$ASSET_WORK/release-assets" record-draft "$WORK" "$ASSET_WORK" \

@@ -7,7 +7,7 @@ import os
 fn api(args []string) (int, string) {
 	mut child := os.new_process(os.find_abs_path_of_executable('gh') or { return 1, err.msg() })
 	defer { child.close() }
-	child.set_args(['api', ...args])
+	child.set_args(['api', '--hostname=github.com', ...args])
 	child.set_redirect_stdio_merged()
 	child.run()
 	output := child.stdout_slurp()

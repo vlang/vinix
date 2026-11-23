@@ -211,8 +211,9 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 		mut children := []&os.Process{cap: batch.len}
 		for name in batch {
 			mut child := os.new_process(gh)
-			child.set_args(['api', endpoint, '--method', 'POST', '-H', 'Content-Type: application/octet-stream',
-				'-f', 'name=' + name, '--input', os.join_path(stage, name), '--silent'])
+			child.set_args(['api', '--hostname=github.com', endpoint, '--method', 'POST', '-H',
+				'Content-Type: application/octet-stream', '-f', 'name=' + name, '--input',
+				os.join_path(stage, name), '--silent'])
 			child.run()
 			children << child
 		}
