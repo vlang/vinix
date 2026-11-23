@@ -472,6 +472,31 @@ revisions are in
 Its SHA-256 is `e26880c5849922bc488b8aeb77078e80dd9b74f459f60f00431109e2de40543d`.
 All 913 entries in the extracted `qualification.sha256` passed.
 
+### Interrupted draft upload recovery
+
+At `88f1ce131`, the release driver saves the draft ID, repository, tag,
+commit, prerelease setting, checksum manifest and notes before uploading.
+`--resume-draft=ID` revalidates the original local assets and the remote tag
+and draft. It uploads the missing assets, skips completed uploads with
+matching digests and verifies the exact asset set before publishing or
+leaving the release as a draft.
+
+All 41 release fixture checks passed using signed inputs for both
+architectures, local GitHub stubs and host helpers compiled once from the
+same sources the driver uses. The interrupted upload resumed with the
+same draft ID after the public checksum list changed. The fixture rejected
+duplicate uploads and confirmed that publishing the completed draft needed
+no additional uploads. Recovery refused a changed local ISO, a mismatched
+remote digest, a different repository and an already published release.
+ASan/UBSan controls restored the saved manifest and notes byte for byte
+and refused both a duplicate record write and an invalid recovery ID.
+
+The paired inputs, run logs, simulated draft state and recovery records
+are in
+`~/.local/state/vinix/r14-release-resume-run-Cja4yh/qualification.tar.gz`.
+Its SHA-256 is `54186cc7d8f548b4f76659221230340663efdfa16c0af891726eace482547c26`.
+All 899 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
