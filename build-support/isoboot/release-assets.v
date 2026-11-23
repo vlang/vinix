@@ -12,12 +12,12 @@ struct UploadedAsset {
 	digest string
 }
 
-struct DraftRelease {
+struct Release {
 	id         u64
 	tag_name   string
 	name       string
-	draft      bool
-	prerelease bool
+	draft      bool @[required]
+	prerelease bool @[required]
 	body       string
 	html_url   string
 	upload_url string
@@ -127,28 +127,29 @@ fn stage_assets(directory string, manifest string, destination string) ! {
 	}
 }
 
-fn upload_endpoint(draft DraftRelease, repo string) !string {
-	endpoint := 'https://uploads.github.com/repos/${repo}/releases/${draft.id}/assets'
-	if draft.id == 0 || draft.upload_url.to_lower() != endpoint.to_lower() + '{?name,label}' {
+fn upload_endpoint(release Release, repo string) !string {
+	endpoint := 'https://uploads.github.com/repos/${repo}/releases/${release.id}/assets'
+	if release.id == 0 || release.upload_url.to_lower() != endpoint.to_lower() + '{?name,label}' {
 		return error('GitHub returned an invalid draft upload destination')
 	}
 	return endpoint
 }
 
-fn read_draft(response string, id string, tag string, notes string, prerelease bool) !DraftRelease {
-	draft := json2.decode[DraftRelease](pkgcore.read_metadata(response)!)!
-	if draft.id == 0 || (id != '' && draft.id.str() != id) || !draft.draft
-		|| draft.tag_name != tag || draft.name != 'Vinix ' + tag || draft.body != notes
-		|| draft.prerelease != prerelease || draft.html_url == '' {
+fn read_release(response string, id string, tag string, notes string, prerelease bool) !Release {
+	release := json2.decode[Release](pkgcore.read_metadata(response)!)!
+	if release.id == 0 || (id != '' && release.id.str() != id)
+		|| release.tag_name != tag || release.name != 'Vinix ' + tag || release.body != notes
+		|| release.prerelease != prerelease || release.html_url == '' {
 		return error('GitHub draft metadata changed after creation')
 	}
-	return draft
+	return release
 }
 
 fn record_draft(work string, directory string, response string, repo string, tag string, commit string, prerelease bool) !u64 {
 	manifest := pkgcore.read_metadata(os.join_path(directory, 'SHA256SUMS'))!
 	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
-	draft := read_draft(response, '', tag, notes, prerelease)!
+	draft := read_release(response, '', tag, notes, prerelease)!
+	if !draft.draft { return error('GitHub did not create a draft release') }
 	upload_endpoint(draft, repo)!
 	if draft.assets.len != 0 { return error('new GitHub draft already contains assets') }
 	path := os.join_path(work, 'draft-${draft.id}.json')
@@ -197,7 +198,8 @@ fn missing_assets(directory string, assets []UploadedAsset) ![]string {
 
 fn upload_draft(stage string, directory string, response string, repo string, id string, tag string, prerelease bool) ! {
 	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
-	draft := read_draft(response, id, tag, notes, prerelease)!
+	draft := read_release(response, id, tag, notes, prerelease)!
+	if !draft.draft { return error('GitHub release is already published') }
 	endpoint := upload_endpoint(draft, repo)!
 	names := missing_assets(directory, draft.assets)!
 	if names.len == 0 { return }
@@ -224,12 +226,15 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 	}
 }
 
-fn verify_draft(directory string, response string, id string, tag string, prerelease bool) !string {
+fn verify_release(directory string, response string, repo string, id string, tag string, prerelease bool, published bool) !string {
 	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
-	draft := read_draft(response, id, tag, notes, prerelease)!
-	missing := missing_assets(directory, draft.assets)!
+	release := read_release(response, id, tag, notes, prerelease)!
+	if published && release.draft { return error('GitHub release ${id} is still a draft') }
+	if !published && !release.draft { return error('GitHub release ${id} is already published') }
+	upload_endpoint(release, repo)!
+	missing := missing_assets(directory, release.assets)!
 	if missing.len > 0 { return error('missing GitHub draft assets: ' + missing.join(', ')) }
-	return draft.html_url
+	return release.html_url
 }
 
 fn run() ! {
@@ -258,11 +263,18 @@ fn run() ! {
 			os.args[8] == 'true')!
 		return
 	}
-	if os.args.len == 7 && os.args[1] == 'verify-draft' && os.args[6] in ['true', 'false']! {
-		println(verify_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6] == 'true')!)
+	if os.args.len == 3 && os.args[1] == 'release-state' {
+		release := json2.decode[Release](pkgcore.read_metadata(os.args[2])!)!
+		println(if release.draft { 'draft' } else { 'published' })
 		return
 	}
-	return error('usage: release-assets record | capture | check | stage | record-draft | restore-draft | upload-draft | verify-draft')
+	if os.args.len == 9 && os.args[1] == 'verify-release' && os.args[7] in ['true', 'false']!
+		&& os.args[8] in ['draft', 'published']! {
+		println(verify_release(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6],
+			os.args[7] == 'true', os.args[8] == 'published')!)
+		return
+	}
+	return error('usage: release-assets record | capture | check | stage | record-draft | restore-draft | upload-draft | release-state | verify-release')
 }
 
 fn main() {

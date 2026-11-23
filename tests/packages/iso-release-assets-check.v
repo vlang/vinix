@@ -16,6 +16,8 @@ const release_url = 'https://example.invalid/fixture'
 const draft_refusals = ['draft-tag-rebound', 'draft-wrong-upload-url',
 	'tag-moved-during-upload', 'tag-removed-during-upload', 'draft-bad-digest',
 	'draft-incomplete-asset', 'draft-missing-asset', 'draft-extra-asset', 'draft-changed', 'upload-interrupted']
+const publish_refusals = ['publish-readback-lost', 'publish-still-draft',
+	'publish-changed-asset', 'publish-tag-moved']
 
 struct FixtureAsset {
 	name string
@@ -229,6 +231,10 @@ fn github_release_api(remote string, path string, scenario string) !int {
 	if path != 'releases/' + draft_id { return error('unexpected draft release ID') }
 	mut draft := json2.decode[FixtureRelease](os.read_file(local)!)!
 	if os.args.len == 3 {
+		if !draft.draft && scenario == 'publish-readback-lost' {
+			eprintln('fixture could not read published release')
+			return 1
+		}
 		draft.assets = read_uploaded_assets(os.getenv('VINIX_ASSET_TEST_OUT'), remote + '/uploads',
 			scenario.starts_with('resume-'))!
 		first := if draft.assets.len > 0 { draft.assets[0] } else { FixtureAsset{} }
@@ -239,19 +245,35 @@ fn github_release_api(remote string, path string, scenario string) !int {
 			'draft-extra-asset' { draft.assets << FixtureAsset{...first, name: 'extra.iso'} }
 			else {}
 		}
+		if !draft.draft && scenario in ['publish-changed-asset', 'resume-published-bad-digest']! {
+			draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)}
+		}
 		if scenario == 'draft-changed' { draft = FixtureRelease{...draft, tag_name: tag + '-changed'} }
 		os.write_file(local, json2.encode(draft))!
 		println(json2.encode(draft))
 		return 0
 	}
-	os.write_file(remote + '/publish-attempt', os.args[1..].join('\n') + '\n')!
-	if os.args[3..] != ['--method', 'PATCH', '-F', 'draft=false', '--jq',
-		'select(.draft == false) | .html_url'] || !draft.draft {
+	if !draft.draft || os.exists(remote + '/publish-attempt') {
 		return error('unexpected draft publish request')
+	}
+	os.write_file(remote + '/publish-attempt', os.args[1..].join('\n') + '\n')!
+	legacy := os.args[3..] == ['--method', 'PATCH', '-F', 'draft=false', '--jq',
+		'select(.draft == false) | .html_url']
+	if !legacy && os.args[3..] != ['--method', 'PATCH', '-F', 'draft=false', '--silent'] {
+		return error('unexpected draft publish request')
+	}
+	if scenario == 'publish-still-draft' {
+		if legacy { println(release_url) }
+		return 0
 	}
 	draft.draft = false
 	os.write_file(local, json2.encode(draft))!
-	println(release_url)
+	if scenario == 'publish-tag-moved' { os.write_file(tag_file(remote, tag), other_commit)! }
+	if scenario == 'publish-response-lost' {
+		eprintln('fixture lost the publish response')
+		return 1
+	}
+	if legacy { println(release_url) }
 	return 0
 }
 
@@ -530,7 +552,9 @@ fn check_resume(root string, work string, out string, remote string, environment
 		return error('recovery did not complete the retained draft')
 	}
 	resume_attempt(root, work, environment, 'resume-publish', [], '')!
-	resume_attempt(root, work, environment, 'resume-already-published', [], 'GitHub draft metadata changed after creation')!
+	resume_attempt(root, work, environment, 'resume-already-published', [], '')!
+	resume_attempt(root, work, environment, 'resume-published-with-draft', ['--draft'], 'is already published')!
+	resume_attempt(root, work, environment, 'resume-published-bad-digest', [], 'GitHub draft asset differs from the verified upload')!
 	published := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if published.draft || !os.exists(remote + '/publish-attempt')
 		|| os.read_file(record)! != recovery || os.read_file(remote + '/release-attempt')! != created {
@@ -569,6 +593,8 @@ fn run() ! {
 	if date_code != 0 { return error('cannot resolve fixture date: ' + date_output) }
 	default_tag := 'iso-' + date_output.trim_space()
 	mut scenarios := draft_refusals.clone()
+	scenarios << publish_refusals
+	scenarios << 'publish-response-lost'
 	scenarios << ['draft-only', 'tag-mismatch', 'tag-existing', 'tag-auto', 'tag-moved', 'tag-raced',
 		'tag-raced-match', 'tag-create-failed', 'tag-read-failed', 'workspace-lock',
 		'public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
@@ -620,7 +646,7 @@ fn run() ! {
 			return error('release left a private staging directory: ' + scenario)
 		}
 		draft_refusal := scenario in draft_refusals
-		expect_create := draft_refusal || scenario in ['draft-only', 'tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
+		expect_create := draft_refusal || scenario in publish_refusals || scenario in ['publish-response-lost', 'draft-only', 'tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
 			'workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test']!
 		if os.exists(remote + '/create-tag') != expect_create {
@@ -628,7 +654,7 @@ fn run() ! {
 		}
 		if scenario in ['workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test', 'tag-existing', 'tag-auto',
-			'tag-raced-match', 'draft-only']! {
+			'tag-raced-match', 'draft-only', 'publish-response-lost']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
 			verify_handoff(out, with_packages, scenario)!
 			draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
@@ -642,6 +668,20 @@ fn run() ! {
 				if retry_code != 0 || !os.is_file(root + '/build-release/fixture-lock-build/SHA256SUMS') {
 					return error('release workspace retry failed\n' + retry_log)
 				}
+			}
+		} else if scenario in publish_refusals {
+			diagnostic := match scenario {
+				'publish-readback-lost' { 'retry with --resume-draft=' + environment['VINIX_ASSET_TEST_DRAFT_ID'] }
+				'publish-still-draft' { 'is still a draft' }
+				'publish-changed-asset' { 'GitHub draft asset differs from the verified upload' }
+				else { 'points to ${other_commit}, expected ${commit}' }
+			}
+			if code == 0 || !log.contains(diagnostic) || log.contains('==> Published')
+				|| !os.exists(remote + '/publish-attempt') {
+				return error('invalid publication reported as successful: ' + scenario + '\n' + log)
+			}
+			if scenario == 'publish-readback-lost' {
+				resume_attempt(root, work, environment, 'resume-confirm-readback', [], '')!
 			}
 		} else if scenario == 'build-only' {
 			if code != 0 || os.exists(out + '/fixture-upload') || !os.exists(out + '/RELEASE_NOTES.md') {

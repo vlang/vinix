@@ -643,6 +643,12 @@ mismatch stops the run for inspection. Use `--draft` to finish the uploads
 while keeping the release unpublished. A complete draft can also be published
 with the same resume command.
 
+After the publish request, the driver reads the release by ID and checks its
+published state, metadata, asset digests and tag before reporting success. If
+the confirmation is interrupted, run `--resume-draft=ID` again with the same
+recovery record and original assets. The driver verifies an already published
+release without uploading files or sending another publish request.
+
 Set `TMPDIR` to a filesystem with room for ISO extraction and signed bundle
 verification when the system temporary filesystem is small. Standalone
 `package-receipt verify` also keeps its private ISO copy in that filesystem.

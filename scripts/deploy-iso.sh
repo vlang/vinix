@@ -11,7 +11,7 @@
 #   --prerelease       mark the release as a pre-release
 #   --no-test          do not boot-test the images first
 #   --no-publish       build (and test) only
-#   --resume-draft=ID  continue a draft from the original local build outputs
+#   --resume-draft=ID  continue an upload or confirm publication by release ID
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
 #   --repo=OWNER/NAME  GitHub repository (default: the one gh picks for this checkout)
@@ -206,35 +206,52 @@ confirm_publish() {
     fi
 }
 
+verify_release() {
+    local release_id="$1" response="$2" state="$3" release_url
+    release_url="$("$ASSET_WORK/release-assets" verify-release "$ASSET_WORK" "$response" \
+        "$REPO" "$release_id" "$TAG" "$prerelease" "$state")" || return
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT" || return
+    echo "$release_url"
+}
+
 finish_draft() {
-    local release_id="$1" response="$2" draft_url release_url
+    local release_id="$1" response="$2" release_url
     cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
     "$ASSET_WORK/release-assets" upload-draft "$ASSET_STAGE" "$ASSET_WORK" \
         "$response" "$REPO" "$release_id" "$TAG" "$prerelease"
     gh api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
-    draft_url="$("$ASSET_WORK/release-assets" verify-draft "$ASSET_WORK" "$ASSET_WORK/draft.json" \
-        "$release_id" "$TAG" "$prerelease")"
-    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    release_url="$(verify_release "$release_id" "$ASSET_WORK/draft.json" draft)"
     if [ "$DRAFT" -eq 1 ]; then
         step "Saved verified draft"
-        echo "$draft_url"
     else
-        release_url="$(gh api "$release_api/$release_id" --method PATCH -F draft=false \
-            --jq 'select(.draft == false) | .html_url')"
-        [ -n "$release_url" ] || die "GitHub did not confirm publication of draft $release_id"
+        if ! gh api "$release_api/$release_id" --method PATCH -F draft=false --silent; then
+            echo "Publish request failed. Checking GitHub for release $release_id." >&2
+        fi
+        gh api "$release_api/$release_id" > "$ASSET_WORK/published.json" ||
+            die "cannot read back release $release_id; retry with --resume-draft=$release_id"
+        release_url="$(verify_release "$release_id" "$ASSET_WORK/published.json" published)"
         step "Published"
-        echo "$release_url"
     fi
+    echo "$release_url"
 }
 
 if [ -n "$RESUME_DRAFT" ]; then
     git check-ref-format "refs/tags/$TAG" || die "invalid Git tag in recovery record: $TAG"
     OUT="$SCRIPT_DIR/build-release/$TAG"
     step "Resuming GitHub draft $RESUME_DRAFT for $TAG at $SHORT"
-    confirm_publish
-    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
     "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
     gh api "$release_api/$RESUME_DRAFT" > "$ASSET_WORK/resume-draft.json"
+    release_state="$("$ASSET_WORK/release-assets" release-state "$ASSET_WORK/resume-draft.json")"
+    if [ "$release_state" = published ]; then
+        [ "$DRAFT" -eq 0 ] || die "GitHub release $RESUME_DRAFT is already published"
+        "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
+        release_url="$(verify_release "$RESUME_DRAFT" "$ASSET_WORK/resume-draft.json" published)"
+        step "Confirmed published release"
+        echo "$release_url"
+        exit 0
+    fi
+    confirm_publish
+    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
     finish_draft "$RESUME_DRAFT" "$ASSET_WORK/resume-draft.json"
     exit 0
 fi
@@ -555,9 +572,11 @@ describe_boot() {
         esac
     done
     echo
-    echo "Give the VM **at least 4 GiB** of memory and one **empty disk of 4 GiB or more**"
+    echo "Give the VM **at least 4 GiB** of memory and one **writable disk of 4 GiB or more**"
     echo "(16 GiB leaves room for apps). Choose **Install Vinix on an empty disk** at"
-    echo "the ISO boot menu. Once the desktop starts, shut down, detach the ISO or"
+    echo "the ISO boot menu. To reuse a disk, back it up, disconnect other drives,"
+    echo "and use **Erase a disk and install Vinix**. This replaces all partitions"
+    echo "and files on the target disk. Once the desktop starts, shut down, detach the ISO or"
     echo "remove the USB stick, and boot the installed disk. Users, files and apps"
     echo "persist on that disk. **Try Vinix** starts a temporary session in memory."
     echo
