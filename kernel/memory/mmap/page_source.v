@@ -23,6 +23,8 @@ mut:
 	offset u64
 	length u64
 	flags int
+	policy numa.RangePolicy
+	policy_index u64
 	cached_private bool
 	direct bool
 	data_begin u64
@@ -43,6 +45,8 @@ fn range_page_source(local &MmapRangeLocal, virt u64) RangePageSource {
 		offset: u64(global.offset)
 		length: global.length
 		flags: local.flags
+		policy: local.policy
+		policy_index: range_policy_index(local, virt)
 		cached_private: global.private_cow
 		direct: local.flags & map_anonymous != 0
 			|| (global.segmented_file && !range_page_has_file_data(global, virt))
@@ -157,7 +161,7 @@ fn fill_range_page(mut pagemap memory.Pagemap, _source RangePageSource,
 fn acquire_range_page(source RangePageSource, file_page u64) ?voidptr {
 	if source.backing != unsafe { nil } { return pager.load(unsafe { &pager.Backing(source.backing) }) }
 	if source.direct {
-		page := numa.alloc_user_page()
+		page := numa.alloc_range_page(source.policy, source.policy_index, true)
 		if page == unsafe { nil } {
 			errno.set(errno.enomem)
 			return none
@@ -171,7 +175,7 @@ fn acquire_range_page(source RangePageSource, file_page u64) ?voidptr {
 		// ELF edge zero-fill belongs to this segment, not the cached vnode
 		// page or another segment/process mapping the same file page.
 		if source.flags & map_shared == 0 && memory.pmm_refcount(page) > 1 {
-			copy := numa.alloc_user_page_nozero()
+			copy := numa.alloc_range_page(source.policy, source.policy_index, false)
 			if copy == unsafe { nil } {
 				source.give_back(file_page, page)
 				errno.set(errno.enomem)
@@ -189,4 +193,10 @@ fn acquire_range_page(source RangePageSource, file_page u64) ?voidptr {
 		}
 	}
 	return page
+}
+
+fn range_policy_index(local &MmapRangeLocal, virt u64) u64 {
+	shadow := shadow_address(local, virt)
+	if local.global.policy_origin == 0 { return shadow / page_size }
+	return local.global.policy_origin + (shadow - local.global.base) / page_size
 }

@@ -164,6 +164,8 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		inherit_mapping_ref: global.owns_mapping_ref
 		credit_base: old_address
 		credit_serial: global.serial
+		policy: source.policy
+		policy_origin: range_policy_index(source, old_address)
 	}
 	if global.segmented_file {
 		source_relative := old_address - global.base
@@ -292,7 +294,7 @@ fn compatible_remap_span_unlocked(pagemap &memory.Pagemap, base u64, length u64,
 		local, _, file_page := addr2range(pagemap, cursor) or { errno.set(errno.efault); return false }
 		if local.metadata_protected() { errno.set(errno.eperm); return false }
 		if local.global != reference.global || local.prot != reference.prot
-			|| local.flags != reference.flags || local.cow != reference.cow
+			|| local.flags != reference.flags || local.cow != reference.cow || local.policy != reference.policy
 			|| local.dont_fork != reference.dont_fork || local.wipe_on_fork != reference.wipe_on_fork
 			|| file_page != first_page + (cursor - base) / page_size {
 			errno.set(errno.efault)

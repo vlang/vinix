@@ -3,7 +3,6 @@ module mmap
 
 import errno
 import memory
-import numa
 
 // The caller pins the address space. Hold its page-table lock while examining
 // one batch, and release it before copying any statuses to userspace.
@@ -36,28 +35,29 @@ fn physical_page_node(phys u64) i32 {
 
 // Address-policy queries use the caller's map. A node query can fault in
 // a readable page, so look the range up again after releasing the lock.
-pub fn query_policy_address(mut pagemap memory.Pagemap, address u64, want_node bool) i32 {
-	if address >= memory.user_address_limit() { return -i32(errno.efault) }
+pub fn query_policy_address(mut pagemap memory.Pagemap, address u64, want_node bool) (i32, u64) {
+	if address >= memory.user_address_limit() { return -i32(errno.efault), 0 }
 	for attempt in 0 .. 4 {
 		pagemap.l.acquire()
-		result := policy_address_locked(pagemap, address, want_node)
+		result, mask := policy_address_locked(pagemap, address, want_node)
 		pagemap.l.release()
-		if result != -i32(errno.eagain) { return result }
+		if result != -i32(errno.eagain) { return result, mask }
 		if attempt == 3 || !resolve_missing_with_access(pagemap, address, true) { break }
 	}
-	return -i32(errno.efault)
+	return -i32(errno.efault), 0
 }
 
-fn policy_address_locked(pagemap &memory.Pagemap, address u64, want_node bool) i32 {
-	local, _, _ := addr2range(pagemap, address) or { return -i32(errno.efault) }
+fn policy_address_locked(pagemap &memory.Pagemap, address u64, want_node bool) (i32, u64) {
+	local, _, _ := addr2range(pagemap, address) or { return -i32(errno.efault), 0 }
 	if !want_node {
-		// With no explicit range policy, MPOL_F_ADDR reports MPOL_DEFAULT.
-		return i32(numa.mpol_default)
+		return i32(local.policy.mode), local.policy.mask
 	}
-	if !page_mapping_has_node(local) { return -i32(errno.efault) }
+	if !page_mapping_has_node(local) { return -i32(errno.efault), 0 }
 	if phys := pagemap.user_page_phys(address, false) {
 		node := physical_page_node(phys)
-		return if node >= 0 { node } else { -i32(errno.efault) }
+		if node >= 0 { return node, local.policy.mask }
+		return -i32(errno.efault), 0
 	}
-	return if local.prot & prot_read != 0 { -i32(errno.eagain) } else { -i32(errno.efault) }
+	if local.prot & prot_read != 0 { return -i32(errno.eagain), 0 }
+	return -i32(errno.efault), 0
 }

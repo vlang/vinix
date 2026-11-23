@@ -2790,6 +2790,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   addresses, demand paging, and nodemask copy boundaries on both
   architectures. See [the address policy receipts](docs/linux-mempolicy.md).
 
+- [x] Implement native `mbind` for private anonymous mappings. Qualify
+  per-range queries, fault placement, strict checks and policy inheritance
+  on both architectures. See [the binding receipts](docs/linux-mbind.md).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

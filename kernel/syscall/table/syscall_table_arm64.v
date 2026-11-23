@@ -510,7 +510,7 @@ pub fn init_syscall_table() {
 	syscall_table[178] = voidptr(syscall_linux_gettid) // __NR_gettid
 	syscall_table[179] = voidptr(sys.syscall_sysinfo) // __NR_sysinfo
 	syscall_table[168] = voidptr(numa.syscall_getcpu) // __NR_getcpu
-	syscall_table[235] = voidptr(numa.syscall_mbind) // __NR_mbind
+	syscall_table[235] = voidptr(mmap.syscall_mbind) // __NR_mbind
 	syscall_table[236] = voidptr(syscall_linux_get_mempolicy) // __NR_get_mempolicy
 	syscall_table[239] = voidptr(syscall_linux_move_pages) // __NR_move_pages
 	syscall_table[237] = voidptr(numa.syscall_set_mempolicy) // __NR_set_mempolicy

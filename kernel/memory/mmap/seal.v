@@ -12,14 +12,7 @@ import proc
 fn split_seal_boundary_unlocked(mut pagemap memory.Pagemap, boundary u64) ? {
 	local, _, _ := addr2range(pagemap, boundary) or { return }
 	if local.base == boundary || local.sealed { return }
-	mut upper := new_local_range(unsafe { *local })? @[freed]
-	upper.base = boundary
-	upper.length = local.base + local.length - boundary
-	upper.offset = local.offset + i64(boundary - local.base)
-	split_off_unlocked(mut pagemap, local, upper) or {
-		free_local_range(upper)
-		return none
-	}
+	split_upper_range_unlocked(mut pagemap, local, boundary)?
 }
 
 fn seal_unlocked(mut pagemap memory.Pagemap, base u64, end u64) u64 {

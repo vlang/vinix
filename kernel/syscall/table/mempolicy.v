@@ -25,9 +25,8 @@ fn syscall_linux_get_mempolicy(_ voidptr, mode_ptr u64, nodemask u64, maxnode u6
 		mask = numa.all_nodes_mask()
 	} else if flags & u64(numa.mpol_f_addr) != 0 {
 		mut pagemap := process.pagemap
-		mode = mmap.query_policy_address(mut pagemap, address, want_node)
+		mode, mask = mmap.query_policy_address(mut pagemap, address, want_node)
 		if mode < 0 { return errno.err, u64(-mode) }
-		mask = 0
 	} else {
 		if address != 0 { return errno.err, errno.einval }
 		if want_node { mode = i32(numa.current_node()) }

@@ -506,7 +506,7 @@ pub fn init_syscall_table() {
 	syscall_table[150] = voidptr(mmap.syscall_munlock) // munlock
 	syscall_table[151] = voidptr(mmap.syscall_mlockall) // mlockall
 	syscall_table[152] = voidptr(mmap.syscall_munlockall) // munlockall
-	syscall_table[237] = voidptr(numa.syscall_mbind) // mbind
+	syscall_table[237] = voidptr(mmap.syscall_mbind) // mbind
 	syscall_table[238] = voidptr(numa.syscall_set_mempolicy) // set_mempolicy
 	syscall_table[239] = voidptr(syscall_linux_get_mempolicy) // get_mempolicy
 	syscall_table[279] = voidptr(syscall_linux_move_pages) // move_pages

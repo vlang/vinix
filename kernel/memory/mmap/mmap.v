@@ -122,6 +122,7 @@ pub mut:
 	offset    i64
 	prot      int
 	flags     int
+	policy    numa.RangePolicy
 	cow       bool
 	immutable bool
 	sealed    bool
@@ -141,6 +142,9 @@ pub mut:
 	// A reservation needs no physical page tables until its first page is
 	// installed. top_level is created under shadow_pagemap.l at that point.
 	serial u64
+	// Anonymous page index of the first page after a moving remap or wipe
+	// on fork. Zero uses the original mapping base for interleave placement.
+	policy_origin u64
 	private_cow bool
 	tracked_file bool
 	file_registered bool
@@ -187,6 +191,8 @@ mut:
 	credit_serial    u64
 	created_serial   &u64 = unsafe { nil }
 	file_remap FileRemapSource
+	policy numa.RangePolicy
+	policy_origin u64
 }
 
 pub fn list_ranges(pagemap &memory.Pagemap) {
@@ -739,6 +745,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 			mut empty_global := allocate_global_range(MmapRangeGlobal{
 				locals: []&MmapRangeLocal{}
 				base: local_range.base
+				policy_origin: range_policy_index(local_range, local_range.base)
 				length: local_range.length
 				shadow_pagemap: memory.Pagemap{
 			kernel_owner: owner
@@ -790,6 +797,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 					handle_ref: global_range.handle_ref
 					handle_unref: global_range.handle_unref
 					base: global_range.base
+					policy_origin: global_range.policy_origin
 					length: global_range.length
 					offset: global_range.offset
 					pte_extra: global_range.pte_extra
@@ -944,6 +952,10 @@ fn (mut g MmapRangeGlobal) ensure_local_capacity(required int) ? {
 fn split_off_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal, piece &MmapRangeLocal) ? {
 	mut local := unsafe { _local }
 	mut global := local.global
+	// Every caller splits an existing mapping, including protection and
+	// inheritance changes that construct the new piece field by field.
+	mut split := unsafe { piece }
+	split.policy = local.policy
 	ensure_range_capacity_unlocked(mut pagemap, pagemap.mmap_ranges.len + 1)?
 	range_locals_lock.acquire()
 	global.ensure_local_capacity(global.locals.len + 1) or {
@@ -958,6 +970,17 @@ fn split_off_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal, piece 
 	local.length -= piece.length
 	range_locals_lock.release()
 	insert_range_unlocked(mut pagemap, piece)
+}
+
+fn split_upper_range_unlocked(mut pagemap memory.Pagemap, local &MmapRangeLocal, boundary u64) ? {
+	mut upper := new_local_range(unsafe { *local })? @[freed]
+	upper.base = boundary
+	upper.length = local.base + local.length - boundary
+	upper.offset = local.offset + i64(boundary - local.base)
+	split_off_unlocked(mut pagemap, local, upper) or {
+		free_local_range(upper)
+		return none
+	}
 }
 
 pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _prot int) ? {
@@ -1015,7 +1038,7 @@ fn install_range_page(mut pagemap memory.Pagemap, source RangePageSource, virt u
 	if voidptr(current) != source.local_identity || current.global.serial != source.global_serial
 		|| current.generation != source.local_generation
 		|| current_file_page != source.file_page || file_page != source.file_page
-		|| current.flags != source.flags {
+		|| current.flags != source.flags || current.policy != source.policy {
 		pagemap.l.release()
 		source.give_back(file_page, page)
 		return
@@ -1152,7 +1175,8 @@ fn unshare_private_page_unlocked(mut pagemap memory.Pagemap, local_range &MmapRa
 	// A private copy is written by, and then read by, the thread taking this
 	// fault, so it belongs on that thread's node rather than next to the shared
 	// page it was copied from.
-	new_page := numa.alloc_user_page_nozero()
+	index := range_policy_index(local_range, virt)
+	new_page := numa.alloc_range_page(local_range.policy, index, false)
 	if new_page == unsafe { nil } {
 		return none
 	}
@@ -1416,6 +1440,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		offset: offset
 		prot: prot
 		flags: flags
+		policy: options.policy
 		global: unsafe { nil }
 	})?
 
@@ -1493,6 +1518,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	mut range_global := allocate_global_range(MmapRangeGlobal{
 		locals: []&MmapRangeLocal{}
 		base: base
+		policy_origin: options.policy_origin
 		length: length
 		resource: resource_
 		handle: range_handle

@@ -14,9 +14,10 @@ lookup. The scalar mode is written before the mask, and trailing words are
 zeroed before copying the first word. `MPOL_F_MEMS_ALLOWED` reports mode zero
 and the allowed nodes.
 
-Vinix still stores memory policy on the process. Per-mapping `mbind`
-policies, Linux's interleave-next result for `MPOL_F_NODE` without
-`MPOL_F_ADDR`, and translated or 32-bit policy calls remain open.
+Vinix stores the default allocation policy on the process. Address queries
+also report [explicit policies on private anonymous mappings](linux-mbind.md).
+Linux's interleave-next result for `MPOL_F_NODE` without `MPOL_F_ADDR` and
+translated or 32-bit policy calls remain open.
 
 ## Qualification
 

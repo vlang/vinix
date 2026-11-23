@@ -68,18 +68,17 @@ copy-on-write fault goes.
 
 `set_mempolicy(2)`, `get_mempolicy(2)` and `mbind(2)` are implemented, with
 `MPOL_DEFAULT`, `MPOL_LOCAL`, `MPOL_PREFERRED`, `MPOL_BIND` and
-`MPOL_INTERLEAVE`. The policy is process-wide and is inherited across a fork.
+`MPOL_INTERLEAVE`. `set_mempolicy(2)` changes the process policy, which is
+inherited across a fork.
 
 `MPOL_BIND` is strict: a fault that cannot be served from the bound nodes
 reports ENOMEM rather than quietly allocating somewhere else. `MPOL_PREFERRED`
 is a preference and does fall back.
 
-`mbind(2)` has no per-range policy store behind it, so a binding applies to the
-process the way `set_mempolicy(2)` does. That is weaker than Linux and
-deliberately so: a caller that binds an arena and then faults it in gets its
-pages from the nodes it asked for, which is the effect programs use `mbind` for.
-Pages already faulted in are not moved, exactly as on Linux without
-`MPOL_MF_MOVE`.
+`mbind(2)` can apply a policy to private anonymous mappings. The policy
+controls future anonymous allocations and copy-on-write faults, is inherited
+across fork, and is visible to address queries through `get_mempolicy(2)`.
+Resident pages keep their placement. See the [mbind contract and receipts](linux-mbind.md).
 
 `getcpu(2)` reports the node of the CPU the caller is on.
 

@@ -611,39 +611,6 @@ pub fn syscall_set_mempolicy(_ voidptr, mode int, nodemask u64, maxnode u64) (u6
 	return store_policy(mut process, mode, mask)
 }
 
-// mbind(addr, len, mode, nodemask, maxnode, flags).
-//
-// Vinix has no per-range policy store, so a binding applies to the process the
-// way set_mempolicy(2) does. That is weaker than Linux, and deliberately so: a
-// caller that binds one arena and then faults it in gets its pages from the
-// nodes it asked for, which is the effect programs use mbind for. Pages already
-// faulted in are not moved, exactly as on Linux without MPOL_MF_MOVE.
-pub fn syscall_mbind(_ voidptr, addr u64, _length u64, mode int, nodemask u64, maxnode u64, _flags u64) (u64, u64) {
-	if (addr & (page_size - 1)) != 0 {
-		return errno.err, errno.einval
-	}
-	if mode < 0 || mode >= mpol_max {
-		return errno.err, errno.einval
-	}
-	mask := read_nodemask(nodemask, maxnode) or { return errno.err, errno.einval }
-
-	mut running := proc.current_thread()
-	if running == unsafe { nil } {
-		return errno.err, errno.einval
-	}
-	mut process := running.process
-	if process == unsafe { nil } {
-		return errno.err, errno.einval
-	}
-	if mode == mpol_default || mode == mpol_local {
-		process.mempolicy_mode = mode
-		process.mempolicy_nodemask = 0
-		process.mempolicy_interleave = 0
-		return 0, 0
-	}
-	return store_policy(mut process, mode, mask)
-}
-
 // ── Reporting ───────────────────────────────────────────────────────────────
 
 fn report() {
