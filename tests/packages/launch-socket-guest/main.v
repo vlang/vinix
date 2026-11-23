@@ -9,18 +9,17 @@ fn C.dup2(int, int) int
 fn C.open(&char, int, ...int) int
 fn C.close(int) int
 fn C.fork() int
-fn C.execv(&char, &&char) int
+fn C.execl(&char, &char, ...voidptr) int
 fn C._exit(int)
 fn C.waitpid(int, &i32, int) int
 fn C.reboot(int) int
 fn C.usleep(u32) int
 
 fn check() bool {
-	argv := [c'streams', &char(unsafe { nil })]!
 	pid := C.fork()
 	if pid < 0 { return false }
 	if pid == 0 {
-		C.execv(c'/usr/share/package-fixtures/streams', unsafe { &argv[0] })
+		C.execl(c'/usr/share/package-fixtures/streams', c'streams', voidptr(0))
 		C._exit(91)
 	}
 	mut status := i32(0)

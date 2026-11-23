@@ -45,10 +45,16 @@ pub fn needs_isolation() !bool {
 }
 
 fn ready(fd int, deadline u64) ! {
-	now := time.sys_mono_now()
-	if now >= deadline { return error('isolated package input timed out') }
 	mut polling := Poll{ fd: i32(fd), events: 1 }
-	if C.vinix_launch_poll(voidptr(&polling), 1, int((deadline - now) / 1_000_000)) <= 0 { return error('isolated package input timed out') }
+	for {
+		now := time.sys_mono_now()
+		if now >= deadline { break }
+		timeout := int((deadline - now + 999_999) / 1_000_000)
+		result := C.vinix_launch_poll(voidptr(&polling), 1, timeout)
+		if result > 0 { return }
+		if result == 0 || C.errno != C.EINTR { break }
+	}
+	return error('isolated package input timed out')
 }
 
 fn read_exact(fd int, data voidptr, length int, deadline u64) ! {

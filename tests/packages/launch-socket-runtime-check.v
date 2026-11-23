@@ -13,7 +13,7 @@ fn main() {
 		scenarios: [hwhost.Scenario{
 			name: 'packages-launch-socket'
 			arches: ['aarch64', 'x86_64']
-			about: 'UNIX EOF readiness after read/recvfrom/recvmsg, simultaneous shutdown, partial launch requests and descriptor transport'
+			about: 'UNIX EOF readiness, simultaneous shutdown, interrupted launch waits and descriptor transport'
 			required: ['HWTEST START packages-launch-socket', 'LAUNCH SOCKET EOF and descriptor regressions PASS', 'HWTEST PASS packages-launch-socket']
 			ending: .poweroff
 			timeout: 120

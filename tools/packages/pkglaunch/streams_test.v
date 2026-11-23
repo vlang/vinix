@@ -4,10 +4,106 @@ module pkglaunch
 import time
 
 #include <sys/socket.h>
+#include <signal.h>
+#include <sys/wait.h>
 fn C.socketpair(int, int, int, &i32) int
 fn C.pipe(&i32) int
 fn C.shutdown(int, int) int
 fn C.recvfrom(int, voidptr, usize, int, voidptr, voidptr) isize
+fn C.fork() int
+fn C.getpid() int
+fn C.kill(int, int) int
+fn C.signal(int, voidptr) voidptr
+fn C.siginterrupt(int, int) int
+fn C.usleep(u32) int
+fn C.waitpid(int, &i32, int) int
+fn C._exit(int)
+
+fn ignore_launch_interrupt(_ i32) {}
+
+fn launch_interrupt_handler() voidptr {
+	previous := C.signal(C.SIGUSR1, voidptr(ignore_launch_interrupt))
+	assert previous != voidptr(C.SIG_ERR)
+	assert C.siginterrupt(C.SIGUSR1, 1) == 0
+	return previous
+}
+
+fn interrupt_launch_waiter(parent int, count int) {
+	for _ in 0 .. count {
+		C.usleep(20_000)
+		if C.kill(parent, C.SIGUSR1) != 0 { C._exit(92) }
+	}
+}
+
+fn wait_for_launch_writer(pid int) {
+	mut status := i32(0)
+	for {
+		result := C.waitpid(pid, &status, 0)
+		if result < 0 && C.errno == C.EINTR { continue }
+		assert result == pid && status == 0
+		return
+	}
+}
+
+fn test_launch_request_and_descriptors_survive_interrupted_waits() {
+	previous := launch_interrupt_handler()
+	defer { C.signal(C.SIGUSR1, previous) }
+	mut pair := [2]i32{}
+	assert C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &pair[0]) == 0
+	mut request := Request{ nonce: 'd'.repeat(32), arguments: ['run', 'org.fixture.app'] }
+	defer { request.close() }
+	parent := C.getpid()
+	pid := C.fork()
+	assert pid >= 0
+	if pid == 0 {
+		C.close(pair[0])
+		interrupt_launch_waiter(parent, 4)
+		send_request(pair[1], request) or { C._exit(93) }
+		interrupt_launch_waiter(parent, 4)
+		send_streams(pair[1], [pair[1], pair[1], pair[1]]!) or { C._exit(94) }
+		C._exit(0)
+	}
+	C.close(pair[1])
+	defer { C.close(pair[0]) }
+	defer { wait_for_launch_writer(pid) }
+	mut captured := receive_request(pair[0])!
+	defer { captured.close() }
+	assert captured.nonce == request.nonce && captured.arguments == request.arguments
+	streams := receive_streams(pair[0])!
+	defer { for fd in streams { C.close(fd) } }
+	for fd in streams { assert C.fcntl(fd, C.F_GETFD) & C.FD_CLOEXEC != 0 }
+}
+
+fn test_launch_partial_read_keeps_its_deadline_under_signals() {
+	previous := launch_interrupt_handler()
+	defer { C.signal(C.SIGUSR1, previous) }
+	mut pair := [2]i32{}
+	assert C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &pair[0]) == 0
+	parent := C.getpid()
+	pid := C.fork()
+	assert pid >= 0
+	if pid == 0 {
+		C.close(pair[0])
+		if C.write(pair[1], c'ab', 2) != 2 { C._exit(95) }
+		interrupt_launch_waiter(parent, 30)
+		C._exit(0)
+	}
+	C.close(pair[1])
+	defer { C.close(pair[0]) }
+	defer { wait_for_launch_writer(pid) }
+	mut bytes := [4]u8{}
+	start := time.sys_mono_now()
+	if _ := read_exact(pair[0], &bytes[0], bytes.len, start + 150_000_000) {
+		assert false, 'partial launch read succeeded'
+	} else {
+		message := err.msg()
+		defer { unsafe { message.free(); err.free() } }
+		elapsed := time.sys_mono_now() - start
+		assert message == 'isolated package input timed out'
+		assert elapsed >= 150_000_000 && elapsed < 500_000_000
+		assert bytes[0] == `a` && bytes[1] == `b`
+	}
+}
 
 fn eof_read(fd int, receiver int, count int) int {
 	mut bytes := [8]u8{}
