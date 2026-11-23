@@ -68,10 +68,11 @@ copy-on-write fault goes.
 
 `set_mempolicy(2)`, `get_mempolicy(2)` and `mbind(2)` are implemented, with
 `MPOL_DEFAULT`, `MPOL_LOCAL`, `MPOL_PREFERRED`, `MPOL_BIND`,
-`MPOL_INTERLEAVE` and `MPOL_PREFERRED_MANY`. `set_mempolicy(2)` changes the
-calling thread's policy. New threads and processes inherit it from their
-creator. An executable replacement keeps the policy of the thread that
-called `execve(2)`. See [task memory policy receipts](linux-task-mempolicy.md).
+`MPOL_INTERLEAVE`, `MPOL_PREFERRED_MANY`, and `MPOL_WEIGHTED_INTERLEAVE`.
+`set_mempolicy(2)` changes the calling thread's policy. New threads and
+processes inherit it from their creator. An executable replacement keeps
+the policy of the thread that called `execve(2)`. See
+[task memory policy receipts](linux-task-mempolicy.md).
 
 `MPOL_BIND` reports ENOMEM when the bound nodes cannot serve a fault.
 `MPOL_PREFERRED` and `MPOL_PREFERRED_MANY` allow fallback. The latter tries
@@ -86,6 +87,10 @@ Resident pages keep their placement. See the [mbind contract and receipts](linux
 `set_mempolicy_home_node(2)` selects the node used to order future allocations
 for an explicit `MPOL_BIND` or `MPOL_PREFERRED_MANY` range. See
 [home-node qualification](linux-mempolicy-home-node.md).
+
+`MPOL_WEIGHTED_INTERLEAVE` uses the page index and the node weights in
+`/sys/kernel/mm/mempolicy/weighted_interleave/`. See
+[weighted interleave qualification](linux-weighted-interleave.md).
 
 `getcpu(2)` reports the node of the CPU the caller is on.
 

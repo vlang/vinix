@@ -41,6 +41,7 @@ enum SysFSKind {
 	text
 	node_meminfo
 	node_numastat
+	node_interleave_weight
 	// A file another module answers for; see sysfs_dynamic.v.
 	attribute
 	link
@@ -135,6 +136,12 @@ fn (mut this SysFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSN
 	add_sysfs_directory(mut fs_dir, 'cgroup')
 	mut kernel_dir := add_sysfs_directory(mut root, 'kernel')
 	add_sysfs_directory(mut kernel_dir, 'security')
+	mut mm_dir := add_sysfs_directory(mut kernel_dir, 'mm')
+	mut mempolicy := add_sysfs_directory(mut mm_dir, 'mempolicy')
+	mut weighted := add_sysfs_directory(mut mempolicy, 'weighted_interleave')
+	for node in 0 .. numa.node_count() {
+		add_sysfs_generated(mut weighted, sysfs_numbered('node', node), .node_interleave_weight, node)
+	}
 	add_sysfs_directory(mut root, 'module')
 	// Linux always has /sys/block, and sandboxes bind it in without checking:
 	// WebKit's bubblewrap arguments fail when it is missing. Vinix publishes
@@ -212,7 +219,10 @@ fn add_sysfs_text(mut parent VFSNode, name string, text string) &VFSNode {
 
 fn add_sysfs_generated(mut parent VFSNode, name string, kind SysFSKind, node_id int) &VFSNode {
 	mut node := create_node(parent.filesystem, parent, name, false)
-	node.resource = new_sysfs_resource(kind, stat.ifreg | 0o444, node_id)
+	mode := if kind == .node_interleave_weight { u32(0o644) } else { u32(0o444) }
+	mut res := new_sysfs_resource(kind, stat.ifreg | mode, node_id)
+	if kind == .node_interleave_weight { res.stat.size = page_size }
+	node.resource = res
 	unsafe {
 		parent.children[name] = node
 	}
@@ -392,6 +402,9 @@ fn (this &SysFSResource) contents() string {
 			// for a kernel which never migrates a page after the fact.
 			return 'numa_hit 0\nnuma_miss 0\nnuma_foreign 0\ninterleave_hit 0\nlocal_node 0\nother_node 0\n'
 		}
+		.node_interleave_weight {
+			return sysfs_decimal_line(i64(numa.interleave_weight(this.node)))
+		}
 		else {
 			return ''
 		}
@@ -441,6 +454,16 @@ fn (mut this SysFSResource) read(handle voidptr, buf voidptr, loc u64, count u64
 }
 
 fn (mut this SysFSResource) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
+	if this.kind == .node_interleave_weight {
+		if count == 0 { return i64(0) }
+		length := if count < page_size { count } else { page_size }
+		weight := parse_interleave_weight(unsafe { &u8(buf) }, length) or {
+			errno.set(errno.einval)
+			return none
+		}
+		numa.set_interleave_weight(this.node, weight)
+		return i64(length)
+	}
 	if this.kind != .attribute || this.store == unsafe { nil } {
 		errno.set(errno.eperm)
 		return none
@@ -459,7 +482,7 @@ fn (mut this SysFSResource) mmap(_handle voidptr, _page u64, _flags int) voidptr
 fn (mut this SysFSResource) grow(_handle voidptr, _new_size u64) ? {
 	// `echo mem > /sys/power/state` opens with O_TRUNC first. There is nothing
 	// to resize; the write that follows is the request.
-	if this.kind == .attribute && this.store != unsafe { nil } {
+	if this.kind == .node_interleave_weight || (this.kind == .attribute && this.store != unsafe { nil }) {
 		return
 	}
 	errno.set(errno.eperm)

@@ -2809,6 +2809,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   inheritance, and fault placement on both architectures.
   See [the home-node receipts](docs/linux-mempolicy-home-node.md).
 
+- [x] Support native `MPOL_WEIGHTED_INTERLEAVE` for indexed private anonymous
+  allocations and publish per-node weights through sysfs. Qualify live weight
+  changes, out-of-order faults, and range overrides on both architectures.
+  See [the weighted interleave receipts](docs/linux-weighted-interleave.md).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

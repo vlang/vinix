@@ -2,9 +2,51 @@
 module numa
 
 import errno
+import klock
 import memory
 import proc
 import usercopy
+
+__global (
+	interleave_weights [max_nodes]u8
+	interleave_weights_lock klock.Lock
+)
+
+// An unset weight and a user-written zero both select the default weight.
+fn effective_weight(weight u8) u8 {
+	return if weight == 0 { u8(1) } else { weight }
+}
+
+pub fn interleave_weight(node int) u8 {
+	interleave_weights_lock.acquire()
+	defer { interleave_weights_lock.release() }
+	return effective_weight(interleave_weights[node])
+}
+
+pub fn set_interleave_weight(node int, weight u8) {
+	interleave_weights_lock.acquire()
+	interleave_weights[node] = weight
+	interleave_weights_lock.release()
+}
+
+// Use a single weight snapshot for both the period and the selected slot.
+// Release the lock before calling the physical allocator.
+fn weighted_interleave_node(mask u64, index u64) int {
+	interleave_weights_lock.acquire()
+	defer { interleave_weights_lock.release() }
+	mut total := u64(0)
+	for node in 0 .. node_count() {
+		if mask & (u64(1) << node) != 0 { total += u64(effective_weight(interleave_weights[node])) }
+	}
+	mut slot := index % total
+	for node in 0 .. node_count() {
+		if mask & (u64(1) << node) == 0 { continue }
+		weight := u64(effective_weight(interleave_weights[node]))
+		if slot < weight { return node }
+		slot -= weight
+	}
+	return first_node_in(mask)
+}
 
 // The native Linux memory policy syscalls read maxnode-1 bits.
 pub fn import_nodemask(address u64, maxnode u64) ?u64 {
@@ -89,6 +131,9 @@ pub fn alloc_range_page(range_policy proc.NumaPolicy, index u64, zero bool) void
 		}
 		mpol_preferred {
 			return alloc_policy_node(first_node_in(policy.mask), false, zero)
+		}
+		mpol_weighted_interleave {
+			return alloc_policy_node(weighted_interleave_node(policy.mask, index), false, zero)
 		}
 		else {}
 	}

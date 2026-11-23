@@ -13,8 +13,8 @@ intact when an allocation falls back.
 
 An explicit range can override the node used to order those attempts.
 See [home-node qualification](linux-mempolicy-home-node.md).
-`MPOL_WEIGHTED_INTERLEAVE`, optional mode flags, and translated or
-32-bit policy calls remain open.
+Indexed weighted interleave has separate qualification. Optional mode flags
+and translated or 32-bit policy calls remain open. [Weighted interleave qualification](linux-weighted-interleave.md)
 
 ## Qualification
 

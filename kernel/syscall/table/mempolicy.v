@@ -29,7 +29,15 @@ fn syscall_linux_get_mempolicy(_ voidptr, mode_ptr u64, nodemask u64, maxnode u6
 		if mode < 0 { return errno.err, u64(-mode) }
 	} else {
 		if address != 0 { return errno.err, errno.einval }
-		if want_node { mode = i32(numa.current_node()) }
+		if want_node {
+			// All current weighted allocations use a mapping index. They do
+			// not advance the cursor for allocations without one.
+			mode = if mode == numa.mpol_weighted_interleave {
+				i32(numa.first_node_in(mask))
+			} else {
+				i32(numa.current_node())
+			}
+		}
 	}
 
 	if mode_ptr != 0 && !usercopy.copy_to_user(mode_ptr, unsafe { &mode }, sizeof(i32)) {

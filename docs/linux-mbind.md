@@ -8,8 +8,10 @@ reports the explicit mapping policy. Adding `MPOL_F_NODE` returns the
 page's physical node in the mode slot. [Linux 6.12.51 memory policy implementation](https://github.com/gregkh/linux/blob/v6.12.51/mm/mempolicy.c)
 
 The supported policies are `MPOL_DEFAULT`, `MPOL_LOCAL`, `MPOL_PREFERRED`,
-`MPOL_BIND`, `MPOL_INTERLEAVE`, and `MPOL_PREFERRED_MANY`. The preferred-many
-mode has [separate placement and fallback coverage](linux-preferred-many.md).
+`MPOL_BIND`, `MPOL_INTERLEAVE`, `MPOL_PREFERRED_MANY`, and
+`MPOL_WEIGHTED_INTERLEAVE`. See the separate qualification reports for
+[preferred-many](linux-preferred-many.md) and
+[weighted interleave](linux-weighted-interleave.md).
 New pages and private copy-on-write faults use the mapping policy.
 Interleave uses the anonymous page index, which survives splitting, fork
 and moving remap. A strict
@@ -18,8 +20,8 @@ A failed interval check leaves the existing mapping policies in place.
 
 `MPOL_DEFAULT` clears mapping policies and can span holes when the
 interval includes a mapping. Other modes require a fully mapped interval.
-Page migration, policy on shared or file-backed mappings and the reserved
-`brk` arena, and weighted interleave remain open. The pager still chooses
+Page migration and policy on shared or file-backed mappings and the reserved
+`brk` arena remain open. The pager still chooses
 the frames for swapped refaults. Vinix's existing
 private moving remap copies resident data and can change its physical node.
 

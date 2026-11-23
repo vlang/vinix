@@ -62,7 +62,8 @@ pub const mpol_bind = 2
 pub const mpol_interleave = 3
 pub const mpol_local = 4
 pub const mpol_preferred_many = 5
-pub const mpol_max = 6
+pub const mpol_weighted_interleave = 6
+pub const mpol_max = 7
 
 // get_mempolicy(2) flags.
 pub const mpol_f_node = 1
@@ -400,7 +401,7 @@ pub fn all_nodes_mask() u64 {
 
 // ── Memory policy ───────────────────────────────────────────────────────────
 
-fn first_node_in(mask u64) int {
+pub fn first_node_in(mask u64) int {
 	for id := 0; id < numa_node_count && id < 64; id++ {
 		if mask & (u64(1) << u64(id)) != 0 {
 			return id

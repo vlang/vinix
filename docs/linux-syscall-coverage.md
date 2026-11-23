@@ -733,6 +733,8 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/removed.v` | `b9da77e43848e2a691b7c01245d705f5f1240592d633c63f1675979e296ba435` |
 | `kernel/fs/stat.v` | `32383658a8c70553b16ca2c62169db483e6dbb2ca49fe3eb6436e5cb35a755a8` |
 | `kernel/fs/statmount.v` | `82bc993d71311a804006c2f04f6e03afe1cc2e7e52bf8eec7df6d9cfd5f4b9d2` |
+| `kernel/fs/sysfs.v` | `d747b52e4b9150ec2f19c3941f51a0457515af37739df40b4da8a4e73054cb08` |
+| `kernel/fs/sysfs_numa.v` | `85b05aacc4debf0b40ef2bdfa9afd4b126ec4dbf8f8e9d0fed63a8a2b5cfe9ed` |
 | `kernel/fs/tmpfs.v` | `6f82a74212ecedee58a8e9796af3c87b5e4e81f7398832b4c941c26e90de7e40` |
 | `kernel/fs/vfs.v` | `bd61cba1a55ea010c79441353e459b5089a3def9f1198b39361016470bf2665a` |
 | `kernel/futex/futex.v` | `090d03d5a9276d33b195e9cb1d8adcf366049679b7988bba80d139256d68f8fa` |
@@ -769,8 +771,8 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/memory/virtual.v` | `22806c1b3e00b303b1a0192596eaa323868a0691ed05a29425e875ab1287da8a` |
 | `kernel/memory/virtual_amd64.v` | `483bb2e7ac7a1248c6f09e182a8f27b8a250f4b3e4aeba2642b4be300b00bb9d` |
 | `kernel/memory/virtual_arm64.v` | `71602c4c637ebfaad8b85d1af34ca9a3d4e1afd4ebf85fdb433fa992871693c0` |
-| `kernel/numa/numa.v` | `51ce988ae51795ea74b7a2a8d75d1417a92b20e73f615ad5030f8bac46c86a47` |
-| `kernel/numa/range_policy.v` | `86a621d0688fdf5cc02d3155a31735263f67f48384ac37eaff9eea5867bb0100` |
+| `kernel/numa/numa.v` | `4e4fed8ff30abc01a30d221553d47caf6925ef08b40f41d1c117896eb31238d4` |
+| `kernel/numa/range_policy.v` | `36d84b8a26d28497f13fa624b0a4eec813fbcbcc3ae4f6078720d02dadcc8541` |
 | `kernel/pipe/pipe.v` | `fd5941aedfd8345f76940db898cae368659dd9ffb8e8c7b8f20b083c7fbac292` |
 | `kernel/pipe/usercopy.v` | `7af5925a4de313f7d8847269f2e07a293cbfb9c585eeaf2ab926d712983cad9b` |
 | `kernel/proc/container.v` | `85e56d1f926053313b1cf1c6ec80a8ccaeaffee48e665d11d39252fe3b9200dc` |
@@ -799,7 +801,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/syscall/table/linux_common.v` | `6550cc7f7c90a95cbfd695ebeaba1bb19359b4a9ef894712031c6648e236d788` |
 | `kernel/syscall/table/linux_compat.v` | `f7bd11f5ad30281c2ffa06b9833fde39a0b30c2ae895d3aca1e2577e4f94e5a8` |
 | `kernel/syscall/table/linux_table_amd64.v` | `d39a3b803ebb3441e6aeb8b762323ae1b21eb6ea8a06b8c0775c0597606f62e2` |
-| `kernel/syscall/table/mempolicy.v` | `3f989ff91e5839190f08a98901cb34d081f6d8d4daca532198ca399c01266f9f` |
+| `kernel/syscall/table/mempolicy.v` | `09fc9c2a1045d00f6ace354eb6212c7264ca0b7cc4d02b71b3a16445fc25322b` |
 | `kernel/syscall/table/mmap_aslr_amd64.v` | `8670ac6d0f56c37f91402b0a6311b746c9bc7471fdda97e6aa2d96939cfe45ce` |
 | `kernel/syscall/table/move_pages.v` | `8623af5210eab1f549309742d3200d72f4c823ab8945e205d4b537f6fc6f02bf` |
 | `kernel/syscall/table/pipe_usercopy_amd64.v` | `48c1bdd554d3dfc05a544f3d18df0d284fe3e1a074621abcf8c1688cb416e8d0` |
@@ -824,7 +826,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/userland.v` | `c295476564f80e961b97f559ff382d285e6130e9768321dc8df36ef722b73ca7` |
 | `kernel/userland/userland_arm64.v` | `95d0519708b986ffc4b4661fe94e8b5c4694155e9fdfda79a884feb30d0b31e2` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
-| `tools/linux-compat/coverage.v` | `b135d8a437b59ab24a0058884c92578090df4fbf1aaa179843f5054ad496d9ce` |
+| `tools/linux-compat/coverage.v` | `0c1d47a04e8941202b1c4ef5d6306e77a46eb4d483ec0287fbc2bbf3e919daec` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/linux-6.12-syscalls.h` | `6fefc57e8aad1780c8e022b80d92c78280b06e221829cd85d6775b14e40256fb` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |
