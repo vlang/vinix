@@ -16,6 +16,11 @@ const editor = 'org.neovim.editor'
 const runtime = 'org.vinix.neovim-runtime'
 const approval_input = '/etc/neovim-routing-approval'
 const approval_success = 'uid=1000 run packages-change as alex: exit 0'
+const mixed_catalog_input = '/etc/neovim-routing-mixed-catalog'
+const sqlite = 'org.sqlite.cli'
+const ffmpeg = 'org.ffmpeg.cli'
+const ffprobe = 'org.ffmpeg.probe'
+const hello = 'org.vinix.package-hello'
 
 struct VerifiedGeneration {
 	generation u64
@@ -203,6 +208,43 @@ fn verify_approved_install(document pkgprotocol.DeploymentDocument, password str
 	}
 }
 
+fn verify_mixed_catalog() ! {
+	package := '/usr/bin/vinix-package'
+	document := '/tmp/mixed-release-document.txt'
+	text := 'Mixed release native SDK document'
+	os.write_file(document, text + '\n')!
+	os.chmod(document, 0o644)!
+	native := checked([package, '--offline', 'run', hello, document], '')!
+	if !native.contains('Application: ' + hello) || !native.contains(text) {
+		return error('native SDK launcher did not read its granted document')
+	}
+
+	sqlite_args := [package, '--offline', 'run', sqlite]
+	created := checked(sqlite_args, '.bail on\nPRAGMA journal_mode=WAL; CREATE TABLE saved(value); INSERT INTO saved VALUES(42);\n')!
+	reopened := checked(sqlite_args, '.bail on\nSELECT sum(value) FROM saved; PRAGMA integrity_check;\n')!
+	app_data := '/home/alex/.local/share/vinix-apps/'
+	if created.trim_space() != 'wal' || reopened.trim_space() != '42\nok'
+		|| (os.stat(app_data + sqlite + '/database.sqlite3')!).uid != 1000 {
+		return error('SQLite did not reopen a valid ordinary-owned private database')
+	}
+
+	media_name := 'mixed release; \$literal.wav'
+	checked([package, '--offline', 'run-args', ffmpeg, '--data-cwd', '--', '-v', 'error',
+		'-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.1', '-c:a', 'pcm_s16le', media_name], '')!
+	media := app_data + ffmpeg + '/' + media_name
+	if os.file_size(media) == 0 || (os.stat(media)!).uid != 1000 {
+		return error('FFmpeg did not create ordinary-owned private media')
+	}
+	probe := ['--', '-v', 'error', '-select_streams', 'a:0', '-show_entries',
+		'stream=codec_name,sample_rate,channels', '-of', 'csv=p=0', media]
+	without_grant, _ := run_command([package, '--offline', 'run-args', ffprobe, ...probe], '')!
+	granted := checked([package, '--offline', 'run-args', ffprobe, '--file', media, ...probe], '')!
+	if without_grant == 0 || granted.trim_space() != 'pcm_s16le,44100,1' {
+		return error('FFprobe did not enforce the explicit grant or identify the generated audio')
+	}
+	println('HWTEST PASS approved mixed catalog ran native SDK, SQLite, FFmpeg and FFprobe')
+}
+
 fn route() ! {
 	for directory in ['/run', '/home', '/root', '/tmp', '/var/log'] { os.mkdir_all(directory)! }
 	os.chmod('/tmp', 0o1777)!
@@ -221,10 +263,15 @@ fn route() ! {
 	lock_text := os.read_file(declaration)!
 	mut document := pkgprotocol.decode_deployment_document(lock_text)!
 	defer { document.close() }
+	mixed_catalog := os.is_file(mixed_catalog_input)
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
 	if document.format != 2 || document.architecture != architecture || editor !in document.packages
 		|| runtime in document.packages || !document.locked.any(it.id == runtime) {
 		return error('release declaration must select Neovim with its locked runtime dependency')
+	}
+	if mixed_catalog && (!approve || document.packages != [ffmpeg, ffprobe, editor, sqlite,
+		'org.vinix.counter', 'org.vinix.memo', hello]) {
+		return error('mixed release declaration must select the seven application roots for approval')
 	}
 
 	os.rename(declaration, declaration + '.saved')!
@@ -278,6 +325,7 @@ fn route() ! {
 	println('HWTEST PASS Neovim graphical routing without activation or approval')
 	if approve {
 		verify_approved_install(document, password)!
+		if mixed_catalog { verify_mixed_catalog()! }
 		if os.read_file(declaration)! != lock_text || os.read_file(choice)! != 'skip\n'
 			|| os.read_file(legacy_log)! != 'install neovim\n' {
 			return error('approved install changed release inputs or called the legacy installer')

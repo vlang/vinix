@@ -20,17 +20,18 @@ const desktop_files = [
 ]
 const fixture_password = 'test-only password'
 const approved_install = 'HWTEST PASS approved Software generation verified and Neovim launched as uid 1000'
+const mixed_catalog_launches = 'HWTEST PASS approved mixed catalog ran native SDK, SQLite, FFmpeg and FFprobe'
 
 fn parse_options(values []string) !map[string]string {
 	required := ['--arch', '--kernel', '--staging', '--config', '--deployment', '--bundle', '--out']
-	plain := ['--arch', '--approve', '--memory-mib']
+	plain := ['--arch', '--approve', '--memory-mib', '--mixed-catalog']
 	mut options := map[string]string{}
 	for argument in values {
 		name := argument.all_before('=')
 		value := argument.all_after('=')
 		if (name !in required && name !in plain)
 			|| !argument.contains('=') || value == '' || name in options {
-			return error('expected distinct --arch, --kernel, --staging, --config, --deployment, --bundle, --out and optional --approve and --memory-mib options')
+			return error('expected distinct --arch, --kernel, --staging, --config, --deployment, --bundle, --out and optional --approve, --memory-mib and --mixed-catalog options')
 		}
 		options[name] = if name in plain { value } else { os.abs_path(value) }
 	}
@@ -39,6 +40,12 @@ fn parse_options(values []string) !map[string]string {
 	}
 	if (options['--approve'] or { 'false' }) !in ['true', 'false'] {
 		return error('--approve must be true or false')
+	}
+	if (options['--mixed-catalog'] or { 'false' }) !in ['true', 'false'] {
+		return error('--mixed-catalog must be true or false')
+	}
+	if options['--mixed-catalog'] == 'true' && options['--approve'] != 'true' {
+		return error('--mixed-catalog requires --approve=true')
 	}
 	return options
 }
@@ -124,6 +131,7 @@ fn check() ! {
 	options := parse_options(os.args[1..])!
 	arch := options['--arch']
 	approve := options['--approve'] == 'true'
+	mixed_catalog := options['--mixed-catalog'] == 'true'
 	memory_option := options['--memory-mib'] or { if approve { '2048' } else { '1024' } }
 	memory_mib := strconv.atoi(memory_option) or { return error('--memory-mib must be a positive integer') }
 	if memory_mib < 1 { return error('--memory-mib must be a positive integer') }
@@ -201,6 +209,7 @@ fn check() ! {
 			target + '/usr/bin/vinix-sandbox', mut inputs)!
 		os.write_file(target + '/etc/neovim-routing-approval', fixture_password)!
 	}
+	if mixed_catalog { os.write_file(target + '/etc/neovim-routing-mixed-catalog', '')! }
 
 	os.cp(guest, target + '/usr/bin/pkg')!
 	os.chmod(target + '/usr/bin/pkg', 0o755)!
@@ -222,6 +231,7 @@ fn check() ! {
 			screens << hwhost.Screen{file: file, like: 'proposal.ppm'}
 		}
 	}
+	if mixed_catalog { required << mixed_catalog_launches }
 	scenario := hwhost.Scenario{
 		name: 'Neovim graphical routing'
 		arches: [arch]
