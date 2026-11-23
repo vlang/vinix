@@ -554,6 +554,36 @@ The fixture inputs, run logs, remote state and request destinations are in
 Its SHA-256 is `5f05dcf99b93e607ce17d52b9d2a8ae9364ebbbc147a9064b47fa68d46de158f`.
 All 1,102 entries in the extracted `qualification.sha256` passed.
 
+### Draft creation recovery
+
+At `b8e53543f`, the driver saves the verified manifest and notes before
+requesting a draft. A unique marker in the notes also carries the manifest
+digest. After a lost response the driver lists drafts and reads the exact
+tag match by numeric ID. `--resume-create=TAG` repeats that lookup and
+verifies the inherited metadata, tag commit and original local assets.
+It converts the creation record to the ordinary ID-based recovery record
+before uploading to the recovered draft.
+[GitHub draft listing API](https://docs.github.com/en/rest/releases/releases#list-releases)
+
+All 62 fixture checks passed with local GitHub stubs, compiled host helpers
+and signed inputs for both architectures. They covered immediate recovery
+and a later retry for a tag containing a slash. Ambiguous or unrelated
+drafts, missing drafts and changed local assets each stopped recovery.
+A new build for the same tag also refused while the creation record
+protected the saved assets. The fixture checked that the original draft
+received the uploads and that the driver issued exactly one creation
+request.
+
+ASan/UBSan controls checked exact metadata restore, replay after the
+ID-based record was already saved, and refusal of a wrong ID, changed
+manifest or conflicting record. A loopback check with the installed
+GitHub CLI confirmed exact draft IDs and tags across two result pages.
+
+The paired inputs, creation records, run logs and transport checks are in
+`~/.local/state/vinix/r14-release-draft-creation-5UxLWf/qualification.tar.gz`.
+Its SHA-256 is `dc84951da78014774343651c8bc7c52f5f9a2fb4f1ed022223795df42d708d73`.
+All 1,233 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
