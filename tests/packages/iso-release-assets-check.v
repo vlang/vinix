@@ -57,6 +57,25 @@ fn fixture_runtime() ! {
 	os.chmod(path, 0o755)!
 }
 
+fn workspace_contender(root string, phase string, environment map[string]string) (int, string) {
+	tag := 'fixture-lock-' + phase
+	mut env := environment.clone()
+	env['VINIX_ASSET_TEST_OUT'] = root + '/build-release/' + tag
+	env['VINIX_ASSET_TEST_CASE'] = 'workspace-contender'
+	return command('/bin/bash', [root + '/scripts/deploy-iso.sh', '--tag=' + tag, '--arch=amd64',
+		'--no-test', '--no-publish'], root, env)
+}
+
+fn reject_workspace_contender(out string, phase string) ! {
+	root := os.getenv('VINIX_ASSET_TEST_ROOT')
+	code, log := workspace_contender(root, phase, os.environ())
+	os.write_file(out + '/fixture-contender-' + phase + '.log', log)!
+	if code == 0 || !log.contains('another ISO release is using build-release/work')
+		|| os.exists(root + '/build-release/fixture-lock-' + phase) {
+		return error('competing release reached the ' + phase + ' workspace\n' + log)
+	}
+}
+
 fn capture_upload(out string, scenario string) ! {
 	args := os.args[1..]
 	files := args.filter(it.starts_with('/'))
@@ -64,6 +83,7 @@ fn capture_upload(out string, scenario string) ! {
 	if notes_option < 0 || notes_option + 1 >= args.len || files.len < 2 {
 		return error('release handoff is missing upload files or notes')
 	}
+	if scenario == 'workspace-lock' { reject_workspace_contender(out, 'upload')! }
 	notes := args[notes_option + 1]
 	stage := os.dir(notes)
 	if stage == out || notes != stage + '/RELEASE_NOTES.md' || files.any(os.dir(it) != stage) {
@@ -129,7 +149,10 @@ fn run_stub(name string) !int {
 	scenario := os.getenv('VINIX_ASSET_TEST_CASE')
 	match name {
 		'xorriso' { return extract_iso(out, scenario) }
-		'get-deps', 'build-aarch64.sh' {}
+		'get-deps' {
+			if scenario == 'workspace-lock' { reject_workspace_contender(out, 'build')! }
+		}
+		'build-aarch64.sh' {}
 		'build-desktop-amd64.sh' {
 			os.cp(os.getenv('VINIX_ASSET_TEST_AMD64_ISO'), os.getenv('VINIX_AMD64_DESKTOP_ISO'))!
 			fixture_bundle(os.getenv('VINIX_AMD64_X11_BUNDLE'))!
@@ -183,7 +206,7 @@ fn prepare_driver(repository string, root string) ! {
 		os.mkdir_all(root + '/' + directory)!
 	}
 	for path in ['scripts/deploy-iso.sh', 'build-support/find-v.sh', 'build-support/isoboot/release-assets.v',
-		'build-support/isoboot/package-receipt.v']! {
+		'build-support/isoboot/package-receipt.v', 'build-support/isoboot/release-lock.v']! {
 		os.cp(repository + '/' + path, root + '/' + path)!
 	}
 	os.write_file(root + '/ui2/v.mod', 'module fixture')!
@@ -272,10 +295,11 @@ fn run() ! {
 	}
 	base['PATH'] = root + '/fake-bin:' + os.getenv('PATH')
 	base['VINIX_ASSET_TEST_XORRISO'] = os.find_abs_path_of_executable('xorriso')!
+	base['VINIX_ASSET_TEST_ROOT'] = root
 	base['VINIX_UI2_SOURCE'] = root + '/ui2'
 	base['VINIX_ASSET_TEST_AMD64_ISO'] = am + '/image.iso'
 	base['VINIX_ASSET_TEST_ARM64_ISO'] = arm + '/image.iso'
-	for scenario in ['public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
+	for scenario in ['workspace-lock', 'public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
 		'bad-build-sidecar', 'boot-copy-changed', 'x11-after-boot', 'ios-pair-after-boot',
 		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff', 'build-only',
 		'publish-no-test', 'packages-no-test']! {
@@ -301,10 +325,17 @@ fn run() ! {
 		if os.ls(root + '/build-release/work')!.any(it.starts_with('release-assets.')) {
 			return error('release left a private staging directory: ' + scenario)
 		}
-		if scenario in ['legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
+		if scenario in ['workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
 			verify_handoff(out, with_packages, scenario)!
+			if scenario == 'workspace-lock' {
+				retry_code, retry_log := workspace_contender(root, 'build', base)
+				os.write_file(work + '/workspace-lock-retry.log', retry_log)!
+				if retry_code != 0 || !os.is_file(root + '/build-release/fixture-lock-build/SHA256SUMS') {
+					return error('release workspace retry failed\n' + retry_log)
+				}
+			}
 		} else if scenario == 'build-only' {
 			if code != 0 || os.exists(out + '/fixture-upload') || !os.exists(out + '/RELEASE_NOTES.md') {
 				return error('build-only fixture failed\n' + log)

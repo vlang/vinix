@@ -614,6 +614,10 @@ skipped, the driver prepares verified copies at publication. GitHub reads the
 verified assets, the recorded checksum list, and the generated release notes
 from the private directory. Allow space under `build-release/work` for a second
 copy of the assets while verifying, boot testing, or publishing.
+The driver holds an exclusive lock on `build-release/work` through publication
+or build-only completion. A second invocation in the same workspace exits
+before creating its tag output directory. Use a workspace filesystem that
+supports directory `flock`.
 Set `TMPDIR` to a filesystem with room for ISO extraction and signed bundle
 verification when the system temporary filesystem is small. Standalone
 `package-receipt verify` also keeps its private ISO copy in that filesystem.

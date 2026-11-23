@@ -20,6 +20,7 @@
 # source -- the Alpine package layers the arm64 desktop is assembled from,
 # ui2, the V compiler -- comes from this checkout and the environment, as for
 # the regular build scripts; set V to pick a compiler.
+# Only one release may use a checkout's build-release workspace at a time.
 # VINIX_IOS_RELEASE_RUNTIME may retain a previously published optional runtime.
 # Set VINIX_IOS_RELEASE_RUNTIME_SHA256 and VINIX_IOS_RELEASE_RUNTIME_ORIGIN too;
 # its static ARM64 ELF and checksum are verified and its origin is recorded.
@@ -128,6 +129,24 @@ if [ "$REF" = HEAD ] && [ -n "$(git status --porcelain --untracked-files=no)" ];
     echo "NOTE: this checkout has uncommitted changes; the release is built from $SHORT without them."
 fi
 
+WORK="$SCRIPT_DIR/build-release/work"
+CACHE="$SCRIPT_DIR/build-release/cache"
+SRC="$WORK/src"
+mkdir -p "$WORK"
+. "$SCRIPT_DIR/build-support/find-v.sh"
+ASSET_WORK="$(mktemp -d "$WORK/release-assets.XXXXXX")"
+trap 'rm -rf "$ASSET_WORK"' EXIT
+"$V" -backend c -prod -cc cc -o "$ASSET_WORK/release-lock" \
+    "$SCRIPT_DIR/build-support/isoboot/release-lock.v"
+exec 9<"$WORK"
+"$ASSET_WORK/release-lock" lock
+cleanup_release() {
+    # Release the lock even if a child inherited the workspace descriptor.
+    "$ASSET_WORK/release-lock" unlock || true
+    rm -rf "$ASSET_WORK"
+}
+trap cleanup_release EXIT
+
 if [ "$PUBLISH" -eq 1 ]; then
     need gh
     gh auth status >/dev/null 2>&1 || die "gh is not logged in; run: gh auth login"
@@ -158,12 +177,8 @@ elif release_exists "$TAG"; then
 fi
 
 OUT="$SCRIPT_DIR/build-release/$TAG"
-WORK="$SCRIPT_DIR/build-release/work"
-CACHE="$SCRIPT_DIR/build-release/cache"
-SRC="$WORK/src"
-mkdir -p "$OUT" "$WORK" "$CACHE"
+mkdir -p "$OUT" "$CACHE"
 
-. "$SCRIPT_DIR/build-support/find-v.sh"
 if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
     UI2_SOURCE="$VINIX_UI2_SOURCE"
 elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
@@ -203,8 +218,6 @@ plan_package_selection() {
 
 PACKAGE_WORK=''
 PACKAGE_RECEIPTS=()
-ASSET_WORK="$(mktemp -d "$WORK/release-assets.XXXXXX")"
-trap 'rm -rf "$ASSET_WORK"' EXIT
 if [ -n "$PACKAGE_REVIEW" ] ||
    { [ "$BUILD_AMD64" -eq 1 ] && package_inputs_selected X86_64; } ||
    { [ "$BUILD_ARM64" -eq 1 ] && package_inputs_selected AARCH64; }; then
