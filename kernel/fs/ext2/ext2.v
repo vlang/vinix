@@ -592,13 +592,25 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 	this.populate_checked(node) or {}
 }
 
+struct EXT2PopulateAliases {
+mut:
+	resources map[u32]&EXT2Resource
+}
+
 fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
 	this.l.acquire()
 	defer { this.l.release() }
-	this.populate_checked_locked(node)?
+	// One walk populates the entire detached tree. The index borrows resources
+	// owned by nodes already in that tree, and disappears before mount publishes
+	// it. Later link(2) operations take their references from the source node.
+	mut aliases := unsafe { &EXT2PopulateAliases(C.vinix_stack_alloc(sizeof(EXT2PopulateAliases))) }
+	unsafe { *aliases = EXT2PopulateAliases{} }
+	defer { unsafe { aliases.resources.free() } }
+	this.populate_checked_locked(node, mut aliases)?
 }
 
-fn (mut this EXT2Filesystem) populate_checked_locked(node &vfs.VFSNode) ? {
+fn (mut this EXT2Filesystem) populate_checked_locked(node &vfs.VFSNode,
+	mut aliases EXT2PopulateAliases) ? {
 	mut parent := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *parent = EXT2Inode{} }
 	parent.read_entry(mut this, u32(node.resource.stat.ino))?
@@ -679,56 +691,50 @@ fn (mut this EXT2Filesystem) populate_checked_locked(node &vfs.VFSNode) ? {
 			else {}
 		}
 
-		mut vfs_node := vfs.create_node(this.as_filesystem(), node, name, stat.isdir(mode))
-		vfs_node.read_only = this.read_only
-		mut resource := &EXT2Resource{
-			filesystem: unsafe { this }
-			refcount: 1
-		}
-
-		// Loaded and newly created inodes must identify the same filesystem.
-		// Otherwise safe descriptor-relative operations fail after a remount.
-		resource.stat.dev = this.dev_id
-		resource.stat.mode = mode
-		resource.stat.uid = inode.user_id
-		resource.stat.gid = inode.group_id
-		resource.stat.ino = dir_entry.inode_index
-		resource.stat.size = inode.size()
-		resource.stat.nlink = inode.hard_link_cnt
-		resource.stat.blksize = this.block_size
-		resource.stat.blocks = inode.sector_cnt
-
-		resource.stat.atim = time.TimeSpec{i64(inode.access_time), 0}
-		resource.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
-		resource.stat.mtim = time.TimeSpec{i64(inode.mod_time), 0}
-		resource.can_mmap = stat.isreg(mode)
-		resource.attr_bits = inode.flags & resource_mod.attributes_kept
-
-		vfs_node.resource = resource.boxed()
+		mut symlink_target := ''
 		if stat.islnk(mode) && inode.size32l != 0 {
 			if target := inode.fast_symlink_target(this.block_size) {
-				vfs_node.symlink_target = target
+				symlink_target = target
 			} else {
 				target_buffer := memory.calloc(u64(inode.size32l) + 1, 1)
 				if target_buffer == unsafe { nil } {
+					memory.free(name_buffer)
 					errno.set(errno.enomem)
 					return none
 				}
 				inode.read(mut this, target_buffer, 0, inode.size32l) or {
 					memory.free(target_buffer)
+					memory.free(name_buffer)
 					return none
 				}
-				vfs_node.symlink_target = unsafe {
+				symlink_target = unsafe {
 					tos(&u8(target_buffer), int(inode.size32l)).clone()
 				}
 				memory.free(target_buffer)
 			}
 		}
 
+		index := dir_entry.inode_index
+		may_share := !stat.isdir(mode) && inode.hard_link_cnt > 1
+		mut res := if may_share {
+			aliases.resources[index] or { unsafe { &EXT2Resource(nil) } }
+		} else { unsafe { &EXT2Resource(nil) } }
+		if res == unsafe { nil } {
+			res = resource_from_inode(this, index, *inode)
+			res.stat.mode = mode
+			res.can_mmap = stat.isreg(mode)
+			if may_share { aliases.resources[index] = res }
+		} else {
+			katomic.inc(mut &res.refcount)
+		}
+		mut vfs_node := vfs.create_node(this.as_filesystem(), node, name, stat.isdir(mode))
+		vfs_node.read_only = this.read_only
+		vfs_node.resource = res.boxed()
+		vfs_node.symlink_target = symlink_target
 		vfs.publish_child(vfs_node.parent, name, vfs_node)
 		if stat.isdir(mode) && name != '.' && name != '..' {
 			vfs_node.create_dotentries(node)
-			this.populate_checked_locked(vfs_node)?
+			this.populate_checked_locked(vfs_node, mut aliases)?
 		}
 		i += dir_entry.entry_size
 	}

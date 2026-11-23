@@ -4,8 +4,7 @@ Vinix now returns `ETXTBSY` when a native exec opens a regular file held
 by a writable open description. The inverse applies to writable opens,
 `O_TRUNC` and pathname `truncate` while the file is executing. Read-only
 opens and `O_PATH` remain usable. A hard link conflicts using the same
-device and inode numbers, even if ext2 populated its aliases separately
-after a remount. This follows [Linux 6.12.51 exec](https://github.com/gregkh/linux/blob/v6.12.51/fs/exec.c)
+device and inode numbers. This follows [Linux 6.12.51 exec](https://github.com/gregkh/linux/blob/v6.12.51/fs/exec.c)
 and [its inode write-access checks](https://github.com/gregkh/linux/blob/v6.12.51/include/linux/fs.h).
 
 A writable open description is shared by descriptor copies and stays alive
@@ -51,10 +50,9 @@ The coverage here concerns the backing inode of a native image. Overlayfs
 metadata copy-up may change the backing inode of an overlay name while its
 previous inode is in use. Translated payloads keep a temporary claim during
 handoff to the native interpreter. Remote mutations are outside local inode
-accounting. Ext2's existing independent link-count snapshots for persisted
-aliases can reclaim an unlinked inode too early, leaving a busy claim for an
-inode number that ext2 has reused. Removal and reuse of a running file's last
-persisted hardlink need shared ext2 inode ownership.
+accounting. Ext2 shares inode ownership among hard links within a mounted tree,
+including after a remount. Independently mounted views of a device still build
+separate inode state. [Hard-link lifetime qualification](linux-ext2-hardlinks.md)
 
 Set-ID exec credential transitions and Chromium's packaged sandbox still
 need separate implementation and qualification.

@@ -2687,6 +2687,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   replacement, fork and ext2 hard links after remount on both architectures.
   See [the executable write-exclusion receipts](docs/linux-etxtbsy.md).
 
+- [x] Share ext2 and VJFS inode state across persisted hard links in one mounted
+  tree. Qualify mapped data, metadata and inode reuse after the last link to a
+  running executable is removed. See [the lifetime receipts](docs/linux-ext2-hardlinks.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
