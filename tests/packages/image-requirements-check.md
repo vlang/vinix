@@ -1044,6 +1044,24 @@ The paired inputs, baseline and native runs, and sanitizer checks are in
 Its SHA-256 is `7d5497ce59f4012b4443e9cecd6a4321b021bf6da9911d33821c6fe324de5f34`.
 All 1,632 entries in the extracted `qualification.sha256` passed.
 
+### Incomplete draft asset inspection
+
+At `ac4f2241c`, read-only draft inspection reports an empty GitHub `starter`
+asset by name and ID in `incomplete`. The asset must have an expected name,
+an explicit size of zero and no digest. Resume and published-release checks
+refuse these assets.
+
+All 171 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. The native driver reported the blocking asset and
+preserved the saved draft record and all existing uploads. ASan/UBSan
+checked null digests, absent or nonzero sizes, conflicting digests,
+unexpected names, repeated asset IDs and the published-release refusal.
+
+The paired inputs, native report, run logs and sanitizer checks are in
+`~/.local/state/vinix/r14-release-starter-assets-PapGTh/qualification.tar.gz`.
+Its SHA-256 is `ce5f4e34026bbf85b5c746558f171379a74e8a33dc2f1643ac85ef93e74010e4`.
+All 1,637 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
