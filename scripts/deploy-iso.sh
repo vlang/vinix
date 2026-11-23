@@ -17,6 +17,7 @@
 #   --prepared-review=FILE  require the exact reviewed JSON for --publish-prepared
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
 #   --resume-create=TAG  recover a release by tag using local recovery records
+#   --retry-create=TAG  retry a pending creation request when no release is found
 #   --inspect-recovery=TAG  show local recovery records for the tag as JSON
 #   --verify-draft=ID  verify the local assets for a saved draft as JSON
 #   --inspect-draft=ID  compare a GitHub release with its saved record as JSON
@@ -71,6 +72,7 @@ REPO=''
 PACKAGE_REVIEW=''
 RESUME_DRAFT=''
 RESUME_CREATE=''
+RETRY_CREATE=''
 INSPECT_RECOVERY=''
 VERIFY_DRAFT=''
 INSPECT_DRAFT=''
@@ -113,6 +115,10 @@ for arg in "$@"; do
         --resume-create=*)
             RESUME_CREATE="${arg#*=}"
             [ -n "$RESUME_CREATE" ] || { echo "ERROR: --resume-create requires a tag" >&2; exit 1; }
+            ;;
+        --retry-create=*)
+            RETRY_CREATE="${arg#*=}"
+            [ -n "$RETRY_CREATE" ] || { echo "ERROR: --retry-create requires a tag" >&2; exit 1; }
             ;;
         --inspect-recovery=*)
             INSPECT_RECOVERY="${arg#*=}"
@@ -202,7 +208,7 @@ if [ -n "$PREPARED_REVIEW" ]; then
 fi
 cd "$SCRIPT_DIR"
 post_build=0
-for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" \
+for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$RETRY_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" \
     "$INSPECT_RECOVERY" "$VERIFY_DRAFT" "$VERIFY_CREATION" "$INSPECT_DRAFT" "$INSPECT_CREATION"; do
     if [ -n "$action" ]; then
         [ "$post_build" -eq 0 ] || die "choose one verification, publication or recovery action"
@@ -270,17 +276,18 @@ fi
 
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true
-if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED$VERIFY_DRAFT$INSPECT_DRAFT$INSPECT_CREATION" ]; then
+if [ -n "$RESUME_DRAFT$RESUME_CREATE$RETRY_CREATE$PUBLISH_PREPARED$VERIFY_DRAFT$INSPECT_DRAFT$INSPECT_CREATION" ]; then
     build_release_assets
     if [ -n "$PUBLISH_PREPARED" ]; then
         git check-ref-format "refs/tags/$PUBLISH_PREPARED" || die "invalid prepared release tag: $PUBLISH_PREPARED"
         OUT="$SCRIPT_DIR/build-release/$PUBLISH_PREPARED"
         recovery="$("$ASSET_WORK/release-assets" restore-prepared "$OUT" "$PUBLISH_PREPARED" \
             "$ASSET_WORK" "$PREPARED_REVIEW")"
-    elif [ -n "$INSPECT_CREATION" ]; then
-        git check-ref-format "refs/tags/$INSPECT_CREATION" || die "invalid recovery tag: $INSPECT_CREATION"
-        OUT="$SCRIPT_DIR/build-release/$INSPECT_CREATION"
-        recovery="$("$ASSET_WORK/release-assets" restore-creation "$OUT" "$INSPECT_CREATION" "$ASSET_WORK")"
+    elif [ -n "$INSPECT_CREATION$RETRY_CREATE" ]; then
+        creation_tag="${INSPECT_CREATION:-$RETRY_CREATE}"
+        git check-ref-format "refs/tags/$creation_tag" || die "invalid recovery tag: $creation_tag"
+        OUT="$SCRIPT_DIR/build-release/$creation_tag"
+        recovery="$("$ASSET_WORK/release-assets" restore-creation "$OUT" "$creation_tag" "$ASSET_WORK")"
     elif [ -n "$RESUME_CREATE" ]; then
         git check-ref-format "refs/tags/$RESUME_CREATE" || die "invalid recovery tag: $RESUME_CREATE"
         OUT="$SCRIPT_DIR/build-release/$RESUME_CREATE"
@@ -518,7 +525,7 @@ if [ -n "$TAG" ]; then
     if [ "$PUBLISH" -eq 1 ] || [ "$PREPARE_ONLY" -eq 1 ]; then
         git check-ref-format "refs/tags/$TAG" || die "invalid Git tag: $TAG"
     fi
-    if [ -z "$PUBLISH_PREPARED" ]; then check_build_output "$TAG"; fi
+    if [ -z "$PUBLISH_PREPARED$RETRY_CREATE" ]; then check_build_output "$TAG"; fi
 fi
 if [ "$PUBLISH" -eq 1 ]; then
     refresh_release_tags
@@ -537,18 +544,8 @@ check_tag_commit() {
         die "GitHub tag $TAG points to $tag_commit, expected $COMMIT"
 }
 
-publish_staged_assets() {
+create_staged_release() {
     local candidate_id=''
-    refresh_release_tags
-    refuse_existing_release
-    "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
-    "$ASSET_WORK/release-assets" prepare-creation "$OUT" "$ASSET_WORK" "$REPO" \
-        "$TAG" "$COMMIT" "$prerelease"
-    # The prepared handoff retains the notes covered by its verification report.
-    if [ -z "$PUBLISH_PREPARED" ]; then
-        cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
-        mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
-    fi
     echo "  If draft creation is interrupted, retry with --resume-create=$TAG"
     if ! github_api "$release_api" --method POST -f "tag_name=$TAG" \
         -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
@@ -559,6 +556,34 @@ publish_staged_assets() {
     fi
     finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"
 }
+
+publish_staged_assets() {
+    refresh_release_tags
+    refuse_existing_release
+    "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
+    "$ASSET_WORK/release-assets" prepare-creation "$OUT" "$ASSET_WORK" "$REPO" \
+        "$TAG" "$COMMIT" "$prerelease"
+    # The prepared handoff retains the notes covered by its verification report.
+    if [ -z "$PUBLISH_PREPARED" ]; then
+        cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
+        mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
+    fi
+    create_staged_release
+}
+
+if [ -n "$RETRY_CREATE" ]; then
+    refuse_existing_release
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    step "Retrying GitHub draft creation for $TAG at $SHORT"
+    confirm_publish
+    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
+    refresh_release_tags
+    refuse_existing_release
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    "$ASSET_WORK/release-assets" check-creation-retry "$WORK" "$OUT" "$ASSET_WORK" "$TAG"
+    create_staged_release
+    exit 0
+fi
 
 if [ -n "$PUBLISH_PREPARED" ]; then
     check_pending_creation "$TAG"

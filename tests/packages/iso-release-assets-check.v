@@ -274,6 +274,10 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		if args.len == 6 && args[3..5] == ['--paginate', '--jq']
 			&& args[5].contains('expected a release list') {
 			println('${tag}-other')
+			if scenario == 'retry-create-raced' {
+				marker := remote + '/retry-list-first'
+				if os.exists(marker) { println(tag) } else { os.write_file(marker, '')! }
+			}
 			after_build := os.exists(out + '/fixture-boot')
 			if scenario == 'release-list-failed' || (after_build && scenario == 'release-list-fails-before-create') {
 				eprintln('fixture GitHub release list failed after a partial page')
@@ -302,8 +306,10 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		return 0
 	}
 	if path == 'releases' {
-		if os.exists(remote + '/release-attempt') { return error('fixture second creation request') }
-		os.write_file(remote + '/release-attempt', args[1..].join('\n') + '\n')!
+		retry := scenario == 'retry-create-response-lost'
+		attempt_path := remote + if retry { '/retry-attempt' } else { '/release-attempt' }
+		if os.exists(attempt_path) { return error('fixture second creation request') }
+		os.write_file(attempt_path, args[1..].join('\n') + '\n')!
 		legacy := args.len == 19 && args[17..] == ['--jq', '.id']
 		if (!legacy && args.len != 17) || !args[12].starts_with('body=@') {
 			return error('expected releases POST with notes')
@@ -326,7 +332,13 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			|| !notes.ends_with(' ${sha256.hexhash(manifest)} -->\n') {
 			return error('creation request did not use saved release metadata')
 		}
-		os.cp(intent_path, remote + '/creation-record')!
+		if retry {
+			if os.read_file(intent_path)! != os.read_file(remote + '/creation-record')! {
+				return error('retry replaced the pending creation record')
+			}
+		} else {
+			os.cp(intent_path, remote + '/creation-record')!
+		}
 		if scenario == 'create-no-draft' {
 			eprintln('fixture refused creation before saving the draft')
 			return 1
@@ -344,7 +356,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		os.mkdir(remote + '/uploads')!
 		os.write_file(local, json2.encode(draft))!
 		if scenario == 'create-record-changed' { replace_creation_commit(out)! }
-		if scenario in ['create-response-lost', 'create-delayed', 'publish-prepared-delayed']! {
+		if scenario in ['create-response-lost', 'create-delayed', 'publish-prepared-delayed', 'retry-create-response-lost']! {
 			eprintln('fixture lost the creation response')
 			return 1
 		}
@@ -746,6 +758,7 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 		if os.exists(remote + '/draft.json') || os.exists(recovery_path) || os.read_file(intent_path)! != intent {
 			return error('recovery changed state for a missing draft')
 		}
+		check_retry_creation(root, work, out, remote, environment, intent)!
 		return
 	}
 	if scenario == 'create-delayed' {
@@ -799,6 +812,44 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 			'cannot read release draft recovery record')!
 		recovery_attempt(root, work, environment, 'inspect-creation-retired', ['--inspect-creation=' + tag],
 			'cannot read release draft recovery record')!
+	}
+}
+
+fn check_retry_creation(root string, work string, out string, remote string, environment map[string]string, intent string) ! {
+	tag := environment['VINIX_ASSET_TEST_TAG']
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	options := ['--retry-create=' + tag, '--draft']
+	metadata := json2.decode[FixtureCreation](intent)!
+	intent_path := out + '/.draft-creation.json'
+	recovery := root + '/build-release/work/draft-' + id + '.json'
+	ref := tag_file(remote, tag)
+	os.write_file(ref, other_commit)!
+	recovery_attempt(root, work, environment, 'retry-create-moved-tag', options, 'points to ${other_commit}, expected')!
+	os.write_file(ref, metadata.commit)!
+	iso := out + '/vinix-amd64.iso'
+	original := os.read_file(iso)!
+	os.write_file(iso, 'changed retry ISO')!
+	recovery_attempt(root, work, environment, 'retry-create-stale-asset', options,
+		'release asset changed after verification')!
+	os.write_file(iso, original)!
+	os.write_file(recovery, json2.encode(FixtureCreation{...metadata, id: id.u64()}) + '\n')!
+	recovery_attempt(root, work, environment, 'retry-create-saved-id', options,
+		'saved draft recovery record exists for ' + tag)!
+	os.rm(recovery)!
+	recovery_attempt(root, work, environment, 'retry-create-raced', options, 'release ${tag} already exists')!
+	if os.exists(remote + '/draft.json') || os.exists(remote + '/retry-attempt')
+		|| os.read_file(intent_path)! != intent || os.exists(recovery) {
+		return error('a refused retry changed the original creation state')
+	}
+	recovery_attempt(root, work, environment, 'retry-create-response-lost', options, '')!
+	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	saved := json2.decode[FixtureCreation](os.read_file(recovery)!)!
+	expected := FixtureCreation{...metadata, id: id.u64()}
+	if !draft.draft || draft.id.str() != id || draft.body != metadata.notes
+		|| draft.assets.len != os.read_lines(out + '/SHA256SUMS')!.len + 1
+		|| os.exists(intent_path) || os.exists(remote + '/publish-attempt')
+		|| saved != expected {
+		return error('retry did not complete the original creation attempt')
 	}
 }
 

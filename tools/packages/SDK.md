@@ -756,6 +756,13 @@ been removed, use `--verify-draft=ID`.
 Draft adoption uses the exact creation record captured before the GitHub
 request or lookup. If that record changes during the attempt, the driver
 stops and preserves the changed file for inspection.
+If GitHub has no release for a pending creation record, use
+`./scripts/deploy-iso.sh --retry-create=TAG` to explicitly resend the
+creation request. It uses the original notes and attempt marker, verifies
+the original assets and remote tag, and rechecks release availability
+before sending the request. A release already visible on GitHub or a
+matching saved draft ID blocks the retry. Use `--draft` to keep the
+resulting release unpublished.
 
 Release publication targets GitHub.com. The driver checks the host of the
 repository inferred by `gh`. In a checkout that defaults to another host,

@@ -518,6 +518,13 @@ fn restore_recovery_tag(work string, output string, tag string, repo string, dir
 	restore_creation(output, tag, directory)!
 }
 
+fn check_creation_retry(work string, output string, directory string, tag string) ! {
+	creation, _ := captured_creation(output, directory, tag)!
+	if matching_saved_drafts(work, tag, creation.repo)!.len != 0 {
+		return error('saved draft recovery record exists for ${tag}; use --resume-draft=ID')
+	}
+}
+
 fn summarize_recovery(record DraftRecovery) RecoverySummary {
 	return RecoverySummary{
 		repo: record.repo
@@ -720,6 +727,9 @@ fn run() ! {
 	if os.args.len == 7 && os.args[1] == 'restore-recovery-tag' {
 		return restore_recovery_tag(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])
 	}
+	if os.args.len == 6 && os.args[1] == 'check-creation-retry' {
+		return check_creation_retry(os.args[2], os.args[3], os.args[4], os.args[5])
+	}
 	if os.args.len == 6 && os.args[1] == 'inspect-recovery' {
 		println(json2.encode(inspect_recovery(os.args[2], os.args[3], os.args[4], os.args[5])!))
 		return
@@ -754,7 +764,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | verify-draft | inspect-draft | verify-creation | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | inspect-recovery | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | verify-draft | inspect-draft | verify-creation | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | check-creation-retry | inspect-recovery | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
 }
 
 fn main() {
