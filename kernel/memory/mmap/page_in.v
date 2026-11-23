@@ -112,7 +112,7 @@ fn out_of_memory_since(exhausted u64, sleepable bool) bool {
 fn resolve_cow_waiting(pagemap &memory.Pagemap, address u64) bool {
 	for {
 		exhausted := memory.exhaustions()
-		if resolve_cow_fault(pagemap, address) {
+		if resolve_cow_fault(pagemap, address, false) {
 			return true
 		}
 		if !out_of_memory_since(exhausted, false) {

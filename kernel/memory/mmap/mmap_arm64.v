@@ -49,7 +49,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ?PageFault {
 		}
 		previous_interrupt_state := cpu.interrupt_toggle(true)
 		resolved := wnr != 0 && addr < higher_half && current != unsafe { nil }
-			&& resolve_cow_fault(current.process.pagemap, addr)
+			&& resolve_cow_fault(current.process.pagemap, addr, true)
 		cpu.interrupt_toggle(previous_interrupt_state)
 		if resolved {
 			return .resolved

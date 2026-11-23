@@ -138,7 +138,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ?PageFault {
 				sti
 			}
 			resolved := current != unsafe { nil }
-				&& resolve_cow_fault(current.process.pagemap, addr)
+				&& resolve_cow_fault(current.process.pagemap, addr, true)
 			asm volatile amd64 {
 				cli
 			}

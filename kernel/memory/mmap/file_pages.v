@@ -1,20 +1,30 @@
 @[has_globals]
 module mmap
 
+import lib
+import katomic
 import memory
 import resource
 
-__global (file_globals &MmapRangeGlobal = unsafe { nil })
+__global (
+	file_globals &MmapRangeGlobal = unsafe { nil }
+	truncate_globals &MmapRangeGlobal = unsafe { nil }
+)
 
 fn register_file_global(global &MmapRangeGlobal) {
 	mut g := unsafe { global }
-	if !g.tracked_file { return }
+	if !g.tracked_file && !g.tracked_truncation { return }
 	range_locals_lock.acquire()
 	defer { range_locals_lock.release() }
 	if g.file_registered { return }
-	g.file_next = file_globals
-	if file_globals != unsafe { nil } { file_globals.file_previous = g }
-	file_globals = g
+	if g.tracked_truncation {
+		g.file_next = truncate_globals
+		truncate_globals = g
+	} else {
+		g.file_next = file_globals
+		file_globals = g
+	}
+	if g.file_next != unsafe { nil } { g.file_next.file_previous = g }
 	g.file_registered = true
 }
 
@@ -22,10 +32,101 @@ fn register_file_global(global &MmapRangeGlobal) {
 // shadow tables or the resource can be released.
 fn unregister_file_global_locked(mut g MmapRangeGlobal) {
 	if !g.file_registered { return }
-	if g.file_previous == unsafe { nil } { file_globals = g.file_next }
-	else { g.file_previous.file_next = g.file_next }
+	if g.file_previous != unsafe { nil } {
+		g.file_previous.file_next = g.file_next
+	} else if g.tracked_truncation {
+		truncate_globals = g.file_next
+	} else {
+		file_globals = g.file_next
+	}
 	if g.file_next != unsafe { nil } { g.file_next.file_previous = g.file_previous }
 	g.file_registered = false
+}
+
+// Hold the inode lock across revocation and the shrink that follows it.
+// VM operations can enter the inode in the opposite order, so reverse locks
+// are acquired without waiting. Failure changes neither PTEs nor generations.
+pub fn try_truncate_file_mappings(box voidptr, cutoff u64) bool {
+	if !range_locals_lock.test_and_acquire() { return false }
+	defer { range_locals_lock.release() }
+	mut held := &memory.Pagemap(unsafe { nil })
+	defer {
+		for held != unsafe { nil } {
+			next := held.truncate_next
+			last := voidptr(next) == voidptr(held)
+			held.truncate_next = unsafe { nil }
+			held.l.release()
+			if last { break }
+			held = next
+		}
+	}
+	for g := truncate_globals; g != unsafe { nil }; g = g.file_next {
+		if voidptr(g.resource) != box { continue }
+		begin, end := file_truncation_span(g, cutoff)
+		if begin == end { continue }
+		for local in g.locals {
+			mut pm := local.pagemap
+			if pm.truncate_next != unsafe { nil } { continue }
+			if !pm.l.test_and_acquire() { return false }
+			pm.truncate_next = if held == unsafe { nil } { pm } else { held }
+			held = pm
+		}
+	}
+	for g := truncate_globals; g != unsafe { nil }; g = g.file_next {
+		if voidptr(g.resource) != box { continue }
+		begin, end := file_truncation_span(g, cutoff)
+		if begin != end { truncate_file_span_unlocked(mut g, begin, end) }
+	}
+	return true
+}
+
+fn file_truncation_span(g &MmapRangeGlobal, cutoff u64) (u64, u64) {
+	if g.segmented_file && g.file_data_length == 0 { return g.base, g.base }
+	offset := u64(g.offset)
+	// ELF pages supplied entirely by the anonymous BSS have no file offset.
+	first := if g.segmented_file { lib.align_down(g.file_data_start, page_size) } else { u64(0) }
+	last := if g.segmented_file {
+		lib.align_up(g.file_data_start + g.file_data_length, page_size)
+	} else {
+		g.length
+	}
+	end := g.base + last
+	delta := if cutoff > offset { cutoff - offset } else { u64(0) }
+	return g.base + min_u64(max_u64(delta, first), last), end
+}
+
+fn truncate_file_span_unlocked(mut g MmapRangeGlobal, begin u64, end u64) {
+	// The registry and all local map locks are held. No other path can
+	// enter this shadow, even for a range below the truncation boundary.
+	g.shadow_pagemap.l.acquire()
+	defer { g.shadow_pagemap.l.release() }
+	for mut local in g.locals {
+		base := shadow_begin(local)
+		first := max_u64(begin, base)
+		last := min_u64(end, base + local.length)
+		if first >= last { continue }
+		// A source that already obtained an old frame cannot install it
+		// after this point, even if the file is grown again before it returns.
+		local.generation = katomic.inc(mut &next_range_generation)
+		mut pm := local.pagemap
+		limit := local.base + (last - base)
+		mut page := pm.next_present(local.base + (first - base), limit)
+		for page < limit {
+			pm.unmap_page_unlocked(page) or { panic('truncate: local file PTE disappeared') }
+			page = pm.next_present(page + page_size, limit)
+		}
+	}
+	if g.shadow_pagemap.top_level == unsafe { nil } { return }
+	// Shared tmpfs PTEs borrow from the inode. Private shadows own one
+	// PMM reference each, for either a cache frame or a detached COW copy.
+	is_private := g.locals[0].flags & map_shared == 0
+	mut page := g.shadow_pagemap.next_present(begin, end)
+	for page < end {
+		physical := g.shadow_pagemap.virt2phys(page) or { panic('truncate: missing shadow frame') }
+		g.shadow_pagemap.unmap_page_unlocked(page) or { panic('truncate: shadow file PTE disappeared') }
+		if is_private { memory.pmm_free(voidptr(physical), 1) }
+		page = g.shadow_pagemap.next_present(page + page_size, end)
+	}
 }
 
 pub struct FilePageState {

@@ -13,6 +13,7 @@ import lib
 import event.eventstruct
 import katomic
 import file
+import sched
 
 @[heap]
 struct TmpFSResource {
@@ -45,9 +46,9 @@ pub mut:
 	seals u32
 	// A file with mapped cache pages can no longer live in one movable
 	// buffer: growing it would relocate pages a mapping already points at.
-	// It switches to a sparse list of physical pages, which stay put once
-	// allocated. ftruncate and mmap reserve slots without backing untouched
-	// pages; Chromium creates many large shared-memory files this way.
+	// It switches to a sparse list of physical pages, which stay put until
+	// truncate revokes their mappings. Reservations need no frames for
+	// untouched pages.
 	paged bool
 	pages []u64
 	allocated_pages u64
@@ -319,6 +320,8 @@ fn (mut this TmpFSResource) private_mapping_cow() bool {
 	return true
 }
 
+fn (mut this TmpFSResource) truncates_mapped_pages() {}
+
 fn (mut this TmpFSResource) numa_policy_at(offset u64) proc.NumaPolicy {
 	this.policy_lock.acquire()
 	defer { this.policy_lock.release() }
@@ -455,9 +458,8 @@ fn (mut this TmpFSResource) materialize_page_locked(index int, file_data bool) b
 	return true
 }
 
-// A truncated file keeps its pages, and they still hold what was there. Zero
-// [from, to) in whichever of them exist, so that growing the file again, by
-// ftruncate or by writing past its end, reads back zeros.
+// Zero [from, to) in the pages that exist. The retained partial page can
+// contain bytes beyond EOF, including writes through a shared view.
 fn (mut this TmpFSResource) zero_pages_locked(from u64, to u64) {
 	limit := u64(this.pages.len) * page_size
 	end := if to < limit { to } else { limit }
@@ -637,8 +639,7 @@ fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, 
 	this.clear_write_setid_locked()
 	if this.paged {
 		// A hole from a seek past EOF reads back as zero: freshly allocated
-		// pages already are, and pages kept from before a truncation are
-		// cleared.
+		// pages already are, and any existing tail bytes are cleared.
 		if write_at > u64(this.stat.size) {
 			this.zero_pages_locked(u64(this.stat.size), write_at)
 		}
@@ -742,27 +743,52 @@ fn (mut this TmpFSResource) unlink(_handle voidptr) ? {
 	katomic.dec(mut &this.stat.nlink)
 }
 
-fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
-	this.l.acquire()
-	defer {
+// Returns with the data lock held. If a mapper was busy, let it finish and
+// recheck size, seals and attributes before trying the untouched shrink again.
+fn (mut this TmpFSResource) lock_resize(new_size u64) ?u64 {
+	cutoff := lib.align_up(new_size, page_size)
+	for {
+		this.l.acquire()
+		old_size := u64(this.stat.size)
+		if this.attr_bits & resource.attributes_kept != 0
+			|| (new_size < old_size && this.seals & f_seal_shrink != 0)
+			|| (new_size > old_size && this.seals & f_seal_grow != 0) {
+			this.l.release()
+			errno.set(errno.eperm)
+			return none
+		}
+		if new_size >= old_size || cutoff >= old_size
+			|| mmap.try_truncate_file_mappings(voidptr(this.box), cutoff) {
+			return old_size
+		}
+		can_yield := this.l.ints
 		this.l.release()
+		if can_yield { sched.yield(true) }
 	}
-	if this.attr_bits & resource.attributes_kept != 0 {
-		errno.set(errno.eperm)
-		return none
-	}
+	return none
+}
 
-	old_size := u64(this.stat.size)
-	if (new_size < old_size && this.seals & f_seal_shrink != 0)
-		|| (new_size > old_size && this.seals & f_seal_grow != 0) {
-		errno.set(errno.eperm)
-		return none
+fn (mut this TmpFSResource) shrink_pages_locked(new_size u64) {
+	cutoff := lib.align_up(new_size, page_size)
+	this.zero_pages_locked(new_size, cutoff)
+	first := cutoff / page_size
+	if first < u64(this.pages.len) {
+		for i in int(first) .. this.pages.len {
+			physical := this.pages[i]
+			if physical == 0 { continue }
+			memory.pmm_free(voidptr(physical), 1)
+			this.allocated_pages--
+		}
+		this.pages.trim(int(first))
 	}
+	this.stat.blocks = this.allocated_pages * page_size / u64(this.stat.blksize)
+}
+
+fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
+	old_size := this.lock_resize(new_size)?
+	defer { this.l.release() }
 	if new_size <= old_size {
-		// A shared-mapped file keeps its pages when truncated: another mapping
-		// may still reach them, and a regrow must show the same page, not a
-		// fresh one. An ordinary file's borrowed storage can stay borrowed and
-		// re-materialise its still-visible prefix on the next grow.
+		if this.paged && new_size < old_size { this.shrink_pages_locked(new_size) }
 		this.clear_write_setid_locked()
 		this.stat.size = new_size
 		if !this.paged {
@@ -776,7 +802,7 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 		return none
 	}
 	if this.paged {
-		// Pages kept past the old end still hold stale bytes; new ones are zero.
+		// Shared writes after EOF may have touched the old partial page.
 		this.zero_pages_locked(old_size, new_size)
 		if !this.grow_pages_locked(lib.div_roundup(new_size, page_size)) {
 			return none

@@ -13,9 +13,9 @@ delivers `SIGSEGV` with `SEGV_ACCERR`. Checked syscall copies report
 
 Tmpfs checks the page offset under the inode lock each time it supplies a
 page. A later fault can therefore use a newly grown extent. Shrinking the
-file changes the outcome for pages that still have to fault in. Revoking
-pages already mapped at truncation, and beyond-EOF faults on other
-filesystems, remain outside this qualification.
+file changes the outcome for pages that still have to fault in. The
+resident-page qualification below covers aliases populated before the
+shrink. Beyond-EOF faults on other filesystems remain open.
 
 ## Qualification
 
@@ -50,3 +50,50 @@ with SHA-256
 The verified x86-64 retry is at
 `~/.cache/vinix-r15/tmpfs-eof/tidfault-retry.tar.zst`, with SHA-256
 `2a51fc204f50eaefae03d2c93537469ca1782343b804a41894c12623a489d7d5`.
+
+## Truncation of resident tmpfs and memfd mappings
+
+Shrinking a tmpfs file or memfd revokes whole pages beyond its new end from
+shared and private views, including pages inherited through fork and private
+copy-on-write pages. The kernel waits for the translation invalidations before
+releasing the frames. A fault that obtained an old page before the shrink
+revalidates the mapping before installing it. Growth can then fault in fresh
+pages. [Linux shmem shrink and invalidation](https://raw.githubusercontent.com/gregkh/linux/v6.12.51/mm/shmem.c)
+
+The retained partial cache page keeps its prefix and gets a zeroed tail.
+A private copy of that page keeps its own bytes. The inode's block count
+drops when whole cache pages are released.
+
+Revocation holds the affected page-map locks and the file-mapping registry
+through the translation invalidations. A contended map causes a retry
+before any translation changes. Borrowed initramfs snapshots of retained
+partial pages and shared futex identity across shrink and regrowth remain
+outside this qualification.
+
+The probe covers offset aliases, a split private mapping, a checked copy
+into a cold private page, and a child that touches its inherited page
+before the parent truncates. It checks the retained partial page, the
+inode block count, and zero-filled refaults after regrowth.
+
+The production kernels were built from `6cf645904` plus the archived
+patch. Both original kernels returned the old byte on the first resident
+read past the new EOF. The same probe ELFs passed on the corrected Vinix
+kernels and on Linux 6.12.51.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `06378141eaa5b826` | `cd97749d6ffba978` |
+| x86-64 | `beca6eb39290c1c6` | `609235f3ac4dce0f` |
+
+Free memory stayed flat after 128 measured grow, fault, copy-on-write, and
+shrink cycles on each architecture. The allocation checker reproduced the
+baseline failures and the same 307 AArch64 and 255 x86-64 sites. Independent
+review covered lock ordering, fault revalidation, fork, and frame ownership.
+
+The `memfdseals`, `remapfile`, `weighted`, `shmabi`, `truncateabi`,
+`truncatepath`, and `futexkeys` regressions passed on both architectures.
+The resumed runs used the same final kernels as the resident-page probe.
+
+The qualification archive is at
+`~/.cache/vinix-r15/tmpfs-truncate/qualification.tar.zst`, with SHA-256
+`b33cc9215bfe7dc7c342210d1ee79c3f7c99ddc1d536d27a46ed94fe41a25089`.

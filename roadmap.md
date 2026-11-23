@@ -2863,6 +2863,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   precedence, and changes in the available extent on both architectures.
   See [the EOF fault receipts](docs/linux-tmpfs-eof.md).
 
+- [x] Revoke resident tmpfs and memfd pages on shrink. Qualify offset aliases,
+  inherited private copies, retained partial pages, and zero-filled regrowth
+  on both architectures.
+  See [the resident truncation receipts](docs/linux-tmpfs-eof.md#truncation-of-resident-tmpfs-and-memfd-mappings).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

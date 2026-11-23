@@ -94,6 +94,16 @@ pub fn tracks_mapping_dirty(res Resource) bool {
 	return res is MappingDirtyResource
 }
 
+// The backend revokes mappings before releasing cache frames on shrink.
+pub interface MappingTruncateResource {
+mut:
+	truncates_mapped_pages()
+}
+
+pub fn tracks_mapping_truncation(res Resource) bool {
+	return res is MappingTruncateResource
+}
+
 pub interface MappingPageoutResource {
 mut:
 	pageout_mapping(page u64) u64

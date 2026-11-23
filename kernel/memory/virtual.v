@@ -158,6 +158,9 @@ pub mut:
 	mmap_ranges []voidptr
 	// Search tree for mmap ranges; its nodes are owned by mmap_ranges.
 	mmap_root   voidptr
+	// Temporary reverse-order lock list for inode truncation, protected
+	// by the VM's file mapping registry lock.
+	truncate_next &Pagemap = unsafe { nil }
 	// Being torn down: no CPU runs it any more, retained translations were
 	// invalidated before its pages/tables are returned to the allocator.
 	dying bool
