@@ -1206,6 +1206,12 @@ set `VINIX_IOS_RELEASE_RUNTIME` to its local executable,
 `VINIX_IOS_RELEASE_RUNTIME_ORIGIN` to its release download URL. Deployment verifies
 the checksum and static ARM64 ELF headers and records the origin in the notes.
 
+When a build selects package configuration, repository or application inputs,
+`deploy-iso.sh` records the preflight selection before building and checks the
+package files inside the finished ISO before release. Each checked image gets a
+`vinix-packages-ARCH.json` receipt in the release assets and `SHA256SUMS`.
+See [release package configuration](tools/packages/SDK.md#release-image-configuration).
+
 `./scripts/test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same checks on
 ISOs with the installer. It checks live boots, installation, and boots with the
 ISO detached through amd64 BIOS and UEFI and arm64 UEFI. A boot passes when the

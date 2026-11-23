@@ -28,6 +28,7 @@
 #   vinix-amd64.iso   boots through BIOS or UEFI, from a CD or a disk
 #   vinix-arm64.iso   boots through UEFI
 #   SHA256SUMS
+#   vinix-packages-ARCH.json  verified package selection (when inputs are selected)
 #   vinix-x11-ARCH.tar.gz(.sha256)  the X11 that pkg installs with the first
 #                     graphical application; the images leave it out
 #   vinix-ios-runtime-arm64(.sha256)  the static iOS runtime the first-run app
@@ -166,6 +167,35 @@ echo "Release $TAG from $SHORT ($(git log -1 --format=%s "$COMMIT"))"
 echo "  V:   $V ($("$V" version 2>/dev/null || echo 'version unknown'))"
 echo "  ui2: $UI2_SOURCE"
 echo "  out: $OUT"
+
+# Freeze the expected selection before building. The receipt tool belongs to
+# this release driver, including when --ref selects an older desktop source.
+package_inputs_selected() {
+    local variable target
+    for variable in VINIX_PACKAGE_IMAGE_CONFIG VINIX_PACKAGE_IMAGE_REPOSITORIES VINIX_PACKAGE_IMAGE_APPLICATIONS; do
+        target="${variable}_$1"
+        if [ -n "${!target:-}${!variable:-}" ]; then return 0; fi
+    done
+    return 1
+}
+
+PACKAGE_WORK=''
+PACKAGE_RECEIPTS=()
+if { [ "$BUILD_AMD64" -eq 1 ] && package_inputs_selected X86_64; } ||
+   { [ "$BUILD_ARM64" -eq 1 ] && package_inputs_selected AARCH64; }; then
+    step "Preflighting selected release package inputs"
+    PACKAGE_WORK="$(mktemp -d "$WORK/package-release.XXXXXX")"
+    trap 'rm -rf "$PACKAGE_WORK"' EXIT
+    "$V" -backend c -prod -cc cc \
+        -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/build-support|$SCRIPT_DIR/tools/accounts" \
+        -o "$PACKAGE_WORK/receipt" "$SCRIPT_DIR/build-support/isoboot/package-receipt.v"
+    if [ "$BUILD_AMD64" -eq 1 ]; then
+        "$PACKAGE_WORK/receipt" plan x86_64 > "$PACKAGE_WORK/amd64.plan"
+    fi
+    if [ "$BUILD_ARM64" -eq 1 ]; then
+        "$PACKAGE_WORK/receipt" plan aarch64 > "$PACKAGE_WORK/arm64.plan"
+    fi
+fi
 
 # ── A clean tree at the release commit ─────────────────────────────────────
 
@@ -313,6 +343,19 @@ for image in "${IMAGES[@]}"; do
     fi
 done
 
+if [ -n "$PACKAGE_WORK" ]; then
+    step "Checking package inputs embedded in the release ISOs"
+    for arch in amd64 arm64; do
+        plan="$PACKAGE_WORK/$arch.plan"
+        if [ ! -s "$plan" ]; then continue; fi
+        name="vinix-packages-$arch.json"
+        "$PACKAGE_WORK/receipt" verify "$OUT/vinix-$arch.iso" "$plan" > "$PACKAGE_WORK/$name"
+        mv -f "$PACKAGE_WORK/$name" "$OUT/$name"
+        PACKAGE_RECEIPTS+=("$OUT/$name")
+        BUNDLES+=("$OUT/$name")
+    done
+fi
+
 # ── Boot tests ─────────────────────────────────────────────────────────────
 
 TEST_SUMMARY=''
@@ -335,7 +378,7 @@ sha256() {
         shasum -a 256 "$@"
     fi
 }
-(cd "$OUT" && sha256 $(for image in "${IMAGES[@]}"; do basename "$image"; done) > SHA256SUMS)
+(cd "$OUT" && sha256 $(for asset in "${IMAGES[@]}" ${PACKAGE_RECEIPTS[@]+"${PACKAGE_RECEIPTS[@]}"}; do basename "$asset"; done) > SHA256SUMS)
 cat "$OUT/SHA256SUMS"
 
 describe_boot() {
@@ -395,9 +438,18 @@ describe_boot() {
     echo '    -netdev user,id=net0 -device virtio-net-device,netdev=net0'
     echo '```'
     echo
-    echo "Firefox, Chromium and the other optional apps are not on the image: the first"
-    echo "launch offers them and \`pkg install\` downloads them, so give the VM a network"
-    echo "card (the commands above do). Vinix drives VirtIO and Intel e1000 cards. Nor is"
+    if [ "${#PACKAGE_RECEIPTS[@]}" -gt 0 ]; then
+        echo "### Signed packages from the images"
+        echo
+        echo "Each receipt records the bundled publisher keys, signed indexes and any"
+        echo "release applications selected for review in Software."
+        for receipt in "${PACKAGE_RECEIPTS[@]}"; do
+            echo "- [$(basename "$receipt")](https://github.com/${REPO:-vlang/vinix}/releases/download/$TAG/$(basename "$receipt"))"
+        done
+        echo
+    fi
+    echo "Optional apps offered by legacy setup use \`pkg install\` and need networking."
+    echo "Vinix drives VirtIO and Intel e1000 cards. The images leave out"
     echo "X11: the first graphical Linux application brings it, from the"
     echo "\`vinix-x11-*.tar.gz\` files of this release. Python is a \`pkg install python3\`"
     echo "away; the V compiler and Oh My Zsh are left out too. The iOS runtime the first"
