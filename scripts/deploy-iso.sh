@@ -315,7 +315,7 @@ finish_draft() {
         release_url="$(verify_release "$release_id" "$ASSET_WORK/published.json" published)"
         outcome="Published"
     fi
-    if [ -n "$RESUME_DRAFT" ]; then retire_resumed_creation; fi
+    if [ -n "$original" ]; then retire_resumed_creation; fi
     step "$outcome"
     echo "$release_url"
 }
@@ -350,9 +350,15 @@ if [ -n "$RESUME_CREATE" ]; then
     "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
     candidate_id="$(find_created_draft)"
     github_api "$release_api/$candidate_id" > "$ASSET_WORK/created-draft.json"
+    saved_draft="$("$ASSET_WORK/release-assets" has-saved-creation-draft \
+        "$WORK" "$OUT" "$ASSET_WORK" "$TAG" "$candidate_id")"
     confirm_publish
-    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
-    finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"
+    if [ "$saved_draft" = true ]; then
+        finish_draft "$candidate_id" "$ASSET_WORK/created-draft.json" "$OUT"
+    else
+        "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
+        finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"
+    fi
     exit 0
 fi
 

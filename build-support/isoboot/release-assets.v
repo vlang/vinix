@@ -277,24 +277,44 @@ fn restore_creation(output string, tag string, directory string) ! {
 	restore_metadata(creation, directory)!
 }
 
+fn saved_draft_matches(path string, record string, id u64) !bool {
+	os.lstat(path) or {
+		if err.code() == C.ENOENT { return false }
+		return err
+	}
+	if read_recovery_text(path)! != record {
+		return error('conflicting recovery record for GitHub draft ${id}')
+	}
+	return true
+}
+
+fn captured_creation(output string, directory string, tag string) !(DraftRecovery, string) {
+	path := creation_path(directory)
+	text := read_recovery_text(path)!
+	if read_recovery_text(creation_path(output))! != text {
+		return error('draft creation record changed during publication')
+	}
+	return parse_creation(text, path, tag)!, text
+}
+
+fn has_saved_creation_draft(work string, output string, directory string, tag string, id string) !bool {
+	number := id.u64()
+	if number == 0 || number.str() != id { return error('invalid draft recovery ID') }
+	creation, _ := captured_creation(output, directory, tag)!
+	path := os.join_path(work, 'draft-${id}.json')
+	return saved_draft_matches(path, json2.encode(DraftRecovery{...creation, id: number}) + '\n', number)
+}
+
 fn record_draft(work string, output string, directory string, response string, tag string, id string) !u64 {
 	intent := creation_path(output)
-	captured := creation_path(directory)
-	text := read_recovery_text(captured)!
-	if read_recovery_text(intent)! != text { return error('draft creation record changed during publication') }
-	creation := parse_creation(text, captured, tag)!
+	creation, text := captured_creation(output, directory, tag)!
 	draft := read_release(response, id, tag, creation.notes, creation.prerelease)!
 	if !draft.draft { return error('GitHub did not create a draft release') }
 	upload_endpoint(draft, creation.repo)!
 	if draft.assets.len != 0 { return error('new GitHub draft already contains assets') }
 	path := os.join_path(work, 'draft-${draft.id}.json')
 	record := json2.encode(DraftRecovery{...creation, id: draft.id}) + '\n'
-	if os.exists(path) {
-		// The earlier conversion may have stopped after writing the record.
-		if pkgcore.read_metadata(path)! != record {
-			return error('conflicting recovery record for GitHub draft ${draft.id}')
-		}
-	} else {
+	if !saved_draft_matches(path, record, draft.id)! {
 		pkgcore.atomic_write_new(path, record)!
 	}
 	current := read_recovery_text(intent) or {
@@ -537,6 +557,10 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'restore-creation' {
 		return restore_creation(os.args[2], os.args[3], os.args[4])
 	}
+	if os.args.len == 7 && os.args[1] == 'has-saved-creation-draft' {
+		println(has_saved_creation_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])!)
+		return
+	}
 	if os.args.len == 8 && os.args[1] == 'record-draft' {
 		println(record_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7])!)
 		return
@@ -563,7 +587,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | stage-reviewed | prepare-creation | restore-creation | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | stage-reviewed | prepare-creation | restore-creation | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
 }
 
 fn main() {

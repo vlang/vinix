@@ -15,7 +15,8 @@ const other_commit = '1234567890123456789012345678901234567890'
 const release_url = 'https://example.invalid/fixture'
 const draft_refusals = ['draft-tag-rebound', 'draft-wrong-upload-url',
 	'tag-moved-during-upload', 'tag-removed-during-upload', 'draft-bad-digest',
-	'draft-incomplete-asset', 'draft-missing-asset', 'draft-extra-asset', 'draft-changed', 'upload-interrupted']
+	'draft-incomplete-asset', 'draft-missing-asset', 'draft-extra-asset', 'draft-changed', 'upload-interrupted',
+	'upload-interrupted-create']
 const publish_refusals = ['publish-readback-lost', 'publish-still-draft',
 	'publish-changed-asset', 'publish-tag-moved']
 const repo_refusals = ['repo-foreign', 'repo-invalid', 'repo-dotdot']
@@ -330,7 +331,9 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			scenario.starts_with('resume-'))!
 		first := if draft.assets.len > 0 { draft.assets[0] } else { FixtureAsset{} }
 		match scenario {
-			'draft-bad-digest', 'resume-bad-remote' { draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)} }
+			'draft-bad-digest', 'resume-bad-remote', 'resume-create-saved-bad-remote' {
+				draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)}
+			}
 			'draft-incomplete-asset' { draft.assets[0] = FixtureAsset{...first, state: 'starter'} }
 			'draft-missing-asset' { draft.assets.delete(0) }
 			'draft-extra-asset' { draft.assets << FixtureAsset{...first, name: 'extra.iso'} }
@@ -391,7 +394,7 @@ fn upload_fixture(args []string, out string, remote string, scenario string) !in
 	}
 	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if !draft.draft || draft.tag_name != tag { return error('upload does not target the draft') }
-	if scenario == 'resume-complete-draft' && name == 'vinix-amd64.iso' {
+	if scenario in ['resume-complete-draft', 'resume-create-saved-upload']! && name == 'vinix-amd64.iso' {
 		stage := os.dir(file)
 		mut names := os.ls(stage)!
 		names.sort()
@@ -407,7 +410,7 @@ fn upload_fixture(args []string, out string, remote string, scenario string) !in
 		match scenario {
 			'tag-moved-during-upload' { os.write_file(tag_file(remote, tag), other_commit)! }
 			'tag-removed-during-upload' { os.rm(tag_file(remote, tag))! }
-			'upload-interrupted' {
+			'upload-interrupted', 'upload-interrupted-create' {
 				eprintln('fixture upload interrupted')
 				return 1
 			}
@@ -809,6 +812,48 @@ fn check_resume(root string, work string, out string, remote string, environment
 	if published.draft || !os.exists(remote + '/publish-attempt')
 		|| os.read_file(record)! != recovery || os.read_file(remote + '/release-attempt')! != created {
 		return error('recovery did not publish the original draft')
+	}
+}
+
+fn check_tag_upload_recovery(root string, work string, out string, remote string, environment map[string]string) ! {
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	tag := environment['VINIX_ASSET_TEST_TAG']
+	record := root + '/build-release/work/draft-' + id + '.json'
+	saved := os.read_file(record)!
+	intent_path := out + '/.draft-creation.json'
+	intent := os.read_file(remote + '/creation-record')!
+	os.write_file(intent_path, intent)!
+	attempt := os.read_file(remote + '/release-attempt')!
+	mut before := os.ls(remote + '/uploads')!
+	before.sort()
+	expected := os.read_lines(out + '/SHA256SUMS')!.len + 1
+	if before.len == 0 || before.len >= expected { return error('fixture draft is not partially uploaded') }
+	options := ['--resume-create=' + tag, '--draft']
+	os.rm(record)!
+	recovery_attempt(root, work, environment, 'resume-create-no-saved-upload', options,
+		'new GitHub draft already contains assets')!
+	if os.exists(record) { return error('unrecorded partial draft gained a recovery record') }
+	metadata := json2.decode[FixtureCreation](saved)!
+	conflict := json2.encode(FixtureCreation{...metadata, commit: other_commit}) + '\n'
+	os.write_file(record, conflict)!
+	recovery_attempt(root, work, environment, 'resume-create-conflicting-upload', options,
+		'conflicting recovery record for GitHub draft ' + id)!
+	if os.read_file(record)! != conflict { return error('refused recovery rewrote the conflicting ID record') }
+	os.write_file(record, saved)!
+	recovery_attempt(root, work, environment, 'resume-create-saved-bad-remote', options,
+		'GitHub draft asset differs from the verified upload')!
+	mut after := os.ls(remote + '/uploads')!
+	after.sort()
+	if before != after || os.read_file(intent_path)! != intent || os.read_file(record)! != saved
+		|| os.exists(remote + '/publish-attempt') {
+		return error('refused tag recovery changed the partial draft or its records')
+	}
+	recovery_attempt(root, work, environment, 'resume-create-saved-upload', options, '')!
+	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	if !draft.draft || draft.id.str() != id || draft.assets.len != expected || os.exists(intent_path)
+		|| os.read_file(record)! != saved || os.read_file(remote + '/release-attempt')! != attempt
+		|| !os.exists(remote + '/resume-stage') || os.exists(remote + '/publish-attempt') {
+		return error('tag recovery did not complete the original partial draft')
 	}
 }
 
@@ -1236,7 +1281,7 @@ fn run() ! {
 				'draft-missing-asset' { 'missing GitHub draft assets' }
 				'draft-extra-asset' { 'unexpected GitHub draft asset' }
 				'draft-changed' { 'GitHub draft metadata changed after creation' }
-				'upload-interrupted' { 'fixture upload interrupted' }
+				'upload-interrupted', 'upload-interrupted-create' { 'fixture upload interrupted' }
 				else { 'release asset changed after verification' }
 			}
 			if code == 0 || !log.contains(diagnostic) || os.exists(remote + '/publish-attempt')
@@ -1257,6 +1302,9 @@ fn run() ! {
 				return error('unexpected boot test handoff: ' + scenario)
 			}
 			if scenario == 'upload-interrupted' { check_resume(root, work, out, remote, environment)! }
+			if scenario == 'upload-interrupted-create' {
+				check_tag_upload_recovery(root, work, out, remote, environment)!
+			}
 		}
 		println('ISO release assets ${scenario} PASS')
 	}
