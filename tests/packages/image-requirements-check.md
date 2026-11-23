@@ -237,6 +237,30 @@ matched their archive's bytes, modes, types and links. The SHA-256 of
 `qualification.sha256` is
 `7cf8c8296f4edadc508557179f0c26ea0768d88aa620bbf7fe0f346a0c8cde6a`.
 
+### Reviewed plans and release handoff
+
+At `72780fea3`, `--package-review=DIR` requires an exact plan for every
+requested target. Swapped architectures, a missing second target plan and
+an unconfigured target all stopped the driver before checkout. Separate valid
+plans for amd64 and arm64 passed with the signed mixed catalog.
+
+The driver formed `SHA256SUMS` from the private verified receipts. A separate
+checksum reader verified both ISO files and both public receipts. Changes to
+the ISO or to the public receipt during the boot-test step blocked publication
+of the checksum list. Changing the checksum list at the confirmation prompt
+blocked the upload. A clean handoff passed the ISO, checksum list and receipt
+to a local GitHub stub. The legacy run produced its ordinary ISO checksum.
+
+The replay supplied fixture ISOs and stubbed the build, boot and upload steps.
+The verifier read the actual package files from the fixture ISOs, including
+the signed mixed bundle and its payloads. The eight ISO receipt controls and
+the package repository fixture passed.
+
+The paired fixture ISOs, plans, receipts and logs are in
+`~/.local/state/vinix/r14-release-handoff-6QVM7E`. The SHA-256 of
+`qualification.sha256` is
+`2df1f66944c0dcd98b18350059c514b480b47fe72435a1d39ec384f4a220e293`.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
