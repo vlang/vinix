@@ -162,9 +162,7 @@ pub fn receive_result(fd int, request Request) !int {
 			// directly to result() escapes in the manual-free compiler.
 			text := unsafe { tos(&bytes[0], used).clone() }
 			defer { unsafe { text.free() } }
-			// result() borrows this parameter only for its synchronous check.
-			// An implicit receiver address promotes the whole request to the heap.
-			return unsafe { &request }.result(text)
+			return request.result(text)
 		}
 		used += int(count)
 	}

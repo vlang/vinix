@@ -31,7 +31,7 @@ fn suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkglaunch/protocol_test.v', path: 'usr/share/package-fixtures/protocol' },
 			hwhost.Program{ source: 'tools/packages/pkglaunch/streams_test.v', path: 'usr/share/package-fixtures/streams' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/command_test.v', path: 'usr/share/package-fixtures/command' },
-			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session' },
+			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session', flags: ['-enable-globals'] },
 		], scenarios: [hwhost.Scenario{ name: 'packages-launch-transport', arches: ['aarch64', 'x86_64'],
 			about: 'owned canonical launch envelopes, receipts and wire transfers as root and UID 1000 under allocation tracking',
 			required: ['HWTEST START packages-launch-transport',

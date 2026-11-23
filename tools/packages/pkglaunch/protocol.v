@@ -114,7 +114,9 @@ pub fn (request &Request) receipt(code int) string {
 	return result_prefix + request.nonce + ' ' + digest + ' ' + number
 }
 
-pub fn (request &Request) result(text string) !int {
+// The completion reader holds a value copy. A value receiver keeps that copy
+// on the stack while validation borrows its fields.
+pub fn (request Request) result(text string) !int {
 	if text.len > 128 { return error('isolated package completion receipt is invalid') }
 	number := text.all_after_last(' ')
 	defer { unsafe { number.free() } }

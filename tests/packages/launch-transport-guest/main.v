@@ -7,12 +7,13 @@ import os
 #include <sys/reboot.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#define vinix_transport_execv(path, argv) execv((path), (char *const *)(argv))
 fn C.dup2(int, int) int
 fn C.fork() int
 fn C.setgroups(usize, voidptr) int
 fn C.setgid(u32) int
 fn C.setuid(u32) int
-fn C.execv(&char, &&char) int
+fn C.vinix_transport_execv(&char, voidptr) int
 fn C._exit(int)
 fn C.waitpid(int, &i32, int) int
 fn C.sync()
@@ -27,7 +28,7 @@ fn actor(ordinary bool) ! {
 		if ordinary {
 			if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(90) }
 		}
-		C.execv(c'/usr/share/package-fixtures/launch-transport', unsafe { &argv[0] })
+		C.vinix_transport_execv(c'/usr/share/package-fixtures/launch-transport', unsafe { &argv[0] })
 		C._exit(91)
 	}
 	mut status := i32(0)

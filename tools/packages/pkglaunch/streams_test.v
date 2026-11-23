@@ -22,7 +22,7 @@ fn eof_readable(fd int) {
 	// Level-triggered EOF must remain visible on repeated polls and reads.
 	for _ in 0 .. 2 {
 		mut polling := Poll{ fd: i32(fd), events: 1 }
-		assert C.vinix_launch_poll(unsafe { &polling }, 1, 250) == 1
+		assert C.vinix_launch_poll(voidptr(&polling), 1, 250) == 1
 		assert polling.revents & 1 != 0
 	}
 }
@@ -40,7 +40,7 @@ fn test_half_closed_socket_remains_readable_after_draining() {
 				assert C.write(pair[1], c'ab', 2) == 2
 				assert eof_read(pair[0], receiver, 2) == 2
 				mut empty := Poll{ fd: pair[0], events: 1 }
-				assert C.vinix_launch_poll(unsafe { &empty }, 1, 0) == 0
+				assert C.vinix_launch_poll(voidptr(&empty), 1, 0) == 0
 				assert C.write(pair[1], c'ab', 2) == 2
 				assert C.shutdown(pair[1], how) == 0
 				eof_readable(pair[0])
