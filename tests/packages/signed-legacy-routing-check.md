@@ -221,8 +221,8 @@ AArch64 passed in 35.709 seconds and x86-64 passed in 61.025 seconds with
 2 GiB of guest RAM. A fresh AArch64 run without the approval option passed
 the read-only check in 21.487 seconds with 1 GiB. The initial 1 GiB approval
 attempts left the store without an active generation. The AArch64 capture
-shows a retained unpublished package stage after the install stopped. The smaller live
-fixture's staging failure remains open.
+shows a retained unpublished package stage after the install stopped. The
+[1 GiB replay](#approved-neovim-install-with-1-gib) below covers the fix.
 
 The full run roots and diagnostics are in
 `~/.local/state/vinix/r14-neovim-approval-qVjrYJYs/accepted`. All three
@@ -230,3 +230,37 @@ restored run roots matched independent archive inventories. Decode
 `runs.tar.zst` with `zstd --long=30 -dc` when restoring. The SHA-256 of
 `qualification.sha256` is
 `30912a3acfd97841aa7754f9f2a79db5ecff20934348e1f73704109a07ab87a7`.
+
+## Approved Neovim install with 1 GiB
+
+The signed release from the earlier approval check now installs at 1 GiB
+through the same visible Software approval flow. Run the controller with
+`--approve=true --memory-mib=1024`. AArch64 passed in 35.552 seconds and
+x86-64 in 65.377 seconds. Each run verified all five packages and payloads
+in generation 1, checked the recorded roots, and launched headless Neovim
+as UID 1000.
+
+Direct offline replay on `7c10afe81` recorded owner-budget denials and no
+active generation on either architecture. With the tmpfs reservation fix
+in `2ad8f73e2`, both command-line installs passed with zero denials. With
+the old progress encoder still in use, x86-64 reproduced the owner denial
+both through Software and through `vinix-package --progress deployment-apply`. The
+graphical worker had reserved 55,783,838 of its 55,876,096 bytes when another
+108,992-byte file reservation was refused. The kernel charge now covers the
+resource and interface box at twice their combined sizes.
+
+The encoder probe measured 15,404 retained bytes across 100 original
+encodes. Direct buffer encoding retained zero bytes in the same probe.
+The paired approvals passed with the progress writer from `14d8bf8c4`.
+The live kernels were built from `39b336c8f` with the tmpfs fix applied. The
+desktop and authentication tools came from the prior staged release, and
+the package CLI was rebuilt for each target. The host accounting, package
+verification and health progress suites passed. The Linux compatibility
+owner-limit and recovery fixture also passed on both targets.
+
+The checksummed runs, input receipts, screenshots and build logs are in
+`~/.local/state/vinix/r14-neovim-staging-NZI9bwhR/accepted`. The nine saved run
+roots matched the original logical bytes, paths, types, modes and links.
+Use `zstd --long=30 -dc` for `approval-runs.tar.zst` and
+`diagnostic/runs.tar.zst`. The SHA-256 of `qualification.sha256` is
+`c8748757b9e16263d8348d58e691ea96e947df8845d86ab88cddac59d187a57c`.
