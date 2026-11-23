@@ -933,7 +933,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     production C generation for both targets. The
     [paired QEMU checks](tests/packages/audio-portal-native-check.md#finalized-qemu-waveform-capture)
     pass exact stereo waveforms, seat switching and cleanup on both targets.
-    Independently reviewed kernel seals and stalled-driver acceptance remain open.
+    The [HD Audio stall check](tests/packages/audio-portal-native-check.md#hd-audio-stall-and-close-recovery)
+    verifies bounded write and drain failures and successful reuse after close.
+    Independently reviewed kernel seals and other stalled devices remain open.
   - [x] [Ordinary-account graphical sessions](tests/packages/software-session-check.md)
     use the effective account's home and child environment, inherited console
     descriptors, private readiness and shared numeric broker/framebuffer paths.

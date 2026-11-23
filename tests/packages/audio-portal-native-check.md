@@ -312,3 +312,30 @@ The raw WAVs, QMP and serial logs, verdicts and selected input digests are in
 `~/.local/state/vinix/r14-audio-waveform-nlujq3/qualification.tar.gz`.
 Its SHA-256 is `477675c493322ecbc372d246c5f5ca0bbfe8db826d4f6f839a80f313eedf7fc3`.
 The extracted files passed every entry in `qualification.sha256`.
+
+## HD Audio stall and close recovery
+
+At `52ea5d1fc`, HD Audio waits for playback with a two-second monotonic
+stall deadline that renews when audio makes progress. A write that already
+queued bytes returns that count. A write that queues nothing and an
+explicit drain report the timeout. The OSS layer also carries errors from
+the existing VirtIO and Apple speaker drain checks. Closing a stream still
+stops and resets the driver before releasing the device owner.
+
+The `hda-stall` scenario ran with `VFLAGS=-d hda_stall_test` on x86-64.
+Suppressing playback completions at 44.1 kHz produced an exact 1 MiB
+partial write, a write timeout at 2.000 seconds and a drain timeout at
+2.001 seconds. Close returned, a new 48 kHz stream drained a short buffer,
+and the guest shut down. The fault injection is absent from the ordinary
+kernel build.
+
+Ordinary AArch64 and x86-64 kernels passed all six signed audio guest and
+strict waveform checks. Both package audio host suites and all fourteen
+hardware harness host suites passed. The stalls exercised here are
+emulated HD Audio playback completions. VirtIO stall recovery, physical
+Apple speaker faults and independently reviewed kernel seals remain open.
+
+The raw logs, waveforms, build logs and selected digests are in
+`~/.local/state/vinix/r14-hda-stall-yBvEPW/qualification.tar.gz`.
+Its SHA-256 is `a2826aabe3e03479429b8c5ffd5c45738aea6909f3f39fd9e464f3a201023b02`.
+The extracted files passed every entry in `qualification.sha256`.
