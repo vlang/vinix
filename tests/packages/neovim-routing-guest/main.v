@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import json2
 import os
 import time
 import tools.packages.pkgprotocol
@@ -13,6 +14,13 @@ const legacy_log = '/home/alex/legacy-installer.log'
 const choice = '/home/alex/.vinix-first-run-release'
 const editor = 'org.neovim.editor'
 const runtime = 'org.vinix.neovim-runtime'
+const approval_input = '/etc/neovim-routing-approval'
+const approval_success = 'uid=1000 run packages-change as alex: exit 0'
+
+struct VerifiedGeneration {
+	generation u64
+	requested []string
+}
 
 fn run_command(args []string, input string) !(int, string) {
 	mut child := os.new_process(args[0])
@@ -113,6 +121,84 @@ fn verify_proposal(document pkgprotocol.DeploymentDocument) ! {
 	println('HWTEST INFO SIGNED PROPOSAL ' + reply.trim_space())
 }
 
+fn approval_step(name string, pause time.Duration) {
+	println('HWTEST INFO approval ' + name)
+	time.sleep(pause)
+}
+
+fn read_after_catalog_refresh(args []string) !string {
+	// Software's follow-up catalog refresh can overlap the installed-state checks.
+	deadline := time.sys_mono_now() + 30 * time.second
+	for {
+		code, output := run_command(args, '')!
+		if code == 0 { return output }
+		if !output.contains('another package transaction is running; review again when it finishes')
+			|| time.sys_mono_now() >= deadline {
+			return error(args.join(' ') + ' failed: ' + output)
+		}
+		time.sleep(200 * time.millisecond)
+	}
+	return error('package read did not complete')
+}
+
+fn verify_approved_install(document pkgprotocol.DeploymentDocument, password string) ! {
+	// The host delivers input through QEMU at each step. The guest only observes
+	// package state, authentication and the real installed entrypoint.
+	approval_step('pointer', 300 * time.millisecond)
+	approval_step('press', 300 * time.millisecond)
+	approval_step('release', 2 * time.second)
+	require_uninstalled()!
+	approval_step('prompt', 400 * time.millisecond)
+	for index in 0 .. password.len {
+		approval_step('key ${index}.', 250 * time.millisecond)
+	}
+	require_uninstalled()!
+	approval_step('masked without activation PASS', 400 * time.millisecond)
+	approval_step('submit', 300 * time.millisecond)
+	// Leave time to capture Software's visible result on both success and failure.
+	defer { approval_step('response', 4 * time.second) }
+
+	log_path := '/var/log/vinix/auth.log'
+	deadline := time.sys_mono_now() + 90 * time.second
+	for {
+		log := os.read_file(log_path) or { '' }
+		if log.contains(password) { return error('administrator audit exposed the fixture password') }
+		if log.contains(approval_success) {
+			if log.split_into_lines().filter(it.contains('run packages-change')).len != 1 {
+				return error('expected exactly one approved package change')
+			}
+			// The auth service records dispatch before the package worker has
+			// finished. Wait for the real activation before auditing.
+			if os.is_link('/var/lib/vinix-packages/current') { break }
+		}
+		if time.sys_mono_now() >= deadline {
+			if memory := os.read_file('/proc/meminfo') { println('HWTEST INFO package install memory\n' + memory) }
+			return error('approved package change did not activate a generation')
+		}
+		time.sleep(200 * time.millisecond)
+	}
+	audit_text := read_after_catalog_refresh(['/usr/bin/vinix-package', '--offline', '--json',
+		'deployment-audit', declaration])!
+	mut audit := pkgprotocol.decode_deployment_audit(audit_text)!
+	defer { audit.close() }
+	if !audit.matches || audit.generation != 1 || audit.architecture != document.architecture
+		|| audit.rows.len != document.locked.len || audit.rows.any(it.status != 'match') {
+		return error('approved generation differs from the reviewed release lock')
+	}
+	state_text := read_after_catalog_refresh(['/usr/bin/vinix-package', '--offline', '--json', 'verify'])!
+	state := json2.decode[VerifiedGeneration](state_text)!
+	if state.generation != audit.generation || state.requested != document.packages {
+		return error('verified generation did not retain the approved application roots')
+	}
+	println('HWTEST INFO INSTALLED AUDIT ' + audit_text.trim_space())
+	result := checked(['/usr/bin/vinix-package', '--offline', 'run-args', editor, '--data-cwd', '--',
+		'--headless', '-u', 'NONE', '-i', 'NONE', '-n',
+		'-c', "lua assert(vim.uv.getuid()==1000); print('NEOVIM_SOFTWARE_INSTALL_OK')", '-c', 'qa!'], '')!
+	if !result.contains('NEOVIM_SOFTWARE_INSTALL_OK') {
+		return error('approved install did not run the real editor as the ordinary user')
+	}
+}
+
 fn route() ! {
 	for directory in ['/run', '/home', '/root', '/tmp', '/var/log'] { os.mkdir_all(directory)! }
 	os.chmod('/tmp', 0o1777)!
@@ -121,8 +207,10 @@ fn route() ! {
 	os.setenv('HOME', '/root', true)
 	os.setenv('VINIX_SYSTEM_SESSION', '1', true)
 	require_uninstalled()!
+	approve := os.exists(approval_input)
+	password := if approve { os.read_file(approval_input)! } else { 'test-only password' }
 	checked(['/usr/sbin/vinix-account', 'init'], '')!
-	checked(['/usr/sbin/vinix-account', 'add', 'alex', 'Alex', 'admin'], 'test-only password\n')!
+	checked(['/usr/sbin/vinix-account', 'add', 'alex', 'Alex', 'admin'], password + '\n')!
 	os.write_file(choice, 'skip\n')!
 	os.chmod(choice, 0o600)!
 	os.chown(choice, 1000, 1000)!
@@ -184,6 +272,14 @@ fn route() ! {
 	}
 	require_uninstalled()!
 	println('HWTEST PASS Neovim graphical routing without activation or approval')
+	if approve {
+		verify_approved_install(document, password)!
+		if os.read_file(declaration)! != lock_text || os.read_file(choice)! != 'skip\n'
+			|| os.read_file(legacy_log)! != 'install neovim\n' {
+			return error('approved install changed release inputs or called the legacy installer')
+		}
+		println('HWTEST PASS approved Software generation verified and Neovim launched as uid 1000')
+	}
 }
 
 fn main() {

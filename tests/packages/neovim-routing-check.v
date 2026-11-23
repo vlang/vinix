@@ -17,19 +17,27 @@ const desktop_files = [
 	'usr/sbin/vinix-session',
 	'usr/share/vinix/actions/packages-change',
 ]
+const fixture_password = 'test-only password'
+const approved_install = 'HWTEST PASS approved Software generation verified and Neovim launched as uid 1000'
 
 fn parse_options(values []string) !map[string]string {
+	required := ['--arch', '--kernel', '--staging', '--config', '--deployment', '--bundle', '--out']
 	mut options := map[string]string{}
 	for argument in values {
 		name := argument.all_before('=')
 		value := argument.all_after('=')
-		if name !in ['--arch', '--kernel', '--staging', '--config', '--deployment', '--bundle', '--out']
+		if (name !in required && name != '--approve')
 			|| !argument.contains('=') || value == '' || name in options {
-			return error('expected distinct --arch, --kernel, --staging, --config, --deployment, --bundle and --out options')
+			return error('expected distinct --arch, --kernel, --staging, --config, --deployment, --bundle, --out and optional --approve options')
 		}
-		options[name] = if name == '--arch' { value } else { os.abs_path(value) }
+		options[name] = if name in ['--arch', '--approve'] { value } else { os.abs_path(value) }
 	}
-	if options.len != 7 || options['--arch'] !in ['aarch64', 'x86_64'] { return error('missing inputs or unsupported architecture') }
+	if !required.all(it in options) || options['--arch'] !in ['aarch64', 'x86_64'] {
+		return error('missing inputs or unsupported architecture')
+	}
+	if (options['--approve'] or { 'false' }) !in ['true', 'false'] {
+		return error('--approve must be true or false')
+	}
 	return options
 }
 
@@ -56,6 +64,40 @@ fn take_picture(marker string, name string, delay int) hwhost.Action {
 	}
 }
 
+fn approval_action(step string, command string, arguments string) hwhost.Action {
+	return hwhost.Action{
+		after: 'HWTEST INFO approval ' + step
+		qmp: '{"execute":"' + command + '","arguments":' + arguments + '}'
+		answer_lacks: '"error"'
+	}
+}
+
+fn approval_actions() []hwhost.Action {
+	// Confirm in the 1024x768 Software proposal. Press and release are
+	// separate so both USB and VirtIO HID devices observe the click.
+	x := 463 * 32767 / 1024
+	y := 612 * 32767 / 768
+	mut actions := [
+		approval_action('pointer', 'input-send-event', '{"events":[{"type":"abs","data":{"axis":"x","value":${x}}},{"type":"abs","data":{"axis":"y","value":${y}}}]}'),
+		approval_action('press', 'input-send-event', '{"events":[{"type":"btn","data":{"button":"left","down":true}}]}'),
+		approval_action('release', 'input-send-event', '{"events":[{"type":"btn","data":{"button":"left","down":false}}]}'),
+		take_picture('HWTEST INFO approval prompt', 'approval.ppm', 0),
+	]
+	for index, byte in fixture_password.bytes() {
+		key := match byte {
+			` ` { 'spc' }
+			`-` { 'minus' }
+			else { byte.ascii_str() }
+		}
+		actions << approval_action('key ${index}.', 'human-monitor-command',
+			'{"command-line":"sendkey ${key} 100"}')
+	}
+	actions << take_picture('HWTEST INFO approval masked without activation PASS', 'masked.ppm', 0)
+	actions << approval_action('submit', 'human-monitor-command', '{"command-line":"sendkey ret 100"}')
+	actions << take_picture('HWTEST INFO approval response', 'response.ppm', 1000)
+	return actions
+}
+
 fn changed_pixels(before hwhost.Picture, next hwhost.Picture) !int {
 	if before.width != 1024 || before.height != 768 || before.width != next.width || before.height != next.height {
 		return error('requires the expected 1024 by 768 desktop framebuffer')
@@ -79,6 +121,7 @@ fn check() ! {
 	}
 	options := parse_options(os.args[1..])!
 	arch := options['--arch']
+	approve := options['--approve'] == 'true'
 	root := hwhost.find_root(@FILE)!
 	host := hwhost.find_host(root, arch, '')!
 	work := options['--out']
@@ -148,6 +191,11 @@ fn check() ! {
 	os.write_file(target + '/etc/shadow', 'root:!:0:0:99999:7:::\n')!
 	os.chmod(target + '/etc/shadow', 0o600)!
 	os.write_file(target + '/etc/vinix/auth.conf', 'scrypt_ln = 10\nscrypt_p = 1\n')!
+	if approve {
+		copy_pinned(options['--staging'] + '/usr/bin/vinix-sandbox',
+			target + '/usr/bin/vinix-sandbox', mut inputs)!
+		os.write_file(target + '/etc/neovim-routing-approval', fixture_password)!
+	}
 
 	os.cp(guest, target + '/usr/bin/pkg')!
 	os.chmod(target + '/usr/bin/pkg', 0o755)!
@@ -156,24 +204,34 @@ fn check() ! {
 	before := 'HWTEST INFO ordinary desktop before Neovim setup'
 	invalid := 'HWTEST INFO invalid declaration refused without fallback PASS'
 	review := 'HWTEST INFO exact setup command requested signed Neovim review PASS'
+	mut required := ['HWTEST INFO absent declaration called legacy installer as uid 1000 PASS', before, invalid, review,
+		'HWTEST PASS Neovim graphical routing without activation or approval']
+	mut actions := [take_picture(before, 'desktop.ppm', 0), take_picture(invalid, 'invalid.ppm', 0),
+		take_picture(review, 'proposal.ppm', 3000)]
+	mut screens := [hwhost.Screen{file: 'desktop.ppm'}, hwhost.Screen{file: 'invalid.ppm', like: 'desktop.ppm'},
+		hwhost.Screen{file: 'proposal.ppm', like: 'desktop.ppm'}]
+	if approve {
+		required << approved_install
+		actions << approval_actions()
+		for file in ['approval.ppm', 'masked.ppm', 'response.ppm'] {
+			screens << hwhost.Screen{file: file, like: 'proposal.ppm'}
+		}
+	}
 	scenario := hwhost.Scenario{
 		name: 'Neovim graphical routing'
 		arches: [arch]
 		qemu: ['-nic', 'none']
 		qemu_x86_64: ['-vga', 'std', '-device', 'qemu-xhci,id=gui-input', '-device', 'usb-kbd,bus=gui-input.0',
 			'-device', 'usb-tablet,bus=gui-input.0']
-		required: ['HWTEST INFO absent declaration called legacy installer as uid 1000 PASS', before, invalid, review,
-			'HWTEST PASS Neovim graphical routing without activation or approval']
+		required: required
 		forbidden: ['HWTEST FAIL', 'Kernel panic', 'cannot start Software']
-		actions: [take_picture(before, 'desktop.ppm', 0), take_picture(invalid, 'invalid.ppm', 0),
-			take_picture(review, 'proposal.ppm', 3000)]
-		screens: [hwhost.Screen{file: 'desktop.ppm'}, hwhost.Screen{file: 'invalid.ppm', like: 'desktop.ppm'},
-			hwhost.Screen{file: 'proposal.ppm', like: 'desktop.ppm'}]
+		actions: actions
+		screens: screens
 		ending: .running
 	}
 	runtime_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
 	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{kernel: options['--kernel'], guest: guest,
-		state: boot, timeout: 300, keep: true})
+		state: boot, timeout: 300, memory_mib: if approve { 2048 } else { 1024 }, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	if !outcome.passed || outcome.interrupted || outcome.reason != '' { return error(outcome.reason) }
 	for path, expected in inputs {
@@ -190,7 +248,7 @@ fn check() ! {
 	}
 	os.write_file(work + '/pixels.json', json2.encode({'invalid_changed': refused_changes,
 		'proposal_changed': proposal_changes}) + '\n')!
-	println('NEOVIM GRAPHICAL ROUTING PASS ' + arch)
+	println(if approve { 'NEOVIM GRAPHICAL APPROVAL PASS ' + arch } else { 'NEOVIM GRAPHICAL ROUTING PASS ' + arch })
 }
 
 fn main() {
