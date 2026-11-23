@@ -2779,6 +2779,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   lifetime, filesystem credentials, partial vector returns, and anonymous
   paging on both architectures. See [the advice receipts](docs/linux-process-madvise.md).
 
+- [x] Match native `fadvise64` descriptor and range validation. Qualify
+  error ordering, signed ranges, argument widths, and libc return values
+  on both architectures. See [the file advice receipts](docs/linux-fadvise.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

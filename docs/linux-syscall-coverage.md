@@ -716,7 +716,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | --- | --- |
 | `kernel/c/pthread.h` | `349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2` |
 | `kernel/event/event.v` | `1f95b365a5abcfe7fdf93b8b57bcbcee11e6d6327d0f20fef358bfde5fbffcf0` |
-| `kernel/file/file.v` | `7dccedd0d8fbd08b7303f27a0c5c29789b0256f2a885a85e56ea0eeb9e2341b5` |
+| `kernel/file/file.v` | `dc7865fda451731f987418bf308c56e63bfbf0538f41741e260b4c0fa135fb0c` |
 | `kernel/fs/cachestat.v` | `a91f13d49f8fddfd26f3acf44014ccafec290ccfdae0865ec17e5fdfe424ab11` |
 | `kernel/fs/memfd_policy.v` | `33534ea5547c7d52ce3fbb2d0d195955d60351b065ec992549496b6b9b7cc1f2` |
 | `kernel/fs/mount.v` | `eacc84513600846fe2b29f374f412317a6483a1de5dee673588f24b55aa35d7b` |

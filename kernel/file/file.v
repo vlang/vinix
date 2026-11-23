@@ -12,6 +12,7 @@ import event
 import event.eventstruct
 import memory
 import memory.mmap
+import pagecache
 import time
 import usercopy
 import lib
@@ -1491,37 +1492,44 @@ pub fn syscall_fallocate(_ voidptr, fdnum int, mode int, offset i64, length i64)
 	return 0, 0
 }
 
-// Dispatch cache advice when supported; other resources may ignore hints.
-pub fn syscall_fadvise64(_ voidptr, fdnum int, offset i64, length i64, advice int) (u64, u64) {
-	if offset < 0 || length < 0 || advice < 0 || advice > 5 {
-		return errno.err, errno.einval
-	}
-
-	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
-	defer {
-		fd.unref()
-	}
-	fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
-
+// Resolve the fd before interpreting the range. Linux only treats FIFOs as
+// ESPIPE here; a socket can accept and ignore a valid hint.
+pub fn syscall_fadvise64(_ voidptr, fdnum i32, offset i64, length i64, advice i32) (u64, u64) {
+	mut fd := fd_from_fdnum(unsafe { nil }, int(fdnum)) or { return errno.err, errno.get() }
+	defer { fd.unref() }
 	mut handle := fd.handle
 	if handle.flags & resource.o_path != 0 {
 		return errno.err, errno.ebadf
 	}
 	mut res := handle.resource
 	mode := res.stat.mode
-	if stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
+	if stat.isifo(mode) || mode & stat.ifmt == stat.ifpipe {
 		return errno.err, errno.espipe
 	}
+	if length < 0 || advice < 0 || advice > 5 {
+		return errno.err, errno.einval
+	}
+	handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 	if advice <= 2 {
 		handle.l.acquire()
-		handle.read_advice = advice
+		handle.read_advice = int(advice)
 		handle.read_streak = 0
 		handle.read_ahead_end = 0
 		handle.l.release()
+		return 0, 0
 	}
-	resource.advise_resource(mut res, voidptr(handle), u64(offset), u64(length), advice) or {
-		return errno.err, errno.get()
+	if advice != pagecache.willneed && advice != pagecache.dontneed {
+		return 0, 0
 	}
+	// Linux rounds the start of DONTNEED up to a page. Negative offsets
+	// between -PAGE_SIZE and zero therefore discard from the start of the
+	// file. Other negative starts name pages beyond any possible file.
+	from_start := advice == pagecache.dontneed && offset < 0 && offset > -i64(memory.page_size)
+	if offset < 0 && !from_start { return 0, 0 }
+	start := if from_start { i64(0) } else { offset }
+	count := if from_start || length > i64(0x7fffffffffffffff) - start { i64(0) } else { length }
+	// Prefetch and cache eviction are best effort, even when storage fails.
+	resource.advise_resource(mut res, voidptr(handle), u64(start), u64(count), int(advice)) or {}
 	return 0, 0
 }
 
