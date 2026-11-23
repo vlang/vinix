@@ -38,6 +38,8 @@ fn fixture_files(name string) []string {
 		['core.v', 'notifybuf.v', 'quota.v', 'admission.v']
 	} else if name == 'membsync' {
 		['core.v', 'data.v']
+	} else if name == 'memfdcreate' {
+		['core.v', 'noexec.v']
 	} else if name in ['selecttimeout','ppolltime','ppollsignal'] {
 		['core.v', 'storage.v', 'bounds.v']
 	} else if name in ['selectempty', 'execown', 'selectfds', 'selectword', 'selectorder', 'selecttimeout', 'selecttimeval', 'ppollargs', 'pollcount', 'ppolltime', 'ppollsignal', 'pollcopy', 'selectwake', 'pipeready', 'epollkey', 'epollchurn'] {
@@ -307,7 +309,7 @@ fn added_markers(name string, arch string, marker string) ?[]string {
 		'fsuid' { [marker, 'LINUX FSUID SUMMARY: checks=20 failures=0', 'LINUX FSUID CHILD: checks=22 failures=0'] }
 		'mqueue' { [marker, 'LINUX MQUEUE SUMMARY: checks=307 failures=0', 'LINUX MQUEUE CHILD: checks=16 failures=0'] }
 		'membsync' { [marker, 'LINUX MEMBSYNC MEMORY: commands=3 rounds=256', 'LINUX MEMBSYNC SUMMARY: cpus=0,1 jit=200 concurrent=400'] }
-		'memfdcreate' { [marker, 'LINUX MEMFDCREATE SUMMARY: publication=256 exec=43'] }
+		'memfdcreate' { [marker, 'LINUX MEMFDCREATE ACL: PASS', 'LINUX MEMFDCREATE SUMMARY: publication=256 exec=43 noexec=EACCES'] }
 		'futex2' { [marker, 'LINUX FUTEX2 SUMMARY: checks=86 failures=0'] }
 		'mseal' { [marker, 'LINUX MSEAL SUMMARY: checks=' + (if arch == 'aarch64' { '168' } else { '167' }) + ' failures=0'] }
 		'textbusy' { [marker, 'LINUX TEXTBUSY SUMMARY: writer and image lifetime controls passed'] }

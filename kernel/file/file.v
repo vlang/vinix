@@ -1616,6 +1616,11 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	}
 	if cmd == f_add_seals {
 		fd.handle.mac_check(proc.mac_metadata) or { failure := errno.get(); fd.unref(); return errno.err, failure }
+		access := handle.flags & resource.o_accmode
+		if access != resource.o_wronly && access != resource.o_rdwr {
+			fd.unref()
+			return errno.err, errno.eperm
+		}
 	}
 	if cmd == f_get_seals {
 		fd.handle.mac_check(proc.mac_inspect) or { failure := errno.get(); fd.unref(); return errno.err, failure }

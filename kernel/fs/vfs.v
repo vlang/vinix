@@ -3138,10 +3138,12 @@ pub const mfd_cloexec = 0x0001
 pub const mfd_allow_sealing = 0x0002
 
 const mfd_exec = 0x0010
+const mfd_noexec_seal = 0x0008
 const memfd_name_max = 249 // 255-byte name, less the "memfd:" prefix
 
 pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
-	if flags & ~u32(mfd_cloexec | mfd_allow_sealing | mfd_exec) != 0 {
+	if flags & ~u32(mfd_cloexec | mfd_allow_sealing | mfd_exec | mfd_noexec_seal) != 0
+		|| flags & u32(mfd_exec | mfd_noexec_seal) == u32(mfd_exec | mfd_noexec_seal) {
 		return errno.err, errno.einval
 	}
 	shown := usercopy.copy_cstring_from_user(name, memfd_name_max + 1) or {
@@ -3157,23 +3159,28 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	file.reserve_fd(unsafe { nil }, reservation) or { return errno.err, errno.get() }
 	defer { file.cancel_fd_reservation(reservation) }
 
-	// MFD_EXEC explicitly requests the executable mode also used by default.
-	mut res := create_anonymous(0o777) or { return errno.err, errno.get() }
+	noexec := flags & u32(mfd_noexec_seal) != 0
+	mode := if noexec { u32(0o666) } else { u32(0o777) }
+	mut res := create_anonymous(mode) or { return errno.err, errno.get() }
 	defer {
 		res.unref(unsafe { nil }) or {}
 	}
-	// Linux shmem files start with the creator's filesystem ids, mode 0777
-	// independent of umask, and no directory links. Browsers reduce the mode
-	// and reopen the same inode read-only through /proc/self/fd.
+	// Linux shmem files start with the creator's filesystem ids and no
+	// directory links. The mode is independent of umask.
 	process := proc.current_thread().process
 	res.stat.uid = process.fsuid
 	res.stat.gid = process.fsgid
 	res.stat.nlink = 0
 	if mut res is TmpFSResource {
 		res.memfd = true
-		// Without MFD_ALLOW_SEALING the one seal a memfd starts with is the
-		// one that forbids adding any other.
-		res.seals = if flags & u32(mfd_allow_sealing) != 0 { u32(0) } else { f_seal_seal }
+		res.seals = if noexec {
+			// NOEXEC_SEAL also allows callers to add further seals.
+			f_seal_exec
+		} else if flags & u32(mfd_allow_sealing) != 0 {
+			u32(0)
+		} else {
+			f_seal_seal
+		}
 	}
 
 	// memfd_create hands back a descriptor open for reading and writing. Saying

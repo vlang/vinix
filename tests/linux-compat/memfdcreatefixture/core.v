@@ -211,11 +211,11 @@ fn check_publication() {
 	}
 }
 
-fn execute_copy() {
+fn execute_copy(flags u64, expected_error i32) {
 	unsafe {
 		image := C.open(c'/proc/self/exe', C.O_RDONLY | C.O_CLOEXEC)
-		destination := create(c'executable-copy', mfd_exec | mfd_cloexec)
-		need(image >= 0 && destination >= 0, c'open the image and executable memfd')
+		destination := create(c'elf-copy', flags | mfd_cloexec)
+		need(image >= 0 && destination >= 0, c'open the image and target memfd')
 		mut buffer := [4096]u8{}
 		for {
 			count := C.read(image, &buffer[0], buffer.len)
@@ -226,18 +226,21 @@ fn execute_copy() {
 		mut path := [48]char{}
 		C.snprintf(&path[0], path.len, c'/proc/self/fd/%d', destination)
 		fd := C.open(&path[0], C.O_RDONLY | C.O_CLOEXEC)
-		need(fd >= 0 && C.close(image) == 0 && C.close(destination) == 0, c'reopen executable read-only')
+		need(fd >= 0 && C.close(image) == 0 && C.close(destination) == 0, c'reopen memfd image read-only')
 		child := C.fork()
 		need(child >= 0, c'fork executable memfd child')
 		if child == 0 {
 			args := [&char(c'memfd-copy'), &char(c'--memfd-image'), &char(nil)]!
 			env := [&char(nil)]!
-			C.syscall(i64(C.SYS_execveat), fd, c'', &args[0], &env[0], C.AT_EMPTY_PATH)
-			need(false, c'execute ELF from memfd with execveat')
+			ret := C.syscall(i64(C.SYS_execveat), fd, c'', &args[0], &env[0], C.AT_EMPTY_PATH)
+			need(expected_error != 0 && ret == -1 && *C.__errno_location() == expected_error,
+				c'execveat memfd verdict')
+			C._exit(0)
 		}
 		mut status := i32(-1)
-		need(C.waitpid(child, &status, 0) == child && status == (43 << 8), c'memfd image executed')
-		need(C.close(fd) == 0, c'close executable memfd')
+		expected_status := if expected_error == 0 { 43 << 8 } else { 0 }
+		need(C.waitpid(child, &status, 0) == child && status == expected_status, c'memfd image child verdict')
+		need(C.close(fd) == 0, c'close memfd image')
 	}
 }
 
@@ -252,8 +255,11 @@ pub fn run(argc i32, argv &&char) i32 {
 		check_flags()
 		check_exhaustion()
 		check_publication()
-		execute_copy()
-		C.printf(c'LINUX MEMFDCREATE SUMMARY: publication=%d exec=43\n', publication_rounds)
+		check_noexec()
+		if !reference { check_noexec_acl() }
+		execute_copy(mfd_exec, 0)
+		execute_copy(mfd_noexec_seal, C.EACCES)
+		C.printf(c'LINUX MEMFDCREATE SUMMARY: publication=%d exec=43 noexec=EACCES\n', publication_rounds)
 		C.puts(if reference { c'LINUX MEMFDCREATE REFERENCE: PASS' } else { c'LINUX MEMFDCREATE: PASS' })
 		C.fflush(nil)
 		for { C.pause() }

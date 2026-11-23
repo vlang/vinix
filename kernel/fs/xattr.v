@@ -426,6 +426,7 @@ fn (mut res TmpFSResource) write_xattr(name string, value []u8, flags int) ? {
 			requested_mode = if flags & resource.acl_clear_setgid != 0 { derived & ~u32(0o2000) } else { derived }
 			removing = !extended
 		}
+		res.check_exec_seal_locked(requested_mode)?
 		if removing {
 			if index >= 0 {
 				kbudget.release(res.xattrs.entries[index].kernel_charge)
@@ -611,6 +612,7 @@ fn (mut res TmpFSResource) chmod_mode(mode u32) ? {
 	res.l.acquire()
 	defer { res.l.release() }
 	desired := (res.stat.mode & stat.ifmt) | (mode & 0o7777)
+	res.check_exec_seal_locked(desired)?
 	res.sync_acl_mode_locked(desired)?
 	res.stat.mode = desired
 	res.stat.ctim = realtime_clock

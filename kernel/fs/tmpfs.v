@@ -127,11 +127,21 @@ const f_seal_write = u32(0x8)
 const f_seal_future_write = u32(0x10)
 const f_seal_exec = u32(0x20)
 
+// The caller holds l so execute-bit changes and seals serialize together.
+fn (this &TmpFSResource) check_exec_seal_locked(mode u32) ? {
+	if this.seals & f_seal_exec != 0 && (this.stat.mode ^ mode) & 0o111 != 0 {
+		errno.set(errno.eperm)
+		return none
+	}
+}
+
 fn (mut this TmpFSResource) get_seals() ?u32 {
 	if !this.memfd {
 		errno.set(errno.einval)
 		return none
 	}
+	this.l.acquire()
+	defer { this.l.release() }
 	return this.seals
 }
 

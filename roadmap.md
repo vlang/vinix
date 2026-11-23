@@ -2740,6 +2740,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   `execveat` on both native architectures. See
   [the memfd creation receipts](docs/linux-memfd-create.md).
 
+- [x] Support `MFD_NOEXEC_SEAL` and enforce execute-bit seals in tmpfs.
+  Qualify mode changes, seal access, normal mappings, and ELF execution
+  refusal on both native architectures. See
+  [the execute-sealed memfd receipts](docs/linux-memfd-noexec.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both
