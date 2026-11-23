@@ -197,6 +197,46 @@ screenshots and build receipts are in `~/.local/state/vinix/r14-iso-buLjXi`.
 The SHA-256 of `qualification.sha256` is
 `9601c5ee5e241a8a60894cb5c950583a5702f022df364ed1593c38ab47f73cf8`.
 
+## Release ISO package receipts
+
+At `2292c4e8b`, `deploy-iso.sh` preflights the effective package selection for
+each requested target before building. It verifies the package configuration,
+complete signed offline bundles and application declaration read from the
+finished ISO. A mismatch stops the release before boot tests or publishing.
+The verified `vinix-packages-ARCH.json` files bind the ISO SHA-256 to the package
+configuration and deployment hashes, publisher keys and signed indexes, and
+selected application IDs. The release notes link them and `SHA256SUMS` covers
+them along with the ISOs.
+
+The two retained ISOs above passed with both the current V compiler and the
+frozen release compiler. Both produced identical receipt bytes and retained
+the expected AArch64 sequence 4 and x86-64 sequence 3. The maintained V controls
+repacked an admitted package tree into small ISO fixtures. The matching ISO
+passed. Changed configuration, missing declaration, damaged payload, invalid
+signature, wrong preflight sequence, package-file symlink and duplicate member
+each refused. A configuration-only ISO also passed.
+
+An isolated `deploy-iso.sh --no-test --no-publish` replay used the retained
+ISO as its build output. The matching target passed and its receipt appeared in
+the release notes and checksum list. A valid per-target selection took
+precedence over a missing generic file. Substituting the other target's ISO
+stopped the driver before writing a receipt or release notes. The no-selection
+replay produced its ordinary ISO checksum and notes.
+
+To replay the controls, build `build-support/isoboot/package-receipt.v` and
+`tests/packages/iso-package-receipt-check.v` with `-backend c -prod -cc cc` and
+`-path '@vlib|@vmodules|.|build-support|tools/accounts'`. Run `package-receipt
+plan ARCH` with the same environment used for the release, save its stdout to
+`PLAN.json`, and then run `package-receipt verify ISO PLAN.json`. Run
+`iso-package-receipt-check RECEIPT_TOOL STAGED_PACKAGE_ROOT PLAN.json NEW_WORK`
+with one signed repository and a matching deployment in the staged root.
+
+The receipts, controls, driver logs and input digests are in
+`~/.local/state/vinix/r14-iso-package-receipts-L7k4Lo`. The stored run roots
+matched their archive's bytes, modes, types and links. The SHA-256 of
+`qualification.sha256` is
+`7cf8c8296f4edadc508557179f0c26ea0768d88aa620bbf7fe0f346a0c8cde6a`.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
