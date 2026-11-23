@@ -892,6 +892,25 @@ The paired inputs, before and after runs, and sanitizer checks are in
 Its SHA-256 is `5b134701a991b849274925affdde55c1acc7997e98ce9d2bdaa7f663a7ffde1d`.
 All 1,523 entries in the extracted `qualification.sha256` passed.
 
+### Local recovery record inspection
+
+At `f3eeac801`, `--inspect-recovery=TAG` reports the pending creation
+record and the saved IDs for the exact tag. It places the pending record
+first and orders saved IDs numerically. `--repo=OWNER/NAME` filters both
+record types, and the report includes the saved manifest and notes digests.
+
+All 132 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. Inspection covered an empty result, multiple saved
+IDs, repository filtering, a linked creation record and mutually exclusive
+actions. The native run made no GitHub calls and every input file kept its
+digest. ASan/UBSan checked filtering, aliases and numeric ordering through
+the largest unsigned 64-bit ID.
+
+The paired inputs, reports, run logs and sanitizer checks are in
+`~/.local/state/vinix/r14-release-inspect-recovery-0VXMnx/qualification.tar.gz`.
+Its SHA-256 is `c4bde60274beabbfe1c9ff9066932c3d537c1c79a44f9ac1d39ce06aeee448e2`.
+All 1,491 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
