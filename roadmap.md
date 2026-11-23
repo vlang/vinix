@@ -2662,10 +2662,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 
 - [x] Implement POSIX message queues (mq_open, mq_unlink, mq_timedsend,
   mq_timedreceive, mq_notify, mq_getsetattr) with Linux 6.12's names, limits,
-  RLIMIT_MSGQUEUE accounting, priority order, blocking hand-offs, restartable
-  timeouts, status text, poll, signal and netlink-cookie notifications and IPC
-  namespaces. The same probe ELF passes 191 + 16 checks on Vinix and Linux 6.12
-  on both architectures. See [the message queue receipts](docs/linux-mqueue.md).
+  RLIMIT_MSGQUEUE accounting, message priority order, scheduling-priority
+  handoffs, restartable timeouts, status text, poll, signal and netlink-cookie
+  notifications and IPC namespaces. The same probe ELF passes 221 + 16 checks
+  on Vinix and Linux 6.12 on both architectures. See
+  [the message queue receipts](docs/linux-mqueue.md).
 
 - [x] Implement native futex2 vector waits, masked waits and wakes, and
   compare-requeue. Qualify 128-entry waits, shared and private keys, absolute

@@ -85,10 +85,12 @@ mut:
 }
 
 // A blocked sender or receiver, on its own stack. A receiver is handed its
-// message; a sender's message is taken from it into the queue.
+// message; a sender's message is taken from it into the queue. The syscall
+// frame keeps its own thread alive until it is removed under mq_lock.
 struct Waiter {
 mut:
 	next    &Waiter = unsafe { nil }
+	task    &proc.Thread = unsafe { nil }
 	wake    eventstruct.Event
 	ready   bool
 	message &Message = unsafe { nil }
@@ -527,20 +529,30 @@ fn read_deadline(address u64, deadline &time.TimeSpec) u64 {
 	return 0
 }
 
+fn waiter_rank(task &proc.Thread) int {
+	rank := proc.effective_sched_rank(task)
+	// Linux's task priority uses nice for ordinary policies, including IDLE.
+	return if rank > proc.rank_realtime_base { rank } else { 20 - proc.nice_value(task) }
+}
+
 fn (mut this Queue) enqueue_waiter(waiter &Waiter, sending bool) {
-	mut head := if sending { this.senders } else { this.receivers }
-	if head == unsafe { nil } {
-		if sending {
-			this.senders = unsafe { waiter }
-		} else {
-			this.receivers = unsafe { waiter }
+	mut added := unsafe { waiter }
+	added.task = proc.current_thread()
+	rank := waiter_rank(added.task)
+	mut slot := if sending { unsafe { &this.senders } } else { unsafe { &this.receivers } }
+	mut current := unsafe { *slot }
+	// The head receives the next handoff. Use the last qualifying slot to
+	// match Linux's reverse traversal even after a queued task changes nice.
+	for current != unsafe { nil } {
+		if waiter_rank(current.task) >= rank {
+			slot = unsafe { &current.next }
 		}
-		return
+		current = current.next
 	}
-	for head.next != unsafe { nil } {
-		head = head.next
+	unsafe {
+		added.next = *slot
+		*slot = added
 	}
-	head.next = unsafe { waiter }
 }
 
 fn (mut this Queue) dequeue_waiter(waiter &Waiter, sending bool) {

@@ -11,6 +11,7 @@ module mqueuefixture
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +49,10 @@ mut:
 	st_uid   u32
 	st_gid   u32
 	st_size  i64
+}
+
+struct C.sched_param {
+	sched_priority i32
 }
 
 fn C.syscall(isize, ...) isize
@@ -604,6 +609,69 @@ fn blocking(mut s State) {
 	}
 }
 
+fn waiter_order(mut s State, sending bool) {
+	unsafe {
+		s.label = if sending { c'sender order' } else { c'receiver order' }
+		q := mq_open(c'qw', o_creat | o_excl | o_rdwr, 0o600, set_attr(s.attr, 0, 1, 1, 0))
+		check(mut s, c'open queue', q >= 0, q)
+		if q < 0 { return }
+		defer {
+			C.close(i32(q))
+			mq_unlink(c'qw')
+		}
+		if sending {
+			check(mut s, c'fill queue', mq_send(q, c'x', 1, 0, nil) == 0, 0)
+		}
+		mut children := [4]i32{}
+		for slot in 0 .. children.len {
+			pid := C.fork()
+			if pid == 0 {
+				if slot == 3 {
+					params := C.sched_param{sched_priority: 1}
+					if C.syscall(isize(C.SYS_sched_setscheduler), 0, C.SCHED_FIFO, &params) != 0 {
+						C.printf(c'LINUX MQUEUE FAIL: FIFO setup errno=%d\n', *C.__errno_location())
+						C.fflush(nil)
+						C._exit(3)
+					}
+				}
+				timeout := deadline(mut s, 10000)
+				if sending {
+					// The lowest-ranked sender has the highest message priority.
+					// A one-slot queue makes the admission order observable.
+					message := `a` + u8(slot)
+					C._exit(if mq_send(q, &message, 1, u64(4 - slot), timeout) == 0 { 0 } else { 1 })
+				}
+				got := mq_receive(q, s.buf, 1, nil, timeout)
+				C._exit(if got == 1 && s.buf[0] == u8(c'4231'[slot]) { 0 } else { 2 })
+			}
+			children[slot] = pid
+			check(mut s, c'waiter blocks', pid > 0 && wait_sleeping(pid), pid)
+			if slot == 0 && pid > 0 {
+				changed := result(C.syscall(isize(C.SYS_setpriority), C.PRIO_PROCESS, pid, 10))
+				check(mut s, c'lower the blocked waiter priority', changed == 0, changed)
+			}
+		}
+		if sending {
+			for expected in [u8(`x`), `d`, `b`, `c`, `a`]! {
+				got := mq_receive(q, s.buf, 1, nil, deadline(mut s, 2000))
+				check(mut s, c'promote sender in scheduling order', got == 1 && s.buf[0] == expected,
+					if got == 1 { i64(s.buf[0]) } else { got })
+			}
+		} else {
+			for index in 0 .. children.len {
+				message := `1` + u8(index)
+				sent := mq_send(q, &message, 1, 0, deadline(mut s, 2000))
+				check(mut s, c'offer message to one waiter', sent == 0, sent)
+			}
+		}
+		for pid in children {
+			if pid <= 0 { continue }
+			mut status := i32(-1)
+			check(mut s, c'waiter got its expected result', C.waitpid(pid, &status, 0) == pid && status == 0, status)
+		}
+	}
+}
+
 fn attr_calls(mut s State) {
 	unsafe {
 		s.label = c'getsetattr'
@@ -923,6 +991,8 @@ pub fn run(argc i32, argv &&char) i32 {
 		attributes(mut s)
 		send_receive(mut s)
 		blocking(mut s)
+		waiter_order(mut s, true)
+		waiter_order(mut s, false)
 		attr_calls(mut s)
 		notifications(mut s)
 		unprivileged(mut s)

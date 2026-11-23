@@ -37,15 +37,17 @@ checked by the final probe.
   unsigned int), the descriptor (EBADF unless a queue open for writing), the
   length (EMSGSIZE) and the message (EFAULT). A full queue gives EAGAIN with
   O_NONBLOCK; otherwise the sender waits holding its message, which a
-  receiver moves into the queue when it makes room.
+  receiver moves into the queue when it makes room. A handoff selects the
+  waiting sender by scheduling priority, then by arrival order among ties.
 - mq_timedreceive: EBADF unless open for reading, EMSGSIZE for a buffer
   shorter than msgsize, EAGAIN when empty and non-blocking. Messages come
   highest priority first, oldest first within one. A message sent while a
-  receiver waits goes straight to the first waiting receiver. The priority is
-  written before the data; a fault in either is EFAULT and the message is
-  gone, as on Linux. Waits end with ETIMEDOUT at the deadline (at once for a
-  past one, but only when they must wait) and are restartable: a signal
-  without SA_RESTART gives EINTR, one with SA_RESTART resumes the wait.
+  receiver waits goes straight to the highest-ranked receiver, with ties in
+  arrival order. The priority is written before the data. A fault in either
+  copy returns EFAULT and consumes the message. Waits end with ETIMEDOUT at
+  the deadline, or immediately if the deadline has passed and the call needs
+  to wait. A signal without SA_RESTART gives EINTR. With SA_RESTART the call
+  resumes the wait.
 - poll and epoll report POLLIN|POLLRDNORM with messages queued and
   POLLOUT|POLLWRNORM while there is room, whatever the access mode. read(2)
   returns Linux's status line, `QSIZE:%-10lu NOTIFY:%-5d SIGNO:%-5d
@@ -123,12 +125,43 @@ Hashes are SHA-256 prefixes. Bundles are kept outside Git in
 first version's runs in `mq-{arm,x86}-{1,2}` and `mq-{arm,x86}-linux-1`; the
 exploratory log is `~/.cache/vinix-r15/explore/mqx-arm-1` (`fef784677c079bf7`).
 
+### Scheduling-priority handoffs
+
+When a sender or receiver joins the wait list, Vinix compares its scheduling
+priority with the current priorities of blocked tasks. Equal priorities keep
+arrival order. Changing an already queued task's priority preserves its
+position. The comparison uses Vinix's effective real-time rank and ordinary
+tasks' nice values. [Linux 6.12.51 waiter insertion](https://github.com/gregkh/linux/blob/v6.12.51/ipc/mqueue.c#L658)
+
+The probe adds 30 checks for blocked senders and receivers. It lowers a task's
+priority after confirming it is blocked, queues two tied tasks, and queues a
+FIFO task last. The one-slot sender queue verifies that admission uses task
+priority even when the first sender has the highest message priority. Each
+receiver checks the byte it actually received.
+
+Production kernels from `cd0c06b07` plus this change passed all 221 + 16
+checks on both architectures. The same probe ELF passed on Linux 6.12.51 on
+each architecture. The old x86-64 kernel admitted the first sender instead
+of the FIFO sender. Both kernel links used `--strip-debug`. The AArch64 boot
+image reused the earlier Limine loader and verified the embedded candidate
+kernel and initramfs after replacing them. The allocation checker matched the
+baseline's site counts and existing allow-list failures.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `09023b2f90169413` | `2605e916c4b27c05` | `8f34825a27609bc1` | `e3394fda85fc3901` |
+| x86-64 | `ddcca48703dedaf3` | `62e52ad85e2b8440` | `2bffdd4c5eec7e27` | `bca0d070f9f293dd` |
+
+Hashes are SHA-256 prefixes. The archive is
+`~/.cache/vinix-r15/mq-waiters/qualification.tar.gz`, with SHA-256
+`65f1eabe78299adae2e3874aa344cb7667f1f46f963a63bb0a5b20924bb0f80e`.
+
 ## Limits
 
 - No mqueue filesystem: `/dev/mqueue` cannot be mounted, so queues cannot be
   listed, inspected or removed through files.
-- Waiting senders and receivers are served in arrival order; Linux orders them
-  by scheduling priority.
+- Ordinary priority inheritance follows Vinix's scheduler. The probe covers
+  nice values, FIFO and arrival ties.
 - RLIMIT_MSGQUEUE is charged per real uid across all user namespaces; Linux
   charges per user namespace up its hierarchy. The queues' root directory
   counts as owned by uid 0 in every IPC namespace (Linux: by the namespace
