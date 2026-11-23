@@ -262,7 +262,8 @@ fn syscall_linux_bpf(_ voidptr, _cmd int, _attr u64, _size u32) (u64, u64) {
 
 // Advertise only the instruction synchronization commands the platform can
 // execute. Wasmtime uses these before publishing newly compiled ARM64 code.
-fn syscall_linux_membarrier(_ voidptr, command int, flags u32, _cpu_id int) (u64, u64) {
+fn syscall_linux_membarrier(_ voidptr, command_word u64, flags u32, _cpu_id int) (u64, u64) {
+	command := i32(u32(command_word))
 	if flags != 0 { return errno.err, errno.einval }
 	if command == 0 {
 		return if sched.sync_core_supported() { u64(32 | 64) } else { u64(0) }, 0

@@ -3,8 +3,8 @@
 @[has_globals]
 module sched
 
-// TLB shootdown: dropping a translation from the other CPUs that may hold it,
-// which x86 can only do by asking each of them. See memory/virtual_amd64.v.
+// TLB shootdowns and instruction-stream synchronization both wait for other
+// CPUs to finish a local operation. See memory/virtual_amd64.v for TLB users.
 //
 // The CPU asking holds its page map's lock with interrupts off and waits for
 // every answer. A CPU that cannot take the IPI because its own interrupts are
@@ -26,13 +26,19 @@ const max_tlb_cpus = 256
 // again, in spins: some milliseconds.
 const tlb_resend_spins = 1000000
 
+enum RendezvousKind {
+	tlb
+	tlb_everywhere
+	sync_core
+}
+
 __global (
 	tlb_vector u8
 	// One shootdown at a time: what it drops, and which CPUs are yet to.
 	tlb_lock               klock.Lock
 	tlb_request_cr3        u64
 	tlb_request_virt       u64
-	tlb_request_everywhere bool
+	tlb_request_kind       RendezvousKind
 	tlb_pending            [max_tlb_cpus]u32
 	// Nonzero while a shootdown is waiting, so a spinning CPU checks nothing
 	// more the rest of the time.
@@ -51,7 +57,7 @@ fn tlb_isr(_ u32, _ &cpulocal.GPRState) {
 	apic.lapic_eoi()
 }
 
-// Drop what the shootdown in flight asks of this CPU, if it asks anything. A
+// Answer the request in flight if it targets this CPU. A
 // CPU with interrupts on leaves it to the IPI.
 fn answer_tlb_shootdown() {
 	if katomic.load(&tlb_in_flight) == 0 || cpu.interrupt_state() {
@@ -61,7 +67,11 @@ fn answer_tlb_shootdown() {
 	if me >= max_tlb_cpus || katomic.load(&tlb_pending[me]) == 0 {
 		return
 	}
-	memory.invalidate_local_tlb(tlb_request_cr3, tlb_request_virt, tlb_request_everywhere)
+	if tlb_request_kind == .sync_core {
+		serialize_instruction_stream()
+	} else {
+		memory.invalidate_local_tlb(tlb_request_cr3, tlb_request_virt, tlb_request_kind == .tlb_everywhere)
+	}
 	katomic.store(mut &tlb_pending[me], u32(0))
 }
 
@@ -69,15 +79,19 @@ fn answer_tlb_shootdown() {
 // and return once each has; `everywhere` for a kernel mapping, which every
 // page map shares. The caller has changed the entry and fenced.
 fn tlb_shootdown(cr3 u64, virt u64, everywhere bool) {
-	if cpu_locals.len <= 1 {
-		return
-	}
+	if cpu_locals.len <= 1 { return }
+	cpu_rendezvous(cr3, virt, if everywhere { .tlb_everywhere } else { .tlb })
+}
+
+// Both operations use the same interrupt, spin hook and CPU parking lock.
+// Publishing each pending flag orders stores before the target answers it.
+fn cpu_rendezvous(cr3 u64, virt u64, kind RendezvousKind) {
 	ints := cpu.interrupt_toggle(false)
 	defer {
 		cpu.interrupt_toggle(ints)
 	}
 	me := cpulocal.current().cpu_number
-	if !everywhere && !tlb_needed_elsewhere(me, cr3) {
+	if kind == .tlb && !tlb_needed_elsewhere(me, cr3) {
 		return
 	}
 
@@ -90,7 +104,7 @@ fn tlb_shootdown(cr3 u64, virt u64, everywhere bool) {
 	}
 	tlb_request_cr3 = cr3
 	tlb_request_virt = virt
-	tlb_request_everywhere = everywhere
+	tlb_request_kind = kind
 	katomic.inc(mut &tlb_in_flight)
 
 	count := if cpu_locals.len < max_tlb_cpus { cpu_locals.len } else { max_tlb_cpus }
@@ -98,7 +112,7 @@ fn tlb_shootdown(cr3 u64, virt u64, everywhere bool) {
 		if u64(i) == me || katomic.load(&cpu_locals[i].online) == 0 {
 			continue
 		}
-		if !everywhere && !memory.pagemap_may_be_active_on(u64(i), cr3) {
+		if kind == .tlb && !memory.pagemap_may_be_active_on(u64(i), cr3) {
 			continue
 		}
 		katomic.store(mut &tlb_pending[i], u32(1))
@@ -119,6 +133,7 @@ fn tlb_shootdown(cr3 u64, virt u64, everywhere bool) {
 		}
 	}
 
+	if kind == .sync_core { serialize_instruction_stream() }
 	katomic.dec(mut &tlb_in_flight)
 	tlb_lock.release()
 }

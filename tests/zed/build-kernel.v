@@ -35,8 +35,9 @@ fn main() {
 			os.symlink('${root}/kernel/${dependency}', destination)!
 		}
 	}
-	for path in ['memory/virtual.v', 'aarch64/gic/gic.v', 'sched/sched_arm64.v',
-		'sched/membarrier_arm64.v', 'sched/membarrier_amd64.v', 'syscall/table/linux_compat.v'] {
+	for path in ['memory/virtual.v', 'memory/mmap/mmap.v', 'aarch64/gic/gic.v', 'sched/sched_arm64.v',
+		'sched/membarrier_arm64.v', 'sched/membarrier_amd64.v', 'sched/tlb_amd64.v',
+		'syscall/table/linux_compat.v'] {
 		copy_changed('${root}/kernel/${path}', '${work}/kernel/${path}')!
 	}
 	// Older snapshots use integer zero for this two-pointer return. Normalize

@@ -2723,6 +2723,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   deadlines, signal restart, and legacy futex interoperability on AArch64 and
   x86-64. See [the futex2 receipts](docs/linux-futex2.md).
 
+- [x] Implement x86-64 expedited instruction synchronization with
+  `membarrier`. Qualify cross-CPU JIT publication, concurrent TLB changes,
+  and fork and exec registration on both native architectures. See
+  [the instruction synchronization receipts](docs/linux-membarrier-sync-core.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both
