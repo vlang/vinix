@@ -149,3 +149,36 @@ target, as well as the retained commands and inventories.
 helpers. Earlier ARM runs, including the first complete execution with an
 omitted compiler-argv admission entry, remain diagnostic and are excluded from
 these accepted receipts.
+
+## Paired signed release candidate
+
+At `7881c9614`, the pinned-source build produced fresh Neovim 0.12.5
+editor and runtime roots for both architectures. The x86-64 build used the
+retained desktop release's GCC staging tree through a private build-root
+alias. `pack-catalog-profiles` combined both targets with the existing
+Native SDK Hello, Counter and Memo roots. A disposable local publisher signed
+the resulting ten-package, 2,121-object repository.
+
+The production staging tool's image preflight exported a format-2 lock per
+architecture. Each declared four application roots, including
+`org.neovim.editor`, and pinned the exact `org.vinix.neovim-runtime` 1.0.0
+dependency. The protected declaration reader admitted each lock for its target
+and refused the opposite architecture. Fresh host stores reviewed and applied
+each deployment offline, matched all five metadata pins and verified all
+installed payloads. The same test key signed a second Neovim-only index with
+runtime version 1.1.0 and byte-identical editor and runtime payloads.
+
+The native harness fix in `8b47e1964` selects and pins the V process runtime
+source, freezes the package CLI's property-list dependency, and uses the
+current V type for PTY I/O sizes. The controller and evidence retainer built,
+and all four guest programs linked as static executables for both targets.
+The baseline session link failed with the expected missing process symbol on
+both targets. Disk-write failures stopped both corrected AArch64 attempts
+while preparing the guest package store. The paired host results cover
+the disposable release. Its guest lifecycle, graphical routing and production
+publisher enrollment remain open.
+
+Build inventories, exact locks, signed indexes, host checks and native build
+logs are in `~/.local/state/vinix/r14-neovim-0DPujO`. All 42,670 entries in
+`qualification.sha256` verified. The manifest's SHA-256 is
+`b047aabbe50d8287e07a1711099837c646d5b79cb69a4c502c44e48079b22240`.
