@@ -320,20 +320,31 @@ finish_draft() {
     echo "$release_url"
 }
 
-find_created_draft() {
-    local candidate_id candidate_tag release_id=''
+confirm_published_release() {
+    local release_id="$1" response="$2" release_url
+    [ "$DRAFT" -eq 0 ] || die "GitHub release $release_id is already published"
+    "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
+    release_url="$(verify_release "$release_id" "$response" published)"
+    retire_resumed_creation
+    step "Confirmed published release"
+    echo "$release_url"
+}
+
+find_creation_candidate() {
+    local kind="$1" selection='.[]' candidate_id candidate_tag release_id=''
+    if [ "$kind" = draft ]; then selection='.[] | select(.draft == true)'; fi
     github_api "$release_api?per_page=100" --paginate \
-        --jq '.[] | select(.draft == true) | [.id, .tag_name] | @tsv' > "$ASSET_WORK/release-list" ||
-        die "cannot list GitHub drafts for $TAG. Retry with --resume-create=$TAG"
+        --jq "$selection | [.id, .tag_name] | @tsv" > "$ASSET_WORK/release-list" ||
+        die "cannot list GitHub ${kind}s for $TAG. Retry with --resume-create=$TAG"
     while IFS=$'\t' read -r candidate_id candidate_tag; do
         [ "$candidate_tag" = "$TAG" ] || continue
         case "$candidate_id" in
-            ''|0*|*[!0-9]*) die "GitHub returned an invalid draft ID for $TAG" ;;
+            ''|0*|*[!0-9]*) die "GitHub returned an invalid $kind ID for $TAG" ;;
         esac
-        [ -z "$release_id" ] || die "multiple GitHub drafts use $TAG"
+        [ -z "$release_id" ] || die "multiple GitHub ${kind}s use $TAG"
         release_id="$candidate_id"
     done < "$ASSET_WORK/release-list"
-    [ -n "$release_id" ] || die "no GitHub draft found for $TAG. Retry with --resume-create=$TAG"
+    [ -n "$release_id" ] || die "no GitHub $kind found for $TAG. Retry with --resume-create=$TAG"
     echo "$release_id"
 }
 
@@ -348,10 +359,16 @@ finish_creation() {
 if [ -n "$RESUME_CREATE" ]; then
     step "Recovering GitHub draft creation for $TAG at $SHORT"
     "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
-    candidate_id="$(find_created_draft)"
+    candidate_id="$(find_creation_candidate release)"
     github_api "$release_api/$candidate_id" > "$ASSET_WORK/created-draft.json"
     saved_draft="$("$ASSET_WORK/release-assets" has-saved-creation-draft \
         "$WORK" "$OUT" "$ASSET_WORK" "$TAG" "$candidate_id")"
+    release_state="$("$ASSET_WORK/release-assets" release-state "$ASSET_WORK/created-draft.json")"
+    if [ "$release_state" = published ]; then
+        [ "$saved_draft" = true ] || die "published GitHub release $candidate_id has no saved draft recovery record"
+        confirm_published_release "$candidate_id" "$ASSET_WORK/created-draft.json"
+        exit 0
+    fi
     confirm_publish
     if [ "$saved_draft" = true ]; then
         finish_draft "$candidate_id" "$ASSET_WORK/created-draft.json" "$OUT"
@@ -370,12 +387,7 @@ if [ -n "$RESUME_DRAFT" ]; then
     github_api "$release_api/$RESUME_DRAFT" > "$ASSET_WORK/resume-draft.json"
     release_state="$("$ASSET_WORK/release-assets" release-state "$ASSET_WORK/resume-draft.json")"
     if [ "$release_state" = published ]; then
-        [ "$DRAFT" -eq 0 ] || die "GitHub release $RESUME_DRAFT is already published"
-        "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
-        release_url="$(verify_release "$RESUME_DRAFT" "$ASSET_WORK/resume-draft.json" published)"
-        retire_resumed_creation
-        step "Confirmed published release"
-        echo "$release_url"
+        confirm_published_release "$RESUME_DRAFT" "$ASSET_WORK/resume-draft.json"
         exit 0
     fi
     confirm_publish
@@ -454,7 +466,7 @@ publish_staged_assets() {
         -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
         -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"; then
         echo "Draft creation request failed. Looking for the draft on GitHub." >&2
-        candidate_id="$(find_created_draft)"
+        candidate_id="$(find_creation_candidate draft)"
         github_api "$release_api/$candidate_id" > "$ASSET_WORK/created-draft.json"
     fi
     finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"

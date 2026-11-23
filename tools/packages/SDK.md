@@ -706,12 +706,15 @@ and manifest. If the creation response is lost, the driver looks for the
 draft by exact tag and reads it by ID. If the lookup is interrupted or the
 draft is temporarily missing, use `--resume-create=TAG` from the same
 checkout. Keep the creation record and original assets. This command finds
-a single draft with matching metadata and a verified tag commit. When an
+a single release with matching metadata and a verified tag commit. When an
 exact ID-based recovery record already exists for that draft, it verifies
 the uploaded assets and stages only the missing files. Otherwise the draft
 must be empty before the driver writes an ID-based record and starts the
 upload. A conflicting ID-based record stops recovery. The creation record
 protects the original assets by blocking a fresh build for the same tag.
+If GitHub already published the release, tag recovery requires the matching
+ID-based record, verifies the original and uploaded assets, and confirms the
+release without another publish request. Use this without `--draft`.
 Draft adoption uses the exact creation record captured before the GitHub
 request or lookup. If that record changes during the attempt, the driver
 stops and preserves the changed file for inspection.

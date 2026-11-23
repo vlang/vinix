@@ -254,13 +254,17 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			if after_build && scenario == 'release-appears-before-create' { println(tag) }
 			return 0
 		}
-		if args[3..] != ['--paginate', '--jq', '.[] | select(.draft == true) | [.id, .tag_name] | @tsv'] {
-			return error('expected paginated draft lookup')
+		include_published := args[3..] == ['--paginate', '--jq', '.[] | [.id, .tag_name] | @tsv']
+		if !include_published && args[3..] != ['--paginate', '--jq', '.[] | select(.draft == true) | [.id, .tag_name] | @tsv'] {
+			return error('expected paginated creation lookup')
 		}
 		println('99900\t${tag}-other')
 		if os.exists(local) && scenario !in ['create-delayed', 'publish-prepared-delayed']! {
-			println('${draft_id}\t${tag}')
-			if scenario == 'resume-create-ambiguous' { println('99901\t${tag}') }
+			candidate := json2.decode[FixtureRelease](os.read_file(local)!)!
+			if include_published || candidate.draft {
+				println('${draft_id}\t${tag}')
+				if scenario == 'resume-create-ambiguous' { println('99901\t${tag}') }
+			}
 		}
 		return 0
 	}
@@ -323,7 +327,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 				return error('complete draft recovery created an upload staging directory')
 			}
 		}
-		if !draft.draft && scenario == 'publish-readback-lost' {
+		if !draft.draft && scenario in ['publish-readback-lost', 'resume-create-publish-readback-lost']! {
 			eprintln('fixture could not read published release')
 			return 1
 		}
@@ -339,7 +343,8 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			'draft-extra-asset' { draft.assets << FixtureAsset{...first, name: 'extra.iso'} }
 			else {}
 		}
-		if !draft.draft && scenario in ['publish-changed-asset', 'resume-published-bad-digest']! {
+		if !draft.draft && scenario in ['publish-changed-asset', 'resume-published-bad-digest',
+			'resume-create-published-bad-digest']! {
 			draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)}
 		}
 		if scenario == 'draft-changed' { draft = FixtureRelease{...draft, tag_name: tag + '-changed'} }
@@ -701,7 +706,7 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 	}
 	options := ['--resume-create=' + tag]
 	if scenario == 'create-no-draft' {
-		recovery_attempt(root, work, environment, 'resume-create-missing', options, 'no GitHub draft found')!
+		recovery_attempt(root, work, environment, 'resume-create-missing', options, 'no GitHub release found')!
 		if os.exists(remote + '/draft.json') || os.exists(recovery_path) || os.read_file(intent_path)! != intent {
 			return error('recovery changed state for a missing draft')
 		}
@@ -714,7 +719,7 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 		os.write_file(intent_path, intent)!
 		recovery_attempt(root, work, environment, 'resume-create-protect-output', ['--tag=' + tag,
 			'--repo=local/fixture'], 'draft creation record already exists')!
-		recovery_attempt(root, work, environment, 'resume-create-ambiguous', options, 'multiple GitHub drafts use')!
+		recovery_attempt(root, work, environment, 'resume-create-ambiguous', options, 'multiple GitHub releases use')!
 		recovery_attempt(root, work, environment, 'resume-create-unrelated', options, 'GitHub draft metadata changed after creation')!
 		iso := out + '/vinix-amd64.iso'
 		original := os.read_file(iso)!
@@ -854,6 +859,58 @@ fn check_tag_upload_recovery(root string, work string, out string, remote string
 		|| os.read_file(record)! != saved || os.read_file(remote + '/release-attempt')! != attempt
 		|| !os.exists(remote + '/resume-stage') || os.exists(remote + '/publish-attempt') {
 		return error('tag recovery did not complete the original partial draft')
+	}
+	check_tag_publication_recovery(root, work, out, remote, environment)!
+}
+
+fn check_tag_publication_recovery(root string, work string, out string, remote string, environment map[string]string) ! {
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	options := ['--resume-create=' + environment['VINIX_ASSET_TEST_TAG']]
+	record := root + '/build-release/work/draft-' + id + '.json'
+	saved := os.read_file(record)!
+	intent_path := out + '/.draft-creation.json'
+	intent := os.read_file(remote + '/creation-record')!
+	os.write_file(intent_path, intent)!
+	recovery_attempt(root, work, environment, 'resume-create-publish-readback-lost', options,
+		'cannot read back release ' + id)!
+	published := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	if published.draft || published.id.str() != id || os.read_file(intent_path)! != intent {
+		return error('interrupted publication did not keep the original records')
+	}
+	publish_attempt := os.read_file(remote + '/publish-attempt')!
+	mut uploads := map[string]string{}
+	for name in os.ls(remote + '/uploads')! {
+		uploads[name] = os.read_file(remote + '/uploads/' + name)!
+	}
+	recovery_attempt(root, work, environment, 'resume-create-published-with-draft', [...options, '--draft'],
+		'is already published')!
+	os.rm(record)!
+	recovery_attempt(root, work, environment, 'resume-create-published-without-record', options,
+		'has no saved draft recovery record')!
+	if os.exists(record) { return error('confirmation wrote a missing draft record') }
+	os.write_file(record, saved)!
+	recovery_attempt(root, work, environment, 'resume-create-published-bad-digest', options,
+		'GitHub draft asset differs from the verified upload')!
+	iso := out + '/vinix-amd64.iso'
+	original := os.read_file(iso)!
+	os.write_file(iso, 'changed ISO after draft publication')!
+	recovery_attempt(root, work, environment, 'resume-create-published-stale-local', options,
+		'release asset changed after verification')!
+	os.write_file(iso, original)!
+	if os.read_file(intent_path)! != intent || os.read_file(record)! != saved {
+		return error('failed tag confirmation changed the local records')
+	}
+	recovery_attempt(root, work, environment, 'resume-create-confirm-published', options, '')!
+	confirmation := os.read_file(work + '/resume-create-confirm-published.log')!
+	if !confirmation.contains('Confirmed published release') || os.exists(intent_path)
+		|| os.read_file(record)! != saved || os.read_file(remote + '/publish-attempt')! != publish_attempt
+		|| os.ls(remote + '/uploads')!.len != uploads.len {
+		return error('tag recovery did not confirm the original published release')
+	}
+	for name, upload in uploads {
+		if os.read_file(remote + '/uploads/' + name)! != upload {
+			return error('confirmation rewrote an uploaded asset: ' + name)
+		}
 	}
 }
 
