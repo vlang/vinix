@@ -770,6 +770,27 @@ are in `~/.local/state/vinix/r14-release-preserve-prepared-gVwFxV/qualification.
 Its SHA-256 is `8cce71bb9db5d32c9d125aa7897ab542c3700adae5e2090a6a6155a9c838caaf`.
 All 1,505 entries in the extracted `qualification.sha256` passed.
 
+### Legacy prepared release notes
+
+At `3ac82a55f`, `--verify-prepared` accepts the original release notes with
+one trailing draft marker in the old driver's format. It requires a
+32-character lowercase hexadecimal token and the recorded manifest digest.
+The report still hashes the original notes, and publication still requires
+an exact match to the original file.
+
+All 105 fixture checks passed with signed inputs for both architectures and
+local GitHub stubs. Changed body text, incorrect token length or characters,
+a wrong manifest digest, an extra comment and changed ISO bytes all failed.
+The previous helper rejected an actual old handoff. The native driver now
+verifies that handoff with byte-identical JSON, equal before and after file
+digests and zero GitHub calls. ASan/UBSan checks also passed.
+
+The paired inputs, legacy handoff, before and after reports, run logs and
+sanitizer checks are in
+`~/.local/state/vinix/r14-release-legacy-notes-VeWSvJ/qualification.tar.gz`.
+Its SHA-256 is `336abd40827a2f1865a2dfab7297467bd7b086a7b1ee37ba3c7d8d640fbad26f`.
+All 1,440 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
