@@ -609,6 +609,29 @@ sanitizer checks are in
 Its SHA-256 is `fdb0303c494928f8df68e8b06e24bfd61eaf75af6fa2bf44e57025fddcdbba6d`.
 All 1,646 entries in the extracted `qualification.sha256` passed.
 
+### Release staging space preflight
+
+At `be592f952`, the release helper adds up the logical lengths of the
+files it will copy and checks available space on the staging filesystem.
+It reports both byte counts before creating the copy directory when space
+is short. Each copy is bounded by the measured source length. Resume
+counts missing assets and any staged metadata. Complete drafts continue
+to verify in place.
+
+All 63 release fixtures passed using signed inputs for both architectures,
+compiled host helpers and local GitHub stubs. The
+[focused checker](iso-release-staging-space-check.v) controls `statvfs`
+while running the actual helper. All seven cases passed in production
+and ASan/UBSan builds, including one-byte shortfalls, an exact-fit capture,
+a symbolic link refusal, and complete-draft verification with a failing
+space probe. The baseline at `eb0c2f202` copied assets in the one-byte
+shortfall case.
+
+The paired inputs, run logs and focused controls are in
+`~/.local/state/vinix/r14-release-staging-space-AZakUv/qualification.tar.gz`.
+Its SHA-256 is `02acbc8058f3dfe4d9eb96fb3361828bab7b0567ada6e47f029e9fc0a6b726ba`.
+All 1,258 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
