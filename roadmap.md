@@ -2786,6 +2786,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   resident and absent pages, and partial user copies on both architectures.
   See [the page-location receipts](docs/linux-move-pages.md).
 
+- [x] Implement native `get_mempolicy` address queries. Qualify mapped
+  addresses, demand paging, and nodemask copy boundaries on both
+  architectures. See [the address policy receipts](docs/linux-mempolicy.md).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

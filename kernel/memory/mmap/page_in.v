@@ -6,10 +6,14 @@ import proc
 // Page in the page holding `addr` from the mapping it belongs to. With
 // `present_is_done`, a page that is mapped by the time the lock is held is left
 // as it is.
-fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool) ? {
+fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool, require_readable bool) ? {
 	pagemap.l.acquire()
 
 	mut range_local, memory_page, file_page := addr2range(pagemap, addr) or {
+		pagemap.l.release()
+		return none
+	}
+	if require_readable && (range_local.prot & prot_read == 0 || !page_mapping_has_node(range_local)) {
 		pagemap.l.release()
 		return none
 	}
@@ -58,13 +62,17 @@ fn note_anonymous_fault(pagemap &memory.Pagemap, flags int) {
 // buffer, a signal set in a binary's read-only data -- has to do the same, or
 // the syscall fails with EFAULT on a perfectly good pointer.
 fn resolve_missing_page(_pagemap &memory.Pagemap, address u64) bool {
+	return resolve_missing_with_access(_pagemap, address, false)
+}
+
+fn resolve_missing_with_access(_pagemap &memory.Pagemap, address u64, require_readable bool) bool {
 	if address >= higher_half {
 		return false
 	}
 	mut pagemap := unsafe { _pagemap }
 	for {
 		exhausted := memory.exhaustions()
-		page_in(mut pagemap, address, true) or {
+		page_in(mut pagemap, address, true, require_readable) or {
 			if out_of_memory_since(exhausted, false) {
 				continue
 			}

@@ -173,7 +173,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// another thread that faulted on it too; retrying the access is all this
 	// one needs.
 	mut pagemap := current_thread.process.pagemap
-	page_in(mut pagemap, addr, true)?
+	page_in(mut pagemap, addr, true, false)?
 	if gpr_state.cs & 3 == 3 { sched.park_for_cgroup() }
 }
 

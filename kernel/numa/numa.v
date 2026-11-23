@@ -611,56 +611,6 @@ pub fn syscall_set_mempolicy(_ voidptr, mode int, nodemask u64, maxnode u64) (u6
 	return store_policy(mut process, mode, mask)
 }
 
-// get_mempolicy(mode, nodemask, maxnode, addr, flags).
-pub fn syscall_get_mempolicy(_ voidptr, mode_ptr u64, nodemask u64, maxnode u64, _addr u64, flags u64) (u64, u64) {
-	mut running := proc.current_thread()
-	if running == unsafe { nil } {
-		return errno.err, errno.einval
-	}
-	process := running.process
-	if process == unsafe { nil } {
-		return errno.err, errno.einval
-	}
-	if (flags & ~u64(mpol_f_node | mpol_f_addr | mpol_f_mems_allowed)) != 0 {
-		return errno.err, errno.einval
-	}
-
-	mut reported_mode := process.mempolicy_mode
-	mut reported_mask := process.mempolicy_nodemask
-	if (flags & u64(mpol_f_mems_allowed)) != 0 {
-		// MPOL_F_MEMS_ALLOWED asks which nodes the caller may use at all, and
-		// is defined to reject the flags that ask about a policy instead.
-		if (flags & u64(mpol_f_node | mpol_f_addr)) != 0 {
-			return errno.err, errno.einval
-		}
-		reported_mask = all_nodes_mask()
-	} else if (flags & u64(mpol_f_node)) != 0 {
-		// With MPOL_F_NODE and no address, `mode` receives the node the caller
-		// is running on rather than its policy.
-		reported_mode = current_node()
-	}
-
-	if mode_ptr != 0 {
-		value := i32(reported_mode)
-		if !usercopy.copy_to_user(mode_ptr, voidptr(&value), sizeof(i32)) {
-			return errno.err, errno.efault
-		}
-	}
-	if nodemask != 0 {
-		if maxnode == 0 || maxnode > max_nodemask_bits {
-			return errno.err, errno.einval
-		}
-		words := (maxnode + 63) / 64
-		for word := u64(0); word < words; word++ {
-			value := if word == 0 { reported_mask } else { u64(0) }
-			if !usercopy.copy_to_user(nodemask + word * 8, voidptr(&value), sizeof(u64)) {
-				return errno.err, errno.efault
-			}
-		}
-	}
-	return 0, 0
-}
-
 // mbind(addr, len, mode, nodemask, maxnode, flags).
 //
 // Vinix has no per-range policy store, so a binding applies to the process the

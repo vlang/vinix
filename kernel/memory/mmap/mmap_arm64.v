@@ -110,7 +110,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// a copy-on-write fault resolved on another CPU. Retrying the access is all
 	// it needs. Paging the range's page in again would map a page still shared
 	// with a fork child writable, behind copy-on-write's back.
-	page_in(mut pagemap, addr, dfsc >= 0x04 && dfsc <= 0x07)?
+	page_in(mut pagemap, addr, dfsc >= 0x04 && dfsc <= 0x07, false)?
 	if user_fault { sched.park_for_cgroup() }
 }
 
