@@ -3132,29 +3132,36 @@ pub fn parent_dir_for(dirfd int, path string) ?&VFSNode {
 	return get_parent_dir(dirfd, path)
 }
 
-// memfd_create(name, flags): an anonymous file, backed by tmpfs, that exists
-// only as long as a descriptor names it.
+// memfd_create(name, flags): a tmpfs file with no directory entry.
 pub const mfd_cloexec = 0x0001
 
 pub const mfd_allow_sealing = 0x0002
 
+const mfd_exec = 0x0010
+const memfd_name_max = 249 // 255-byte name, less the "memfd:" prefix
+
 pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
-	if flags & ~u32(mfd_cloexec | mfd_allow_sealing) != 0 {
+	if flags & ~u32(mfd_cloexec | mfd_allow_sealing | mfd_exec) != 0 {
 		return errno.err, errno.einval
 	}
-	if name == 0 {
-		return errno.err, errno.efault
+	shown := usercopy.copy_cstring_from_user(name, memfd_name_max + 1) or {
+		code := errno.get()
+		return errno.err, if code == errno.enametoolong { errno.einval } else { code }
 	}
+	defer { unsafe { shown.free() } }
 
-	// The name is only for show -- Linux surfaces it through /proc -- but the
-	// pointer still has to be readable, so a caller passing a bad one is told.
-	mut first := u8(0)
-	if !usercopy.copy_from_user(voidptr(&first), name, 1) {
-		return errno.err, errno.efault
-	}
-	shown := optional_user_string(charptr(name), 249)
+	// Reserve the number before creating the backing file. Keep the slot
+	// private until /proc can resolve the descriptor's vnode.
+	reservation := unsafe { &file.FdReservation(C.vinix_stack_alloc(sizeof(file.FdReservation))) }
+	unsafe { *reservation = file.FdReservation{} }
+	file.reserve_fd(unsafe { nil }, reservation) or { return errno.err, errno.get() }
+	defer { file.cancel_fd_reservation(reservation) }
 
+	// MFD_EXEC explicitly requests the executable mode also used by default.
 	mut res := create_anonymous(0o777) or { return errno.err, errno.get() }
+	defer {
+		res.unref(unsafe { nil }) or {}
+	}
 	// Linux shmem files start with the creator's filesystem ids, mode 0777
 	// independent of umask, and no directory links. Browsers reduce the mode
 	// and reopen the same inode read-only through /proc/self/fd.
@@ -3177,35 +3184,23 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 		open_flags |= resource.o_cloexec
 	}
 
-	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, open_flags, 0, false) or {
-		saved := errno.get()
-		res.unref(unsafe { nil }) or {}
-		unsafe { shown.free() }
-		return errno.err, saved
-	}
+	mut fd := file.fd_create_from_resource(mut res, open_flags) or { return errno.err, errno.get() }
 	// A node that is in no directory. It is what /proc/self/fd/N leads to, and
 	// it is what lets execveat(2) -- or an exec of that /proc path -- run the
 	// file, which is how runc starts its init from a sealed copy of itself.
 	// With no name to lead to it, it goes once its descriptors and any
 	// process running it have; see removed.v.
 	node_name := 'memfd:${shown}' @[freed]
-	unsafe { shown.free() }
 	mut node := create_node(unsafe { filesystems['tmpfs'] }, unsafe { nil }, node_name, false)
 	node.resource = res
 	node.orphan = true
-	// Drop the reference create_anonymous() handed us once the descriptor holds
-	// its own. Keeping both left every memfd alive after its last descriptor and
-	// mapping were gone: runc's 10 MiB copy of itself, for every container.
-	defer {
-		res.unref(unsafe { nil }) or {}
-	}
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return u64(fdnum), 0 }
-	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
-	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
 	fd.handle.node = voidptr(node)
-	fd.handle.mount.depth = 0
-	katomic.inc(mut &node.handles)
-	fd.unref()
+	retain_handle_node(voidptr(node))
+	fdnum := file.fdnum_install_reserved_fd(reservation, fd) or {
+		code := errno.get()
+		fd.unref()
+		return errno.err, code
+	}
 
 	return u64(fdnum), 0
 }

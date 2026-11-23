@@ -723,7 +723,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/procfs.v` | `1c98daae8d2aa6614e1ea0fa4fc0dacc768eb6d9b16fbceb9c126c3c8238d169` |
 | `kernel/fs/removed.v` | `b9da77e43848e2a691b7c01245d705f5f1240592d633c63f1675979e296ba435` |
 | `kernel/fs/tmpfs.v` | `b92ea482e17f525b403f700a05c5ccda5664f543ca4d79c76df0bb0b6320a373` |
-| `kernel/fs/vfs.v` | `d08bcbb1eb9c7e1f929bd5c5c847e91453482a5e1709cb95c7f3e7c68239d346` |
+| `kernel/fs/vfs.v` | `b83bf2f1962cc988786a25cfde10e5cd9167e595cbbe4bdc2c48605c7bf8bfb0` |
 | `kernel/futex/futex.v` | `090d03d5a9276d33b195e9cb1d8adcf366049679b7988bba80d139256d68f8fa` |
 | `kernel/futex/futex2.v` | `a8b0642f5884e85ade87c3466e5fb05fc5e4f2f3e7d124a9d56646cb83bb83bf` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |

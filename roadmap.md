@@ -2735,6 +2735,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   ordering between threads and processes on both native architectures. See
   [the data-memory barrier receipts](docs/linux-membarrier-memory.md).
 
+- [x] Support `MFD_EXEC` and Linux's memfd name and descriptor error ordering.
+  Qualify concurrent descriptor lookup and executing a copied ELF with
+  `execveat` on both native architectures. See
+  [the memfd creation receipts](docs/linux-memfd-create.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both
