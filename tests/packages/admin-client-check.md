@@ -143,3 +143,40 @@ The source patches, host results, and native build, serial and QMP logs are in
 `~/.local/state/vinix/r14-admin-waits-F3766T/qualification.tar.gz`.
 Its SHA-256 is `71eca2240937eaec5754763d11752dbc127b8242da631b51c5b0ff7321e86720`.
 All 70 entries in the extracted `qualification.sha256` passed.
+
+## Administrator client allocation regressions
+
+V 0.5.2 `4478fc4` moved an 80-byte request to the heap in the output reader
+and a 56-byte reply in approval checking. The `f65fd1721` host fixture
+retained 80,000 and 56,000 bytes respectively in its 1,000-call windows.
+At `01ffdfcac`, both helpers borrow read-only references. Completion parsing
+keeps its existing receipt checks, and error diagnostics still own their
+text after the reply is closed.
+
+The first complete guest run after that change exposed a separate 32-byte
+listener copy on every successful approval. At `87bf07ae1`, the administrator
+and launch clients call the listener method directly. Generated C passes the
+address of the stack listener and uses the existing close path to release
+the descriptor and pathname.
+
+The final tracked and ASan/UBSan host runs passed all 29 zero-retention
+windows. The tracked administrator wire tests, administrator protocol tests
+under sanitizers, and tracked launch-client host tests passed too.
+
+The AArch64 and x86-64 guests each passed 72 allocation windows. The local
+checks ran as root and UID 1000. The 14 complete ordinary-client checks each
+made 1,000 calls and retained zero bytes. The protocol, stream and socket
+companions passed, both guests shut down cleanly, and all ten artifacts in
+each receipt verified.
+
+The real authenticated x86-64 administrator scenario passed reviewed install,
+removal and rollback, refusal checks, and socket cleanup. The isolated test
+guest used an equivalent statement-form `load_db` fallback to work around a
+V code generation error. That adjustment is retained as a fixture patch in the
+evidence bundle. All eight artifacts in the authenticated run receipt verified.
+
+The baseline and fixed source patches, generated C, host logs, and guest
+receipts and artifacts are in
+`~/.local/state/vinix/r14-admin-retention-CRipVr/qualification.tar.gz`.
+Its SHA-256 is `0f21cfb8ff149f16eab5e25df3d928b53a6ccd83e1053a576d43e615d94f293d`.
+All 129 entries in the extracted `qualification.sha256` passed.
