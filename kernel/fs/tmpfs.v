@@ -57,6 +57,10 @@ pub mut:
 	shared_mapping_ranges u64
 }
 
+// Cover the resource and its interface box with room for slab rounding.
+// VFS nodes and names, sparse page metadata and file contents are charged separately.
+const tmpfs_resource_charge = u64(2) * (u64(sizeof(TmpFSResource)) + u64(sizeof(resource.Resource)))
+
 fn (mut this TmpFSResource) attribute_bits() u32 {
 	return katomic.load(&this.attr_bits)
 }
@@ -744,7 +748,7 @@ fn (mut this TmpFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSN
 }
 
 fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
-	charge := proc.reserve_kernel(.file, 4096) or { return unsafe { nil } }
+	charge := proc.reserve_kernel(.file, tmpfs_resource_charge) or { return unsafe { nil } }
 	mut new_node := create_node(this.as_filesystem(), parent, name, stat.isdir(mode))
 
 	mut new_resource := &TmpFSResource{
@@ -790,7 +794,7 @@ fn (mut this TmpFS) rename(_old_parent &VFSNode, _old_name string,
 	_new_parent &VFSNode, _new_name string, _flags int) ? {}
 
 fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
-	charge := proc.reserve_kernel(.file, 4096) or { return unsafe { nil } }
+	charge := proc.reserve_kernel(.file, tmpfs_resource_charge) or { return unsafe { nil } }
 	mut new_node := create_node(this.as_filesystem(), parent, target, false)
 
 	mut new_resource := &TmpFSResource{
@@ -825,7 +829,7 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 // memfd_create(2). It behaves like any other tmpfs file — it can be written,
 // truncated and mapped — and goes away with its last descriptor.
 pub fn create_anonymous(mode u32) ?&resource.Resource {
-	charge := proc.reserve_kernel(.file, 4096)?
+	charge := proc.reserve_kernel(.file, tmpfs_resource_charge)?
 	mut new_resource := &TmpFSResource{
 		kernel_charge: charge
 		storage: unsafe { nil }
@@ -852,7 +856,7 @@ pub fn create_anonymous(mode u32) ?&resource.Resource {
 
 fn (mut this TmpFSResource) reserve_page_metadata(bytes u64) bool {
 	if this.kernel_charge.owner.slot == 0 && proc.kernel_owner().slot != 0 {
-		this.kernel_charge = proc.reserve_kernel(.file, 4096) or { return false }
+		this.kernel_charge = proc.reserve_kernel(.file, tmpfs_resource_charge) or { return false }
 	}
 	return proc.grow_kernel(mut this.kernel_charge, bytes)
 }

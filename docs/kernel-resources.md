@@ -36,6 +36,9 @@ The charged paths cover:
 
 - File descriptions, descriptor tables and copies, created VFS nodes, tmpfs
   resources, sparse page-slot metadata, directory listings and tmpfs attributes.
+  A tmpfs resource reserves twice the combined size of the inode resource and
+  its interface box to cover slab rounding. Nodes, names and sparse page-slot
+  metadata are charged separately.
   A node created on a disk filesystem is charged only while it is created:
   the disk bounds those, the node stays cached for as long as the file exists,
   and its charge kept every creator's account slot alive. With one account per
