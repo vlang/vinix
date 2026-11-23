@@ -695,6 +695,9 @@ published state, metadata, asset digests and tag before reporting success. If
 the confirmation is interrupted, run `--resume-draft=ID` again with the same
 recovery record and original assets. The driver verifies an already published
 release without uploading files or sending another publish request.
+Successful ID recovery also removes a leftover `.draft-creation.json` when
+its bytes exactly match the creation record reconstructed from the saved
+draft. A different or unreadable file is kept and reported for inspection.
 
 Before creating a GitHub draft, the driver saves
 `build-release/TAG/.draft-creation.json` with the verified manifest and

@@ -743,6 +743,10 @@ fn check_resume(root string, work string, out string, remote string, environment
 	record := root + '/build-release/work/draft-' + id + '.json'
 	recovery := os.read_file(record)!
 	created := os.read_file(remote + '/release-attempt')!
+	intent_path := out + '/.draft-creation.json'
+	intent := os.read_file(remote + '/creation-record')!
+	// Recreate the state left by an interrupted retirement of the creation record.
+	os.write_file(intent_path, intent)!
 	mut before := os.ls(remote + '/uploads')!
 	before.sort()
 	uploaded := before.filter(it != 'SHA256SUMS')
@@ -761,22 +765,46 @@ fn check_resume(root string, work string, out string, remote string, environment
 	resume_attempt(root, work, environment, 'resume-wrong-repo', ['--repo=local/other'], 'belongs to local/fixture')!
 	mut after_refusals := os.ls(remote + '/uploads')!
 	after_refusals.sort()
-	if after_refusals != before || os.exists(remote + '/publish-attempt') {
+	if after_refusals != before || os.exists(remote + '/publish-attempt')
+		|| os.read_file(intent_path)! != intent {
 		return error('refused recovery changed the draft')
 	}
 	expected := os.read_lines(out + '/SHA256SUMS')!.len + 1
 	// The saved metadata is authoritative even if someone changes the public copy.
 	os.write_file(out + '/SHA256SUMS', 'changed public checksum list')!
+	replace_creation_commit(out)!
+	conflict := os.read_file(intent_path)!
 	resume_attempt(root, work, environment, 'resume-complete-draft', ['--draft'], '')!
 	finished := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if !finished.draft || finished.assets.len != expected || os.exists(remote + '/publish-attempt')
 		|| !os.exists(remote + '/resume-stage') {
 		return error('recovery did not complete the retained draft')
 	}
+	if os.read_file(intent_path)! != conflict
+		|| !os.read_file(work + '/resume-complete-draft.log')!.contains('it differs from the saved draft') {
+		return error('draft recovery did not report and preserve the conflicting creation record')
+	}
+	os.write_file(intent_path, intent)!
+	resume_attempt(root, work, environment, 'resume-verified-draft-cleanup', ['--draft'], '')!
+	if os.exists(intent_path) || os.exists(remote + '/publish-attempt') {
+		return error('verified draft recovery did not retire its creation record')
+	}
+	os.write_file(intent_path, intent)!
 	resume_attempt(root, work, environment, 'resume-publish', [], '')!
-	resume_attempt(root, work, environment, 'resume-already-published', [], '')!
+	if os.exists(intent_path) { return error('publication kept a matching creation record') }
+	os.write_file(intent_path, intent)!
 	resume_attempt(root, work, environment, 'resume-published-with-draft', ['--draft'], 'is already published')!
 	resume_attempt(root, work, environment, 'resume-published-bad-digest', [], 'GitHub draft asset differs from the verified upload')!
+	if os.read_file(intent_path)! != intent { return error('failed verification retired a creation record') }
+	resume_attempt(root, work, environment, 'resume-already-published', [], '')!
+	if os.exists(intent_path) { return error('published release verification kept a matching creation record') }
+	os.symlink(remote + '/creation-record', intent_path)!
+	resume_attempt(root, work, environment, 'resume-published-marker-link', [], '')!
+	if !os.is_link(intent_path) || os.read_file(intent_path)! != intent
+		|| !os.read_file(work + '/resume-published-marker-link.log')!.contains('Keeping draft creation record') {
+		return error('published release verification did not report and preserve the linked creation record')
+	}
+	os.rm(intent_path)!
 	published := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if published.draft || !os.exists(remote + '/publish-attempt')
 		|| os.read_file(record)! != recovery || os.read_file(remote + '/release-attempt')! != created {

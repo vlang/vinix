@@ -294,14 +294,18 @@ verify_release() {
     echo "$release_url"
 }
 
+retire_resumed_creation() {
+    "$ASSET_WORK/release-assets" retire-resumed-creation "$OUT" "$ASSET_WORK" || true
+}
+
 finish_draft() {
-    local release_id="$1" response="$2" original="${3:-}" release_url
+    local release_id="$1" response="$2" original="${3:-}" release_url outcome
     "$ASSET_WORK/release-assets" upload-draft "$ASSET_STAGE" "$ASSET_WORK" \
         "$response" "$REPO" "$release_id" "$TAG" "$prerelease" "$original"
     github_api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
     release_url="$(verify_release "$release_id" "$ASSET_WORK/draft.json" draft)"
     if [ "$DRAFT" -eq 1 ]; then
-        step "Saved verified draft"
+        outcome="Saved verified draft"
     else
         if ! github_api "$release_api/$release_id" --method PATCH -F draft=false --silent; then
             echo "Publish request failed. Checking GitHub for release $release_id." >&2
@@ -309,8 +313,10 @@ finish_draft() {
         github_api "$release_api/$release_id" > "$ASSET_WORK/published.json" ||
             die "cannot read back release $release_id; retry with --resume-draft=$release_id"
         release_url="$(verify_release "$release_id" "$ASSET_WORK/published.json" published)"
-        step "Published"
+        outcome="Published"
     fi
+    if [ -n "$RESUME_DRAFT" ]; then retire_resumed_creation; fi
+    step "$outcome"
     echo "$release_url"
 }
 
@@ -361,6 +367,7 @@ if [ -n "$RESUME_DRAFT" ]; then
         [ "$DRAFT" -eq 0 ] || die "GitHub release $RESUME_DRAFT is already published"
         "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
         release_url="$(verify_release "$RESUME_DRAFT" "$ASSET_WORK/resume-draft.json" published)"
+        retire_resumed_creation
         step "Confirmed published release"
         echo "$release_url"
         exit 0

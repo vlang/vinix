@@ -398,7 +398,33 @@ fn restore_draft(work string, id string, directory string) ! {
 	path := os.join_path(work, 'draft-${id}.json')
 	recovery := read_recovery(path)!
 	if recovery.id.str() != id { return error('invalid release draft recovery record: ' + path) }
+	os.write_file(creation_path(directory), json2.encode(DraftRecovery{...recovery, id: 0}) + '\n')!
 	restore_metadata(recovery, directory)!
+}
+
+fn retire_resumed_creation(output string, directory string) ! {
+	intent := creation_path(output)
+	before := os.lstat(intent) or {
+		if err.code() == C.ENOENT { return }
+		return error('Keeping draft creation record ${intent}: ${err}')
+	}
+	expected := read_recovery_text(creation_path(directory))!
+	current := read_recovery_text(intent) or {
+		return error('Keeping draft creation record ${intent}: ${err}')
+	}
+	if current != expected {
+		return error('Keeping draft creation record ${intent}: it differs from the saved draft')
+	}
+	after := os.lstat(intent) or {
+		return error('Keeping draft creation record ${intent}: ${err}')
+	}
+	if before.dev != after.dev || before.inode != after.inode || before.mode != after.mode
+		|| before.size != after.size || before.mtime != after.mtime || before.ctime != after.ctime {
+		return error('Keeping draft creation record ${intent}: it changed before removal')
+	}
+	os.rm(intent) or {
+		return error('Keeping draft creation record ${intent}: ${err}')
+	}
 }
 
 fn missing_assets(directory string, assets []UploadedAsset) ![]string {
@@ -518,6 +544,9 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'restore-draft' {
 		return restore_draft(os.args[2], os.args[3], os.args[4])
 	}
+	if os.args.len == 4 && os.args[1] == 'retire-resumed-creation' {
+		return retire_resumed_creation(os.args[2], os.args[3])
+	}
 	if os.args.len == 10 && os.args[1] == 'upload-draft' {
 		upload_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
 			os.args[8] == 'true', os.args[9])!
@@ -534,7 +563,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | stage-reviewed | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | stage-reviewed | prepare-creation | restore-creation | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
 }
 
 fn main() {
