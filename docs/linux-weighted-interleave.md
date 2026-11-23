@@ -19,8 +19,8 @@ An oversized write consumes at most one native page. The I/O layer bounds
 the payload copy for scalar, positioned, and vectored writes. The no-address
 `MPOL_F_NODE` query returns the first node in the weighted mask for the
 indexed subset. The allocation-order cursor for kernel and page-cache
-allocations, shared anonymous mapping phase, explicit shared range policies,
-optional mode flags, and translated or 32-bit policy calls remain open.
+allocations, explicit shared range policies, optional mode flags, and
+translated or 32-bit policy calls remain open.
 
 ## Qualification
 
@@ -121,3 +121,39 @@ baseline failures and the same 307 AArch64 and 255 x86-64 allocation sites.
 The restored and verified archive is
 `~/.cache/vinix-r15/weighted-shmem/qualification.tar.zst`, with SHA-256
 `9baf409ba1a58898d0eb9e8fd63e6a88d4763023abd7ef2ef641e46f03ea5042`.
+
+## Shared anonymous placement
+
+Shared anonymous interleave uses the backing object's identity plus the
+page offset in the object. Vinix uses the shared mapping's serial as the
+inode number and reports it with the backing offset and `/dev/zero (deleted)`
+in `/proc/maps`, using device `00:00`. Fork aliases, splits, and moving
+remaps retain the identity and phase. Linux uses a hidden shmem file and
+its inode. [Linux 6.12.51 shared-memory allocation](https://github.com/gregkh/linux/blob/v6.12.51/mm/shmem.c)
+
+The fixture forks with an unfaulted shared region, moves a middle slice
+with `mremap`, and sets a weighted task policy before faulting pages out of
+order. It checks the inode and offset of both views, the resulting node of
+each new page, and the bytes visible through the child's original mapping.
+The fixture uses a large reservation to exercise Vinix's lazy path.
+Small shared mappings can still allocate pages at `mmap` time.
+
+Both production kernels were built from `79cbd5eca` plus the archived
+source patch. The same fixture ELF per architecture passed on Vinix and
+Linux 6.12.51 in single- and two-node guests. The previous Vinix kernels
+failed the shared backing identity check in both two-node guests.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `776b4bd906fe2c61` | `bc378cfbc5eac0d9` |
+| x86-64 | `a94ff9b7e7e8c46e` | `72a31ec837dbc171` |
+
+The `mmap`, `sharedmem`, `mbind`, and `mseal` regressions passed on both
+architectures, including the `mseal` allocation-retention checks.
+Independent review checked backing identity across range edits, lock
+coverage, and proc text ownership. The allocation checker reproduced the
+baseline failures and the same 307 AArch64 and 255 x86-64 allocation sites.
+
+The restored and verified archive is
+`~/.cache/vinix-r15/weighted-anon/qualification.tar.zst`, with SHA-256
+`dbc4ab275322f20788436cdd5fdf50af43a19c243112729b4bd8074408cb90e0`.

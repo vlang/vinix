@@ -16,7 +16,10 @@ fn C.__errno_location() &i32
 fn C._exit(i32)
 fn C.close(i32) i32
 fn C.dprintf(i32, &char, ...) i32
+fn C.fclose(voidptr) i32
 fn C.fflush(voidptr) i32
+fn C.fgets(&char, i32, voidptr) &char
+fn C.fopen(&char, &char) voidptr
 fn C.fork() i32
 fn C.fstat(i32, &C.stat) i32
 fn C.ftruncate(i32, i64) i32
@@ -30,11 +33,13 @@ fn C.mount(&char, &char, &char, u64, voidptr) i32
 fn C.munmap(voidptr, u64) i32
 fn C.open(&char, i32, ...) i32
 fn C.pause() i32
+fn C.pipe(&i32) i32
 fn C.pwrite(i32, voidptr, u64, i64) i64
 fn C.puts(&char) i32
 fn C.read(i32, voidptr, u64) i64
 fn C.rmdir(&char) i32
 fn C.setuid(u32) i32
+fn C.sscanf(&char, &char, ...) i32
 fn C.strcmp(&char, &char) i32
 fn C.strlen(&char) u64
 fn C.syscall(i64, ...) i64
@@ -348,6 +353,89 @@ fn check_shared_placement(page u64, other bool) {
 	}
 }
 
+fn shared_anon_identity(address u64) (u64, u64) {
+	unsafe {
+		maps := C.fopen(c'/proc/self/maps', c'r')
+		need(maps != nil, c'open mapping identities')
+		defer { C.fclose(maps) }
+		mut line := [256]char{}
+		for C.fgets(&line[0], line.len, maps) != nil {
+			mut start := u64(0)
+			mut end := u64(0)
+			mut offset := u64(0)
+			mut ino := u64(0)
+			mut name := [64]char{}
+			fields := C.sscanf(&line[0], c'%lx-%lx %*4s %lx %*x:%*x %lu %63[^\n]',
+				&start, &end, &offset, &ino, &name[0])
+			if fields < 4 || address < start || address >= end { continue }
+			need(fields == 5 && ino != 0 && C.strcmp(&name[0], c'/dev/zero (deleted)') == 0,
+				c'shared anonymous map reports its backing object')
+			return ino, offset + address - start
+		}
+	}
+	need(false, c'find shared anonymous mapping in proc maps')
+	return 0, 0
+}
+
+fn check_shared_anonymous(page u64, other bool) {
+	unsafe {
+		span := u64(64 * 1024 * 1024)
+		carried := 15 * page
+		base := u64(C.mmap(nil, span, C.PROT_READ | C.PROT_WRITE,
+			C.MAP_SHARED | C.MAP_ANONYMOUS, -1, 0))
+		need(base != ~u64(0), c'map a lazy shared anonymous region')
+		ino, original_offset := shared_anon_identity(base)
+		need(original_offset == 0, c'new anonymous backing starts at offset zero')
+		target := u64(C.mmap(nil, carried, C.PROT_NONE,
+			C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+		need(target != ~u64(0), c'reserve fixed remap target')
+		mut pipe := [2]i32{}
+		need(C.pipe(&pipe[0]) == 0, c'synchronize remapped aliases')
+		child := C.fork()
+		need(child >= 0, c'fork with original shared anonymous mapping')
+		mut ready := u8(1)
+		if child == 0 {
+			C.close(pipe[1])
+			need(C.read(pipe[0], &ready, 1) == 1, c'wait for parent to fault moved pages')
+			child_ino, child_offset := shared_anon_identity(base + 2 * page)
+			need(child_ino == ino && child_offset == 2 * page, c'fork keeps backing identity and offset')
+			for index in 2 .. 17 {
+				need(*(&u8(base + u64(index) * page)) == 28, c'child sees bytes from remapped faults')
+			}
+			C._exit(0)
+		}
+		C.close(pipe[0])
+
+		// MREMAP_MAYMOVE | MREMAP_FIXED moves a middle slice, retaining its offsets.
+		need(C.syscall(i64(C.SYS_mremap), base + 2 * page, carried, carried, u64(3), target)
+			== i64(target), c'move the shared anonymous slice')
+		moved_ino, moved_offset := shared_anon_identity(target)
+		need(moved_ino == ino && moved_offset == 2 * page, c'move keeps the inode and backing offset')
+		mut resident := u8(255)
+		need(C.mincore(voidptr(target), page, &resident) == 0 && resident & 1 == 0,
+			c'moved shared pages stay absent until faulted')
+
+		set_weight(0, c'3')
+		if other { set_weight(1, c'2') }
+		mask := if other { u64(3) } else { u64(1) }
+		need(set_policy(weighted_mode, mask) == 0, c'set task weights before moved faults')
+		for step in 0 .. 15 {
+			index := u64(step * 7 % 15)
+			want := if !other || (ino + 2 + index) % 5 < 3 { i32(0) } else { i32(1) }
+			need(fault(target + index * page) == want, c'moved shared anonymous fault uses the backing phase')
+		}
+		need(C.write(pipe[1], &ready, 1) == 1 && C.close(pipe[1]) == 0, c'signal shared pages are ready')
+		mut status := i32(-1)
+		need(C.waitpid(child, &status, 0) == child && status == 0, c'original fork alias remained shared')
+		need(C.munmap(voidptr(target), carried) == 0 && C.munmap(voidptr(base), span) == 0,
+			c'unmap moved and original shared ranges')
+		need(set_policy(default_mode, 0) == 0, c'reset the task policy')
+		set_weight(0, c'0')
+		if other { set_weight(1, c'0') }
+		C.puts(c'LINUX WEIGHTED ANON: PASS')
+	}
+}
+
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
@@ -364,6 +452,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		check_weights(u64(page), other)
 		check_policies(u64(page), other)
 		check_shared_placement(u64(page), other)
+		check_shared_anonymous(u64(page), other)
 		if other { C.puts(c'LINUX WEIGHTED NUMA: PASS') }
 		C.puts(c'LINUX WEIGHTED SUMMARY: sysfs=checked placement=checked')
 		C.puts(if reference { c'LINUX WEIGHTED REFERENCE: PASS' } else { c'LINUX WEIGHTED: PASS' })

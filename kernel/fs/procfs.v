@@ -1435,7 +1435,12 @@ fn maps_text(pid int, detailed bool) string {
 		text.add_byte(` `)
 		text.add_unsigned(info.ino)
 		text.add_byte(` `)
-		name := mapping_name(info, exe_node, exe_dev, exe_ino, brk_base, brk_current, stack_end)
+		shared_anonymous := info.shared && !info.file && info.ino != 0
+		name := if shared_anonymous {
+			'/dev/zero (deleted)'
+		} else {
+			mapping_name(info, exe_node, exe_dev, exe_ino, brk_base, brk_current, stack_end)
+		}
 		if name.len > 0 {
 			// The name starts in the column Linux pads it out to.
 			for text.len() < line_start + 72 {
@@ -1443,7 +1448,7 @@ fn maps_text(pid int, detailed bool) string {
 			}
 			text.add_byte(` `)
 			text.add(name)
-			unsafe { name.free() }
+			if !shared_anonymous { unsafe { name.free() } }
 		}
 		text.add_byte(`\n`)
 		if detailed {

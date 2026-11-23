@@ -2824,6 +2824,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   weights on both architectures.
   See [the shared-memory receipts](docs/linux-weighted-interleave.md#sparse-shared-memory).
 
+- [x] Place shared anonymous pages using the backing object and page offset.
+  Qualify weighted placement across fork and moving remap, with matching
+  identities and offsets in proc maps on both architectures.
+  See [the shared anonymous receipts](docs/linux-weighted-interleave.md#shared-anonymous-placement).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

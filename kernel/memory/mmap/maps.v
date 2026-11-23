@@ -11,8 +11,8 @@ pub mut:
 	end    u64
 	prot   int
 	shared bool
-	// Where in its file the mapping starts, and the file's device and inode;
-	// zero for anonymous memory.
+	// Backing object offset, device and inode. Shared anonymous memory uses
+	// the shadow object's serial as its inode and has no filesystem device.
 	offset u64
 	dev    u64
 	ino    u64
@@ -80,6 +80,9 @@ pub fn mappings(_pagemap &memory.Pagemap, count_pages bool) ?[]MappingInfo {
 				info.handle = global_range.handle
 				info.handle_unref = global_range.handle_unref
 			}
+		} else if global_range != unsafe { nil } && local_range.shared_anonymous() {
+			info.offset = shadow_begin(local_range) - global_range.base
+			info.ino = global_range.serial
 		}
 		if count_pages && local_range.prot != prot_none {
 			counted := pagemap.residency(info.base, info.end)

@@ -196,8 +196,17 @@ fn acquire_range_page(source RangePageSource, file_page u64) ?voidptr {
 	return page
 }
 
+fn (local &MmapRangeLocal) shared_anonymous() bool {
+	return local.flags & (map_shared | map_anonymous) == (map_shared | map_anonymous)
+}
+
 fn range_policy_index(local &MmapRangeLocal, virt u64) u64 {
 	shadow := shadow_address(local, virt)
+	if local.shared_anonymous() {
+		// Linux biases shared anonymous pages by the backing inode.
+		// The shared shadow object's serial plays that role here.
+		return local.global.serial + (shadow - local.global.base) / page_size
+	}
 	if local.global.policy_origin == 0 { return shadow / page_size }
 	return local.global.policy_origin + (shadow - local.global.base) / page_size
 }
