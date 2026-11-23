@@ -43,8 +43,8 @@ pub mut:
 	// a System V shared memory segment. Its link count says 1 all the same.
 	nameless bool
 	seals u32
-	// A file that is mapped MAP_SHARED can no longer live in one movable
-	// buffer: growing it would relocate the pages a mapping already points at.
+	// A file with mapped cache pages can no longer live in one movable
+	// buffer: growing it would relocate pages a mapping already points at.
 	// It switches to a sparse list of physical pages, which stay put once
 	// allocated. ftruncate and mmap reserve slots without backing untouched
 	// pages; Chromium creates many large shared-memory files this way.
@@ -315,6 +315,10 @@ fn (mut this TmpFSResource) lazy_shared_mapping() bool {
 	return true
 }
 
+fn (mut this TmpFSResource) private_mapping_cow() bool {
+	return true
+}
+
 fn (mut this TmpFSResource) numa_policy_at(offset u64) proc.NumaPolicy {
 	this.policy_lock.acquire()
 	defer { this.policy_lock.release() }
@@ -364,9 +368,9 @@ fn (this &TmpFSResource) outlives_mappers() bool {
 	return !this.nameless && this.stat.nlink > 0
 }
 
-// Give the file discrete, immovable physical pages. Called before it is first
-// shared-mapped. The contiguous buffer, borrowed or owned, is copied across
-// page by page and then let go. `file_data` is for tmpfs_page().
+// Give the file discrete, immovable physical pages. The contiguous buffer,
+// borrowed or owned, is copied across page by page and then let go.
+// `file_data` is for tmpfs_page().
 fn (mut this TmpFSResource) ensure_paged_locked(file_data bool) bool {
 	if this.paged {
 		return true
@@ -481,15 +485,13 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 		return unsafe { nil }
 	}
 	offset := page * page_size
+	file_size := u64(this.stat.size)
+	is_shared := flags & mmap.map_shared != 0
 
-	if flags & mmap.map_shared != 0 {
-		// Only pages that lie within the file are backed. A shared mapping may
-		// extend past the end -- callers routinely map a rounded-up region --
-		// and a page past the file must fault (SIGBUS) rather than make the
-		// file grow to cover it.
-		if offset >= u64(this.stat.size) {
-			return unsafe { nil }
-		}
+	// A shared mapping past EOF has no backing. Private mappings of
+	// borrowed initramfs data keep copying only the pages they touch.
+	if is_shared && offset >= file_size { return unsafe { nil } }
+	if offset < file_size && (is_shared || this.paged || this.storage_owned) {
 		file_data := this.outlives_mappers()
 		if !this.ensure_paged_locked(file_data) {
 			return unsafe { nil }
@@ -498,12 +500,13 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 			|| !this.materialize_page_locked(int(page), file_data) {
 			return unsafe { nil }
 		}
-		return voidptr(this.pages[int(page)])
+		physical := voidptr(this.pages[int(page)])
+		// The inode owns the cache page. Each private shadow has a separate
+		// PMM reference, which makes the existing COW path copy on write.
+		if !is_shared && !memory.pmm_retain(physical, 1) { return unsafe { nil } }
+		return physical
 	}
 
-	// The process' own copy. With none to be had the fault fails, and a
-	// process is killed for the memory: this used to stop the kernel.
-	file_size := u64(this.stat.size)
 	copy_page := if offset < file_size {
 		numa.alloc_range_page(this.numa_policy_at(offset), this.stat.ino + page, true)
 	} else {
@@ -514,14 +517,7 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	}
 	if offset < file_size {
 		copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
-		if this.paged {
-			if page < u64(this.pages.len) && this.pages[int(page)] != 0 {
-				unsafe {
-					C.memcpy(voidptr(u64(copy_page) + higher_half),
-						voidptr(this.pages[int(page)] + higher_half), copy_size)
-				}
-			}
-		} else if this.storage != unsafe { nil } {
+		if this.storage != unsafe { nil } {
 			unsafe {
 				C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[offset], copy_size)
 			}

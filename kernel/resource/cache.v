@@ -90,6 +90,10 @@ mut:
 	uncached_mapping_page(page u64, physical voidptr) bool
 }
 
+pub fn tracks_mapping_dirty(res Resource) bool {
+	return res is MappingDirtyResource
+}
+
 pub interface MappingPageoutResource {
 mut:
 	pageout_mapping(page u64) u64

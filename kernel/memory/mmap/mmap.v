@@ -1511,7 +1511,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		extra_pte |= resource.mapping_attributes(mut resource_, range_handle, u64(offset))
 	}
 	tracked_file := flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil }
-		&& resource.private_mapping_cow(mut resource_)
+		&& resource.tracks_mapping_dirty(resource_)
 	if tracked_file && flags & map_shared != 0 { extra_pte |= memory.pte_file_tracked }
 	lazy_file := options.lazy_file || (flags & map_anonymous == 0
 		&& flags & map_shared != 0 && voidptr(resource_) != unsafe { nil }

@@ -39,6 +39,7 @@ fn C.puts(&char) i32
 fn C.read(i32, voidptr, u64) i64
 fn C.rmdir(&char) i32
 fn C.setuid(u32) i32
+fn C.sleep(u32) u32
 fn C.sscanf(&char, &char, ...) i32
 fn C.strcmp(&char, &char) i32
 fn C.strlen(&char) u64
@@ -398,6 +399,40 @@ fn check_private_shmem_policy(fd i32, ino u64, page u64, other bool) {
 	}
 }
 
+fn check_private_shmem_read(fd i32, page u64, other bool) {
+	unsafe {
+		offset := 51 * page
+		need(C.ftruncate(fd, i64(offset + page)) == 0, c'extend backing for private read')
+		shared := u64(C.mmap(nil, page, C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, i64(offset)))
+		private := u64(C.mmap(nil, page, C.PROT_READ, C.MAP_PRIVATE, fd, i64(offset)))
+		need(shared != ~u64(0) && private != ~u64(0), c'map private read and shared write views')
+		bind_shared(shared, page, bind_mode, 1)
+		need(fault(shared) == 0, c'prime the cache page on node zero')
+		mask := if other { u64(2) } else { u64(1) }
+		bind_shared(private, page, weighted_mode, mask)
+		need(*(&u8(private)) == 28, c'private read sees cached data')
+		node, _ := get_policy(private, node_flag | address_flag)
+		need(node == 0, c'private read maps the existing cache page')
+		*(&u8(shared)) = 72
+		need(*(&u8(private)) == 72, c'private read stays coherent until its first write')
+		bind_shared(private, page, bind_mode, mask)
+		need(C.mprotect(voidptr(private), page, C.PROT_READ | C.PROT_WRITE) == 0,
+			c'enable private writes without replacing the cached page')
+		need(fault(private) == if other { i32(1) } else { i32(0) },
+			c'first private write uses the current inode policy')
+		need(*(&u8(shared)) == 72, c'first private write preserves the cached data')
+		*(&u8(shared)) = 91
+		need(*(&u8(private)) == 28, c'private copy stays isolated from later backing writes')
+		need(C.munmap(voidptr(shared), page) == 0 && C.close(fd) == 0,
+			c'drop the shared view and last descriptor')
+		discard(private, page)
+		need(*(&u8(private)) == 91, c'private view refaults from the cache after descriptor close')
+		refault_node, _ := get_policy(private, node_flag | address_flag)
+		need(refault_node == 0 && C.munmap(voidptr(private), page) == 0,
+			c'refault reuses the pinned cache before final unmap')
+	}
+}
+
 fn check_shared_file(fd i32, page u64, other bool) {
 	unsafe {
 		mut info := C.stat{}
@@ -438,7 +473,7 @@ fn check_shared_file(fd i32, page u64, other bool) {
 		if other { set_weight(1, c'0') }
 		check_file_policy(fd, info.st_ino, page, other)
 		check_private_shmem_policy(fd, info.st_ino, page, other)
-		need(C.close(fd) == 0, c'close the shared backing')
+		check_private_shmem_read(fd, page, other)
 	}
 }
 
@@ -455,6 +490,7 @@ fn check_shared_placement(page u64, other bool) {
 		C.puts(c'LINUX WEIGHTED SHMEM: PASS')
 		C.puts(c'LINUX WEIGHTED FILE POLICY: PASS')
 		C.puts(c'LINUX WEIGHTED PRIVATE SHMEM: PASS')
+		C.puts(c'LINUX WEIGHTED PRIVATE SHMEM READ: PASS')
 	}
 }
 
@@ -647,6 +683,56 @@ fn check_shared_policy_storage(page u64, other bool) {
 	C.puts(c'LINUX WEIGHTED SHARED STORAGE: PASS')
 }
 
+fn shmem_free_kib() u64 {
+	unsafe {
+		input := C.fopen(c'/proc/meminfo', c'r')
+		need(input != nil, c'open physical memory counters')
+		mut line := [128]char{}
+		mut kib := u64(0)
+		for C.fgets(&line[0], line.len, input) != nil {
+			if C.sscanf(&line[0], c'MemFree: %lu kB', &kib) == 1 {
+				need(C.fclose(input) == 0, c'close physical memory counters')
+				return kib
+			}
+		}
+	}
+	need(false, c'find free physical memory')
+	return 0
+}
+
+fn check_private_shmem_storage(page u64) {
+	unsafe {
+		address := C.mmap(nil, page, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+		need(address != voidptr(-1) && C.munmap(address, page) == 0,
+			c'reserve a reusable address for private cache churn')
+		mut before := u64(0)
+		for round in 0 .. 160 {
+			fd := i32(C.syscall(i64(C.SYS_memfd_create), c'private-read-churn', u64(0)))
+			need(fd >= 0 && C.ftruncate(fd, i64(2 * page)) == 0, c'create a sparse private churn backing')
+			view := u64(C.mmap(address, page, C.PROT_READ | C.PROT_WRITE,
+				C.MAP_PRIVATE | C.MAP_FIXED_NOREPLACE, fd, i64(page)))
+			need(view == u64(address) && C.close(fd) == 0, c'leave a private mapping as the only owner')
+			need(*(&u8(view)) == 0, c'fault a new cached page through a private mapping')
+			*(&u8(view)) = 62
+			discard(view, page)
+			need(*(&u8(view)) == 0 && C.munmap(voidptr(view), page) == 0,
+				c'refault and release the last private cache reference')
+			if round == 31 {
+				// Closing the last description retires its procfs-visible
+				// vnode for five seconds before the maintenance thread frees it.
+				need(C.sleep(7) == 0, c'let the warmup memfd vnodes retire')
+				before = shmem_free_kib()
+			}
+		}
+		need(C.sleep(7) == 0, c'let the measured memfd vnodes retire')
+		after := shmem_free_kib()
+		C.dprintf(1, c'LINUX WEIGHTED PRIVATE SHMEM STORAGE: rounds=128 before_kib=%lu after_kib=%lu\n',
+			before, after)
+		need(before <= after + 8 * page / 1024, c'private shmem churn does not retain cache or copy pages')
+		C.puts(c'LINUX WEIGHTED PRIVATE SHMEM STORAGE: PASS')
+	}
+}
+
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
@@ -665,7 +751,10 @@ pub fn run(argc i32, argv &&char) i32 {
 		check_shared_placement(u64(page), other)
 		check_shared_anonymous(u64(page), other)
 		check_shared_policy_alias(u64(page), other)
-		if !reference { check_shared_policy_storage(u64(page), other) }
+		if !reference {
+			check_shared_policy_storage(u64(page), other)
+			check_private_shmem_storage(u64(page))
+		}
 		C.puts(c'LINUX WEIGHTED SHARED POLICY: PASS')
 		if other { C.puts(c'LINUX WEIGHTED NUMA: PASS') }
 		C.puts(c'LINUX WEIGHTED SUMMARY: sysfs=checked placement=checked')

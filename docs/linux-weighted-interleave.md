@@ -18,9 +18,9 @@ weight set. [Linux sysfs attribute implementation](https://github.com/gregkh/lin
 An oversized write consumes at most one native page. The I/O layer bounds
 the payload copy for scalar, positioned, and vectored writes. The no-address
 `MPOL_F_NODE` query returns the next allocation-order node. General kernel
-allocation and the block cache, shmem read-fault cache sharing, shmem
-home-node overrides, page migration, optional mode flags, and translated
-or 32-bit policy calls remain open.
+allocation and the block cache, shmem home-node overrides, page
+migration, optional mode flags, and translated or 32-bit policy calls
+remain open.
 
 ## Qualification
 
@@ -319,11 +319,6 @@ inode policy and preserves the parent's copy. Clearing the interval restores
 the ordinary task allocation policy for future faults.
 [Linux shmem policy lookup](https://github.com/gregkh/linux/blob/v6.12.51/mm/shmem.c)
 
-Vinix takes a private copy on the first read fault. A later policy update
-leaves that resident copy on its original node. Linux can keep the cache
-page mapped until the first private write.
-[Linux write-fault allocation](https://github.com/gregkh/linux/blob/v6.12.51/mm/memory.c)
-
 The probe applies weighted interleave through an offset private view of each
 backing type. It checks out-of-order writes into sparse pages through
 private and shared aliases, verifies that private writes leave backing data
@@ -345,3 +340,44 @@ The archive was decoded and compared with the full evidence tree in place.
 It is at `~/.cache/vinix-r15/private-shmem-policy/qualification.tar.zst`,
 with SHA-256
 `f1ae547dce821a7083212a85bfb21f5da9dbaecc3787296be1484d54dd12e38c`.
+
+## Private tmpfs and memfd read faults
+
+A private mapping can read the inode's existing cache page. It sees
+changes through shared aliases until its first write, which makes a copy
+on a node selected by the current policy. `MADV_DONTNEED` drops the copy
+and lets the next fault read the cache again, including after the last
+descriptor closes. [Linux shmem fault implementation](https://github.com/gregkh/linux/blob/v6.12.51/mm/shmem.c)
+
+The inode owns the cache frame. Each private mapping's shadow page table
+owns a physical reference, with separate references for forked shadows.
+Unmap, copy-on-write, and discard release those references. This uses
+the private copy-on-write capability while tmpfs keeps its existing
+in-memory write path.
+
+Private faults on borrowed initramfs storage still copy only the pages
+they touch. Cold cache faults follow the existing tmpfs allocation
+path, whose task-policy fallback supports weighted interleave.
+Beyond-EOF private faults and truncation of already mapped pages remain
+outside this qualification.
+
+Production kernels built from `e070f0fad` plus the archived patch passed
+the same probe ELFs as Linux 6.12.51 on two-node AArch64 and x86-64
+guests. The original AArch64 kernel failed the cached-node assertion
+with the same ELF. The `memfdseals`, `shmabi`, and `remapfile` regressions
+passed on both architectures.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `7e1137da19796227b` | `ffe0d44a546758af` |
+| x86-64 | `dd5b6974cc063239` | `d9641cb9ce851a07` |
+
+After warmup and vnode reclamation, 128 cache-to-copy-to-discard cycles
+reduced free memory by one AArch64 page and five x86-64 pages, within the
+eight-page guard. The allocation checker had the same baseline failures
+and 307 AArch64 and 255 x86-64 sites. Independent review checked the
+fault, fork, discard, and teardown references.
+
+The verified archive is at
+`~/.cache/vinix-r15/private-shmem-read/qualification.tar.zst`, with SHA-256
+`4d0accd6f4e4e87d822515ad5f337ac982e85c05043163743d0ff77faafac254`.

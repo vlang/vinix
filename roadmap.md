@@ -2853,6 +2853,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   policy after fork on both architectures.
   See [the private shmem receipts](docs/linux-weighted-interleave.md#private-tmpfs-and-memfd-range-policies).
 
+- [x] Map tmpfs and memfd cache pages for private reads. Qualify the first
+  write under a changed inode policy and refaults after discard and
+  descriptor close on both architectures.
+  See [the private read receipts](docs/linux-weighted-interleave.md#private-tmpfs-and-memfd-read-faults).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).
