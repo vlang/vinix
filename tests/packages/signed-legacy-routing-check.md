@@ -199,3 +199,34 @@ roots matched independent archive inventories for file bytes, paths, types,
 modes and link targets. Decode `runs.tar.zst` with `zstd --long=30 -dc`
 when restoring. The SHA-256 of `qualification.sha256` is
 `25afc5e978f0744a81ce3e71afe00783e2deab95b6de41b0d91d90e2b0ea35cc`.
+
+## Approved Neovim install through Software
+
+The opt-in `--approve=true` mode at `ea9a74062` extends the same live
+fixture through installation. QMP clicks the visible Confirm button, enters
+the disposable administrator password and submits it. The guest checks for
+an empty generation store and absence of a package-change approval record
+through password entry.
+The captures include the approval prompt, masked password and Software's
+return to the catalog.
+
+The guest observes one authenticated dispatch from UID 1000, then waits for
+the active generation before auditing the exact lock. It verifies all five
+packages and their payloads, checks that the approved roots are recorded in
+generation 1 and runs the installed Neovim headlessly as UID 1000. The auth log
+contains no fixture password. Both the declaration and the earlier Skip
+decision keep their original bytes.
+
+AArch64 passed in 35.709 seconds and x86-64 passed in 61.025 seconds with
+2 GiB of guest RAM. A fresh AArch64 run without the approval option passed
+the read-only check in 21.487 seconds with 1 GiB. The initial 1 GiB approval
+attempts left the store without an active generation. The AArch64 capture
+shows a retained unpublished package stage after the install stopped. The smaller live
+fixture's staging failure remains open.
+
+The full run roots and diagnostics are in
+`~/.local/state/vinix/r14-neovim-approval-qVjrYJYs/accepted`. All three
+restored run roots matched independent archive inventories. Decode
+`runs.tar.zst` with `zstd --long=30 -dc` when restoring. The SHA-256 of
+`qualification.sha256` is
+`30912a3acfd97841aa7754f9f2a79db5ecff20934348e1f73704109a07ab87a7`.

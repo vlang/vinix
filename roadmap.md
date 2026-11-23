@@ -1071,7 +1071,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     unavailable review delivery refuse fallback. The
     [paired native routing check](tests/packages/signed-legacy-routing-check.md#paired-native-neovim-setup-routing)
     shows the complete signed proposal on both targets from the real Neovim
-    setup command. Production publisher selection and other legacy
+    setup command. The [approval check](tests/packages/signed-legacy-routing-check.md#approved-neovim-install-through-software)
+    verifies the installed lock and launches Neovim under the ordinary account
+    on both targets. Production publisher selection and other legacy
     applications remain open.
   - [x] [Authenticated hosted X11 launches](tests/wine-host/README.md)
     create a private per-account authority and fresh random cookie, grant only
