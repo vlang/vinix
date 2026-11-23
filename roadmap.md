@@ -2782,6 +2782,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   lifetime, filesystem credentials, partial vector returns, and anonymous
   paging on both architectures. See [the advice receipts](docs/linux-process-madvise.md).
 
+- [x] Implement native `move_pages` location queries. Qualify credentials,
+  resident and absent pages, and partial user copies on both architectures.
+  See [the page-location receipts](docs/linux-move-pages.md).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

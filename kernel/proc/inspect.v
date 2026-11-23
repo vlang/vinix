@@ -98,22 +98,8 @@ pub fn inspect_pagemap(local_pid int) ?ProcessInspection {
 	lock_table()
 	defer { unlock_table() }
 	caller := current_thread().process
-	pid := global_id_in(caller.numbered_in, local_pid)
-	if pid <= 0 || pid >= max_pid {
-		errno.set(errno.esrch)
-		return none
-	}
-	mut target := processes[pid]
-	if target == unsafe { nil } {
-		t := threads_by_tid[pid]
-		if t != unsafe { nil } {
-			target = t.process
-		}
-	}
-	if target == unsafe { nil } || target.pid <= 0 || target.exiting
-		|| target.pagemap == unsafe { nil }
-		|| (numbers_own(caller.numbered_in)
-			&& voidptr(target.numbered_in) != voidptr(caller.numbered_in)) {
+	target := inspection_target_locked(caller, local_pid)
+	if target == unsafe { nil } || target.exiting || target.pagemap == unsafe { nil } {
 		errno.set(errno.esrch)
 		return none
 	}
@@ -125,6 +111,48 @@ pub fn inspect_pagemap(local_pid int) ?ProcessInspection {
 		pagemap:       retain_inspection_locked(target.pagemap)
 		fault_missing: voidptr(target) == voidptr(caller)
 	}
+}
+
+fn inspection_target_locked(caller &Process, local_pid int) &Process {
+	pid := global_id_in(caller.numbered_in, local_pid)
+	if pid <= 0 || pid >= max_pid {
+		return unsafe { nil }
+	}
+	mut target := processes[pid]
+	if target == unsafe { nil } {
+		t := threads_by_tid[pid]
+		if t != unsafe { nil } {
+			target = t.process
+		}
+	}
+	if target == unsafe { nil } || target.constructing || target.pid <= 0
+		|| (numbers_own(caller.numbered_in)
+			&& voidptr(target.numbered_in) != voidptr(caller.numbered_in)) {
+		return unsafe { nil }
+	}
+	return target
+}
+
+// move_pages uses READ_REALCREDS for an explicit PID. Hold the old map
+// through the complete vector even if the target exits or replaces it.
+pub fn pin_page_location_pagemap(local_pid int) ?&memory.Pagemap {
+	lock_table()
+	defer { unlock_table() }
+	caller := current_thread().process
+	target := if local_pid == 0 { caller } else { inspection_target_locked(caller, local_pid) }
+	if target == unsafe { nil } {
+		errno.set(errno.esrch)
+		return none
+	}
+	if local_pid != 0 && !inspection_allowed(caller, target, .real) {
+		errno.set(errno.eperm)
+		return none
+	}
+	if target.exiting || target.pagemap == unsafe { nil } {
+		errno.set(errno.einval)
+		return none
+	}
+	return retain_inspection_locked(target.pagemap)
 }
 
 // The table protects the target identity, credentials and current pagemap

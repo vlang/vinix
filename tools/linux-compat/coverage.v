@@ -216,6 +216,7 @@ fn coverage(root string) !Coverage {
 		'kernel/syscall/table/linux_compat.v', 'kernel/syscall/table/linux_common.v',
 		'kernel/syscall/table/container.v', 'kernel/syscall/table/trace_amd64.v',
 		'kernel/syscall/table/process_madvise.v', 'kernel/proc/inspect.v',
+		'kernel/syscall/table/move_pages.v', 'kernel/memory/mmap/page_location.v',
 		'kernel/file/file.v', 'kernel/resource/resource.v', 'kernel/resource/cache.v',
 		'kernel/socket/unix/unix.v', 'kernel/pipe/pipe.v', 'kernel/pipe/usercopy.v', 'kernel/fs/vfs.v', 'kernel/fs/mount_policy.v',
 		'kernel/fs/stat.v',

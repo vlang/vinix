@@ -512,6 +512,7 @@ pub fn init_syscall_table() {
 	syscall_table[168] = voidptr(numa.syscall_getcpu) // __NR_getcpu
 	syscall_table[235] = voidptr(numa.syscall_mbind) // __NR_mbind
 	syscall_table[236] = voidptr(numa.syscall_get_mempolicy) // __NR_get_mempolicy
+	syscall_table[239] = voidptr(syscall_linux_move_pages) // __NR_move_pages
 	syscall_table[237] = voidptr(numa.syscall_set_mempolicy) // __NR_set_mempolicy
 
 	// Resource / file locking
