@@ -14,7 +14,7 @@ const mbind_move_all = u32(4)
 pub fn syscall_mbind(_ voidptr, address u64, length u64, mode i32, nodes u64, maxnode u64,
 	flags u32) (u64, u64) {
 	if mode < 0 || mode >= numa.mpol_max { return errno.err, errno.einval }
-	raw_mask := numa.import_range_nodemask(nodes, maxnode) or { return errno.err, errno.get() }
+	raw_mask := numa.import_nodemask(nodes, maxnode) or { return errno.err, errno.get() }
 	if flags & ~(mbind_strict | mbind_move | mbind_move_all) != 0 {
 		return errno.err, errno.einval
 	}
@@ -32,7 +32,7 @@ pub fn syscall_mbind(_ voidptr, address u64, length u64, mode i32, nodes u64, ma
 	if span == 0 { return 0, 0 }
 	if flags & (mbind_move | mbind_move_all) != 0 { return errno.err, errno.eopnotsupp }
 
-	policy := range_policy(mode, raw_mask) or { return errno.err, errno.einval }
+	policy := numa.normalize_policy(mode, raw_mask) or { return errno.err, errno.einval }
 	mut pagemap := process.pagemap
 	begin_mapping_update(mut pagemap) or { return errno.err, errno.get() }
 	defer { end_mapping_update(mut pagemap) }
@@ -44,26 +44,7 @@ pub fn syscall_mbind(_ voidptr, address u64, length u64, mode i32, nodes u64, ma
 	return 0, 0
 }
 
-fn range_policy(mode i32, mask u64) ?numa.RangePolicy {
-	allowed := mask & numa.all_nodes_mask()
-	match mode {
-		numa.mpol_default, numa.mpol_local {
-			if mask != 0 { return none }
-			return numa.RangePolicy{mode: int(mode)}
-		}
-		numa.mpol_preferred {
-			if mask == 0 { return numa.RangePolicy{mode: numa.mpol_local} }
-			if allowed == 0 { return none }
-			return numa.RangePolicy{mode: int(mode), mask: allowed & (~allowed + 1)}
-		}
-		else {
-			if allowed == 0 { return none }
-			return numa.RangePolicy{mode: int(mode), mask: allowed}
-		}
-	}
-}
-
-fn bind_range_unlocked(mut pagemap memory.Pagemap, base u64, end u64, policy numa.RangePolicy,
+fn bind_range_unlocked(mut pagemap memory.Pagemap, base u64, end u64, policy proc.NumaPolicy,
 	strict_mask ?u64) u64 {
 	// Validate the whole interval before changing policies. Default can
 	// clear mapped pieces across holes, provided at least one piece exists.
@@ -105,7 +86,7 @@ fn bind_range_unlocked(mut pagemap memory.Pagemap, base u64, end u64, policy num
 	return 0
 }
 
-fn split_policy_boundary_unlocked(mut pagemap memory.Pagemap, boundary u64, policy numa.RangePolicy) ? {
+fn split_policy_boundary_unlocked(mut pagemap memory.Pagemap, boundary u64, policy proc.NumaPolicy) ? {
 	local, _, _ := addr2range(pagemap, boundary) or { return }
 	if local.base != boundary && local.policy != policy {
 		split_upper_range_unlocked(mut pagemap, local, boundary)?

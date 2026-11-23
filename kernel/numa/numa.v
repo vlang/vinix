@@ -399,58 +399,6 @@ pub fn all_nodes_mask() u64 {
 
 // ── Memory policy ───────────────────────────────────────────────────────────
 
-// Where the current thread's next anonymous page should come from, and whether
-// that is a requirement or a preference. Linux's first-touch rule is the
-// default: the page comes from the node the faulting thread is running on.
-fn preferred_node() (int, bool) {
-	if !numa_multinode {
-		return no_node, false
-	}
-	home := current_node()
-
-	running := proc.current_thread()
-	if running == unsafe { nil } {
-		return home, false
-	}
-	mut process := running.process
-	if process == unsafe { nil } {
-		return home, false
-	}
-
-	mask := process.mempolicy_nodemask & all_nodes_mask()
-	match process.mempolicy_mode {
-		mpol_bind {
-			if mask == 0 {
-				return home, false
-			}
-			// Staying put satisfies the binding whenever it is allowed to.
-			if mask & (u64(1) << u64(home)) != 0 {
-				return home, true
-			}
-			return first_node_in(mask), true
-		}
-		mpol_preferred {
-			if mask == 0 {
-				return home, false
-			}
-			if mask & (u64(1) << u64(home)) != 0 {
-				return home, false
-			}
-			return first_node_in(mask), false
-		}
-		mpol_interleave {
-			if mask == 0 {
-				return home, false
-			}
-			return interleave_next(mut process, mask), false
-		}
-		else {
-			// MPOL_DEFAULT and MPOL_LOCAL both mean "the node I am on".
-			return home, false
-		}
-	}
-}
-
 fn first_node_in(mask u64) int {
 	for id := 0; id < numa_node_count && id < 64; id++ {
 		if mask & (u64(1) << u64(id)) != 0 {
@@ -458,54 +406,6 @@ fn first_node_in(mask u64) int {
 		}
 	}
 	return 0
-}
-
-// Round-robin across the policy's nodes. The cursor lives on the process, so
-// its threads interleave together rather than each starting over. It is read
-// and written without a lock: two threads faulting at once may take the same
-// node, which costs an interleave one step of its rotation and nothing else.
-fn interleave_next(mut process proc.Process, mask u64) int {
-	for step := 0; step < numa_node_count && step < 64; step++ {
-		candidate := int((process.mempolicy_interleave + u64(step)) % u64(numa_node_count))
-		if mask & (u64(1) << u64(candidate)) != 0 {
-			process.mempolicy_interleave = u64(candidate + 1) % u64(numa_node_count)
-			return candidate
-		}
-	}
-	return first_node_in(mask)
-}
-
-// A page for the current thread's address space, honouring its memory policy.
-// Returns nil on exhaustion, like the fallible PMM entry points it wraps: the
-// caller is serving a userspace fault and can report ENOMEM. The memory the
-// kernel keeps for itself is exhaustion too (memory/reserve.v); what a caller
-// does about it is memory.recover_from_exhaustion().
-pub fn alloc_user_page() voidptr {
-	if !numa_multinode {
-		return memory.pmm_alloc_user(1)
-	}
-	node, strict := preferred_node()
-	if node < 0 {
-		return memory.pmm_alloc_user(1)
-	}
-	if !memory.user_room(1) {
-		return unsafe { nil }
-	}
-	return note_node_exhaustion(memory.pmm_alloc_on_node(1, node, strict), strict)
-}
-
-pub fn alloc_user_page_nozero() voidptr {
-	if !numa_multinode {
-		return memory.pmm_alloc_user_nozero(1)
-	}
-	node, strict := preferred_node()
-	if node < 0 {
-		return memory.pmm_alloc_user_nozero(1)
-	}
-	if !memory.user_room(1) {
-		return unsafe { nil }
-	}
-	return note_node_exhaustion(memory.pmm_alloc_nozero_on_node(1, node, strict), strict)
 }
 
 // A node that is full under a strict policy is the policy's doing, with
@@ -534,81 +434,16 @@ pub fn syscall_getcpu(_ voidptr, cpu_ptr u64, node_ptr u64, _tcache u64) (u64, u
 	return 0, 0
 }
 
-// The largest nodemask a caller may name. Linux's own limit is MAX_NUMNODES,
-// and one is needed here for the same reason: the bit count decides how many
-// words are copied, so an unbounded one is an unbounded loop over user memory.
-const max_nodemask_bits = u64(8 * 1024)
-
-// Read a Linux nodemask. `maxnode` counts bits, not words, and zero means "no
-// mask at all". Vinix supports sixteen nodes, so one word is always enough;
-// bits above that must be clear or the request names a node which cannot exist.
-fn read_nodemask(nodemask u64, maxnode u64) ?u64 {
-	if nodemask == 0 || maxnode == 0 {
-		return u64(0)
-	}
-	if maxnode > max_nodemask_bits {
-		return none
-	}
-	words := (maxnode + 63) / 64
-	mut mask := u64(0)
-	for word := u64(0); word < words; word++ {
-		mut value := u64(0)
-		if !usercopy.copy_from_user(voidptr(&value), nodemask + word * 8, sizeof(u64)) {
-			return none
-		}
-		if word == 0 {
-			mask = value
-		} else if value != 0 {
-			return none
-		}
-	}
-	// Bits past the caller's own maxnode are not part of the mask.
-	if maxnode < 64 {
-		mask &= (u64(1) << maxnode) - 1
-	}
-	return mask
-}
-
-fn store_policy(mut process proc.Process, mode int, mask u64) (u64, u64) {
-	// A mode that needs nodes and was given none is the caller's mistake, not
-	// something to guess at.
-	if mode == mpol_bind || mode == mpol_interleave {
-		if mask == 0 {
-			return errno.err, errno.einval
-		}
-	}
-	if (mask & ~all_nodes_mask()) != 0 {
-		return errno.err, errno.einval
-	}
-	process.mempolicy_mode = mode
-	process.mempolicy_nodemask = mask
-	process.mempolicy_interleave = 0
-	return 0, 0
-}
-
-// set_mempolicy(mode, nodemask, maxnode). The policy is process-wide and is
-// inherited by a fork, as on Linux.
-pub fn syscall_set_mempolicy(_ voidptr, mode int, nodemask u64, maxnode u64) (u64, u64) {
+// set_mempolicy(mode, nodemask, maxnode) changes the calling thread's policy.
+pub fn syscall_set_mempolicy(_ voidptr, mode i32, nodemask u64, maxnode u64) (u64, u64) {
 	if mode < 0 || mode >= mpol_max {
 		return errno.err, errno.einval
 	}
-	mask := read_nodemask(nodemask, maxnode) or { return errno.err, errno.einval }
-
-	mut running := proc.current_thread()
-	if running == unsafe { nil } {
-		return errno.err, errno.einval
-	}
-	mut process := running.process
-	if process == unsafe { nil } {
-		return errno.err, errno.einval
-	}
-	if mode == mpol_default || mode == mpol_local {
-		process.mempolicy_mode = mode
-		process.mempolicy_nodemask = 0
-		process.mempolicy_interleave = 0
-		return 0, 0
-	}
-	return store_policy(mut process, mode, mask)
+	mask := import_nodemask(nodemask, maxnode) or { return errno.err, errno.get() }
+	policy := normalize_policy(mode, mask) or { return errno.err, errno.einval }
+	mut caller := proc.current_thread()
+	caller.numa_policy = policy
+	return 0, 0
 }
 
 // ── Reporting ───────────────────────────────────────────────────────────────

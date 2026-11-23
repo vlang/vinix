@@ -830,6 +830,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		ioprio_value: proc.inherited_io_priority(source)
 		ioprio_context: proc.inherited_io_context(source)
 		personality: source.personality
+		numa_policy: source.numa_policy
 		comm:           source.comm.clone()
 		comm_named:     source.comm_named
 	} }

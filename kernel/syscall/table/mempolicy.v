@@ -15,16 +15,16 @@ fn syscall_linux_get_mempolicy(_ voidptr, mode_ptr u64, nodemask u64, maxnode u6
 		return errno.err, errno.einval
 	}
 
-	process := proc.current_thread().process
-	mut mode := i32(process.mempolicy_mode)
-	mut mask := process.mempolicy_nodemask
+	caller := proc.current_thread()
+	mut mode := i32(caller.numa_policy.mode)
+	mut mask := caller.numa_policy.mask
 	want_node := flags & u64(numa.mpol_f_node) != 0
 	if flags & u64(numa.mpol_f_mems_allowed) != 0 {
 		if flags != u64(numa.mpol_f_mems_allowed) { return errno.err, errno.einval }
 		mode = 0
 		mask = numa.all_nodes_mask()
 	} else if flags & u64(numa.mpol_f_addr) != 0 {
-		mut pagemap := process.pagemap
+		mut pagemap := caller.process.pagemap
 		mode, mask = mmap.query_policy_address(mut pagemap, address, want_node)
 		if mode < 0 { return errno.err, u64(-mode) }
 	} else {

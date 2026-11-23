@@ -2794,6 +2794,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   per-range queries, fault placement, strict checks and policy inheritance
   on both architectures. See [the binding receipts](docs/linux-mbind.md).
 
+- [x] Make native `set_mempolicy` thread-local. Qualify independent placement
+  within a shared address space, policy inheritance through clone, fork and
+  exec, and nodemask validation on both architectures.
+  See [the task policy receipts](docs/linux-task-mempolicy.md).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

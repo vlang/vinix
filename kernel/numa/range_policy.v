@@ -3,17 +3,11 @@ module numa
 
 import errno
 import memory
+import proc
 import usercopy
 
-pub struct RangePolicy {
-pub:
-	mode int
-	mask u64
-}
-
-// Native mbind uses maxnode-1 bits. Import the mask before validating the
-// address or migration flags, as Linux does.
-pub fn import_range_nodemask(address u64, maxnode u64) ?u64 {
+// The native Linux memory policy syscalls read maxnode-1 bits.
+pub fn import_nodemask(address u64, maxnode u64) ?u64 {
 	if address == 0 || maxnode == 1 { return u64(0) }
 	if maxnode == 0 || maxnode - 1 > memory.page_size * 8 {
 		errno.set(errno.einval)
@@ -44,9 +38,33 @@ pub fn import_range_nodemask(address u64, maxnode u64) ?u64 {
 	return mask
 }
 
-pub fn alloc_range_page(policy RangePolicy, index u64, zero bool) voidptr {
-	if policy.mode == mpol_default || !numa_multinode {
-		return if zero { alloc_user_page() } else { alloc_user_page_nozero() }
+pub fn normalize_policy(mode i32, mask u64) ?proc.NumaPolicy {
+	allowed := mask & all_nodes_mask()
+	match mode {
+		mpol_default, mpol_local {
+			if mask != 0 { return none }
+			return proc.NumaPolicy{mode: int(mode)}
+		}
+		mpol_preferred {
+			if mask == 0 { return proc.NumaPolicy{mode: mpol_local} }
+			if allowed == 0 { return none }
+			return proc.NumaPolicy{mode: int(mode), mask: allowed & (~allowed + 1)}
+		}
+		else {
+			if allowed == 0 { return none }
+			return proc.NumaPolicy{mode: int(mode), mask: allowed}
+		}
+	}
+}
+
+pub fn alloc_range_page(range_policy proc.NumaPolicy, index u64, zero bool) voidptr {
+	if !numa_multinode {
+		return if zero { memory.pmm_alloc_user(1) } else { memory.pmm_alloc_user_nozero(1) }
+	}
+	mut policy := range_policy
+	if policy.mode == mpol_default {
+		caller := proc.current_thread()
+		if caller != unsafe { nil } { policy = caller.numa_policy }
 	}
 	if !memory.user_room(1) { return unsafe { nil } }
 	home := current_node()

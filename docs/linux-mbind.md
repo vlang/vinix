@@ -2,7 +2,7 @@
 
 `mbind` sets the policy for a page-aligned address range of private anonymous
 memory. It rounds the length up to a page and splits the mapping at the
-requested boundaries when needed. The process policy continues to govern
+requested boundaries when needed. The calling thread's policy governs
 ordinary allocations through `set_mempolicy`. `get_mempolicy(MPOL_F_ADDR)`
 reports the explicit mapping policy. Adding `MPOL_F_NODE` returns the
 page's physical node in the mode slot. [Linux 6.12.51 memory policy implementation](https://github.com/gregkh/linux/blob/v6.12.51/mm/mempolicy.c)

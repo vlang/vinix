@@ -122,7 +122,7 @@ pub mut:
 	offset    i64
 	prot      int
 	flags     int
-	policy    numa.RangePolicy
+	policy    proc.NumaPolicy
 	cow       bool
 	immutable bool
 	sealed    bool
@@ -191,7 +191,7 @@ mut:
 	credit_serial    u64
 	created_serial   &u64 = unsafe { nil }
 	file_remap FileRemapSource
-	policy numa.RangePolicy
+	policy proc.NumaPolicy
 	policy_origin u64
 }
 

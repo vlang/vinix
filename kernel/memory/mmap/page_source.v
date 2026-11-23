@@ -3,6 +3,7 @@ module mmap
 import errno
 import memory
 import numa
+import proc
 import resource
 import pager
 
@@ -23,7 +24,7 @@ mut:
 	offset u64
 	length u64
 	flags int
-	policy numa.RangePolicy
+	policy proc.NumaPolicy
 	policy_index u64
 	cached_private bool
 	direct bool

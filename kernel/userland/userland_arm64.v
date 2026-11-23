@@ -1511,6 +1511,7 @@ fn load_native_program_image(execve bool, mut image ExecImage, prog_mount &lib.M
 		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
 		proc.carry_io_context(mut new_thread, t)
 		new_thread.personality = proc.exec_personality(t)
+		new_thread.numa_policy = t.numa_policy
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
 		// exec keeps blocked and ignored signals, as the x86 handoff does.
 		new_thread.masked_signals = t.masked_signals

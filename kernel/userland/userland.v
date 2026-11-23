@@ -680,6 +680,7 @@ fn load_native_program_image(execve bool, mut image ExecImage, prog_mount &lib.M
 		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
 		proc.carry_io_context(mut new_thread, t)
 		new_thread.personality = proc.exec_personality(t)
+		new_thread.numa_policy = t.numa_policy
 
 		// execve keeps the signal mask and what was ignored; only handlers,
 		// which pointed into the old program, go back to the default.

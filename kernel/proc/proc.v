@@ -210,6 +210,12 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 	return limits
 }
 
+pub struct NumaPolicy {
+pub:
+	mode int
+	mask u64
+}
+
 pub struct Process {
 pub mut:
 	constructing bool
@@ -418,15 +424,6 @@ pub mut:
 	// these scalars, protected by the process table lock.
 	retired_leader_nice int
 	leader_nice_retired bool
-	// NUMA memory policy, from set_mempolicy(2) and mbind(2). Zero is
-	// MPOL_DEFAULT: an anonymous page comes from the node the faulting thread
-	// is running on. Inherited across fork and preserved by exec, as on Linux.
-	mempolicy_mode     int
-	mempolicy_nodemask u64
-	// Where MPOL_INTERLEAVE is up to. It lives on the process so that its
-	// threads interleave together instead of each starting from node zero.
-	mempolicy_interleave u64
-
 	// Container state; see container.v. The directory absolute paths start
 	// from (nil means the system root), the namespaces this process is in,
 	// its capability sets and its cgroup.

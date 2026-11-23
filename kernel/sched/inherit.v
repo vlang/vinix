@@ -147,10 +147,6 @@ pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, a
 		new_proc.layout_fixed = old_process.layout_fixed
 		new_proc.dumpable = proc.dumpability(old_process)
 		new_proc.sigreturn_page = old_process.sigreturn_page
-		// A NUMA memory policy is process state, like the rlimits, so
-		// a fork keeps the placement its parent asked for.
-		new_proc.mempolicy_mode = old_process.mempolicy_mode
-		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask
 		if share_vm {
 			new_proc.pagemap = mmap.share_pagemap(old_process.pagemap)
 		} else {
