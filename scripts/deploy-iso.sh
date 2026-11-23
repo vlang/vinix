@@ -16,7 +16,7 @@
 #   --publish-prepared=TAG  verify and publish a saved handoff
 #   --prepared-review=FILE  require the exact reviewed JSON for --publish-prepared
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
-#   --resume-create=TAG  recover a draft whose creation response was lost
+#   --resume-create=TAG  recover a release by tag using local recovery records
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
 #   --repo=OWNER/NAME  GitHub.com repository (default: the repository gh discovers)
@@ -229,7 +229,12 @@ if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED" ]; then
     elif [ -n "$RESUME_CREATE" ]; then
         git check-ref-format "refs/tags/$RESUME_CREATE" || die "invalid recovery tag: $RESUME_CREATE"
         OUT="$SCRIPT_DIR/build-release/$RESUME_CREATE"
-        recovery="$("$ASSET_WORK/release-assets" restore-creation "$OUT" "$RESUME_CREATE" "$ASSET_WORK")"
+        recovery="$("$ASSET_WORK/release-assets" restore-recovery-tag \
+            "$WORK" "$OUT" "$RESUME_CREATE" "$REPO" "$ASSET_WORK")"
+        if [ -f "$ASSET_WORK/saved-draft-id" ]; then
+            read -r RESUME_DRAFT < "$ASSET_WORK/saved-draft-id"
+            RESUME_CREATE=''
+        fi
     else
         recovery="$("$ASSET_WORK/release-assets" restore-draft "$WORK" "$RESUME_DRAFT" "$ASSET_WORK")"
     fi

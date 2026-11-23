@@ -715,6 +715,10 @@ protects the original assets by blocking a fresh build for the same tag.
 If GitHub already published the release, tag recovery requires the matching
 ID-based record, verifies the original and uploaded assets, and confirms the
 release without another publish request. Use this without `--draft`.
+If the creation record has already been removed, `--resume-create=TAG`
+looks for a single valid saved ID record for that exact tag and resumes by
+ID. Pass `--repo=OWNER/NAME` to narrow the lookup. If multiple records match,
+use `--resume-draft=ID`.
 Draft adoption uses the exact creation record captured before the GitHub
 request or lookup. If that record changes during the attempt, the driver
 stops and preserves the changed file for inspection.

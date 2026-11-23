@@ -238,6 +238,9 @@ fn github_release_api(args []string, remote string, path string, scenario string
 	upload_endpoint := fixture_upload_endpoint(draft_id)
 	local := remote + '/draft.json'
 	if path == 'releases?per_page=100' {
+		if scenario in ['resume-tag-confirm-saved', 'resume-tag-confirm-repo']! {
+			return error('saved ID recovery unexpectedly listed releases')
+		}
 		if args.len == 6 && args[3..5] == ['--paginate', '--jq']
 			&& args[5].contains('expected a release list') {
 			println('${tag}-other')
@@ -912,6 +915,48 @@ fn check_tag_publication_recovery(root string, work string, out string, remote s
 			return error('confirmation rewrote an uploaded asset: ' + name)
 		}
 	}
+	check_tag_without_creation(root, work, out, remote, environment)!
+}
+
+fn check_tag_without_creation(root string, work string, out string, remote string, environment map[string]string) ! {
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	tag := environment['VINIX_ASSET_TEST_TAG']
+	options := ['--resume-create=' + tag]
+	record := root + '/build-release/work/draft-' + id + '.json'
+	saved := os.read_file(record)!
+	metadata := json2.decode[FixtureCreation](saved)!
+	intent_path := out + '/.draft-creation.json'
+	remote_attempt := os.read_file(remote + '/publish-attempt')!
+	wrong_id := root + '/build-release/work/draft-99997.json'
+	os.write_file(wrong_id, saved)!
+	os.rm(record)!
+	recovery_attempt(root, work, environment, 'resume-tag-missing-record', options,
+		'no saved draft recovery record for ' + tag)!
+	if os.exists(record) || os.read_file(wrong_id)! != saved {
+		return error('missing tag recovery rewrote a draft record')
+	}
+	os.write_file(record, saved)!
+	other := root + '/build-release/work/draft-99998.json'
+	other_text := json2.encode(FixtureCreation{...metadata, id: 99998, repo: 'local/other'}) + '\n'
+	os.write_file(other, other_text)!
+	recovery_attempt(root, work, environment, 'resume-tag-ambiguous-record', options,
+		'multiple saved draft recovery records for ' + tag)!
+	recovery_attempt(root, work, environment, 'resume-tag-wrong-repo', [...options, '--repo=local/absent'],
+		'no saved draft recovery record for ' + tag + ' on local/absent')!
+	recovery_attempt(root, work, environment, 'resume-tag-confirm-repo', [...options, '--repo=local/fixture'], '')!
+	if os.read_file(other)! != other_text { return error('tag recovery rewrote another repository record') }
+	os.rm(other)!
+	os.symlink(remote + '/creation-record', intent_path)!
+	recovery_attempt(root, work, environment, 'resume-tag-linked-creation', options,
+		'metadata must be a bounded regular file')!
+	if !os.is_link(intent_path) { return error('tag recovery replaced a linked creation record') }
+	os.rm(intent_path)!
+	recovery_attempt(root, work, environment, 'resume-tag-confirm-saved', options, '')!
+	if os.exists(intent_path) || os.read_file(record)! != saved
+		|| os.read_file(remote + '/publish-attempt')! != remote_attempt {
+		return error('saved tag confirmation changed the recovery records or republished the release')
+	}
+	os.rm(wrong_id)!
 }
 
 fn check_prepared_release(root string, work string, out string, remote string, environment map[string]string) ! {
