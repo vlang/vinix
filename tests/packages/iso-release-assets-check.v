@@ -67,6 +67,17 @@ struct FixtureDraftVerification {
 	release FixturePreparedVerification
 }
 
+struct FixtureDraftUploadStatus {
+	draft_id string
+	repo string
+	tag string
+	commit string
+	prerelease bool
+	state string
+	uploaded []string
+	missing []string
+}
+
 struct FixtureRecoverySummary {
 	repo string
 	draft_id string
@@ -354,14 +365,14 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			return 1
 		}
 		draft.assets = read_uploaded_assets(os.getenv('VINIX_ASSET_TEST_OUT'), remote + '/uploads',
-			scenario.starts_with('resume-'))!
+			scenario.starts_with('resume-') || scenario.starts_with('inspect-draft'))!
 		first := if draft.assets.len > 0 { draft.assets[0] } else { FixtureAsset{} }
 		match scenario {
-			'draft-bad-digest', 'resume-bad-remote', 'resume-create-saved-bad-remote' {
+			'draft-bad-digest', 'resume-bad-remote', 'resume-create-saved-bad-remote', 'inspect-draft-bad-digest' {
 				draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)}
 			}
 			'draft-incomplete-asset' { draft.assets[0] = FixtureAsset{...first, state: 'starter'} }
-			'draft-missing-asset' { draft.assets.delete(0) }
+			'draft-missing-asset', 'inspect-draft-published-missing' { draft.assets.delete(0) }
 			'draft-extra-asset' { draft.assets << FixtureAsset{...first, name: 'extra.iso'} }
 			else {}
 		}
@@ -880,6 +891,25 @@ fn check_saved_draft_verification(root string, work string, out string, remote s
 	if os.exists(remote + '/unexpected-gh') { return error('local draft verification invoked GitHub') }
 }
 
+fn check_draft_inspection(root string, work string, remote string, environment map[string]string, scenario string, state string) ! {
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	path := root + '/build-release/work/draft-' + id + '.json'
+	record := os.read_file(path)!
+	saved := json2.decode[FixtureCreation](record)!
+	recovery_attempt(root, work, environment, scenario, ['--inspect-draft=' + id], '')!
+	report := json2.decode[FixtureDraftUploadStatus](os.read_file(work + '/' + scenario + '.log')!)!
+	mut uploaded := os.ls(remote + '/uploads')!
+	uploaded.sort()
+	mut names := saved.manifest.split_into_lines().map(it.all_after('  '))
+	names << 'SHA256SUMS'
+	missing := names.sorted().filter(it !in uploaded)
+	if report.draft_id != id || report.repo != saved.repo || report.tag != saved.tag
+		|| report.commit != saved.commit || report.prerelease != saved.prerelease || report.state != state
+		|| report.uploaded != uploaded || report.missing != missing || os.read_file(path)! != record {
+		return error('inspection did not report the verified remote state: ' + scenario)
+	}
+}
+
 fn check_resume(root string, work string, out string, remote string, environment map[string]string) ! {
 	check_saved_draft_verification(root, work, out, remote, environment)!
 	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
@@ -890,8 +920,14 @@ fn check_resume(root string, work string, out string, remote string, environment
 	intent := os.read_file(remote + '/creation-record')!
 	// Recreate the state left by an interrupted retirement of the creation record.
 	os.write_file(intent_path, intent)!
+	inspect := ['--inspect-draft=' + id]
 	mut before := os.ls(remote + '/uploads')!
 	before.sort()
+	check_draft_inspection(root, work, remote, environment, 'inspect-draft-partial', 'draft')!
+	recovery_attempt(root, work, environment, 'inspect-draft-bad-digest', inspect,
+		'GitHub draft asset differs from the verified upload')!
+	recovery_attempt(root, work, environment, 'inspect-draft-wrong-repo', [...inspect, '--repo=local/other'],
+		'belongs to local/fixture')!
 	uploaded := before.filter(it != 'SHA256SUMS')
 	if uploaded.len == 0 { return error('interrupted draft has no retained payload') }
 	for scenario, name in {'resume-stale-local': 'vinix-amd64.iso', 'resume-stale-uploaded': uploaded[0]} {
@@ -928,6 +964,8 @@ fn check_resume(root string, work string, out string, remote string, environment
 		return error('draft recovery did not report and preserve the conflicting creation record')
 	}
 	os.write_file(intent_path, intent)!
+	check_draft_inspection(root, work, remote, environment, 'inspect-draft-complete', 'draft')!
+	if os.read_file(intent_path)! != intent { return error('inspection changed the creation record') }
 	resume_attempt(root, work, environment, 'resume-verified-draft-cleanup', ['--draft'], '')!
 	if os.exists(intent_path) || os.exists(remote + '/publish-attempt') {
 		return error('verified draft recovery did not retire its creation record')
@@ -936,6 +974,9 @@ fn check_resume(root string, work string, out string, remote string, environment
 	resume_attempt(root, work, environment, 'resume-publish', [], '')!
 	if os.exists(intent_path) { return error('publication kept a matching creation record') }
 	os.write_file(intent_path, intent)!
+	check_draft_inspection(root, work, remote, environment, 'inspect-draft-published', 'published')!
+	recovery_attempt(root, work, environment, 'inspect-draft-published-missing', inspect,
+		'missing GitHub draft assets')!
 	resume_attempt(root, work, environment, 'resume-published-with-draft', ['--draft'], 'is already published')!
 	resume_attempt(root, work, environment, 'resume-published-bad-digest', [], 'GitHub draft asset differs from the verified upload')!
 	if os.read_file(intent_path)! != intent { return error('failed verification retired a creation record') }

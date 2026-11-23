@@ -19,6 +19,7 @@
 #   --resume-create=TAG  recover a release by tag using local recovery records
 #   --inspect-recovery=TAG  show local recovery records for the tag as JSON
 #   --verify-draft=ID  verify the local assets for a saved draft as JSON
+#   --inspect-draft=ID  compare a GitHub release with its saved record as JSON
 #   --verify-creation=TAG  verify the local assets for a pending creation record as JSON
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
@@ -71,6 +72,7 @@ RESUME_DRAFT=''
 RESUME_CREATE=''
 INSPECT_RECOVERY=''
 VERIFY_DRAFT=''
+INSPECT_DRAFT=''
 VERIFY_CREATION=''
 BUILD_OPTIONS=0
 
@@ -118,6 +120,12 @@ for arg in "$@"; do
             VERIFY_DRAFT="${arg#*=}"
             case "$VERIFY_DRAFT" in
                 ''|0*|*[!0-9]*) echo "ERROR: --verify-draft requires a numeric draft ID" >&2; exit 1 ;;
+            esac
+            ;;
+        --inspect-draft=*)
+            INSPECT_DRAFT="${arg#*=}"
+            case "$INSPECT_DRAFT" in
+                ''|0*|*[!0-9]*) echo "ERROR: --inspect-draft requires a numeric draft ID" >&2; exit 1 ;;
             esac
             ;;
         --verify-creation=*)
@@ -189,7 +197,7 @@ fi
 cd "$SCRIPT_DIR"
 post_build=0
 for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" \
-    "$INSPECT_RECOVERY" "$VERIFY_DRAFT" "$VERIFY_CREATION"; do
+    "$INSPECT_RECOVERY" "$VERIFY_DRAFT" "$VERIFY_CREATION" "$INSPECT_DRAFT"; do
     if [ -n "$action" ]; then
         [ "$post_build" -eq 0 ] || die "choose one verification, publication or recovery action"
         post_build=1
@@ -256,7 +264,7 @@ fi
 
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true
-if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED$VERIFY_DRAFT" ]; then
+if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED$VERIFY_DRAFT$INSPECT_DRAFT" ]; then
     build_release_assets
     if [ -n "$PUBLISH_PREPARED" ]; then
         git check-ref-format "refs/tags/$PUBLISH_PREPARED" || die "invalid prepared release tag: $PUBLISH_PREPARED"
@@ -273,7 +281,8 @@ if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED$VERIFY_DRAFT" ]; then
             RESUME_CREATE=''
         fi
     else
-        recovery="$("$ASSET_WORK/release-assets" restore-draft "$WORK" "${RESUME_DRAFT:-$VERIFY_DRAFT}" "$ASSET_WORK")"
+        saved_id="${RESUME_DRAFT:-${VERIFY_DRAFT:-$INSPECT_DRAFT}}"
+        recovery="$("$ASSET_WORK/release-assets" restore-draft "$WORK" "$saved_id" "$ASSET_WORK")"
     fi
     IFS=$'\t' read -r recovery_repo TAG COMMIT prerelease <<< "$recovery"
     [ -z "$REPO" ] || [ "$REPO" = "$recovery_repo" ] || die "release $TAG belongs to $recovery_repo"
@@ -285,6 +294,10 @@ if [ -n "$VERIFY_DRAFT" ]; then
     git check-ref-format "refs/tags/$TAG" || die "invalid Git tag in recovery record: $TAG"
     "$ASSET_WORK/release-assets" verify-draft "$SCRIPT_DIR/build-release/$TAG" "$ASSET_WORK" "$VERIFY_DRAFT"
     exit 0
+fi
+
+if [ -n "$INSPECT_DRAFT" ]; then
+    git check-ref-format "refs/tags/$TAG" || die "invalid Git tag in recovery record: $TAG"
 fi
 
 github_api() {
@@ -320,6 +333,13 @@ if [ "$PUBLISH" -eq 1 ]; then
     "$V" -backend c -prod -cc cc -o "$ASSET_WORK/release-tag" \
         "$SCRIPT_DIR/build-support/isoboot/release-tag.v"
     release_api="repos/$REPO/releases"
+fi
+
+if [ -n "$INSPECT_DRAFT" ]; then
+    github_api "$release_api/$INSPECT_DRAFT" > "$ASSET_WORK/inspect-draft.json"
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    "$ASSET_WORK/release-assets" inspect-draft "$ASSET_WORK" "$ASSET_WORK/inspect-draft.json" "$INSPECT_DRAFT"
+    exit 0
 fi
 
 confirm_publish() {

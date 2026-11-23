@@ -734,6 +734,13 @@ metadata digests, and verified asset names, sizes and digests. It uses the
 manifest and notes from the saved record and leaves the local files untouched.
 Use `--repo=OWNER/NAME` to check the recorded destination. Remote checks run
 during recovery.
+Run `./scripts/deploy-iso.sh --inspect-draft=ID` to check the GitHub release
+against the saved record. The JSON reports whether it is a `draft` or
+`published` and lists verified `uploaded` and `missing` asset names in
+sorted order, including `SHA256SUMS`. Inspection verifies the remote tag
+and refuses unexpected assets, digest mismatches, or missing assets on a
+published release. It makes read requests only. Use `--verify-draft=ID`
+to check the local files.
 If a draft ID has yet to be saved, run
 `./scripts/deploy-iso.sh --verify-creation=TAG`. It checks the local assets
 against `.draft-creation.json` and reports the recorded destination, commit,

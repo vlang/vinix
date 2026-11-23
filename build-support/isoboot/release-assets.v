@@ -60,6 +60,17 @@ struct DraftVerification {
 	release  PreparedVerification
 }
 
+struct DraftUploadStatus {
+	draft_id string
+	repo string
+	tag string
+	commit string
+	prerelease bool
+	state string
+	uploaded []string
+	missing []string
+}
+
 struct RecoverySummary {
 	repo            string
 	draft_id        string
@@ -571,6 +582,29 @@ fn missing_assets(directory string, assets []UploadedAsset) ![]string {
 	return expected.keys()
 }
 
+fn inspect_saved_draft(directory string, response string, id string) !DraftUploadStatus {
+	saved := read_recovery(creation_path(directory))!
+	release := read_release(response, id, saved.tag, saved.notes, saved.prerelease)!
+	upload_endpoint(release, saved.repo)!
+	mut missing := missing_assets(directory, release.assets)!
+	missing.sort()
+	if !release.draft && missing.len > 0 {
+		return error('missing GitHub draft assets: ' + missing.join(', '))
+	}
+	mut uploaded := release.assets.map(it.name)
+	uploaded.sort()
+	return DraftUploadStatus{
+		draft_id: id
+		repo: saved.repo
+		tag: saved.tag
+		commit: saved.commit
+		prerelease: saved.prerelease
+		state: if release.draft { 'draft' } else { 'published' }
+		uploaded: uploaded
+		missing: missing
+	}
+}
+
 fn upload_draft(stage string, directory string, response string, repo string, id string, tag string, prerelease bool, original string) ! {
 	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
 	draft := read_release(response, id, tag, notes, prerelease)!
@@ -660,6 +694,10 @@ fn run() ! {
 		println(json2.encode(verify_saved_draft(os.args[2], os.args[3], os.args[4])!))
 		return
 	}
+	if os.args.len == 5 && os.args[1] == 'inspect-draft' {
+		println(json2.encode(inspect_saved_draft(os.args[2], os.args[3], os.args[4])!))
+		return
+	}
 	if os.args.len == 5 && os.args[1] == 'verify-creation' {
 		println(json2.encode(verify_creation(os.args[2], os.args[3], os.args[4])!))
 		return
@@ -711,7 +749,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | verify-draft | verify-creation | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | inspect-recovery | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | verify-draft | inspect-draft | verify-creation | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | inspect-recovery | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
 }
 
 fn main() {
