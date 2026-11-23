@@ -867,6 +867,45 @@ fn check_prepared_release(root string, work string, out string, remote string, e
 		|| os.read_file(review_file)! != 'review changed after the driver captured it\n' {
 		return error('publication did not use the prepared release metadata')
 	}
+	check_legacy_prepared_notes(root, work, out, environment, prepared, published.body, review_text)!
+}
+
+fn check_legacy_prepared_notes(root string, work string, out string, environment map[string]string, prepared FixtureCreation, marked_notes string, review string) ! {
+	verify := ['--verify-prepared=' + prepared.tag]
+	notes_path := out + '/RELEASE_NOTES.md'
+	os.write_file(notes_path, marked_notes)!
+	recovery_attempt(root, work, environment, 'verify-prepared-legacy-notes', verify, '')!
+	if os.read_file(work + '/verify-prepared-legacy-notes.log')! != review
+		|| os.read_file(notes_path)! != marked_notes {
+		return error('legacy notes changed the verification report or the notes on disk')
+	}
+	recovery_attempt(root, work, environment, 'publish-prepared-legacy-notes',
+		['--publish-prepared=' + prepared.tag], 'prepared release notes changed')!
+
+	prefix := prepared.notes + '\n<!-- Vinix release attempt: '
+	marker := marked_notes.all_after(prefix)
+	nonce := marker.all_before(' ')
+	suffix := ' ' + marker.all_after(' ')
+	for name, contents in {
+		'changed-body': 'changed notes' + marked_notes[prepared.notes.len..]
+		'bad-nonce': prefix + 'g' + nonce[1..] + suffix
+		'short-nonce': prefix + nonce[1..] + suffix
+		'wrong-manifest': prefix + nonce + ' ' + sha256.hexhash('another manifest') + ' -->\n'
+		'extra-comment': marked_notes + '<!-- another comment -->\n'
+	} {
+		os.write_file(notes_path, contents)!
+		recovery_attempt(root, work, environment, 'verify-prepared-legacy-' + name, verify,
+			'prepared release notes changed')!
+		if os.read_file(notes_path)! != contents { return error('verification rewrote rejected notes') }
+	}
+	os.write_file(notes_path, marked_notes)!
+	iso := out + '/vinix-amd64.iso'
+	original := os.read_file(iso)!
+	os.write_file(iso, 'changed ISO with legacy notes')!
+	recovery_attempt(root, work, environment, 'verify-prepared-legacy-changed-asset', verify,
+		'release asset changed after verification')!
+	os.write_file(iso, original)!
+	os.write_file(notes_path, prepared.notes)!
 }
 
 fn check_prepared_recovery(root string, work string, out string, remote string, environment map[string]string) ! {

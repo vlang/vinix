@@ -8,6 +8,8 @@ import os
 import tools.packages.pkgcore
 
 const github_asset_limit = u64(2) * 1024 * 1024 * 1024
+const attempt_marker_prefix = '\n<!-- Vinix release attempt: '
+const attempt_marker_bytes = 16
 
 struct UploadedAsset {
 	name   string
@@ -224,10 +226,14 @@ fn save_prepared(output string, directory string, repo string, tag string, commi
 		json2.encode(metadata) + '\n')!
 }
 
+fn attempt_marker_suffix(manifest string) string {
+	return ' ${sha256.hexhash(manifest)} -->\n'
+}
+
 fn prepare_creation(output string, directory string, repo string, tag string, commit string, prerelease bool) ! {
 	metadata := release_metadata(directory, repo, tag, commit, prerelease)!
-	marker := rand.bytes(16)!.hex()
-	notes := metadata.notes + '\n<!-- Vinix release attempt: ${marker} ${sha256.hexhash(metadata.manifest)} -->\n'
+	marker := rand.bytes(attempt_marker_bytes)!.hex()
+	notes := metadata.notes + attempt_marker_prefix + marker + attempt_marker_suffix(metadata.manifest)
 	os.write_file(os.join_path(directory, 'RELEASE_NOTES.md'), notes)!
 	pkgcore.atomic_write_new(creation_path(output),
 		json2.encode(DraftRecovery{...metadata, notes: notes}) + '\n')!
@@ -249,7 +255,7 @@ fn read_creation(output string, tag string) !DraftRecovery {
 	path := creation_path(output)
 	creation := read_recovery(path)!
 	if creation.id != 0 || creation.tag != tag
-		|| !creation.notes.ends_with(' ${sha256.hexhash(creation.manifest)} -->\n') {
+		|| !creation.notes.ends_with(attempt_marker_suffix(creation.manifest)) {
 		return error('invalid release draft creation record: ' + path)
 	}
 	return creation
@@ -283,7 +289,17 @@ fn restore_metadata(recovery DraftRecovery, directory string) ! {
 	println('${recovery.repo}\t${recovery.tag}\t${recovery.commit}\t${recovery.prerelease}')
 }
 
-fn read_prepared(output string, tag string, repo string) !DraftRecovery {
+fn matches_prepared_notes(notes string, metadata DraftRecovery, allow_legacy_marker bool) bool {
+	if notes == metadata.notes { return true }
+	if !allow_legacy_marker { return false }
+	prefix := metadata.notes + attempt_marker_prefix
+	suffix := attempt_marker_suffix(metadata.manifest)
+	marker_end := prefix.len + attempt_marker_bytes * 2
+	return notes.len == marker_end + suffix.len && notes.starts_with(prefix) && notes.ends_with(suffix)
+		&& notes[prefix.len..marker_end].bytes().all(it in '0123456789abcdef'.bytes())
+}
+
+fn read_prepared(output string, tag string, repo string, allow_legacy_marker bool) !DraftRecovery {
 	path := os.join_path(output, '.prepared-release.json')
 	metadata := read_recovery(path)!
 	if metadata.id != 0 || metadata.tag != tag { return error('invalid prepared release record: ' + path) }
@@ -291,14 +307,15 @@ fn read_prepared(output string, tag string, repo string) !DraftRecovery {
 	if pkgcore.read_metadata(os.join_path(output, 'SHA256SUMS'))! != metadata.manifest {
 		return error('prepared SHA256SUMS changed')
 	}
-	if pkgcore.read_metadata(os.join_path(output, 'RELEASE_NOTES.md'))! != metadata.notes {
+	notes := pkgcore.read_metadata(os.join_path(output, 'RELEASE_NOTES.md'))!
+	if !matches_prepared_notes(notes, metadata, allow_legacy_marker) {
 		return error('prepared release notes changed')
 	}
 	return metadata
 }
 
 fn restore_prepared(output string, tag string, directory string, review string) ! {
-	metadata := read_prepared(output, tag, '')!
+	metadata := read_prepared(output, tag, '', false)!
 	if review != '' {
 		text := pkgcore.read_metadata(review)!
 		os.write_file(os.join_path(directory, 'prepared-review.json'), text)!
@@ -327,7 +344,7 @@ fn prepared_report(directory string, metadata DraftRecovery, entries map[string]
 }
 
 fn verify_prepared(output string, tag string, repo string) !PreparedVerification {
-	metadata := read_prepared(output, tag, repo)!
+	metadata := read_prepared(output, tag, repo, true)!
 	entries := parse_manifest(metadata.manifest, os.join_path(output, 'SHA256SUMS'))!
 	report := prepared_report(output, metadata, entries)!
 	for asset in report.assets {

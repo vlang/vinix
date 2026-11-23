@@ -654,6 +654,10 @@ publication. It verifies the saved metadata and reads each asset in place.
 The JSON report includes the repository, tag, commit, prerelease setting,
 hashes of the checksum list and notes, and the name, byte count and SHA-256
 of each asset. Use `--repo=OWNER/NAME` to check the recorded destination.
+For older handoffs, verification recognizes one trailing draft attempt
+marker with the recorded manifest digest and reports the digest of the
+original notes. It leaves the local notes file as it found it. Resume an
+existing release attempt with `--resume-create` or `--resume-draft`.
 
 Run `./scripts/deploy-iso.sh --publish-prepared=TAG` from the same checkout.
 The driver verifies the saved metadata and original assets and checks
