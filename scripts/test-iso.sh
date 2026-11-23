@@ -134,11 +134,14 @@ vm_shoot() {
 
 # A blank disk for a boot to install onto, as a new VM's is.
 blank_disk() {
-    if [ "$KEEP_QEMU_DISKS" -eq 1 ] && { [ -e "$1" ] || [ -L "$1" ]; }; then
-        echo "ERROR: retained disk already exists: $1; use a fresh --out directory" >&2
-        return 1
+    if [ "$KEEP_QEMU_DISKS" -eq 1 ]; then
+        if ! (set -o noclobber; : > "$1") 2>/dev/null; then
+            echo "ERROR: cannot create retained disk: $1; use a fresh --out directory" >&2
+            return 1
+        fi
+    else
+        rm -f "$1"
     fi
-    rm -f "$1"
     truncate -s 4G "$1" 2>/dev/null || mkfile -n 4g "$1"
 }
 
