@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import io
 import json2
 import os
 import strconv
@@ -85,6 +86,52 @@ fn rewrite_archive(archive string, scenario string) ! {
 	os.rename(changed, archive)!
 }
 
+fn copy_gzip_bytes(source string, destination string, mode string, count i64) ! {
+	mut input := os.open(source)!
+	defer { input.close() }
+	mut output := os.open_file(destination, mode)!
+	defer { output.close() }
+	io.copy_n(mut output, mut input, count)!
+}
+
+fn change_gzip(path string, scenario string) ! {
+	match scenario {
+		'concatenated-gzip-prefix', 'concatenated-gzip-suffix' {
+			extra := path + '.extra'
+			prefix := scenario == 'concatenated-gzip-prefix'
+			os.write_file(extra, if prefix { '' } else { 'second gzip member' })!
+			checked(['gzip', '-n', extra])!
+			second := extra + '.gz'
+			input_path := if prefix { path } else { second }
+			copy_gzip_bytes(input_path, if prefix { second } else { path }, 'a',
+				i64(os.file_size(input_path)))!
+			if prefix { os.rename(second, path)! } else { os.rm(second)! }
+		}
+		'trailing-gzip-bytes' {
+			mut file := os.open_file(path, 'a')!
+			defer { file.close() }
+			file.write_string('trailing bytes')!
+		}
+		'bad-gzip-crc', 'bad-gzip-size' {
+			offset := if scenario == 'bad-gzip-crc' { i64(-8) } else { i64(-4) }
+			mut file := os.open_file(path, 'r+')!
+			defer { file.close() }
+			file.seek(offset, .end)!
+			mut byte := []u8{len: 1}
+			if file.read(mut byte)! != 1 { return error('cannot read gzip fixture trailer') }
+			byte[0] ^= 1
+			file.seek(offset, .end)!
+			if file.write(byte)! != 1 { return error('cannot change gzip fixture trailer') }
+		}
+		'truncated-gzip-trailer' {
+			short := path + '.short'
+			copy_gzip_bytes(path, short, 'w', i64(os.file_size(path)) - 4)!
+			os.rename(short, path)!
+		}
+		else {}
+	}
+}
+
 fn make_iso(root string, work string, scenario string) !string {
 	tree := work + '/iso'
 	os.mkdir_all(tree + '/boot')!
@@ -99,6 +146,7 @@ fn make_iso(root string, work string, scenario string) !string {
 		os.rename(archive + '.gz', archive)!
 		checked(['gzip', '-n', archive])!
 	}
+	change_gzip(archive + '.gz', scenario)!
 	suffix := if scenario == 'wrong-compression' { '.bz2' } else { '.gz' }
 	os.rename(archive + suffix, tree + '/boot/initramfs.tar.gz')!
 	iso := work + '/image.iso'
@@ -157,7 +205,9 @@ fn run() ! {
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	for scenario in ['match', 'wrong-configuration', 'missing-declaration', 'wrong-object', 'wrong-signature', 'stale-index',
 		'alias', 'duplicate', 'blocked-parent', 'search-only-parent', 'missing-parent', 'late-parent', 'legacy-file',
-		'contiguous-file', 'pax-path', 'non-ustar-header', 'spaced-size', 'wrong-compression', 'nested-compression']! {
+		'contiguous-file', 'pax-path', 'non-ustar-header', 'spaced-size', 'wrong-compression', 'nested-compression',
+		'concatenated-gzip-prefix', 'concatenated-gzip-suffix', 'trailing-gzip-bytes', 'bad-gzip-crc',
+		'bad-gzip-size', 'truncated-gzip-trailer']! {
 		work := out + '/' + scenario
 		root := work + '/root'
 		os.mkdir_all(root)!
@@ -217,7 +267,12 @@ fn run() ! {
 			'non-ustar-header' { diagnostic = 'ISO initramfs requires POSIX USTAR headers' }
 			'spaced-size' { diagnostic = 'invalid boot USTAR mode or size' }
 			'wrong-compression' { diagnostic = 'ISO initramfs must be gzip-compressed' }
-			'nested-compression' { diagnostic = 'ISO initramfs must have one gzip compression layer' }
+			'nested-compression' { diagnostic = 'ISO initramfs requires POSIX USTAR headers' }
+			'concatenated-gzip-prefix', 'concatenated-gzip-suffix', 'trailing-gzip-bytes' {
+				diagnostic = 'data follows the ISO initramfs gzip member'
+			}
+			'bad-gzip-crc', 'bad-gzip-size' { diagnostic = 'invalid ISO initramfs gzip stream' }
+			'truncated-gzip-trailer' { diagnostic = 'truncated ISO initramfs gzip stream' }
 			else {}
 		}
 		iso := make_iso(root, work, scenario)!

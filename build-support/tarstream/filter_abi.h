@@ -13,10 +13,6 @@ struct archive_entry;
 struct archive *archive_read_new(void);
 int archive_read_support_filter_all(struct archive *);
 int archive_read_support_filter_none(struct archive *);
-int archive_read_support_filter_gzip(struct archive *);
-int archive_filter_code(struct archive *, int);
-int archive_filter_count(struct archive *);
-#define ARCHIVE_FILTER_GZIP 1
 int archive_read_support_format_raw(struct archive *);
 int archive_read_open_filename(struct archive *, const char *, size_t);
 int archive_read_next_header(struct archive *, struct archive_entry **);

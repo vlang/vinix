@@ -34,9 +34,6 @@ struct C.archive_entry {}
 fn C.archive_read_new() &C.archive
 fn C.archive_read_support_filter_all(&C.archive) int
 fn C.archive_read_support_filter_none(&C.archive) int
-fn C.archive_read_support_filter_gzip(&C.archive) int
-fn C.archive_filter_code(&C.archive, int) int
-fn C.archive_filter_count(&C.archive) int
 fn C.archive_read_support_format_raw(&C.archive) int
 @[c: 'archive_read_open_filename']
 fn C.vinix_tar_archive_read_open_filename(&C.archive, &char, u64) int
@@ -62,7 +59,7 @@ mut:
 	started           bool
 	ended             bool
 	ignore_zeros      bool
-	boot_ustar        bool
+	boot              &BootGzip = unsafe { nil }
 	globals           map[string]string
 	metadata_limit    i64 = 0x7fffffff
 	allow_sparse      bool
@@ -114,7 +111,7 @@ pub fn from_descriptor_cancelled(descriptor i32, cancel fn () bool) !Reader {
 // libarchive only unwraps compression. Parsing names in V preserves their
 // exact UTF-8 bytes, including decomposed names on macOS.
 pub fn open(path string) !Reader {
-	return open_filtered(path, .all)
+	return open_filtered(path, true)
 }
 
 // APK v2 concatenates signature, control and payload gzip/tar streams. Its
@@ -127,7 +124,7 @@ pub fn open_concatenated(path string) !Reader {
 
 // Boot module inputs are deliberately uncompressed, matching tar's r: mode.
 pub fn open_plain(path string) !Reader {
-	return open_filtered(path, .none)
+	return open_filtered(path, false)
 }
 
 // Upload validators know the entire physical input size. Reject an extension
@@ -138,20 +135,7 @@ pub fn open_plain_bounded(path string, metadata_limit i64) !Reader {
 	return reader
 }
 
-// Release ISOs carry a gzip-compressed POSIX USTAR initramfs. Read its raw
-// headers without applying extensions that the boot unpacker may interpret
-// differently.
-pub fn open_boot_ustar(path string) !Reader {
-	return open_filtered(path, .boot_gzip)
-}
-
-enum ArchiveFilter {
-	none
-	all
-	boot_gzip
-}
-
-fn open_filtered(path string, filters ArchiveFilter) !Reader {
+fn open_filtered(path string, compressed bool) !Reader {
 	$if tarstream_fd_only ? {
 		return error('use a decompressed descriptor for this reader')
 	} $else {
@@ -159,10 +143,10 @@ fn open_filtered(path string, filters ArchiveFilter) !Reader {
 		if stream == unsafe { nil } { return error('cannot allocate archive stream') }
 		mut opened := false
 		defer { if !opened { C.archive_read_free(stream) } }
-		filter := match filters {
-			.all { C.archive_read_support_filter_all(stream) }
-			.none { C.archive_read_support_filter_none(stream) }
-			.boot_gzip { C.archive_read_support_filter_gzip(stream) }
+		filter := if compressed {
+			C.archive_read_support_filter_all(stream)
+		} else {
+			C.archive_read_support_filter_none(stream)
 		}
 		if filter < 0 || C.archive_read_support_format_raw(stream) != 0
 			|| C.vinix_tar_archive_read_open_filename(stream, path.str, 10240) != 0 {
@@ -170,17 +154,8 @@ fn open_filtered(path string, filters ArchiveFilter) !Reader {
 		}
 		mut entry := &C.archive_entry(unsafe { nil })
 		if C.archive_read_next_header(stream, &entry) != 0 { return filter_error(stream) }
-		if filters == .boot_gzip {
-			if C.archive_filter_code(stream, 0) != C.ARCHIVE_FILTER_GZIP {
-				return error('ISO initramfs must be gzip-compressed')
-			}
-			// Libarchive counts the input callback as a filter after the decoder.
-			if C.archive_filter_count(stream) != 2 {
-				return error('ISO initramfs must have one gzip compression layer')
-			}
-		}
 		opened = true
-		return Reader{ stream: stream, boot_ustar: filters == .boot_gzip }
+		return Reader{ stream: stream }
 	}
 }
 
@@ -190,12 +165,17 @@ pub fn (mut reader Reader) close() {
 			C.archive_read_free(reader.stream)
 			reader.stream = unsafe { nil }
 		}
+		if reader.boot != unsafe { nil } {
+			reader.boot.close()
+			unsafe { free(reader.boot) }
+			reader.boot = unsafe { nil }
+		}
 	}
 	reader.descriptor = -1
 }
 
 fn (mut reader Reader) exact(mut buffer []u8, allow_eof bool) !bool {
-	if reader.descriptor < 0 && reader.stream == unsafe { nil } {
+	if reader.descriptor < 0 && reader.stream == unsafe { nil } && reader.boot == unsafe { nil } {
 		return error('archive stream is closed')
 	}
 	mut position := 0
@@ -217,6 +197,9 @@ fn (mut reader Reader) exact(mut buffer []u8, allow_eof bool) !bool {
 				}
 				return os.error_posix()
 			}
+		} else if reader.boot != unsafe { nil } {
+			mut portion := unsafe { buffer[position..] }
+			count = i64(reader.boot.read(mut portion)!)
 		} else {
 			$if tarstream_fd_only ? {
 				return error('archive stream is closed')
@@ -401,13 +384,14 @@ pub fn (mut reader Reader) next() !tarcore.Member {
 		if data.all(it == 0) {
 			if extensions { return error('missing subsequent archive header') }
 			if reader.ignore_zeros { continue }
+			if reader.boot != unsafe { nil } { reader.boot.finish()! }
 			reader.ended = true
 			return End{}
 		}
-		if reader.boot_ustar { check_boot_header(data)! }
+		if reader.boot != unsafe { nil } { check_boot_header(data)! }
 		mut member := parse_header(data)!
 		if member.size < 0 { return error('negative archive member size') }
-		if reader.boot_ustar && (member.mode > 0o7777 || (member.kind != `0` && member.size != 0)) {
+		if reader.boot != unsafe { nil } && (member.mode > 0o7777 || (member.kind != `0` && member.size != 0)) {
 			return error('invalid boot USTAR mode or size')
 		}
 		if member.kind in [u8(`x`), `g`, `X`, `L`, `K`] {
