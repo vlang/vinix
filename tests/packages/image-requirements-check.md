@@ -911,6 +911,25 @@ The paired inputs, reports, run logs and sanitizer checks are in
 Its SHA-256 is `c4bde60274beabbfe1c9ff9066932c3d537c1c79a44f9ac1d39ce06aeee448e2`.
 All 1,491 entries in the extracted `qualification.sha256` passed.
 
+### Local verification of saved draft assets
+
+At `e8b407bc9`, `--verify-draft=ID` checks the original release assets
+against the saved draft manifest. Its JSON gives the ID, release metadata,
+manifest and notes digests, and the verified names, sizes and digests.
+
+All 139 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. Verification rejected a missing ID, a different
+repository, an invalid saved tag, a changed ISO and a linked asset. The
+native driver used the saved metadata despite edits to the public copies.
+It contacted no GitHub endpoint and every local file kept its digest.
+ASan/UBSan checked a same-size ISO change, a symlink, an invalid manifest
+path and byte-identical reporting after restoration.
+
+The paired inputs, native report, run logs and sanitizer checks are in
+`~/.local/state/vinix/r14-release-verify-draft-4Ftw06/qualification.tar.gz`.
+Its SHA-256 is `896343ca88d2b513c6b92b9ea46b10e405591b92be7e5c231765e0fd2d6c339f`.
+All 1,512 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
