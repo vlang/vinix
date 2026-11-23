@@ -7,6 +7,8 @@ import os
 const x11 = 'vinix-x11-amd64.tar.gz'
 const arm_x11 = 'vinix-x11-arm64.tar.gz'
 const ios = 'vinix-ios-runtime-arm64'
+const upload_changes = ['vinix-amd64.iso', x11, 'SHA256SUMS', 'RELEASE_NOTES.md']
+const changed_during_upload = 'changed during upload\n'
 
 fn command(program string, args []string, root string, environment map[string]string) (int, string) {
 	mut child := os.new_process(program)
@@ -55,6 +57,29 @@ fn fixture_runtime() ! {
 	os.chmod(path, 0o755)!
 }
 
+fn capture_upload(out string, scenario string) ! {
+	args := os.args[1..]
+	files := args.filter(it.starts_with('/'))
+	notes_option := args.index('--notes-file')
+	if notes_option < 0 || notes_option + 1 >= args.len || files.len < 2 {
+		return error('release handoff is missing upload files or notes')
+	}
+	notes := args[notes_option + 1]
+	stage := os.dir(notes)
+	if stage == out || notes != stage + '/RELEASE_NOTES.md' || files.any(os.dir(it) != stage) {
+		return error('release handoff did not use a common private staging directory')
+	}
+	os.cp(out + '/SHA256SUMS', out + '/fixture-original-manifest')!
+	os.cp(out + '/RELEASE_NOTES.md', out + '/fixture-original-notes')!
+	if scenario == 'output-change-during-upload' {
+		for name in upload_changes {
+			os.write_file(out + '/' + name, changed_during_upload)!
+		}
+	}
+	os.write_file(out + '/fixture-upload-digests', files.map(checksum_line(it)!).join('\n') + '\n')!
+	os.write_file(out + '/fixture-upload', args.join('\n') + '\n')!
+}
+
 fn run_stub(name string) !int {
 	out := os.getenv('VINIX_ASSET_TEST_OUT')
 	scenario := os.getenv('VINIX_ASSET_TEST_CASE')
@@ -98,7 +123,7 @@ fn run_stub(name string) !int {
 				if !os.exists(upload) { return 1 }
 				println('https://example.invalid/fixture')
 			} else if os.args[1..3] == ['release', 'create'] {
-				os.write_file(upload, os.args[1..].join('\n') + '\n')!
+				capture_upload(out, scenario)!
 			} else { return error('unexpected fixture gh invocation') }
 		}
 		else { return error('unknown release fixture program: ' + name) }
@@ -132,23 +157,37 @@ fn prepare_driver(repository string, root string) ! {
 		'-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Release fixture'])!
 }
 
-fn verify_handoff(out string, with_packages bool) ! {
+fn verify_handoff(out string, with_packages bool, mutated bool) ! {
 	mut names := ['vinix-amd64.iso', 'vinix-arm64.iso', x11, x11 + '.sha256', arm_x11,
 		arm_x11 + '.sha256', ios, ios + '.sha256']
 	if with_packages { names << ['vinix-packages-amd64.json', 'vinix-packages-arm64.json'] }
-	mut expected := names.map(checksum_line(out + '/' + it)!)
-	expected.sort()
-	mut actual := os.read_lines(out + '/SHA256SUMS')!
-	actual.sort()
-	if actual != expected { return error('release checksum list differs from its assets') }
-	for name in names { if !os.is_file(out + '/' + name) { return error('missing fixture asset: ' + name) } }
-	mut upload := os.read_lines(out + '/fixture-upload')!.filter(it.starts_with(out + '/'))
-	// The notes file is a separate CLI option.
-	upload = upload.filter(it != out + '/RELEASE_NOTES.md')
-	mut assets := names.map(out + '/' + it)
-	assets << out + '/SHA256SUMS'
-	upload.sort(); assets.sort()
-	if upload != assets { return error('release handoff differs from the verified asset list') }
+	manifest := os.read_file(out + '/fixture-original-manifest')!
+	notes := os.read_file(out + '/fixture-original-notes')!
+	mut listed := manifest.trim_right('\n').split('\n')
+	mut listed_names := listed.map(it.all_after('  '))
+	listed_names.sort()
+	names.sort()
+	if listed_names != names { return error('release checksum list names the wrong assets') }
+	for line in listed {
+		name := line.all_after('  ')
+		if mutated && name in upload_changes { continue }
+		if line != checksum_line(out + '/' + name)! {
+			return error('release checksum differs from its asset: ' + name)
+		}
+	}
+	if mutated {
+		for name in upload_changes {
+			if os.read_file(out + '/' + name)! != changed_during_upload {
+				return error('release output was not changed during upload: ' + name)
+			}
+		}
+	}
+	listed << ['${sha256.hexhash(manifest)}  SHA256SUMS',
+		'${sha256.hexhash(notes)}  RELEASE_NOTES.md']
+	mut uploaded := os.read_lines(out + '/fixture-upload-digests')!
+	listed.sort()
+	uploaded.sort()
+	if uploaded != listed { return error('release handoff bytes differ from the verified assets') }
 }
 
 fn run() ! {
@@ -171,9 +210,10 @@ fn run() ! {
 	base['VINIX_UI2_SOURCE'] = root + '/ui2'
 	base['VINIX_ASSET_TEST_AMD64_ISO'] = am + '/image.iso'
 	base['VINIX_ASSET_TEST_ARM64_ISO'] = arm + '/image.iso'
-	for scenario in ['legacy', 'packages', 'bad-build-sidecar', 'x11-after-boot', 'ios-pair-after-boot',
-		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff']! {
-		with_packages := scenario in ['packages', 'receipt-after-boot']!
+	for scenario in ['legacy', 'packages', 'output-change-during-upload', 'bad-build-sidecar',
+		'x11-after-boot', 'ios-pair-after-boot', 'receipt-after-boot', 'sidecar-at-handoff',
+		'manifest-at-handoff', 'build-only']! {
+		with_packages := scenario in ['packages', 'receipt-after-boot', 'output-change-during-upload']!
 		mut environment := base.clone()
 		if with_packages {
 			for arch, dir in {'X86_64': am, 'AARCH64': arm} {
@@ -185,12 +225,25 @@ fn run() ! {
 		out := root + '/build-release/fixture-' + scenario
 		environment['VINIX_ASSET_TEST_OUT'] = out
 		environment['VINIX_ASSET_TEST_CASE'] = scenario
-		code, log := command('/bin/bash', [root + '/scripts/deploy-iso.sh', '--tag=fixture-' + scenario,
-			'--yes', '--repo=local/fixture'], root, environment)
+		mut args := [root + '/scripts/deploy-iso.sh', '--tag=fixture-' + scenario, '--yes',
+			'--repo=local/fixture']
+		if scenario == 'build-only' { args << ['--arch=amd64', '--no-publish'] }
+		code, log := command('/bin/bash', args, root, environment)
 		os.write_file(work + '/' + scenario + '.log', log)!
-		if scenario in ['legacy', 'packages']! {
+		if os.ls(root + '/build-release/work')!.any(it.starts_with('release-assets.')) {
+			return error('release left a private staging directory: ' + scenario)
+		}
+		if scenario in ['legacy', 'packages', 'output-change-during-upload']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
-			verify_handoff(out, with_packages)!
+			verify_handoff(out, with_packages, scenario == 'output-change-during-upload')!
+		} else if scenario == 'build-only' {
+			if code != 0 || os.exists(out + '/fixture-upload') || !os.exists(out + '/RELEASE_NOTES.md') {
+				return error('build-only fixture failed\n' + log)
+			}
+			expected := ['vinix-amd64.iso', x11, x11 + '.sha256'].map(checksum_line(out + '/' + it)!)
+			if expected != os.read_lines(out + '/SHA256SUMS')! {
+				return error('build-only checksums differ from the output assets')
+			}
 		} else {
 			diagnostic := match scenario {
 				'bad-build-sidecar' { 'release bundle checksum differs from its payload' }

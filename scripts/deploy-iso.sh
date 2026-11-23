@@ -408,11 +408,7 @@ fi
 # ── Checksums and notes ────────────────────────────────────────────────────
 
 step "Writing checksums and release notes"
-check_release_assets() {
-    "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
-}
-
-check_release_assets
+"$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
 cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/public-checksums"
 mv -f "$ASSET_WORK/public-checksums" "$OUT/SHA256SUMS"
 cat "$OUT/SHA256SUMS"
@@ -522,7 +518,9 @@ describe_boot() {
     fi
     echo
     echo "SHA-256 checksums are in \`SHA256SUMS\`."
-} > "$OUT/RELEASE_NOTES.md"
+} > "$ASSET_WORK/RELEASE_NOTES.md"
+cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
+mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
 
 if [ "$PUBLISH" -eq 0 ]; then
     step "Done; not publishing (--no-publish)"
@@ -555,14 +553,26 @@ if [ "$ASSUME_YES" -ne 1 ]; then
     esac
 fi
 
-create_args=(release create "$TAG" --repo "$REPO" --target "$COMMIT"
-    --title "Vinix $TAG" --notes-file "$OUT/RELEASE_NOTES.md")
-[ "$DRAFT" -eq 1 ] && create_args+=(--draft)
-[ "$PRERELEASE" -eq 1 ] && create_args+=(--prerelease)
-check_release_assets
 cmp -s "$ASSET_WORK/SHA256SUMS" "$OUT/SHA256SUMS" ||
     die "SHA256SUMS changed after verification"
-gh "${create_args[@]}" "${IMAGES[@]}" "$OUT/SHA256SUMS" ${BUNDLES[@]+"${BUNDLES[@]}"}
+step "Preparing verified copies for upload"
+UPLOAD="$ASSET_WORK/upload"
+"$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" \
+    "$ASSET_WORK/RELEASE_NOTES.md" "$UPLOAD"
+upload_images=()
+upload_bundles=()
+for image in "${IMAGES[@]}"; do
+    upload_images+=("$UPLOAD/${image##*/}")
+done
+for bundle in ${BUNDLES[@]+"${BUNDLES[@]}"}; do
+    upload_bundles+=("$UPLOAD/${bundle##*/}")
+done
+
+create_args=(release create "$TAG" --repo "$REPO" --target "$COMMIT"
+    --title "Vinix $TAG" --notes-file "$UPLOAD/RELEASE_NOTES.md")
+[ "$DRAFT" -eq 1 ] && create_args+=(--draft)
+[ "$PRERELEASE" -eq 1 ] && create_args+=(--prerelease)
+gh "${create_args[@]}" "${upload_images[@]}" "$UPLOAD/SHA256SUMS" ${upload_bundles[@]+"${upload_bundles[@]}"}
 
 step "Published"
 gh release view "$TAG" --repo "$REPO" --json url --jq .url
