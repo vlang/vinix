@@ -146,3 +146,56 @@ was listed successfully. The original focused bundle remains unchanged.
 Archive: `/Users/alex/Library/Caches/vinix-codex/section14/package-release-routing-20261026-host-clang.tar.gz`
 
 SHA-256: `cd3c0b81a75b8239a0e456b9cf72fead4adfe4c635b44e96fec57030da68789c`
+
+## Paired native Neovim setup routing
+
+The fixture at `2ec0c1987` runs the actual
+`vinix-desktop --install-setup-app neovim` command in an isolated UID-1000
+account. It uses the kernels and desktop staging binaries from the
+[paired release ISO build](image-requirements-check.md#paired-desktop-iso-qualification)
+at `7c10afe81` and the [signed Neovim candidate](neovim-check.md#paired-signed-release-candidate).
+The minimal live guests start with a saved Skip decision and authenticate the
+original offline repository before opening Software.
+
+A declaration-absent control records the exact legacy `pkg install neovim`
+call from UID 1000. A malformed declaration refuses the same command with
+zero new legacy calls or Software processes. The genuine architecture-matched
+lock then opens one ordinary Software client. An independent package CLI
+review matches all five exact locked rows, including Neovim's runtime. Neither
+guest creates a package generation or requests administrator package-change
+approval. The saved decision and declaration bytes are preserved.
+
+Both guests passed in 21.255 seconds (AArch64) and 24.568 seconds (x86-64).
+The malformed declaration changed zero pixels in the compared desktop area.
+The valid command changed 467,711 and 467,699 pixels, respectively. Both
+proposal captures show Neovim 0.12.5, its runtime, the other locked applications
+and the separate Confirm button. The initial fixture showed a launcher error
+when it omitted the released Software alias. The accepted fixture checks the
+alias, requires the actual ordinary Software process and rejects launch errors.
+
+Build and run with the hardware controller's V, musl and firmware inputs.
+Supply the extracted release staging root, the candidate image configuration
+and the exported format-2 lock for the same target. `--bundle` names the
+signed repository containing `index.json`, `index.sig` and `objects`.
+
+```sh
+v -backend c -prod -gc none -manualfree -cc clang \
+  -path '@vlib|.|tests/hardware-platform|@vmodules' \
+  -o /scratch/neovim-routing-check tests/packages/neovim-routing-check.v
+/scratch/neovim-routing-check --arch=aarch64 --kernel=/release/vinix \
+  --staging=/release/staging --config=/candidate/config-aarch64.json \
+  --deployment=/candidate/deployment-aarch64.json \
+  --bundle=/candidate/bundle/neovim-fixture --out=/scratch/neovim-routing-arm
+```
+
+Repeat with the x86-64 inputs. These live fixture boots exercise the
+read-only graphical handoff. Production publisher enrollment and other
+legacy catalog migrations remain open.
+
+The complete run roots, input hashes, QMP and serial transcripts, controller
+and screenshots are retained in
+`~/.local/state/vinix/r14-neovim-routing-vtrXbdd1/accepted`. Both restored
+roots matched independent archive inventories for file bytes, paths, types,
+modes and link targets. Decode `runs.tar.zst` with `zstd --long=30 -dc`
+when restoring. The SHA-256 of `qualification.sha256` is
+`25afc5e978f0744a81ce3e71afe00783e2deab95b6de41b0d91d90e2b0ea35cc`.

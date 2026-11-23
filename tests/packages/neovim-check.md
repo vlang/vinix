@@ -198,8 +198,10 @@ accepted both complete runs and refused all 12 resealed corruptions on each
 target.
 
 Both runs used raw USTAR fixture media on a temporary RAM-backed host volume.
-They qualify the terminal lifecycle of the disposable release. Graphical
-acquisition routing and production publisher enrollment remain open.
+They qualify the terminal lifecycle of the disposable release. The
+[paired graphical routing check](signed-legacy-routing-check.md#paired-native-neovim-setup-routing)
+covers the same candidate's setup handoff to Software. Production publisher
+enrollment remains open.
 
 The full run and validation archives are retained in
 `~/.local/state/vinix/r14-neovim-native-rBB0NvkY/accepted`. The archives
