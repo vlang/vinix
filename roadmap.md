@@ -799,6 +799,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     bundled catalog and retains the approved pins in the image declaration.
     Paired ISO builds accept separate configurations, signed bundles and locks
     for each target. The AArch64 image caches use the effective AArch64 inputs.
+    [Paired desktop ISO qualification](tests/packages/image-requirements-check.md#paired-desktop-iso-qualification)
+    verified both sets of signed test inputs in the final ISOs and on the
+    installed disks after firmware boot with the installation media detached.
     [Image catalog declarations](tests/packages/image-catalog-check.md) carry the
     exact lock into normal staging. Software discovers it for a full-set review
     with separate confirmation; matching trust and signed offline bundles remain

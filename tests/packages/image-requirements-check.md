@@ -167,6 +167,36 @@ and serial/QMP logs are in `~/.local/state/vinix/r14-x86-3wLLds`. The SHA-256
 of `qualification.sha256` is
 `b9ab2f87ccf4f49d74550f6e82e6e392726bf093ed2936aa769c358d49652c41`.
 
+## Paired desktop ISO qualification
+
+One local paired `deploy-iso.sh --no-publish --no-test` run built both desktop
+ISOs from `7c10afe81`, using prepared userland layers and the frozen November
+23 compiler and UI2 inputs. A disposable publisher signed separate repository
+indexes for the two targets. The x86-64 image selected sequence 3 and the
+AArch64 image selected sequence 4. The configuration digest, reviewed format-2
+lock, signed index, signature and payload bytes matched their selected inputs
+when extracted from each finished ISO. Each extracted bundle passed preflight.
+
+All eight QEMU checks passed with `test-iso.sh` from `be38c13fa`. x86-64 passed
+default and BIOS live boots, UEFI installation, and UEFI and BIOS disk-only
+boots. AArch64 passed VirtIO installation, a disk-only boot and a USB input
+boot. Each scenario checked keyboard and pointer input. Both installations
+passed GPT and VJFS layout validation. The first x86-64 run completed its boot
+checks and lost its summary when the runner changed during execution. The
+recorded x86-64 verdicts come from the fixed-revision rerun.
+
+The runner's `--keep-qemu-disks` option retained the raw installation disks.
+The V disk exporter admitted clean snapshots of their root partitions for
+read-only inspection after disk-only boot. On both disks the configuration,
+reviewed lock and complete repository matched the ISO bytes and passed
+preflight again. Each lock was a single-link regular file owned by root with
+mode 0644. The raw disk hashes remained identical across inspection.
+
+Both ISOs, retained installation disks, extracted metadata, serial logs,
+screenshots and build receipts are in `~/.local/state/vinix/r14-iso-buLjXi`.
+The SHA-256 of `qualification.sha256` is
+`9601c5ee5e241a8a60894cb5c950583a5702f022df364ed1593c38ab47f73cf8`.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
