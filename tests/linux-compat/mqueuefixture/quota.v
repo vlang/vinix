@@ -11,7 +11,7 @@ fn set_queue_limit(soft u64) bool {
 	}
 }
 
-fn write_quota_id_map(path &char, value &char) bool {
+fn write_text_file(path &char, value &char) bool {
 	unsafe {
 		fd := C.open(path, C.O_WRONLY)
 		if fd < 0 { return false }
@@ -28,9 +28,9 @@ fn quota_namespace(nested bool) bool {
 		if C.syscall(isize(C.SYS_prctl), pr_set_dumpable, 1, 0, 0, 0) != 0 { return false }
 		if C.syscall(isize(C.SYS_unshare), clone_newuser | clone_newipc) != 0 { return false }
 		mapping := if nested { &char(c'0 0 1') } else { &char(c'0 1030 1') }
-		return write_quota_id_map(c'/proc/self/uid_map', mapping)
-			&& (nested || write_quota_id_map(c'/proc/self/setgroups', c'deny'))
-			&& write_quota_id_map(c'/proc/self/gid_map', mapping)
+		return write_text_file(c'/proc/self/uid_map', mapping)
+			&& (nested || write_text_file(c'/proc/self/setgroups', c'deny'))
+			&& write_text_file(c'/proc/self/gid_map', mapping)
 	}
 }
 

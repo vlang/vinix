@@ -2710,6 +2710,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   effective UID attribution, and reuse after the last queue reference. See
   [the queue quota receipts](docs/linux-mqueue.md#queue-quota-across-user-namespaces).
 
+- [x] Reserve the open file's kernel memory before publishing a new `mq_open`
+  name. Qualify `ENOMEM`, directory visibility and inotify delivery under a
+  cgroup memory limit on both native architectures. See
+  [the descriptor budget receipts](docs/linux-mqueue.md#descriptor-budget-during-queue-creation).
+
 - [x] Implement native futex2 vector waits, masked waits and wakes, and
   compare-requeue. Qualify 128-entry waits, shared and private keys, absolute
   deadlines, signal restart, and legacy futex interoperability on AArch64 and

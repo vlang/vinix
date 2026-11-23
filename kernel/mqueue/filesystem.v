@@ -170,8 +170,9 @@ fn create_queue_file(parent &vfs.VFSNode, name string, mode u32, apply_umask boo
 	code := if !root.linked { u64(errno.eacces) } else if find_locked(root.ipc_ns, name) != unsafe { nil } {
 		u64(errno.eexist)
 	} else {
-		create_locked(mut spare, process, account, root.ipc_ns, name, final_mode, unsafe { nil })
+		prepare_queue_locked(mut spare, process, account, root.ipc_ns, name, final_mode, unsafe { nil })
 	}
+	if code == 0 { link_queue_name_locked(mut spare) }
 	node := spare.node
 	mq_lock.release()
 	if code != 0 {

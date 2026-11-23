@@ -935,9 +935,9 @@ fn writable(handle &file.Handle) bool {
 	return mode == resource.o_wronly || mode == resource.o_rdwr
 }
 
-// Create a queue in `spare` under mq_lock: mqueue_create_attr() and
-// mqueue_get_inode(). 0 or the errno.
-fn create_locked(mut spare Queue, process &proc.Process, account QuotaOwner, ns u64, name string, mode u32, attr &Attr) u64 {
+// Prepare a private queue under mq_lock. The caller can give its initial
+// reference to the registry after all fallible work is done. 0 or the errno.
+fn prepare_queue_locked(mut spare Queue, process &proc.Process, account QuotaOwner, ns u64, name string, mode u32, attr &Attr) u64 {
 	privileged := capable(process, proc.cap_sys_resource)
 	if namespace_queues_locked(ns) >= queues_max && !privileged {
 		return errno.enospc
@@ -977,20 +977,22 @@ fn create_locked(mut spare Queue, process &proc.Process, account QuotaOwner, ns 
 	unsafe { C.memcpy(&spare.name[0], name.str, name.len) }
 	spare.name_len = name.len
 	spare.ipc_ns = ns
-	spare.linked = true
 	spare.user_ns = account.user_ns
 	spare.user = account.uid
 	spare.charged = bytes
 	spare.maxmsg = maxmsg
 	spare.msgsize = msgsize
 	spare.status = pollout | pollwrnorm
-	// The registry's reference.
 	spare.refcount = 1
-	link_all_locked(mut spare)
-	if ns in mq_roots {
-		publish_queue_locked(mut spare, unsafe { mq_roots[ns] })
-	}
 	return 0
+}
+
+fn link_queue_name_locked(mut queue Queue) {
+	queue.linked = true
+	link_all_locked(mut queue)
+	if queue.ipc_ns in mq_roots {
+		publish_queue_locked(mut queue, unsafe { mq_roots[queue.ipc_ns] })
+	}
 }
 
 pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, attr_ptr u64) (u64, u64) {
@@ -1031,6 +1033,11 @@ pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, a
 		spare = allocate_queue() or { return errno.err, errno.get() }
 		account = quota_owner(process)
 	}
+	// Accmode 3 gives neither direction. Preserve the reported status flags
+	// and always set close-on-exec on the descriptor.
+	flags := (oflag & 3) | (oflag & resource.file_status_flags_mask & ~(resource.o_accmode | 3))
+		| resource.o_cloexec
+	mut fd := &file.FD(unsafe { nil })
 	mut result := u64(0)
 	mut created := false
 	mq_lock.acquire()
@@ -1056,18 +1063,28 @@ pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, a
 	} else if root != unsafe { nil } && !permitted(process, root, 3) {
 		result = errno.eacces
 	} else {
-		result = create_locked(mut spare, process, account, ns_id, name, mode & ~process.umask, attr)
+		result = prepare_queue_locked(mut spare, process, account, ns_id, name, mode & ~process.umask, attr)
 		if result == 0 {
 			queue = spare
-			spare = unsafe { nil }
 			created = true
 		}
 	}
 	if result == 0 {
-		// The descriptor's reference, and this call's while it may unname a
-		// queue it made if the descriptor's kernel budget runs out.
+		// The existing name or the private spare keeps a reference while
+		// the constructor takes (and on failure returns) the descriptor's.
+		// Keep the quota check and publication in the same critical section.
 		katomic.inc(mut &queue.refcount)
-		katomic.inc(mut &queue.refcount)
+		opened := resource.OpenedResource{resource: queue.box, owned: true}
+		if descriptor := file.fd_create_from_opened(opened, flags) {
+			fd = unsafe { descriptor }
+			katomic.inc(mut &queue.refcount) // retained through table installation
+			if created {
+				link_queue_name_locked(mut queue)
+				spare = unsafe { nil }
+			}
+		} else {
+			result = errno.get()
+		}
 	}
 	mq_lock.release()
 	if spare != unsafe { nil } {
@@ -1076,26 +1093,10 @@ pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, a
 	if result != 0 {
 		return errno.err, result
 	}
-	// The access mode as the file has it, accmode 3 giving neither direction
-	// as on Linux, and the status flags F_GETFL reports. Always close-on-exec.
-	flags := (oflag & 3) | (oflag & resource.file_status_flags_mask & ~(resource.o_accmode | 3))
-		| resource.o_cloexec
-	opened := resource.OpenedResource{
-		resource: queue.box
-		owned:    true
-	}
-	mut fdnum := -1
-	if fd := file.fd_create_from_opened(opened, flags) {
-		fdnum = file.fdnum_install_reserved_fd(reservation, fd) or {
-			failure := errno.get()
-			mut unused := unsafe { fd }
-			unused.unref()
-			errno.set(failure)
-			-1
-		}
-	}
-	if fdnum < 0 {
+	// Descriptor close can acquire mq_lock while holding fds_lock.
+	fdnum := file.fdnum_install_reserved_fd(reservation, fd) or {
 		failure := errno.get()
+		fd.unref()
 		finish_open(mut queue, created)
 		return errno.err, failure
 	}
@@ -1103,9 +1104,9 @@ pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, a
 	return u64(fdnum), 0
 }
 
-// Gives back mq_open's own reference. The number is reserved before the queue
-// is made, but the open file's kernel budget can still run out; a queue made
-// for a descriptor that could not be had is then removed again.
+// Gives back mq_open's own reference. The descriptor number is already
+// reserved and a raw queue handle has no mount admission check. If table
+// installation nevertheless fails, drop the name this call created.
 fn finish_open(mut queue Queue, unname bool) {
 	if unname {
 		mq_lock.acquire()

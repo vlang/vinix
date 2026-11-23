@@ -354,6 +354,41 @@ Hashes are SHA-256 prefixes. The archive is
 `~/.cache/vinix-r15/mq-user-namespace-quota/qualification.tar.zst`, with SHA-256
 `4aa8a18db11f7dabc459e114a0c97695a7d68f52bb3f791c01ef92aaf6092052`.
 
+### Descriptor budget during queue creation
+
+`mq_open(O_CREAT)` reserves a descriptor number, checks queue quota and
+constructs the open file and descriptor before publishing the new name. If
+their kernel memory charge fails, the private queue is freed. The quota check
+and name publication share the registry lock. Installing the descriptor into
+its reserved slot takes the file table lock after releasing the registry lock
+to preserve the close path's lock order.
+
+The Vinix probe calibrates the queue and descriptor charges in a fresh IPC
+namespace and sets a cgroup limit that admits the queue but refuses the open
+file. It confirms the cgroup's denial in `/proc/kernel-resources`, checks for
+`ENOMEM`, verifies that the name is absent and the inotify watch is empty, and
+then checks that a successful open emits `IN_CREATE`. The previous x86-64
+kernel (`097faff5c`) returned `ENOMEM` and delivered 72 bytes of directory
+events using the same probe ELF.
+
+Production Vinix kernels from `097faff5c` plus this change passed 307 + 16
+checks on both architectures. Linux 6.12.51 passed the shared 301 + 16 checks
+using the same ELFs with `--reference`, which skips the Vinix budget probe.
+The `open`, `userns`, and `budget` regressions passed on both architectures.
+`textbusy` passed on x86-64. On AArch64 the `097faff5c` baseline and the
+candidate both failed to mount the ext2 fixture with `EINVAL`.
+The allocation checker found the same 306 AArch64 and 254 x86-64 sites and
+the same existing failures as the baseline.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `80b0ce91ecedd414` | `25485145a6751a92` | `f9860961b77b17be` | `feb93d7ed0f660a2` |
+| x86-64 | `3399dab79ab800db` | `c333ba306bea3eb7` | `ca515013c547e1eb` | `00f33dbc9f7aba84` |
+
+Hashes are SHA-256 prefixes. The archive is
+`~/.cache/vinix-r15/mq-open-admission/qualification.tar.zst`, with SHA-256
+`d4e1228fc95a8a385a0d5cf4456add0e7f2c6005f6526361f2cadb1a92024788`.
+
 ## Limits
 
 - Retired queue nodes keep their references through the VFS grace period.
@@ -366,7 +401,5 @@ Hashes are SHA-256 prefixes. The archive is
   redirects use the VFS's shared-node behavior across mount aliases.
 - Ordinary priority inheritance follows Vinix's scheduler. The probe covers
   nice values, FIFO and arrival ties.
-- mq_open can still fail after making a queue if the open file's kernel budget
-  runs out; the queue is then removed again.
 - Creating a queue walks the live queue registry under its lock to count IPC
   namespace queues and charge the matching user namespace accounts.

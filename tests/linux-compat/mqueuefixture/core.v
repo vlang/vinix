@@ -1438,6 +1438,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		mount_view(mut s)
 		surviving_mount(mut s)
 		bound_file_lifetime(mut s)
+		if !reference { open_admission(mut s) }
 		C.printf(c'LINUX MQUEUE SUMMARY: checks=%d failures=%d\n', s.checks, s.failures)
 		if s.failures == 0 {
 			C.puts(if reference { c'LINUX MQUEUE REFERENCE: PASS' } else { c'LINUX MQUEUE: PASS' })
