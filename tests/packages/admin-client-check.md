@@ -116,3 +116,30 @@ extraction helper. The distribution driver includes the final tracked fixture.
 - [Source/toolchain/artifact pins](results/2026-10-16/admin-client-toolchain.json), [generated-C review](results/2026-10-16/admin-client-generated-c.txt), [baseline extraction](results/2026-10-16/admin-client-extraction.v)
 - [AArch64 baseline](results/2026-10-16/admin-client-aarch64.baseline.serial.txt), [final](results/2026-10-16/admin-client-aarch64.serial.txt), [real administrator](results/2026-10-16/admin-client-aarch64.admin.serial.txt)
 - [x86-64 baseline](results/2026-10-16/admin-client-x86_64.baseline.serial.txt), [final](results/2026-10-16/admin-client-x86_64.serial.txt), [real administrator](results/2026-10-16/admin-client-x86_64.admin.serial.txt)
+
+## Interrupted administrator socket waits
+
+At `92ba0326f`, the pending connect and root worker accept paths retry
+`poll()` after `EINTR` within their original five- and ten-second monotonic
+deadlines. An interrupted `accept()` retries within the same deadline. The
+listener counts accepted connections toward its eight-peer limit and still
+requires UID 0 from the accepted socket.
+
+The [launch socket guest fixture](launch-socket-check.md) now also runs the
+administrator socket checks. On AArch64 and x86-64 QEMU, the old accept path
+reported that the worker was unavailable when interrupted by `SIGUSR1`. The
+fixed listener accepted the delayed root worker after twelve signals. All four
+boots ended with a guest-initiated poweroff.
+
+On the host, normal and ASan/UBSan builds passed a 150 ms idle deadline with
+repeated signals and a write-readiness wait on a full socket that became
+writable after its peer drained it. The control that polled only once failed
+both checks. The tracked launch-client tests passed. The broader tracked
+administrator fixture reported the same 80,000 bytes retained during bounded
+output handling and 56,000 bytes during approval diagnostics on the unchanged
+baseline and the fixed source.
+
+The source patches, host results, and native build, serial and QMP logs are in
+`~/.local/state/vinix/r14-admin-waits-F3766T/qualification.tar.gz`.
+Its SHA-256 is `71eca2240937eaec5754763d11752dbc127b8242da631b51c5b0ff7321e86720`.
+All 70 entries in the extracted `qualification.sha256` passed.
