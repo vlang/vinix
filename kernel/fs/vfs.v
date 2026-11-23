@@ -3146,6 +3146,13 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 		|| flags & u32(mfd_exec | mfd_noexec_seal) == u32(mfd_exec | mfd_noexec_seal) {
 		return errno.err, errno.einval
 	}
+	process := proc.current_thread().process
+	scope := proc.memfd_noexec_scope(process.ns.pid)
+	explicit_exec := flags & u32(mfd_exec) != 0
+	if explicit_exec && scope == proc.memfd_noexec_enforced {
+		return errno.err, errno.eacces
+	}
+	noexec := flags & u32(mfd_noexec_seal) != 0 || (!explicit_exec && scope >= proc.memfd_noexec_default)
 	shown := usercopy.copy_cstring_from_user(name, memfd_name_max + 1) or {
 		code := errno.get()
 		return errno.err, if code == errno.enametoolong { errno.einval } else { code }
@@ -3159,7 +3166,6 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	file.reserve_fd(unsafe { nil }, reservation) or { return errno.err, errno.get() }
 	defer { file.cancel_fd_reservation(reservation) }
 
-	noexec := flags & u32(mfd_noexec_seal) != 0
 	mode := if noexec { u32(0o666) } else { u32(0o777) }
 	mut res := create_anonymous(mode) or { return errno.err, errno.get() }
 	defer {
@@ -3167,7 +3173,6 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	}
 	// Linux shmem files start with the creator's filesystem ids and no
 	// directory links. The mode is independent of umask.
-	process := proc.current_thread().process
 	res.stat.uid = process.fsuid
 	res.stat.gid = process.fsgid
 	res.stat.nlink = 0

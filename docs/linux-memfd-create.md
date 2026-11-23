@@ -42,4 +42,4 @@ Hashes are SHA-256 prefixes. The archive is
 ## Limits
 
 `MFD_NOEXEC_SEAL` is covered by the subsequent [execute-sealed memfd qualification](linux-memfd-noexec.md).
-`MFD_HUGETLB` and `vm.memfd_noexec` remain unavailable.
+`MFD_HUGETLB` remains unavailable. [PID namespace memfd policy](linux-memfd-policy.md)

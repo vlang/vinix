@@ -95,6 +95,7 @@ enum ProcFSKind {
 	process_cgroup
 	environ
 	sysctl
+	memfd_noexec
 	sysrq_trigger
 	securelevel
 	security_audit
@@ -384,6 +385,8 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	add_procfs_text(mut sys_vm, 'overcommit_memory', '0\n')
 	add_procfs_text(mut sys_vm, 'max_map_count', '1048576\n')
 	add_procfs_text(mut sys_vm, 'mmap_min_addr', '65536\n')
+	mut memfd_policy := add_procfs_file(mut sys_vm, 'memfd_noexec', .memfd_noexec)
+	memfd_policy.resource.stat.mode = stat.ifreg | 0o644
 	mut sys_net := add_procfs_directory(mut sys, 'net')
 	mut sys_net_core := add_procfs_directory(mut sys_net, 'core')
 	add_procfs_text(mut sys_net_core, 'somaxconn', '4096\n')
@@ -943,6 +946,9 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 	if this.kind == .slabinfo {
 		return slabinfo_read(buf, loc, count)
 	}
+	if this.kind == .memfd_noexec {
+		return memfd_policy_read(buf, loc, count)
+	}
 	if (this.kind == .allocstart || this.kind == .allocsites)
 		&& !proc.may_read_kernel_diagnostics() {
 		errno.set(errno.eacces)
@@ -988,11 +994,14 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 	return i64(actual_count)
 }
 
-fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
+fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	// A write must change the advertised state or return an error. User-id
 	// remapping and setgroups namespace policy are not implemented; never let
 	// a runtime infer that writing these files established isolation.
 	match this.kind {
+		.memfd_noexec {
+			return memfd_policy_write(buf, loc, count)
+		}
 		.oom_score_adj {
 			// Read in place: copying the bytes out, into a string and a
 			// trimmed string left all three behind on every write.
@@ -1197,7 +1206,7 @@ fn (mut this ProcFSResource) grow(_handle voidptr, new_size u64) ? {
 			return
 		}
 		.oom_score_adj, .uid_map, .gid_map, .setgroups, .loginuid, .seat_session, .security_events,
-		.sysrq_trigger {
+		.sysrq_trigger, .memfd_noexec {
 			return
 		}
 		else {

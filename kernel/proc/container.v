@@ -63,6 +63,10 @@ pub mut:
 	data voidptr
 	// Pid namespaces: the process that is their init, once there is one.
 	init_pid int
+	// Each PID namespace pins its immutable parent. The live memfd policy
+	// includes every ancestor's local setting.
+	pid_parent &Namespace = unsafe { nil }
+	memfd_noexec u32
 	// A pid namespace other than the initial one numbers its members itself:
 	// `ids` maps each number it has handed out to the kernel's id for that
 	// process or thread. Changed with pid_lock held. Made on first use: as a
@@ -216,7 +220,39 @@ pub fn copy_namespace(parent &Namespace) &Namespace {
 	mut ns := new_namespace(parent.kind, katomic.inc(mut &namespace_id_counter))
 	ns.hostname = parent.hostname.clone()
 	ns.domainname = parent.domainname.clone()
+	if parent.kind == clone_newpid {
+		mut ancestor := unsafe { parent }
+		ns.pid_parent = if is_initial_namespace(ancestor) { ancestor } else { get_namespace(mut ancestor) }
+		ns.memfd_noexec = memfd_noexec_scope(ancestor)
+	}
 	return ns
+}
+
+pub const memfd_noexec_default = u32(1)
+pub const memfd_noexec_enforced = u32(2)
+
+pub fn memfd_noexec_scope(ns &Namespace) u32 {
+	mut current := ns
+	mut scope := u32(0)
+	for current != unsafe { nil } {
+		local := katomic.load(&current.memfd_noexec)
+		if local > scope {
+			scope = local
+		}
+		current = current.pid_parent
+	}
+	return scope
+}
+
+pub fn pid_namespace_contains(ancestor &Namespace, ns &Namespace) bool {
+	mut current := ns
+	for current != unsafe { nil } {
+		if voidptr(current) == voidptr(ancestor) {
+			return true
+		}
+		current = current.pid_parent
+	}
+	return false
 }
 
 pub fn get_namespace(mut ns Namespace) &Namespace {
@@ -246,6 +282,15 @@ pub fn put_namespace(mut ns Namespace) bool {
 	if last && ns.kind == clone_newipc && ipc_namespace_release_hook != unsafe { nil } {
 		hook := unsafe { IPCNamespaceReleaseHook(ipc_namespace_release_hook) }
 		hook(ns.id)
+	}
+	if last && ns.kind == clone_newpid {
+		mut parent := ns.pid_parent
+		for !is_initial_namespace(parent) {
+			if katomic.dec(mut &parent.refcount) {
+				break
+			}
+			parent = parent.pid_parent
+		}
 	}
 	return last
 }

@@ -435,11 +435,10 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 	}
 	// Linux checks each kind (ns->ops->install): CAP_SYS_ADMIN in the
 	// caller's own user namespace and over the target's owner. So a sandbox
-	// root may rejoin a UTS, IPC or cgroup namespace its own user namespace
-	// owns. Mount and PID namespaces still need the initial user namespace's
-	// capability: joining one changes what the caller's root or pids mean.
+	// root may rejoin a UTS, IPC, cgroup or PID namespace its user namespace
+	// owns. Mount namespaces still need the initial user namespace's capability.
 	// Network, time and user namespaces were refused above.
-	owned_kinds := proc.clone_newuts | proc.clone_newipc | proc.clone_newcgroup
+	owned_kinds := proc.clone_newuts | proc.clone_newipc | proc.clone_newcgroup | proc.clone_newpid
 	allowed := if ns.kind & owned_kinds != 0 {
 		owner := if ns.kind == proc.clone_newipc { ns.ipc_user_ns } else { ns.owner_user }
 		proc.has_own_capability(process, proc.cap_sys_admin)
@@ -518,8 +517,18 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 			release_namespace(mut old)
 		}
 		proc.clone_newpid {
+			proc.lock_table()
+			if !proc.has_namespace_capability(process, proc.cap_sys_admin, ns.owner_user) {
+				proc.unlock_table()
+				return errno.err, errno.eperm
+			}
+			if !proc.pid_namespace_contains(process.ns.pid, ns) {
+				proc.unlock_table()
+				return errno.err, errno.einval
+			}
 			mut old := process.ns.pid_for_children
 			process.ns.pid_for_children = proc.get_namespace(mut ns)
+			proc.unlock_table()
 			release_namespace(mut old)
 		}
 		proc.clone_newcgroup {

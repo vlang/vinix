@@ -2747,6 +2747,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   refusal on both native architectures. See
   [the execute-sealed memfd receipts](docs/linux-memfd-noexec.md).
 
+- [x] Implement `vm.memfd_noexec` for active PID namespaces, including
+  inherited policy floors and live ancestor updates. Qualify all three
+  policies, joins of the active namespace, and ancestor rejection on both
+  native architectures.
+  See [the memfd policy receipts](docs/linux-memfd-policy.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both
