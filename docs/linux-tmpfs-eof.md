@@ -66,8 +66,7 @@ drops when whole cache pages are released.
 
 Revocation holds the affected page-map locks and the file-mapping registry
 through the translation invalidations. A contended map causes a retry
-before any translation changes. Borrowed initramfs snapshots of retained
-partial pages remain outside this qualification.
+before any translation changes.
 
 The probe covers offset aliases, a split private mapping, a checked copy
 into a cold private page, and a child that touches its inherited page
@@ -130,3 +129,58 @@ x86-64 sites. The generated Linux dispatch coverage check passed.
 
 The qualification archive is at `~/.cache/vinix-r15/tmpfs-futex/qualification.tar.zst`,
 with SHA-256 `4b1a3c8cf942adac1422767a38b8377d4251a3c8a72e557234c4e17325f673c2`.
+
+## Mappings of borrowed initramfs files
+
+Tmpfs keeps the surviving archive prefix as backing for unmaterialized pages.
+Mapped pages and descriptor writes populate the inode cache one page at a
+time. Clean private mappings see partial-page truncation and later descriptor
+writes. A copy-on-write page retains its bytes within the last partial page.
+Truncation shortens the archive prefix, so regrowth reads zeroes even where
+the original archive still contains data. [Linux partial-page truncation](https://raw.githubusercontent.com/gregkh/linux/v6.12.51/mm/truncate.c#L168-L205)
+
+The inode can release a clean archive page when its last private mapping
+reference drops. Failed multi-page writes can also release clean copies
+prepared before the failure. Pages exposed to shared mappings or modified
+through a descriptor stay in the inode cache. Named cache allocations use
+the file reserve. The page slot array can retain capacity at the highest
+touched offset until the inode is released.
+
+The `mmap` case supplies a 2 MiB file in both boot archives. The Vinix
+control kernels retained the old bytes beyond the new EOF in a clean private
+mapping. The same probe passed on Linux 6.12.51 and on the production Vinix
+kernels built from `6ef792d36` plus the archived patch. The probe also checks
+an untouched archive read, a private write, `SIGBUS` after whole-page shrink,
+and descriptor writes across cached and uncached pages.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix | Free KiB before first fault | After first fault | After unmapping 64 faulted pages |
+| --- | --- | --- | ---: | ---: | ---: |
+| AArch64 | `ac2822eee9c91362` | `e0e5e90fb5227c88` | 898816 | 898640 | 898736 |
+| x86-64 | `ef3be86346033c5b` | `82d8142a583573e4` | 896548 | 896484 | 896520 |
+
+Free memory was also flat across the existing 128 measured truncate and
+regrowth cycles on each architecture. Independent review traced archive
+backing, page references, fork, and lock ordering. The static allocation
+checker reproduced the baseline findings of 307 AArch64 and 255 x86-64 sites.
+
+The `remapfile`, `futexkeys`, `memfdseals`, `shmabi`, and `runtime` guest
+regressions passed on both architectures. Linux dispatch coverage passed.
+
+The qualification archive is at
+`~/.cache/vinix-r15/tmpfs-borrowed/qualification.tar.zst`, with SHA-256
+`b8434105fc53ddc322a610312f665ef3e8991ea4e7f8888e92a8dfaaac358beb`.
+
+Desktop `idle`, `apps`, and `drag` passed on both production kernels. The
+AArch64 smoke run used stock QEMU and added the BusyBox `od` and `install`
+links to a copy of the cached boot archive. An AArch64 allocation-tracking
+build retained zero bytes across 200 `mmap` operations. The broader sweep
+was stopped after that sample.
+
+Desktop evidence is retained with the following files under
+`~/.cache/vinix-r15/tmpfs-borrowed/`.
+
+| File | SHA-256 |
+| --- | --- |
+| `desktop-arm.sha256` | `711a44ac63fc12fca6c8e90fca6898da1e039d708ad68de7047793443e24a173` |
+| `desktop-arm-tracked.sha256` | `c513196d41f53719a340bdf5abe06de8959580eac56b0dfb113e7a92135359fe` |
+| `desktop-x86.inventory.json` | `6c077f20416f2729229a3aad97c9ee89039201b21ed77e2f3b3f2d2628edf30c` |

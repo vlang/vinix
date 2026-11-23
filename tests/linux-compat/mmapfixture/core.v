@@ -267,12 +267,76 @@ fn check_truncate_storage(fd i32, page usize) {
 	}
 }
 
+fn archive_byte(offset usize) u8 {
+	return u8(1 + offset % 251)
+}
+
+fn check_archive_storage(fd i32, page usize) {
+	unsafe {
+		observer := C.open(c'/proc/meminfo', C.O_RDONLY, 0)
+		need(observer >= 0, c'open archive memory counter')
+		span := 64 * page
+		before := truncate_free_kib(observer)
+		view := map_file(fd, span, 0, C.MAP_PRIVATE)
+		need(*(&u8(view)) == archive_byte(0), c'fault the first archive page')
+		first := truncate_free_kib(observer)
+		need(before <= first + 1024, c'a single fault does not duplicate the 2 MiB archive file')
+		for i in 1 .. 64 {
+			offset := usize(i) * page
+			need(*(&u8(view + offset)) == archive_byte(offset), c'fault another archive page')
+		}
+		need(C.munmap(voidptr(view), span) == 0, c'drop all archive page mappings')
+		after := truncate_free_kib(observer)
+		C.printf(c'LINUX MMAP ARCHIVE STORAGE: before_kib=%lu first_kib=%lu after_kib=%lu\n', before, first, after)
+		need(before <= after + 8 * u64(page) / 1024 && C.close(observer) == 0,
+			c'clean archive pages return when their mappings end')
+	}
+}
+
+fn check_borrowed_archive(page usize, reference bool) {
+	unsafe {
+		fd := C.open(c'/tmp/linux-mmap-borrowed', C.O_RDWR, 0)
+		need(fd >= 0, c'open the archived fixture')
+		if !reference { check_archive_storage(fd, page) }
+		clean := map_file(fd, 3 * page, page, C.MAP_PRIVATE)
+		dirty := map_file(fd, 3 * page, page, C.MAP_PRIVATE)
+		need(*(&u8(clean + 19)) == archive_byte(page + 19)
+			&& *(&u8(dirty + 19)) == archive_byte(page + 19)
+			&& *(&u8(clean + page)) == archive_byte(2 * page), c'read archived bytes through private mappings')
+		*(&u8(dirty + 19)) = 255
+		mut data := [4]u8{}
+		need(C.pread(fd, &data[0], data.len, i64(page - 2)) == data.len
+			&& data[0] == archive_byte(page - 2) && data[3] == archive_byte(page + 1),
+			c'read across an untouched archive page and a cached page')
+		need(C.ftruncate(fd, i64(page + 17)) == 0, c'shrink an archived file inside a mapped page')
+		need(*(&u8(clean + 16)) == archive_byte(page + 16) && *(&u8(clean + 17)) == 0 && *(&u8(clean + 19)) == 0,
+			c'clean archive mapping sees a zeroed partial-page tail')
+		need(*(&u8(dirty + 19)) == 255, c'private archive copy retains its write inside the last page')
+		expect_fault(clean + page, false, C.SIGBUS, C.BUS_ADRERR)
+		need(C.ftruncate(fd, i64(4 * page)) == 0 && *(&u8(clean + page)) == 0,
+			c'regrowth faults a zero page in place of archived data')
+		need(C.pread(fd, &data[0], data.len, i64(3 * page + 8)) == data.len
+			&& data[0] == 0 && data[3] == 0, c'untouched regrowth also reads as a hole')
+		need(C.pwrite(fd, c'\xff', 1, i64(page - 1)) == 1
+			&& C.pread(fd, &data[0], data.len, i64(page - 2)) == data.len
+			&& data[0] == archive_byte(page - 2) && data[1] == 255 && data[2] == archive_byte(page),
+			c'writing an uncached archive page preserves its other bytes')
+		shared := map_file(fd, page, page, C.MAP_SHARED)
+		need(C.pwrite(fd, c'\xff', 1, i64(page + 5)) == 1 && *(&u8(clean + 5)) == 255
+			&& *(&u8(shared + 5)) == 255 && *(&u8(dirty + 5)) == archive_byte(page + 5),
+			c'descriptor writes reach shared and clean private archive views')
+		need(C.munmap(voidptr(shared), page) == 0 && C.munmap(voidptr(clean), 3 * page) == 0
+			&& C.munmap(voidptr(dirty), 3 * page) == 0 && C.close(fd) == 0, c'drop archived file views')
+	}
+}
+
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
 		reference := argc > 1 && C.strcmp(argv[1], c'--reference') == 0
 		page := C.sysconf(C._SC_PAGESIZE)
 		if page < 4096 { return 1 }
+		check_borrowed_archive(usize(page), reference)
 		for descriptor in [i64(-1), 123456, 0, 0xffffffff, 0x123400000001]! {
 			address := C.syscall(isize(C.SYS_mmap), isize(0), page,
 				isize(C.PROT_READ | C.PROT_WRITE), isize(C.MAP_PRIVATE | C.MAP_ANONYMOUS),
@@ -311,7 +375,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		if C.syscall(isize(C.SYS_mmap), isize(0), page, isize(C.PROT_READ),
 			isize(C.MAP_PRIVATE), isize(0xffffffff), isize(0)) != -1
 			|| *C.__errno_location() != C.EBADF { return 1 }
-		C.puts(c'LINUX MMAP SUMMARY: file-end=private,shared backings=tmpfs,memfd truncate=resident,fork')
+		C.puts(c'LINUX MMAP SUMMARY: file-end=private,shared backings=tmpfs,memfd,archive truncate=resident,fork,regrowth')
 		C.puts(if reference { c'LINUX MMAP REFERENCE: PASS' } else { c'LINUX MMAP: PASS' })
 		C.fflush(nil)
 		for { C.pause() }

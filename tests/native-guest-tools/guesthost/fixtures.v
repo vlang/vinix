@@ -7,6 +7,12 @@ import json2
 import os
 import policyhost
 
+pub const mmap_archive_path = 'tmp/linux-mmap-borrowed'
+
+pub fn mmap_archive_bytes() []u8 {
+	return []u8{len: 2 * 1024 * 1024, init: u8(1 + index % 251)}
+}
+
 fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 
 fn assert_fixture_imports(text string) ! {

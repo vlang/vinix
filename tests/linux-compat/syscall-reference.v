@@ -85,6 +85,9 @@ fn run() ! {
 	entry(mut archive, 'dev/console', 0o020600, 5, []u8{}, 5, 1)
 	entry(mut archive, 'sbin/probe', 0o100755, 6, probe, 0, 0)
 	entry(mut archive, 'init', 0o100755, 7, os.read_bytes(launcher)!, 0, 0)
+	if name == 'MMAP' {
+		entry(mut archive, guesthost.mmap_archive_path, 0o100600, 9, guesthost.mmap_archive_bytes(), 0, 0)
+	}
 	entry(mut archive, 'TRAILER!!!', 0, 8, []u8{}, 0, 0)
 	os.write_file_array(work + '/initramfs.cpio', archive)!
 	mut command := if arch == 'aarch64' {

@@ -145,6 +145,11 @@ fn main() {
 			exit(1)
 		}
 		marker := 'LINUX ' + name.to_upper() + ': PASS'
+		if name == 'mmap' {
+			seed := work + '/' + name + '/rootfs/' + guesthost.mmap_archive_path
+			os.mkdir_all(os.dir(seed)) or { eprintln(err.msg()); exit(1) }
+			os.write_file_array(seed, guesthost.mmap_archive_bytes()) or { eprintln(err.msg()); exit(1) }
+		}
 		case_timeout := fixture_timeout(name, timeout, options.has('--timeout'))
 		mut detail := ''
 		code := guesthost.guest(frozen_source + '/core.v', '', work + '/' + name, work + '/kernel', arch,

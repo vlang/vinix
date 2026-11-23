@@ -2873,6 +2873,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   past EOF on both architectures.
   See [the shared futex receipts](docs/linux-tmpfs-eof.md#shared-futex-keys-across-shrink-and-regrowth).
 
+- [x] Make private mappings of borrowed initramfs files follow tmpfs cache
+  updates. Qualify partial-page shrink, zero-filled regrowth, and clean page
+  reclamation on both architectures.
+  See [the initramfs mapping receipts](docs/linux-tmpfs-eof.md#mappings-of-borrowed-initramfs-files).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

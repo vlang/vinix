@@ -29,6 +29,7 @@ pub mut:
 	mapping_id u64
 
 	storage  &u8
+	// In paged mode, the length of the remaining immutable archive prefix.
 	capacity u64
 	// The interface box every node and descriptor of it holds, made once and
 	// freed with it. Converting `this` at each use made a 384-byte box, as
@@ -36,10 +37,11 @@ pub mut:
 	box &resource.Resource = unsafe { nil }
 	// Initramfs files initially point straight into the Limine module.  The
 	// module remains reserved for the life of the kernel, so keeping that
-	// pointer avoids allocating and copying the whole root filesystem during
-	// boot.  The first operation which can modify the backing store turns it
-	// into an ordinary tmpfs allocation.
+	// pointer avoids duplicating the root filesystem at boot. In paged mode
+	// each materialized page replaces the corresponding part of that prefix.
 	storage_owned bool
+	// Set while unpacking the initramfs, before any mapping can exist.
+	archive_backed bool
 	// memfd_create(2) files take seals; nothing else does.
 	memfd bool
 	// Made by create_anonymous(), with no place in any directory: a memfd,
@@ -52,8 +54,9 @@ pub mut:
 	// truncate revokes their mappings. Reservations need no frames for
 	// untouched pages.
 	paged bool
+	// The low bit marks a cache page that can be recreated from the archive.
 	pages []u64
-	allocated_pages u64
+	pages_after_backing u64
 	// Extended attributes, nil until one is set; see xattr.v.
 	xattrs &XAttrSet = unsafe { nil }
 	// chattr's immutable and append-only bits; see fs/attributes.v.
@@ -68,6 +71,8 @@ pub mut:
 // Cover the resource and its interface box with room for slab rounding.
 // VFS nodes and names, sparse page metadata and file contents are charged separately.
 const tmpfs_resource_charge = u64(2) * (u64(sizeof(TmpFSResource)) + u64(sizeof(resource.Resource)))
+
+const tmpfs_archive_clean = u64(1)
 
 __global tmpfs_mapping_sequence u64
 
@@ -275,8 +280,8 @@ fn (mut this TmpFSResource) materialize_locked(min_capacity u64) bool {
 
 // tmpfs_borrow_storage installs immutable backing supplied by an initramfs
 // module.  Limine keeps executable-and-module memory reserved, and Vinix maps
-// it in the HHDM, so the bytes remain valid after boot.  Writes, truncation and
-// shared mappings transparently copy the file into owned tmpfs memory.
+// it in the HHDM, so the bytes remain valid after boot. Faults and writes can
+// materialize individual pages in owned tmpfs memory.
 pub fn tmpfs_borrow_storage(mut res resource.Resource, storage voidptr, size u64) bool {
 	if mut res is TmpFSResource {
 		res.l.acquire()
@@ -289,6 +294,7 @@ pub fn tmpfs_borrow_storage(mut res resource.Resource, storage voidptr, size u64
 		res.storage = unsafe { &u8(storage) }
 		res.capacity = size
 		res.storage_owned = false
+		res.archive_backed = size != 0
 		res.stat.size = size
 		res.stat.blocks = lib.div_roundup(size, u64(res.stat.blksize))
 		return true
@@ -377,11 +383,23 @@ fn (this &TmpFSResource) outlives_mappers() bool {
 	return !this.nameless && this.stat.nlink > 0
 }
 
-// Give the file discrete, immovable physical pages. The contiguous buffer,
-// borrowed or owned, is copied across page by page and then let go.
+fn (mut this TmpFSResource) update_paged_blocks_locked() {
+	pages := lib.div_roundup(this.capacity, page_size) + this.pages_after_backing
+	this.stat.blocks = pages * page_size / u64(this.stat.blksize)
+}
+
+// Give the file discrete, immovable cache pages. Owned buffers are small
+// and can be copied immediately. Keep the immutable archive bytes available
+// for reads and populate only the pages accessed by faults or writes.
 // `file_data` is for tmpfs_page().
 fn (mut this TmpFSResource) ensure_paged_locked(file_data bool) bool {
 	if this.paged {
+		return true
+	}
+	if !this.storage_owned {
+		this.capacity = u64(this.stat.size)
+		this.paged = true
+		this.update_paged_blocks_locked()
 		return true
 	}
 	page_count := lib.div_roundup(u64(this.stat.size), page_size)
@@ -414,8 +432,8 @@ fn (mut this TmpFSResource) ensure_paged_locked(file_data bool) bool {
 	this.storage_owned = false
 	this.pages = pages
 	this.paged = true
-	this.allocated_pages = page_count
-	this.stat.blocks = page_count * page_size / u64(this.stat.blksize)
+	this.pages_after_backing = page_count
+	this.update_paged_blocks_locked()
 	return true
 }
 
@@ -448,7 +466,8 @@ fn (mut this TmpFSResource) materialize_page_locked(index int, file_data bool) b
 	if this.pages[index] != 0 {
 		return true
 	}
-	policy := this.numa_policy_at(u64(index) * page_size)
+	offset := u64(index) * page_size
+	policy := this.numa_policy_at(offset)
 	policy_index := this.stat.ino + u64(index)
 	phys := if policy.mode == numa.mpol_default {
 		tmpfs_page(file_data, numa.weighted_task_node(policy_index))
@@ -458,10 +477,39 @@ fn (mut this TmpFSResource) materialize_page_locked(index int, file_data bool) b
 	if phys == unsafe { nil } {
 		return false
 	}
-	this.pages[index] = u64(phys)
-	this.allocated_pages++
-	this.stat.blocks = this.allocated_pages * page_size / u64(this.stat.blksize)
+	mut slot := u64(phys)
+	if offset < this.capacity {
+		this.copy_borrowed_locked(voidptr(u64(phys) + higher_half), offset, page_size)
+		slot |= tmpfs_archive_clean
+	} else {
+		this.pages_after_backing++
+		this.update_paged_blocks_locked()
+	}
+	this.pages[index] = slot
 	return true
+}
+
+// Read an unmaterialized span. Bytes beyond the preserved prefix are holes.
+fn (this &TmpFSResource) copy_borrowed_locked(destination voidptr, offset u64, count u64) {
+	mut copied := u64(0)
+	if offset < this.capacity {
+		available := this.capacity - offset
+		copied = if count < available { count } else { available }
+		unsafe { C.memcpy(destination, &this.storage[offset], copied) }
+	}
+	if copied < count {
+		unsafe { C.memset(voidptr(u64(destination) + copied), 0, count - copied) }
+	}
+}
+
+fn (mut this TmpFSResource) release_clean_archive_page_locked(index int) {
+	slot := this.pages[index]
+	if slot & tmpfs_archive_clean == 0 { return }
+	physical := voidptr(slot & ~tmpfs_archive_clean)
+	if memory.pmm_refcount(physical) == 1 {
+		this.pages[index] = 0
+		memory.pmm_free(physical, 1)
+	}
 }
 
 // Zero [from, to) in the pages that exist. The retained partial page can
@@ -476,7 +524,7 @@ fn (mut this TmpFSResource) zero_pages_locked(from u64, to u64) {
 		if chunk > end - at {
 			chunk = end - at
 		}
-		phys := this.pages[int(at / page_size)]
+		phys := this.pages[int(at / page_size)] & ~tmpfs_archive_clean
 		if phys != 0 {
 			unsafe { C.memset(voidptr(phys + higher_half + in_page), 0, chunk) }
 		}
@@ -497,42 +545,38 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	if offset >= file_size { return resource.mapping_eof }
 	is_shared := flags & mmap.map_shared != 0
 
-	// Private mappings of borrowed initramfs data copy only the pages
-	// they touch.
-	if is_shared || this.paged || this.storage_owned {
-		file_data := this.outlives_mappers()
-		if !this.ensure_paged_locked(file_data) {
-			return unsafe { nil }
-		}
-		if !this.grow_pages_locked(page + 1)
-			|| !this.materialize_page_locked(int(page), file_data) {
-			return unsafe { nil }
-		}
-		physical := voidptr(this.pages[int(page)])
-		// The inode owns the cache page. Each private shadow has a separate
-		// PMM reference, which makes the existing COW path copy on write.
-		if !is_shared && !memory.pmm_retain(physical, 1) { return unsafe { nil } }
-		return physical
-	}
-
-	copy_page := numa.alloc_range_page(this.numa_policy_at(offset), this.stat.ino + page, true)
-	if copy_page == unsafe { nil } {
+	file_data := this.outlives_mappers()
+	if !this.ensure_paged_locked(file_data) || !this.grow_pages_locked(page + 1)
+		|| !this.materialize_page_locked(int(page), file_data) {
 		return unsafe { nil }
 	}
-	copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
-	if this.storage != unsafe { nil } {
-		unsafe {
-			C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[offset], copy_size)
-		}
+	index := int(page)
+	physical := voidptr(this.pages[index] & ~tmpfs_archive_clean)
+	// The inode owns the cache page. Each private shadow has a separate
+	// PMM reference, which makes the existing COW path copy on write.
+	if is_shared {
+		// An installed shared mapping can become writable without a fault.
+		this.pages[index] &= ~tmpfs_archive_clean
+	} else if !memory.pmm_retain(physical, 1) {
+		return unsafe { nil }
 	}
-
-	return copy_page
+	return physical
 }
 
-fn (mut this TmpFSResource) release_mapping(_handle voidptr, _page u64,
+fn (mut this TmpFSResource) release_mapping(_handle voidptr, page u64,
 	physical voidptr, flags int) {
-	if flags & mmap.map_shared == 0 {
+	if flags & mmap.map_shared != 0 { return }
+	if !this.archive_backed {
 		memory.pmm_free(physical, 1)
+		return
+	}
+	this.l.acquire()
+	defer { this.l.release() }
+	memory.pmm_free(physical, 1)
+	// Only the inode still holds this reproducible cache page. A shared
+	// mapping or descriptor write clears the tag before exposing changes.
+	if page < u64(this.pages.len) && this.pages[int(page)] == (u64(physical) | tmpfs_archive_clean) {
+		this.release_clean_archive_page_locked(int(page))
 	}
 }
 
@@ -570,15 +614,16 @@ fn (mut this TmpFSResource) paged_copy(buf voidptr, loc u64, count u64, to_file 
 			chunk = count - done
 		}
 		if index < this.pages.len && this.pages[index] != 0 {
-			page_addr := this.pages[index] + higher_half + in_page
+			page_addr := (this.pages[index] & ~tmpfs_archive_clean) + higher_half + in_page
 			src_or_dst := u64(buf) + done
 			if to_file {
+				this.pages[index] &= ~tmpfs_archive_clean
 				unsafe { C.memcpy(voidptr(page_addr), voidptr(src_or_dst), chunk) }
 			} else {
 				unsafe { C.memcpy(voidptr(src_or_dst), voidptr(page_addr), chunk) }
 			}
 		} else if !to_file {
-			unsafe { C.memset(voidptr(u64(buf) + done), 0, chunk) }
+			this.copy_borrowed_locked(voidptr(u64(buf) + done), absolute, chunk)
 		}
 		done += chunk
 	}
@@ -635,8 +680,7 @@ fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, 
 		errno.set(errno.eperm)
 		return none
 	}
-	// By what the file holds as well as by where the write ends: a small write
-	// into a large file borrowed from the image copies it into pages too.
+	// Select page storage by the existing size and by where the write ends.
 	if !this.paged && (write_end > tmpfs_contiguous_limit
 		|| u64(this.stat.size) > tmpfs_contiguous_limit) && !this.ensure_paged_locked(true) {
 		errno.set(errno.enospc)
@@ -653,8 +697,12 @@ fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, 
 			errno.set(errno.enospc)
 			return none
 		}
-		for index := int(write_at / page_size); index <= int((write_end - 1) / page_size); index++ {
+		first := int(write_at / page_size)
+		for index := first; index <= int((write_end - 1) / page_size); index++ {
 			if !this.materialize_page_locked(index, true) {
+				if this.archive_backed {
+					for prepared in first .. index { this.release_clean_archive_page_locked(prepared) }
+				}
 				errno.set(errno.enospc)
 				return none
 			}
@@ -716,7 +764,7 @@ fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 	if this.paged {
 		for phys in this.pages {
 			if phys != 0 {
-				memory.pmm_free(voidptr(phys), 1)
+				memory.pmm_free(voidptr(phys & ~tmpfs_archive_clean), 1)
 			}
 		}
 		unsafe { this.pages.free() }
@@ -778,16 +826,18 @@ fn (mut this TmpFSResource) shrink_pages_locked(new_size u64) {
 	cutoff := lib.align_up(new_size, page_size)
 	this.zero_pages_locked(new_size, cutoff)
 	first := cutoff / page_size
+	backing_pages := lib.div_roundup(this.capacity, page_size)
 	if first < u64(this.pages.len) {
 		for i in int(first) .. this.pages.len {
 			physical := this.pages[i]
 			if physical == 0 { continue }
-			memory.pmm_free(voidptr(physical), 1)
-			this.allocated_pages--
+			memory.pmm_free(voidptr(physical & ~tmpfs_archive_clean), 1)
+			if u64(i) >= backing_pages { this.pages_after_backing-- }
 		}
 		this.pages.trim(int(first))
 	}
-	this.stat.blocks = this.allocated_pages * page_size / u64(this.stat.blksize)
+	if new_size < this.capacity { this.capacity = new_size }
+	this.update_paged_blocks_locked()
 }
 
 fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
