@@ -570,13 +570,15 @@ preserved, and the retained trust and policy govern the check.
 `scripts/deploy-iso.sh` preflights the selected inputs before building and
 compares them with the package configuration, signed bundles and declaration
 inside each finished ISO. The check reauthenticates the complete embedded
-bundles and verifies their payloads. It reads the gzip-compressed POSIX USTAR
-initramfs and requires package directories to be readable and searchable by
-ordinary accounts and to appear before the files they contain. Each checked ISO
+bundles and verifies their payloads. It streams the POSIX USTAR initramfs from
+one gzip member, checks the CRC and uncompressed size, and requires EOF after
+the trailer. Package directories must be readable and searchable by ordinary
+accounts and appear before the files they contain. Each checked ISO
 has a `vinix-packages-ARCH.json` receipt with the ISO and package metadata hashes,
 bundled publisher keys and sequences, and selected application IDs. The release
 notes and `SHA256SUMS` include the receipts. The check also runs with
-`--no-test` and `--no-publish` and uses `xorriso` and `libarchive`.
+`--no-test` and `--no-publish`. The host helper uses `xorriso` and links
+libarchive and zlib.
 
 To require an independently reviewed selection, build the host helper and
 generate one plan per target with the candidate package input environment.

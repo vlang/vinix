@@ -303,6 +303,32 @@ The fixtures, baseline and fixed outcomes, and mixed-catalog evidence are in
 Its SHA-256 is `4ec9818f3a349e9468d707d28dbce344014915c50ada177cb7ecf8e356d769ec`.
 All 179 entries in the extracted `qualification.sha256` passed.
 
+### Complete gzip member verification
+
+At `33bacba6d`, the boot archive reader checks one gzip member through its
+trailer and requires physical EOF. The streaming decoder validates the CRC
+and uncompressed length, enforces the boot trailer's 32-bit size limit, and
+continues to the trailer when it encounters the TAR end block first.
+
+Both target plans passed 25 host controls with the production verifier and
+with ASan/UBSan. The previous verifier issued receipts for an empty leading
+gzip member, a second member after the archive, raw trailing bytes, a bad CRC,
+and an incorrect uncompressed size. Both versions refused a truncated trailer.
+The six shared reader tests and the descriptor-only probe passed, including
+128 repetitions each for normal skip, body EOF and padding EOF. The descriptor
+probe linked without archive or compression libraries, and the host ZIP
+consumer built with its own zlib declarations.
+
+The two retained mixed-catalog ISOs and the configuration-only fixture produced
+byte-identical receipts. The complete retained desktop initramfs files reached
+repository authentication, which refused their expired fixture indexes.
+
+The paired fixtures, before-and-after receipts and diagnostics, build logs and
+references to the retained ISO inputs are in
+`~/.local/state/vinix/r14-iso-gzip-members-PUo9Vj/qualification.tar.gz`.
+Its SHA-256 is `a02456b88fb2cfecd2b8f0ecb014a79e31e58be42a3e60a9507cfcb2fc805b02`.
+All 202 entries in the extracted `qualification.sha256` passed.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
