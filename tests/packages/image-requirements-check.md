@@ -497,6 +497,36 @@ are in
 Its SHA-256 is `54186cc7d8f548b4f76659221230340663efdfa16c0af891726eace482547c26`.
 All 899 entries in the extracted `qualification.sha256` passed.
 
+### Published release confirmation
+
+At `bd55b1eb0`, the driver reads the release by numeric ID after attempting
+publication. It checks the published state, release metadata, exact asset
+digests and tag commit before reporting success. With the saved recovery
+record and original assets, `--resume-draft=ID` can confirm an already
+published release without sending another upload or publish request.
+[GitHub release readback API](https://docs.github.com/en/rest/releases/releases#get-a-release)
+
+All 49 release fixture checks passed against the committed script with
+signed inputs for both architectures, local GitHub stubs and host helpers
+compiled once from the driver's sources. The previous driver at `5fab77715`
+rejected recovery after publication. The new driver confirmed publication
+after a lost response and recovered after a failed readback. It refused to
+report success when the release was still a draft, an asset digest differed
+or the tag moved. A separate run compiled the host helpers through the
+driver and confirmed the release with closed input. All 11 fixture upload
+and mutation records kept their original checksums.
+
+ASan/UBSan checks covered a verified release and refusal of a missing or
+null draft state, a mismatched digest and a different upload destination.
+A read-only GitHub API call confirmed the fields on a public release.
+[Public release response](https://api.github.com/repos/cli/cli/releases/449359903)
+
+The paired inputs, baseline and committed runs, API observations and source
+revisions are in
+`~/.local/state/vinix/r14-release-publication-l7xDNK/qualification.tar.gz`.
+Its SHA-256 is `13cf06005a0453ff6b50cd0188df9aeb977fbcf3389365eb1c8ca2d15d0d956f`.
+All 1,395 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
