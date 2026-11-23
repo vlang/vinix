@@ -969,6 +969,25 @@ The paired inputs, native report, run logs and sanitizer checks are in
 Its SHA-256 is `fdbf9b18ea683fde5d08f32dd78550eb643ec7773efad2023cc746abc004bb5a`.
 All 1,542 entries in the extracted `qualification.sha256` passed.
 
+### Remote inspection by pending creation tag
+
+At `4f0c133de`, `--inspect-creation=TAG` uses the pending record to find
+and check one GitHub release. Its report includes the remote ID, state,
+and verified uploaded and missing assets. Partial and published releases
+require an exact saved ID record.
+
+All 161 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. Inspection rejected missing or ambiguous results,
+unrelated release metadata, and partial or published releases without a
+saved ID. The native driver reported every missing asset on an empty draft
+without adopting it or changing local files. ASan/UBSan covered empty,
+partial and published responses and the ID-record requirement.
+
+The paired inputs, native report, run logs and sanitizer checks are in
+`~/.local/state/vinix/r14-release-inspect-creation-O0ghGt/qualification.tar.gz`.
+Its SHA-256 is `18331bd92a61e999fe3c3a241db17aa7332441583e4bfac926744ed4bfeba684`.
+All 1,522 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
