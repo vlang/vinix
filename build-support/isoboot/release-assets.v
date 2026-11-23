@@ -335,13 +335,24 @@ fn has_saved_creation_draft(work string, output string, directory string, tag st
 	return saved_draft_matches(path, json2.encode(DraftRecovery{...creation, id: number}) + '\n', number)
 }
 
-fn record_draft(work string, output string, directory string, response string, tag string, id string) !u64 {
-	intent := creation_path(output)
-	creation, text := captured_creation(output, directory, tag)!
-	draft := read_release(response, id, tag, creation.notes, creation.prerelease)!
+fn read_new_draft(response string, id string, creation DraftRecovery) !Release {
+	draft := read_release(response, id, creation.tag, creation.notes, creation.prerelease)!
 	if !draft.draft { return error('GitHub did not create a draft release') }
 	upload_endpoint(draft, creation.repo)!
 	if draft.assets.len != 0 { return error('new GitHub draft already contains assets') }
+	return draft
+}
+
+fn check_created_draft(directory string, response string, tag string) ! {
+	path := creation_path(directory)
+	creation := parse_creation(read_recovery_text(path)!, path, tag)!
+	read_new_draft(response, '', creation)!
+}
+
+fn record_draft(work string, output string, directory string, response string, tag string, id string) !u64 {
+	intent := creation_path(output)
+	creation, text := captured_creation(output, directory, tag)!
+	draft := read_new_draft(response, id, creation)!
 	path := os.join_path(work, 'draft-${draft.id}.json')
 	record := json2.encode(DraftRecovery{...creation, id: draft.id}) + '\n'
 	if !saved_draft_matches(path, record, draft.id)! {
@@ -742,6 +753,9 @@ fn run() ! {
 		println(record_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7])!)
 		return
 	}
+	if os.args.len == 5 && os.args[1] == 'check-created-draft' {
+		return check_created_draft(os.args[2], os.args[3], os.args[4])
+	}
 	if os.args.len == 5 && os.args[1] == 'restore-draft' {
 		return restore_draft(os.args[2], os.args[3], os.args[4])
 	}
@@ -764,7 +778,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | verify-draft | inspect-draft | verify-creation | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | check-creation-retry | inspect-recovery | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | verify-draft | inspect-draft | verify-creation | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | check-creation-retry | inspect-recovery | has-saved-creation-draft | record-draft | check-created-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
 }
 
 fn main() {

@@ -21,6 +21,7 @@ const publish_refusals = ['publish-readback-lost', 'publish-still-draft',
 	'publish-changed-asset', 'publish-tag-moved']
 const repo_refusals = ['repo-foreign', 'repo-invalid', 'repo-dotdot']
 const creation_refusals = ['create-delayed', 'create-no-draft', 'create-record-changed']
+const creation_recoveries = ['create-response-lost', 'create-response-truncated']
 const size_refusals = ['oversize-capture', 'oversize-no-test']
 const release_list_refusals = ['release-list-failed', 'release-already-draft', 'release-already-published',
 	'release-appears-before-create', 'release-list-fails-before-create']
@@ -306,7 +307,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		return 0
 	}
 	if path == 'releases' {
-		retry := scenario == 'retry-create-response-lost'
+		retry := scenario == 'retry-create-response-empty'
 		attempt_path := remote + if retry { '/retry-attempt' } else { '/release-attempt' }
 		if os.exists(attempt_path) { return error('fixture second creation request') }
 		os.write_file(attempt_path, args[1..].join('\n') + '\n')!
@@ -356,10 +357,15 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		os.mkdir(remote + '/uploads')!
 		os.write_file(local, json2.encode(draft))!
 		if scenario == 'create-record-changed' { replace_creation_commit(out)! }
-		if scenario in ['create-response-lost', 'create-delayed', 'publish-prepared-delayed', 'retry-create-response-lost']! {
+		if scenario in ['create-response-lost', 'create-delayed', 'publish-prepared-delayed']! {
 			eprintln('fixture lost the creation response')
 			return 1
 		}
+		if scenario == 'create-response-truncated' {
+			print('{"id":')
+			return 0
+		}
+		if retry { return 0 }
 		println(if legacy { draft_id } else { json2.encode(draft) })
 		return 0
 	}
@@ -841,7 +847,7 @@ fn check_retry_creation(root string, work string, out string, remote string, env
 		|| os.read_file(intent_path)! != intent || os.exists(recovery) {
 		return error('a refused retry changed the original creation state')
 	}
-	recovery_attempt(root, work, environment, 'retry-create-response-lost', options, '')!
+	recovery_attempt(root, work, environment, 'retry-create-response-empty', options, '')!
 	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	saved := json2.decode[FixtureCreation](os.read_file(recovery)!)!
 	expected := FixtureCreation{...metadata, id: id.u64()}
@@ -1490,7 +1496,7 @@ fn run() ! {
 	scenarios << release_list_refusals
 	scenarios << size_refusals
 	scenarios << creation_refusals
-	scenarios << 'create-response-lost'
+	scenarios << creation_recoveries
 	scenarios << draft_refusals
 	scenarios << publish_refusals
 	scenarios << ['publish-response-lost', 'repo-inferred']
@@ -1565,15 +1571,16 @@ fn run() ! {
 		}
 		draft_refusal := scenario in draft_refusals
 		expect_create := draft_refusal || scenario in publish_refusals || scenario in creation_refusals
-			|| scenario in ['create-response-lost', 'publish-response-lost', 'repo-inferred', 'draft-only', 'tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
+			|| scenario in creation_recoveries
+			|| scenario in ['publish-response-lost', 'repo-inferred', 'draft-only', 'tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
 			'workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test']!
 		if os.exists(remote + '/create-tag') != expect_create {
 			return error('unexpected GitHub tag creation for ' + scenario + '\n' + log)
 		}
-		if scenario in ['workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
+		if scenario in creation_recoveries || scenario in ['workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test', 'tag-existing', 'tag-auto',
-			'tag-raced-match', 'draft-only', 'publish-response-lost', 'create-response-lost', 'repo-inferred']! {
+			'tag-raced-match', 'draft-only', 'publish-response-lost', 'repo-inferred']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
 			draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 			verify_handoff(out, with_packages, scenario, draft.body)!

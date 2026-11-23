@@ -702,13 +702,13 @@ draft. A different or unreadable file is kept and reported for inspection.
 Before creating a GitHub draft, the driver saves
 `build-release/TAG/.draft-creation.json` with the verified manifest and
 notes. An HTML comment in the notes ties the draft to that creation attempt
-and manifest. If the creation response is lost, the driver looks for the
-draft by exact tag and reads it by ID. If the lookup is interrupted or the
-draft is temporarily missing, use `--resume-create=TAG` from the same
-checkout. Keep the creation record and original assets. This command finds
-a single release with matching metadata and a verified tag commit. When an
-exact ID-based recovery record already exists for that draft, it verifies
-the uploaded assets and stages only the missing files. Otherwise the draft
+and manifest. If the creation response is lost or cannot be verified, the
+driver looks for the draft by exact tag and reads it by ID before adopting
+it. If the lookup is interrupted or the draft is temporarily missing, use
+`--resume-create=TAG` from the same checkout. Keep the creation record and
+original assets. This command finds a single release with matching metadata
+and a verified tag commit. With an exact ID-based recovery record, it
+verifies uploaded assets and stages only missing files. Otherwise the draft
 must be empty before the driver writes an ID-based record and starts the
 upload. A conflicting ID-based record stops recovery. The creation record
 protects the original assets by blocking a fresh build for the same tag.

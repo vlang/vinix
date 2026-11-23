@@ -545,16 +545,20 @@ check_tag_commit() {
 }
 
 create_staged_release() {
-    local candidate_id=''
+    local candidate_id response="$ASSET_WORK/created-draft.json"
     echo "  If draft creation is interrupted, retry with --resume-create=$TAG"
-    if ! github_api "$release_api" --method POST -f "tag_name=$TAG" \
+    if github_api "$release_api" --method POST -f "tag_name=$TAG" \
         -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
-        -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"; then
-        echo "Draft creation request failed. Looking for the draft on GitHub." >&2
-        candidate_id="$(find_creation_candidate draft)"
-        github_api "$release_api/$candidate_id" > "$ASSET_WORK/created-draft.json"
+        -F draft=true -F "prerelease=$prerelease" > "$response" &&
+        "$ASSET_WORK/release-assets" check-created-draft "$ASSET_WORK" "$response" "$TAG"; then
+        finish_creation "$response" ''
+        return
     fi
-    finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"
+    echo "Draft creation response could not be verified. Looking for the draft on GitHub." >&2
+    candidate_id="$(find_creation_candidate draft)"
+    github_api "$release_api/$candidate_id" > "$response"
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    finish_creation "$response" "$candidate_id"
 }
 
 publish_staged_assets() {
