@@ -1182,7 +1182,7 @@ fn (mut s SpeakerStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 	return i64(done)
 }
 
-fn (mut s SpeakerStream) wait_until_empty() {
+fn (mut s SpeakerStream) wait_until_empty() ? {
 	katomic.store(mut &speaker_caller_phase, phase_drain)
 	defer {
 		katomic.store(mut &speaker_caller_phase, phase_none)
@@ -1194,26 +1194,40 @@ fn (mut s SpeakerStream) wait_until_empty() {
 	}
 	C.vinix_apple_speakers_drain()
 	s.unlock()
+	mut failure := u64(0)
 	start := time.monotonic_ns()
 	for {
 		s.lock()
-		done := C.vinix_apple_speakers_drained() != 0 || C.vinix_apple_speakers_faulted() != 0
+		faulted := C.vinix_apple_speakers_faulted() != 0
+		done := C.vinix_apple_speakers_drained() != 0
 		s.unlock()
+		if faulted {
+			failure = errno.eio
+			break
+		}
 		if done {
 			break
 		}
 		if time.monotonic_ns() - start > drain_stall_ns {
 			print('apple-speakers: drain did not finish\n')
+			failure = errno.etimedout
 			break
 		}
 		if nap(running_period_ns) == .fatal {
+			failure = errno.eintr
 			break
 		}
 	}
-	katomic.store(mut &speaker_caller_phase, phase_drain_tail)
-	nap(drain_tail_ns)
+	if failure == 0 {
+		katomic.store(mut &speaker_caller_phase, phase_drain_tail)
+		if nap(drain_tail_ns) == .fatal { failure = errno.eintr }
+	}
 	katomic.store(mut &speaker_caller_phase, phase_stop)
 	s.lock()
 	C.vinix_apple_speakers_stop()
 	s.unlock()
+	if failure != 0 {
+		errno.set(failure)
+		return none
+	}
 }

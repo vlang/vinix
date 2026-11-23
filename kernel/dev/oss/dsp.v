@@ -52,7 +52,7 @@ mut:
 	sync_write(buf voidptr, loc u64, count u64) ?i64
 	// Bytes a write could hand over right now without waiting.
 	writable() u64
-	wait_until_empty()
+	wait_until_empty() ?
 	is_playing() bool
 }
 
@@ -220,7 +220,7 @@ fn (mut dev OssDevice) ioctl(handle voidptr, _request u64, argp voidptr) ?int {
 		}
 		ctl_dsp_sync {
 			mut stream := dev.stream
-			stream.wait_until_empty()
+			stream.wait_until_empty()?
 			return 0
 		}
 		ctl_dsp_post, ctl_dsp_profile, ctl_dsp_setfragment {
@@ -331,7 +331,8 @@ fn (mut dev OssDevice) unref(handle voidptr) ? {
 	}
 
 	mut stream := dev.stream
-	stream.wait_until_empty()
+	// A failed drain must still stop the stream and release its owner.
+	stream.wait_until_empty() or {}
 	stream.play(false)
 	stream.reset()
 

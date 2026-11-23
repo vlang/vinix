@@ -3,9 +3,11 @@ module hda
 import devcore
 import memory
 import dev.oss
+import errno
 import event.eventstruct
 import event
 import katomic
+import time
 
 struct HDABufferDescriptor {
 pub mut:
@@ -17,6 +19,45 @@ pub mut:
 const max_buffer_descriptors = page_size / sizeof(HDABufferDescriptor)
 const total_buffer_size = max_buffer_descriptors * page_size
 const chunk_size = page_size
+const stall_timeout_ns = u64(2_000_000_000)
+
+struct StreamProgress {
+mut:
+	remaining u32 = u32(total_buffer_size) + 1
+	deadline u64
+}
+
+fn (mut progress StreamProgress) wait(mut stream HDAStream, remaining u32, generation u64) ? {
+	now := time.monotonic_ns()
+	if remaining < progress.remaining {
+		progress.deadline = now + stall_timeout_ns
+	}
+	progress.remaining = remaining
+	if now >= progress.deadline {
+		errno.set(errno.etimedout)
+		return none
+	}
+	mut timer := unsafe { &time.Timer(C.vinix_stack_alloc(sizeof(time.Timer))) }
+	unsafe {
+		*timer = time.Timer{
+			index: -1
+			when: time.TimeSpec{
+				tv_sec: i64(progress.deadline / 1_000_000_000)
+				tv_nsec: i64(progress.deadline % 1_000_000_000)
+			}
+		}
+	}
+	timer.arm_monotonic_deadline()
+	defer { timer.disarm() }
+	mut storage := [unsafe { &stream.event }, unsafe { &timer.event }]!
+	mut events := unsafe { event.stack_list(&storage[0], 2) }
+	// The caller rechecks the queue even after the timer fires. The last
+	// interrupt may have drained it at the deadline.
+	event.await_from_generation(mut events, true, 0, generation) or {
+		errno.set(errno.eintr)
+		return none
+	}
+}
 
 struct HDAStream {
 pub mut:
@@ -237,15 +278,21 @@ fn (mut s HDAStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 	}
 
 	mut i := u64(0)
+	mut waiting := StreamProgress{}
 	for {
 		if i == count {
 			break
 		}
 
+		generation := event.generation(mut s.event)
 		s_remaining := katomic.load(&s.remaining_data)
-
-		if s.regs.ctl0 & sdctl0_run != 0 && s_remaining == total_buffer_size {
-			event.await_one(mut s.event, true) or {}
+		if s_remaining == total_buffer_size {
+			s.play(true)
+			waiting.wait(mut s, s_remaining, generation) or {
+				if i > 0 { return i64(i) }
+				return none
+			}
+			continue
 		}
 
 		to_copy := if i + (total_buffer_size - s_remaining) > count {
@@ -296,23 +343,30 @@ fn (mut s HDAStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 		}
 
 		i += to_copy
+		waiting = StreamProgress{}
 	}
 
 	if first_write {
+		mut priming := StreamProgress{}
 		for {
+			generation := event.generation(mut s.event)
 			s_remaining := katomic.load(&s.remaining_data)
 			if s_remaining <= chunk_size * 2 {
 				break
 			}
-			event.await_one(mut s.event, true) or {}
+			// All bytes have been queued. Report that count even if waiting
+			// for playback is interrupted or times out.
+			priming.wait(mut s, s_remaining, generation) or { break }
 		}
 	}
 
 	return count
 }
 
-fn (mut s HDAStream) wait_until_empty() {
+fn (mut s HDAStream) wait_until_empty() ? {
+	mut waiting := StreamProgress{}
 	for {
+		generation := event.generation(mut s.event)
 		s_remaining := katomic.load(&s.remaining_data)
 		if s_remaining == 0 {
 			break
@@ -352,7 +406,7 @@ fn (mut s HDAStream) wait_until_empty() {
 			}
 		}
 
-		event.await_one(mut s.event, true) or {}
+		waiting.wait(mut s, s_remaining, generation)?
 	}
 }
 
@@ -381,6 +435,11 @@ fn (mut s HDAStream) clear_ring(at u32, length u32) {
 // keeps going over the ring, and must then play silence, not the ring's
 // old contents.
 fn (mut s HDAStream) handle_irq() {
+	$if hda_stall_test ? {
+		// The guest can hold back playback completions at one sample rate
+		// and reopen at another rate to test recovery on the same device.
+		if s.is_output && s.kept_rate == 44100 { return }
+	}
 	pos := s.position()
 	played := (pos + u32(total_buffer_size) - s.hw_pos) % u32(total_buffer_size)
 	s.clear_ring(s.hw_pos, played)

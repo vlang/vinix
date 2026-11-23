@@ -604,7 +604,7 @@ fn (mut s SoundStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 	return i64(done)
 }
 
-fn (mut s SoundStream) wait_until_empty() {
+fn (mut s SoundStream) wait_until_empty() ? {
 	s.lock()
 	defer {
 		s.unlock()
@@ -629,7 +629,10 @@ fn (mut s SoundStream) wait_until_empty() {
 			// mixing buffer, not once it has been heard. Stopping now would
 			// cut off that last stretch, and play it at the start of the
 			// next stream instead.
-			nap(tail_ns)
+			if nap(tail_ns) != .slept {
+				errno.set(errno.eintr)
+				return none
+			}
 			return
 		}
 		now := time.monotonic_ns()
@@ -637,10 +640,12 @@ fn (mut s SoundStream) wait_until_empty() {
 			last_progress = now
 		} else if now - last_progress > stall_timeout_ns {
 			print('virtio-snd: device stopped consuming audio\n')
-			return
+			errno.set(errno.etimedout)
+			return none
 		}
 		if nap(s.wait_ns) != .slept {
-			return
+			errno.set(errno.eintr)
+			return none
 		}
 	}
 }

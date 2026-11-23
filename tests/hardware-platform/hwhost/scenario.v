@@ -1153,6 +1153,18 @@ pub const scenarios = [
 		]
 	},
 	Scenario{
+		name:     'hda-stall'
+		about:    'HD Audio write and drain timeouts with playback recovery after close'
+		arches:   ['x86_64']
+		define:   'hda_stall_test'
+		qemu:     ['-audiodev', 'none,id=hwsnd', '-device', 'intel-hda',
+			'-device', 'hda-output,audiodev=hwsnd,mixer=off']
+		required: ['HWTEST START hda-stall', 'HWTEST STEP stalled write timed out',
+			'HWTEST STEP stalled drain timed out', 'HWTEST STEP fresh stream drained', 'HWTEST PASS hda-stall']
+		ending:   .poweroff
+		timeout:  60
+	},
+	Scenario{
 		name:     'drivers-sleep'
 		about:    'HD Audio and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM'
 		arches:   ['x86_64']
