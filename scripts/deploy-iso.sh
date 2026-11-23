@@ -318,7 +318,42 @@ if [ -n "$RESUME_DRAFT" ]; then
 fi
 
 release_exists() {
-    gh release view --repo "github.com/$REPO" -- "$1" >/dev/null 2>&1
+    local status=0
+    grep -Fqx -- "$1" "$ASSET_WORK/release-tags" || status=$?
+    [ "$status" -le 1 ] || die "cannot read the GitHub release tag list"
+    return "$status"
+}
+
+refresh_release_tags() {
+    github_api "$release_api?per_page=100" --paginate \
+        --jq 'if type != "array" then error("expected a release list")
+              else .[] | .tag_name | if type != "string" then error("invalid release tag")
+              elif index("\n") != null or index("\r") != null then error("invalid release tag")
+              else . end end' > "$ASSET_WORK/release-tags" ||
+        die "cannot list GitHub releases on $REPO"
+}
+
+check_pending_creation() {
+    local tag="$1" record="$SCRIPT_DIR/build-release/$1/.draft-creation.json"
+    if [ -e "$record" ] || [ -L "$record" ]; then
+        die "draft creation record already exists. Recover it with --resume-create=$tag"
+    fi
+}
+
+if [ -n "$TAG" ]; then
+    if [ "$PUBLISH" -eq 1 ]; then
+        git check-ref-format "refs/tags/$TAG" || die "invalid Git tag: $TAG"
+    fi
+    check_pending_creation "$TAG"
+fi
+if [ "$PUBLISH" -eq 1 ]; then
+    refresh_release_tags
+fi
+
+refuse_existing_release() {
+    if release_exists "$TAG"; then
+        die "release $TAG already exists on $REPO"
+    fi
 }
 
 if [ -z "$TAG" ]; then
@@ -333,20 +368,15 @@ if [ -z "$TAG" ]; then
         TAG="$base_tag-$n"
         n=$((n + 1))
     done
+    check_pending_creation "$TAG"
 elif [ "$PUBLISH" -eq 1 ]; then
-    git check-ref-format "refs/tags/$TAG" || die "invalid Git tag: $TAG"
-    if release_exists "$TAG"; then
-        die "release $TAG already exists on $REPO"
-    fi
+    refuse_existing_release
     tag_commit="$("$ASSET_WORK/release-tag" resolve "$REPO" "$TAG")"
     [ -z "$tag_commit" ] || [ "$tag_commit" = "$COMMIT" ] ||
         die "GitHub tag $TAG points to $tag_commit, expected $COMMIT"
 fi
 
 OUT="$SCRIPT_DIR/build-release/$TAG"
-if [ -e "$OUT/.draft-creation.json" ] || [ -L "$OUT/.draft-creation.json" ]; then
-    die "draft creation record already exists. Recover it with --resume-create=$TAG"
-fi
 mkdir -p "$OUT" "$CACHE"
 
 if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
@@ -751,6 +781,8 @@ else
     step "Preparing verified release copies"
     "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
 fi
+refresh_release_tags
+refuse_existing_release
 "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true

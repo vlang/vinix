@@ -626,9 +626,12 @@ or build-only completion. A second invocation in the same workspace exits
 before creating its tag output directory. Use a workspace filesystem that
 supports directory `flock`.
 For publication, the driver checks that an existing GitHub tag resolves to the
-built commit. Automatic tag selection skips names reserved by either a tag or
-a release. After confirmation and asset verification the driver creates any
-missing tag at the built commit and checks the resulting ref. The driver
+built commit. It reads every page of the release list before building.
+Automatic tag selection skips names reserved by a tag, draft or published
+release. Before creating a tag or draft, it refreshes the release list.
+A failed lookup or an occupied release name stops publication. After
+confirmation and asset verification the driver creates any missing tag
+at the built commit and checks the resulting ref. The driver
 creates a draft and checks the upload URL returned for its repository and draft
 ID. The driver streams the assets to that URL, then reads the draft by its
 numeric ID. It checks the tag name, title, notes, prerelease setting, and exact

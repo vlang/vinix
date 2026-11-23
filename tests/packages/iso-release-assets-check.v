@@ -21,6 +21,8 @@ const publish_refusals = ['publish-readback-lost', 'publish-still-draft',
 const repo_refusals = ['repo-foreign', 'repo-invalid', 'repo-dotdot']
 const creation_refusals = ['create-delayed', 'create-no-draft']
 const size_refusals = ['oversize-capture', 'oversize-no-test']
+const release_list_refusals = ['release-list-failed', 'release-already-draft', 'release-already-published',
+	'release-appears-before-create', 'release-list-fails-before-create']
 
 struct FixtureAsset {
 	name string
@@ -213,6 +215,22 @@ fn github_release_api(args []string, remote string, path string, scenario string
 	upload_endpoint := fixture_upload_endpoint(draft_id)
 	local := remote + '/draft.json'
 	if path == 'releases?per_page=100' {
+		if args.len == 6 && args[3..5] == ['--paginate', '--jq']
+			&& args[5].contains('expected a release list') {
+			println('${tag}-other')
+			after_build := os.exists(out + '/fixture-boot')
+			if scenario == 'release-list-failed' || (after_build && scenario == 'release-list-fails-before-create') {
+				eprintln('fixture GitHub release list failed after a partial page')
+				return 1
+			}
+			reserved := remote + '/reserved-release.json'
+			if os.exists(reserved) {
+				existing := json2.decode[FixtureRelease](os.read_file(reserved)!)!
+				println(existing.tag_name)
+			}
+			if after_build && scenario == 'release-appears-before-create' { println(tag) }
+			return 0
+		}
 		if args[3..] != ['--paginate', '--jq', '.[] | select(.draft == true) | [.id, .tag_name] | @tsv'] {
 			return error('expected paginated draft lookup')
 		}
@@ -737,6 +755,7 @@ fn run() ! {
 	if date_code != 0 { return error('cannot resolve fixture date: ' + date_output) }
 	default_tag := 'iso-' + date_output.trim_space()
 	mut scenarios := repo_refusals.clone()
+	scenarios << release_list_refusals
 	scenarios << size_refusals
 	scenarios << creation_refusals
 	scenarios << 'create-response-lost'
@@ -772,6 +791,15 @@ fn run() ! {
 			'tag-auto' {
 				os.write_file(tag_file(remote, default_tag), other_commit)!
 				environment['VINIX_ASSET_TEST_RESERVED_RELEASE'] = default_tag + '-2'
+				os.write_file(remote + '/reserved-release.json',
+					json2.encode(FixtureRelease{id: 1, tag_name: default_tag + '-2'}))!
+			}
+			'release-already-draft', 'release-already-published' {
+				os.write_file(remote + '/reserved-release.json', json2.encode(FixtureRelease{
+					id: 1
+					tag_name: tag
+					draft: scenario == 'release-already-draft'
+				}))!
 			}
 			'tag-mismatch' { os.write_file(tag_file(remote, tag), other_commit)! }
 			'tag-existing', 'tag-moved' { os.write_file(tag_file(remote, tag), commit)! }
@@ -824,6 +852,16 @@ fn run() ! {
 				if retry_code != 0 || !os.is_file(root + '/build-release/fixture-lock-build/SHA256SUMS') {
 					return error('release workspace retry failed\n' + retry_log)
 				}
+			}
+		} else if scenario in release_list_refusals {
+			after_build := scenario in ['release-appears-before-create', 'release-list-fails-before-create']!
+			diagnostic := if scenario in ['release-list-failed', 'release-list-fails-before-create']! {
+				'cannot list GitHub releases on local/fixture'
+			} else { 'release ${tag} already exists on local/fixture' }
+			if code == 0 || !log.contains(diagnostic) || os.exists(out) != after_build
+				|| os.exists(out + '/fixture-boot') != after_build || os.exists(out + '/.draft-creation.json')
+				|| os.exists(remote + '/release-attempt') || os.exists(remote + '/publish-attempt') {
+				return error('unexpected release lookup outcome: ' + scenario + '\n' + log)
 			}
 		} else if scenario in size_refusals {
 			bundle := out + '/' + x11
