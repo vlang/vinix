@@ -81,7 +81,7 @@ fn set_home_node_unlocked(mut pagemap memory.Pagemap, base u64, end u64, node i3
 			cursor = next
 			continue
 		}
-		if old.mode != numa.mpol_bind && old.mode != numa.mpol_preferred_many {
+		if local.shared_anonymous() || (old.mode != numa.mpol_bind && old.mode != numa.mpol_preferred_many) {
 			return errno.eopnotsupp
 		}
 		if old.home_node != node {
@@ -113,7 +113,7 @@ fn bind_range_unlocked(mut pagemap memory.Pagemap, base u64, end u64, policy pro
 		}
 		next := min_u64(end, local.base + local.length)
 		if policy.mode != numa.mpol_default {
-			if local.flags & (map_shared | map_anonymous | map_brk_reservation) != map_anonymous
+			if local.flags & (map_anonymous | map_brk_reservation) != map_anonymous
 				|| !page_mapping_has_node(local) {
 				return errno.eopnotsupp
 			}
@@ -135,8 +135,14 @@ fn bind_range_unlocked(mut pagemap memory.Pagemap, base u64, end u64, policy pro
 			cursor = next_mapped_start(pagemap, cursor, end)
 			continue
 		}
-		local.policy = policy
-		cursor = local.base + local.length
+		next := min_u64(end, local.base + local.length)
+		if local.policy != policy {
+			if local.shared_anonymous() {
+				replace_shared_policy(local, cursor, next, policy) or { return errno.get() }
+			}
+			local.policy = policy
+		}
+		cursor = next
 	}
 	return 0
 }

@@ -145,6 +145,7 @@ pub mut:
 	// Anonymous page index of the first page after a moving remap or wipe
 	// on fork. Zero uses the original mapping base for interleave placement.
 	policy_origin u64
+	shared_policies &SharedPolicies = unsafe { nil }
 	private_cow bool
 	tracked_file bool
 	file_registered bool
@@ -1038,7 +1039,8 @@ fn install_range_page(mut pagemap memory.Pagemap, source RangePageSource, virt u
 	if voidptr(current) != source.local_identity || current.global.serial != source.global_serial
 		|| current.generation != source.local_generation
 		|| current_file_page != source.file_page || file_page != source.file_page
-		|| current.flags != source.flags || current.policy != source.policy {
+		|| current.flags != source.flags
+		|| (!current.shared_anonymous() && current.policy != source.policy) {
 		pagemap.l.release()
 		source.give_back(file_page, page)
 		return
@@ -2417,6 +2419,7 @@ fn free_local_range(local &MmapRangeLocal) {
 fn free_global_range(global &MmapRangeGlobal) {
 	assert global.shadow_pagemap.top_level == unsafe { nil }
 	charge := global.shadow_pagemap.kernel_charge
+	free_shared_policies(global.shared_policies)
 	unsafe { global.locals.free(); free(global) }
 	kbudget.release(charge)
 }

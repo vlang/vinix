@@ -18,8 +18,8 @@ weight set. [Linux sysfs attribute implementation](https://github.com/gregkh/lin
 An oversized write consumes at most one native page. The I/O layer bounds
 the payload copy for scalar, positioned, and vectored writes. The no-address
 `MPOL_F_NODE` query returns the next allocation-order node. General kernel
-allocation and the block cache, explicit shared range policies, optional
-mode flags, and translated or 32-bit policy calls remain open.
+allocation and the block cache, explicit tmpfs and memfd range policies,
+optional mode flags, and translated or 32-bit policy calls remain open.
 
 ## Qualification
 
@@ -202,3 +202,40 @@ runner with `--case weightedcache`. Omit `--numa` for single-node runs.
 The restored and verified archive is
 `~/.cache/vinix-r15/weighted-cache/qualification.tar.zst`, with SHA-256
 `2b35428e734a8a6b3462465d18102a47a64720b38907eb0255456458124046c8`.
+
+## Shared anonymous range policies
+
+`mbind` on a shared anonymous mapping records policy intervals by backing
+offset. A fork alias sees updates through a different address space.
+An overlapping binding replaces the covered interval and preserves its
+outer fragments. Clearing a binding restores the faulting thread's policy
+for future allocations. Resident shared pages keep their data and placement.
+A fault racing an update can use the policy it sampled before allocating.
+Shared home-node overrides and page migration remain outside this subset.
+[Linux shmem policy lookup and installation](https://github.com/gregkh/linux/blob/v6.12.51/mm/shmem.c)
+
+The fixture forks before the parent installs weighted and bind intervals
+and clears an interior slice. It checks the child's address-policy queries,
+physical nodes, and task fallback, then checks the parent's view after it
+clears the remaining policies. The Vinix probe also measures mapping
+charges across 128 replacement and clear cycles after warm-up.
+
+Both production kernels were built from `7a0e62fb1` plus the archived
+source patch. The same fixture ELF per architecture passed on Vinix and
+Linux 6.12.51 in single- and two-node guests. The previous Vinix kernels
+returned `EOPNOTSUPP` when the parent tried to bind the shared range.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `8195fbd794dd2a97` | `b2ddc9be0b93459f` |
+| x86-64 | `c5c8d51a9e54c006` | `31c890a088c41f3b` |
+
+The `mbind`, `memhome`, `sharedmem`, and `mseal` regressions passed on both
+architectures, including the `mseal` retention checks. Independent review
+checked policy ownership, interval replacement, lock coverage, and fault
+snapshots. The allocation checker reproduced the baseline failures and the
+same 307 AArch64 and 255 x86-64 allocation sites.
+
+The restored and verified archive is
+`~/.cache/vinix-r15/shared-policy/qualification.tar.zst`, with SHA-256
+`e3883665639fcaed5a8d29503964c54c4838133645fe1742cd0028274dcaf734`.

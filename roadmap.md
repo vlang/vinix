@@ -2833,6 +2833,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   next-node queries, cache hits, and weight updates on both architectures.
   See [the file allocation receipts](docs/linux-weighted-interleave.md#allocation-order-for-mapped-file-pages).
 
+- [x] Apply explicit `mbind` policies to shared anonymous backing ranges.
+  Qualify fork aliases, overlapping policy edits, and placement after clearing
+  an interval on both architectures.
+  See [the shared range receipts](docs/linux-weighted-interleave.md#shared-anonymous-range-policies).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

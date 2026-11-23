@@ -49,13 +49,14 @@ pub fn query_policy_address(mut pagemap memory.Pagemap, address u64, want_node b
 
 fn policy_address_locked(pagemap &memory.Pagemap, address u64, want_node bool) (i32, u64) {
 	local, _, _ := addr2range(pagemap, address) or { return -i32(errno.efault), 0 }
+	policy := explicit_policy(local, address)
 	if !want_node {
-		return i32(local.policy.mode), local.policy.mask
+		return i32(policy.mode), policy.mask
 	}
 	if !page_mapping_has_node(local) { return -i32(errno.efault), 0 }
 	if phys := pagemap.user_page_phys(address, false) {
 		node := physical_page_node(phys)
-		if node >= 0 { return node, local.policy.mask }
+		if node >= 0 { return node, policy.mask }
 		return -i32(errno.efault), 0
 	}
 	if local.prot & prot_read != 0 { return -i32(errno.eagain), 0 }

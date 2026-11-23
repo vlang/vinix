@@ -336,7 +336,8 @@ fn added_markers(name string, arch string, marker string, two_nodes bool) ?[]str
 		}
 		'weighted' {
 			mut markers := [marker, 'LINUX WEIGHTED SUMMARY: sysfs=checked placement=checked',
-				'LINUX WEIGHTED STORES: PASS', 'LINUX WEIGHTED SHMEM: PASS', 'LINUX WEIGHTED ANON: PASS']
+				'LINUX WEIGHTED STORES: PASS', 'LINUX WEIGHTED SHMEM: PASS', 'LINUX WEIGHTED ANON: PASS',
+				'LINUX WEIGHTED SHARED POLICY: PASS', 'LINUX WEIGHTED SHARED STORAGE: PASS']
 			if two_nodes { markers << 'LINUX WEIGHTED NUMA: PASS' }
 			markers
 		}

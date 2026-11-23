@@ -436,6 +436,112 @@ fn check_shared_anonymous(page u64, other bool) {
 	}
 }
 
+fn bind_shared(base u64, length u64, mode i64, mask u64) {
+	need(C.syscall(i64(C.SYS_mbind), base, length, mode, unsafe { &mask }, u64(64), u64(0))
+		== 0, c'update a shared anonymous policy range')
+}
+
+fn check_shared_policy_alias(page u64, other bool) {
+	unsafe {
+		span := u64(64 * 1024 * 1024)
+		base := u64(C.mmap(nil, span, C.PROT_READ | C.PROT_WRITE,
+			C.MAP_SHARED | C.MAP_ANONYMOUS, -1, 0))
+		need(base != ~u64(0), c'create sparse shared policy backing')
+		ino, _ := shared_anon_identity(base)
+		mask := if other { u64(3) } else { u64(1) }
+		last := if other { u64(2) } else { u64(1) }
+		set_weight(0, c'3')
+		if other { set_weight(1, c'2') }
+		mut pipe := [2]i32{}
+		need(C.pipe(&pipe[0]) == 0, c'synchronize shared policy changes')
+		child := C.fork()
+		need(child >= 0, c'fork before updating shared policies')
+		mut ready := u8(1)
+		if child == 0 {
+			C.close(pipe[1])
+			need(C.read(pipe[0], &ready, 1) == 1 && C.close(pipe[0]) == 0,
+				c'wait for shared policies')
+			need(set_policy(bind_mode, 1) == 0, c'bind child task to node zero')
+			for index in 1 .. 18 {
+				address := base + u64(index) * page
+				if index < 2 || index >= 17 || (index >= 11 && index < 13) {
+					need(policy_is(address, address_flag, default_mode, 0) && fault(address) == 0,
+						c'cleared and uncovered pages follow child task policy')
+				} else if index >= 7 && index < 9 {
+					need(policy_is(address, address_flag, bind_mode, last)
+						&& fault(address) == if other { i32(1) } else { i32(0) },
+						c'child observes an overlapping binding')
+				} else {
+					want := if !other || (ino + u64(index)) % 5 < 3 { i32(0) } else { i32(1) }
+					need(policy_is(address, address_flag, weighted_mode, mask) && fault(address) == want,
+						c'child observes weighted fragments and their backing phase')
+				}
+			}
+			C._exit(0)
+		}
+		C.close(pipe[0])
+		bind_shared(base + 2 * page, 15 * page, weighted_mode, mask)
+		bind_shared(base + 7 * page, 2 * page, bind_mode, last)
+		bind_shared(base + 11 * page, 2 * page, default_mode, 0)
+		need(C.write(pipe[1], &ready, 1) == 1 && C.close(pipe[1]) == 0, c'publish shared policy changes')
+		mut status := i32(-1)
+		need(C.waitpid(child, &status, 0) == child && status == 0,
+			c'child faults follow updated shared policy')
+		bind_shared(base + 2 * page, 15 * page, default_mode, 0)
+		for index in 1 .. 18 {
+			address := base + u64(index) * page
+			need(policy_is(address, address_flag, default_mode, 0) && *(&u8(address)) == 28,
+				c'clearing policy preserves existing shared bytes')
+		}
+		need(C.munmap(voidptr(base), span) == 0, c'unmap shared policy backing')
+		set_weight(0, c'0')
+		if other { set_weight(1, c'0') }
+	}
+}
+
+fn policy_storage() (u64, u64) {
+	unsafe {
+		fd := C.open(c'/proc/kernel-resources', C.O_RDONLY | C.O_CLOEXEC)
+		need(fd >= 0, c'open kernel mapping counters')
+		mut data := [4096]char{}
+		size := C.read(fd, &data[0], u64(data.len - 1))
+		need(size > 0 && C.close(fd) == 0, c'read kernel mapping counters')
+		mut at := i64(0)
+		for at < size {
+			mut objects := u64(0)
+			mut bytes := u64(0)
+			if C.sscanf(&data[at], c'mapping %lu %lu', &objects, &bytes) == 2 {
+				return objects, bytes
+			}
+			for at < size && data[at] != char(10) { at++ }
+			at++
+		}
+	}
+	need(false, c'find mapping charges')
+	return 0, 0
+}
+
+fn check_shared_policy_storage(page u64, other bool) {
+	base := u64(C.mmap(unsafe { nil }, 24 * page, C.PROT_NONE,
+		C.MAP_SHARED | C.MAP_ANONYMOUS, -1, 0))
+	need(base != ~u64(0), c'reserve backing for policy storage churn')
+	mask := if other { u64(3) } else { u64(1) }
+	mut before_objects := u64(0)
+	mut before_bytes := u64(0)
+	for round in 0 .. 129 {
+		bind_shared(base + 2 * page, 15 * page, weighted_mode, mask)
+		bind_shared(base + 7 * page, 2 * page, bind_mode, 1)
+		bind_shared(base + 11 * page, 2 * page, default_mode, 0)
+		bind_shared(base + 2 * page, 15 * page, default_mode, 0)
+		if round == 0 { before_objects, before_bytes = policy_storage() }
+	}
+	after_objects, after_bytes := policy_storage()
+	need(before_objects == after_objects && before_bytes == after_bytes,
+		c'shared policy churn releases mapping charges')
+	need(C.munmap(voidptr(base), 24 * page) == 0, c'release policy churn backing')
+	C.puts(c'LINUX WEIGHTED SHARED STORAGE: PASS')
+}
+
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
@@ -453,6 +559,9 @@ pub fn run(argc i32, argv &&char) i32 {
 		check_policies(u64(page), other)
 		check_shared_placement(u64(page), other)
 		check_shared_anonymous(u64(page), other)
+		check_shared_policy_alias(u64(page), other)
+		if !reference { check_shared_policy_storage(u64(page), other) }
+		C.puts(c'LINUX WEIGHTED SHARED POLICY: PASS')
 		if other { C.puts(c'LINUX WEIGHTED NUMA: PASS') }
 		C.puts(c'LINUX WEIGHTED SUMMARY: sysfs=checked placement=checked')
 		C.puts(if reference { c'LINUX WEIGHTED REFERENCE: PASS' } else { c'LINUX WEIGHTED: PASS' })

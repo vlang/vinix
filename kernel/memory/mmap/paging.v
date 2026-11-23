@@ -477,6 +477,7 @@ fn remap_shared_anonymous(mut pagemap memory.Pagemap, old_address u64, old_lengt
 		base:         base
 		length:       new_length
 		offset:       local.offset + i64(old_address - local.base)
+		policy:       local.policy
 		prot:         local.prot
 		flags:        local.flags
 		dont_fork:    local.dont_fork
