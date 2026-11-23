@@ -443,7 +443,8 @@ The maintained host suite stopped on two existing launch-transport
 ownership assertions. With the same compiler, both assertions reported
 208,000 retained bytes on the unchanged `6c01b60c6` baseline and the
 updated source. The remaining suites and target C generation ran
-independently.
+independently. The subsequent [completion ownership check](launch-transport-check.md#completion-request-allocation-regression)
+records both passing assertions and a successful full host run.
 
 With the change applied to `6c01b60c6`, the signed basic, lifecycle and
 seat scenarios passed on both unsealed QEMU kernels. All six recordings

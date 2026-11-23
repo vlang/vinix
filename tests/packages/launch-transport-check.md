@@ -136,3 +136,41 @@ logs are retained separately from final qualification receipts.
 - [AArch64 stopped half-close fixture](results/2026-10-16/launch-transport-aarch64.partial.serial.txt), [x86_64 fixture](results/2026-10-16/launch-transport-x86_64.partial.serial.txt)
 - [AArch64 receipt](results/2026-10-16/launch-transport-aarch64.json), [report](results/2026-10-16/launch-transport-aarch64.txt), [serial](results/2026-10-16/launch-transport-aarch64.serial.txt), [QMP](results/2026-10-16/launch-transport-aarch64.qmp.txt)
 - [x86_64 receipt](results/2026-10-16/launch-transport-x86_64.json), [report](results/2026-10-16/launch-transport-x86_64.txt), [serial](results/2026-10-16/launch-transport-x86_64.serial.txt), [QMP](results/2026-10-16/launch-transport-x86_64.qmp.txt)
+
+## Completion request allocation regression
+
+V 0.5.2 `4478fc4` generated a heap copy of `Request` at the start of
+`receive_result`. It allocated 208 bytes even when the socket never returned
+a receipt. On `bc57dc1dd`, the successful and malformed completion tests each
+reported 208,000 retained bytes in the first 1,000-cycle window. The problem
+also appeared in the [PCM portal host rerun](audio-portal-native-check.md#pcm-portal-signal-interruption).
+
+At `b9cca369b`, completion validation takes a value receiver and borrows its
+fields synchronously. The generated C keeps the request and the bounded receive
+buffer on the stack. The wire format and status validation have the same
+accepted and refused inputs. Normal and ASan/UBSan tracking runs retained zero
+bytes and zero descriptors in every measured window. All 52 checks in the
+maintained audio portal host suite passed.
+
+The native fixture uses explicit pointer conversions at the `execv` and `poll`
+C boundaries and enables globals for the current account-session helper. It
+keeps the allocation and descriptor assertions and the 1,000-cycle cohorts.
+AArch64 and x86-64 QEMU passed all 40,000 wire cycles per guest across root and
+UID 1000, with zero retained bytes and descriptors in the measured windows.
+The protocol, streams and command companions passed. Both guests powered off
+normally, and all eight artifact hashes in each guest receipt verified.
+
+Signed PCM basic, lifecycle and seat runs also passed on both unsealed QEMU
+kernels. All six recordings passed the strict serial, waveform and guest
+shutdown checks.
+
+The host snapshot and the qualification bundle are in
+`~/.local/state/vinix/r14-completion-G1ADxv/`. The qualification bundle retains
+the before and after generated C, both native receipts and their artifacts,
+and all six signed recordings. Both archive digests verified, and all 132
+entries in the extracted `qualification.sha256` passed.
+
+| Archive | SHA-256 |
+| --- | --- |
+| `host-snapshot.tar.gz` | `222157126117f4f024035d6633e6e1cae5ab6dd05b9ae70b44cb2d0c557e228a` |
+| `qualification.tar.gz` | `fc8999712138f3d7c35b253ec4c4cbcc9c8f647056abbbb342892e2a4dcce6b8` |
