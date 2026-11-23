@@ -988,6 +988,24 @@ The paired inputs, native report, run logs and sanitizer checks are in
 Its SHA-256 is `18331bd92a61e999fe3c3a241db17aa7332441583e4bfac926744ed4bfeba684`.
 All 1,522 entries in the extracted `qualification.sha256` passed.
 
+### Explicit retry of pending draft creation
+
+At `04ac0fd5b`, `--retry-create=TAG` resends the original request from
+the pending creation record. It stages verified assets, checks the tag
+commit, rechecks the release list, and preserves the attempt marker.
+
+All 166 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. A moved tag, stale ISO, matching saved ID and a
+release appearing during staging all stopped the retry before its request.
+The native run recovered the draft after the retry response was lost and
+kept the original notes. ASan/UBSan checked changes to the captured record
+and confirmed that the saved ID check uses the recorded destination.
+
+The paired inputs, creation records, run logs and sanitizer checks are in
+`~/.local/state/vinix/r14-release-retry-create-jpKJ1v/qualification.tar.gz`.
+Its SHA-256 is `3c018450e4f3eb04cb16f71fe438800756b087ca12f09b14fc8a51ed12015cf8`.
+All 1,551 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
