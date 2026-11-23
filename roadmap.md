@@ -797,6 +797,8 @@ architectures; broader release/catalog/runtime acceptance remains open.
     can also drive image staging. The gate checks every version, publisher,
     manifest digest, minimum signed sequence and dependency against the
     bundled catalog and retains the approved pins in the image declaration.
+    Paired ISO builds accept separate configurations, signed bundles and locks
+    for each target. The AArch64 image caches use the effective AArch64 inputs.
     [Image catalog declarations](tests/packages/image-catalog-check.md) carry the
     exact lock into normal staging. Software discovers it for a full-set review
     with separate confirmation; matching trust and signed offline bundles remain

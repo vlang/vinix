@@ -112,7 +112,7 @@ path_generation() {
 }
 
 write_staging_cache_manifest() {
-    local input
+    local input package_key
 
     # Change this when the immutable-layer assembly logic changes. Desktop
     # source and launcher edits are refreshed below without restaging 6+ GiB.
@@ -134,6 +134,8 @@ write_staging_cache_manifest() {
     printf 'qemu_system=%s\n' "$WITH_QEMU_SYSTEM"
     printf 'android=%s\n' "$WITH_ANDROID"
     printf 'roblox=%s\n' "$WITH_ROBLOX"
+    package_key="$("$SCRIPT_DIR/build-support/content-key" --package-image aarch64)" || return
+    printf 'package-image=%s\n' "$package_key"
     for input in \
         "$BASE_INITRAMFS" "$DEVTOOLS_ARCHIVE" "$SYSROOT" \
         "$PYTHON_STAGING" "$NETWORK_TOOLS_STAGING" "$X11_STAGING" \
@@ -1863,6 +1865,16 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/wallpapers"
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/security-tools"
+    "$STAGING/etc/vinix-packages/config.json"
+    "$STAGING/usr/share/vinix-packages/applications.json"
+    "$STAGING/usr/share/licenses/vinix-packages"
+    "$STAGING/usr/share/vinix/actions/packages-change"
+    "$STAGING/usr/share/vinix/actions/packages-launch"
+    "$STAGING/usr/share/applications/vinix-packages"
+    "$STAGING/usr/bin/vinix-package"
+    "$STAGING/usr/bin/vinix-software"
+    "$STAGING/usr/sbin/vinix-session"
+    "$STAGING/usr/libexec/vinix/vinix-linux-runner"
     "$SCRIPT_DIR/build-support/stage-uname.sh"
     "$SCRIPT_DIR/build-support/stage-identity.v"
     "$SCRIPT_DIR/build-support/identitycore"

@@ -39,9 +39,9 @@ fn desktop_fixture(root string) !(string, map[string]string) {
 		fixture_write(root + '/' + item[0], item[1])!
 	}
 	mut env := os.environ()
-	env.delete('VINIX_PACKAGE_IMAGE_CONFIG')
-	env.delete('VINIX_PACKAGE_IMAGE_REPOSITORIES')
-	env.delete('VINIX_PACKAGE_IMAGE_APPLICATIONS')
+	for variable in package_image_variables {
+		for suffix in ['', '_AARCH64', '_X86_64']! { env.delete(variable + suffix) }
+	}
 	for name, value in {
 		'LLVM_BIN':                         llvm
 		'LD_LLD':                           root + '/tools/ld.lld'
@@ -162,6 +162,60 @@ fn test_image_application_requirements_selection_content_and_missing_input_inval
 	env['VINIX_PACKAGE_IMAGE_APPLICATIONS'] = 'invalid\x00path'
 	if _ := fixture_key(root, v, env) { assert false } else { assert err.msg().contains('image application requirements path') }
 	println('IMAGE REQUIREMENTS CACHE selected/missing/removed paths, same-size restored-time content changes and alternate identical-content inputs invalidate; invalid paths refuse PASS')
+}
+
+fn test_package_image_caches_track_only_effective_target_inputs() {
+	root := desktop_temporary()!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	v, mut env := desktop_fixture(root)!
+	for variable in package_image_variables {
+		generic := root + '/generic-' + variable
+		arm := root + '/arm-' + variable
+		x86 := root + '/x86-' + variable
+		is_bundle := variable == 'VINIX_PACKAGE_IMAGE_REPOSITORIES'
+		object := if is_bundle { '/native/objects/payload' } else { '' }
+		for path in [generic, arm, x86]! { fixture_write(path + object, 'first\n')! }
+		arm_variable := variable + '_AARCH64'
+		x86_variable := variable + '_X86_64'
+		env[variable] = generic
+		fallback := fixture_key(root, v, env)!
+		fallback_image := package_image_key('aarch64', env)!
+		env[arm_variable] = arm
+		env[x86_variable] = x86
+		selected := fixture_key(root, v, env)!
+		arm_image := package_image_key('aarch64', env)!
+		x86_image := package_image_key('x86_64', env)!
+		assert selected != fallback && arm_image != fallback_image
+		env[variable] = 'unused\x00path'
+		fixture_write(x86 + object, 'other\n')!
+		assert selected == fixture_key(root, v, env)!
+		assert arm_image == package_image_key('aarch64', env)!
+		x86_changed := package_image_key('x86_64', env)!
+		assert x86_image != x86_changed
+		fixture_write(arm + object, 'other\n')!
+		assert selected != fixture_key(root, v, env)!
+		assert arm_image != package_image_key('aarch64', env)!
+		assert x86_changed == package_image_key('x86_64', env)!
+
+		// Keep the selected input spelling and bytes while replacing its leaf.
+		arm_before_link := package_image_key('aarch64', env)!
+		arm_desktop_before_link := fixture_key(root, v, env)!
+		os.mv(arm, arm + '-moved')!
+		os.symlink(arm + '-moved', arm)!
+		assert arm_before_link != package_image_key('aarch64', env)!
+		assert arm_desktop_before_link != fixture_key(root, v, env)!
+		env[variable] = generic
+		env[arm_variable] = ''
+		assert fallback == fixture_key(root, v, env)!
+		assert fallback_image == package_image_key('aarch64', env)!
+		env[arm_variable] = 'selected\x00path'
+		if _ := package_image_key('aarch64', env) { assert false } else { assert err.msg().contains('embedded null byte') }
+		env.delete(variable)
+		env.delete(arm_variable)
+		env.delete(x86_variable)
+	}
+	if _ := package_image_key('arm64', env) { assert false } else { assert err.msg().contains('unsupported image package architecture') }
+	println('PACKAGE IMAGE CACHE target overrides, fallback, opposite-target isolation, content and leaf changes PASS')
 }
 
 fn test_v_launcher_change_invalidates() {

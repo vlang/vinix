@@ -4,6 +4,7 @@ module pkgcore
 import json2
 import os
 import time
+import tools.packages.imageinputs
 import tools.packages.pkgprotocol
 
 $if macos || ios {
@@ -520,9 +521,21 @@ fn test_image_requirements_file_honors_reviewed_versions_publishers_and_sequence
 
 fn test_image_requirements_file_cli_explicit_and_environment_inputs_preserve_precedence_and_gate_staging() {
 	binary := os.getenv('VINIX_PACKAGE_STAGE_CHECK_CLI'); if binary == '' { return }
-	previous := os.getenv_opt('VINIX_PACKAGE_IMAGE_APPLICATIONS')
-	defer { if value := previous { os.setenv('VINIX_PACKAGE_IMAGE_APPLICATIONS', value, true) } else { os.unsetenv('VINIX_PACKAGE_IMAGE_APPLICATIONS') } }
+	variables := [imageinputs.configuration, imageinputs.repositories, imageinputs.applications]!
+	suffixes := ['', '_AARCH64', '_X86_64']!
+	previous := os.environ()
+	defer {
+		for variable in variables {
+			for suffix in suffixes {
+				name := variable + suffix
+				if value := previous[name] { os.setenv(name, value, true) } else { os.unsetenv(name) }
+			}
+		}
+	}
 	for architecture in ['aarch64', 'x86_64']! {
+		for variable in variables {
+			for suffix in suffixes { os.unsetenv(variable + suffix) }
+		}
 		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }
 		root := work + '/image'; os.mkdir(root)!
 		source := image_apps_config(work, architecture, key, Policy{})!
@@ -541,6 +554,45 @@ fn test_image_requirements_file_cli_explicit_and_environment_inputs_preserve_pre
 		os.setenv('VINIX_PACKAGE_IMAGE_APPLICATIONS', path, true)
 		env_code, environment := image_apps_cli(binary, ['--check', ...base])
 		assert env_code == 0 && environment == explicit, environment
+
+		reviewed_path := work + '/reviewed.lock.json'
+		bare := ['--arch', architecture, '--staging', root, '--cc', work + '/missing-compiler']
+		export_code, export_report := image_apps_cli(binary, ['--check', ...base, '--export-deployment', reviewed_path])
+		assert export_code == 0, export_report
+		inputs := [source, work + '/bundle', reviewed_path]!
+		target_suffix := '_' + architecture.to_upper()
+		other_suffix := if architecture == 'aarch64' { '_X86_64' } else { '_AARCH64' }
+		missing := work + '/missing-input'
+		for index, variable in variables {
+			os.setenv(variable, missing, true)
+			os.setenv(variable + other_suffix, missing, true)
+			os.setenv(variable + target_suffix, inputs[index], true)
+		}
+		target_code, target := image_apps_cli(binary, ['--check', ...bare])
+		assert target_code == 0, target
+		target_report := json2.decode[ImageInputCheck](target)!
+		assert target_report.application_requirements_sha256 == hash_file(reviewed_path)!
+		assert target_report.application_deployment == report.application_deployment
+		inline_code, inline_report := image_apps_cli(binary, ['--check', ...bare, '--require-app', 'editor'])
+		assert inline_code == 0, inline_report
+		assert json2.decode[ImageInputCheck](inline_report)!.application_deployment.packages == ['editor']
+		for index, variable in variables {
+			os.setenv(variable, inputs[index], true)
+			os.setenv(variable + target_suffix, '', true)
+		}
+		for index, variable in variables {
+			os.setenv(variable + target_suffix, missing, true)
+			code, diagnostic := image_apps_cli(binary, [...bare, '--check'])
+			assert code != 0 && !diagnostic.contains('missing-compiler'), diagnostic
+			option := ['--config', '--repositories', '--applications'][index]
+			override_code, overridden := image_apps_cli(binary, [...bare, '--check', option, inputs[index]])
+			assert override_code == 0 && overridden == target, overridden
+			os.setenv(variable + target_suffix, '', true)
+		}
+		fallback_code, fallback := image_apps_cli(binary, [...bare, '--check'])
+		assert fallback_code == 0 && fallback == target, fallback
+		os.setenv(imageinputs.applications, path, true)
+
 		for check in [true, false]! {
 			mut args := base.clone(); if check { args << '--check' }
 			for mixed in [['--applications', path, '--require-app', 'editor'], ['--require-app', 'editor', '--applications', path]] {
@@ -559,6 +611,7 @@ fn test_image_requirements_file_cli_explicit_and_environment_inputs_preserve_pre
 		assert os.ls(root)!.len == 0
 	}
 	println('IMAGE REQUIREMENTS FILE CLI both-host inherited/explicit selection, inline override, mutual exclusion and normal/check compiler gates preserve unchanged images PASS')
+	println('PACKAGE IMAGE TARGET CLI signed deployment locks, all three target overrides, generic fallback and explicit precedence PASS')
 }
 
 fn test_image_deployment_exports_exact_owned_locks_and_saved_digests_for_inline_and_file_requirements() {

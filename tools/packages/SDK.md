@@ -221,6 +221,23 @@ desktop/security staging path also reads `VINIX_PACKAGE_IMAGE_CONFIG`; an explic
 `--config` wins. Use an absolute source path. The desktop image cache key includes
 both that selection and the source contents.
 
+A paired ISO build can select package inputs independently. Append `_AARCH64`
+or `_X86_64` to `VINIX_PACKAGE_IMAGE_CONFIG`, `VINIX_PACKAGE_IMAGE_REPOSITORIES`
+or `VINIX_PACKAGE_IMAGE_APPLICATIONS` to supply an absolute path for that
+target. The stager uses a nonempty target setting ahead of the shared setting.
+Explicit stager options have the highest precedence. For example, a signed bundle
+with both architectures can be shared across two reviewed configurations and
+application locks.
+
+```sh
+VINIX_PACKAGE_IMAGE_CONFIG_AARCH64=/release/aarch64/config.json \
+VINIX_PACKAGE_IMAGE_CONFIG_X86_64=/release/x86_64/config.json \
+VINIX_PACKAGE_IMAGE_REPOSITORIES=/release/signed-repositories \
+VINIX_PACKAGE_IMAGE_APPLICATIONS_AARCH64=/release/aarch64/applications.json \
+VINIX_PACKAGE_IMAGE_APPLICATIONS_X86_64=/release/x86_64/applications.json \
+./scripts/deploy-iso.sh --no-publish
+```
+
 The document uses the normal `architecture`, `repositories` (`id`, `url`,
 `public_key`), `policy` and `launch_user` fields. Defaults are the existing
 format-1 defaults; proprietary-license acceptance and firmware permission require
@@ -543,8 +560,10 @@ owned-result and plan cleanup contract as `check_applications`.
 The native desktop image cache includes the selected path and file contents,
 including same-size edits with restored timestamps. Changing the selection,
 creating/removing its file or selecting identical bytes at another path changes
-the cache key. The existing desktop/security stager inherits this environment
-and applies the normal signed-bundle gate on either target. Requirements still
+the cache key. The AArch64 builder also keys its assembled image root from the
+effective target configuration, bundle and requirements so an input change can
+stage into a fresh root. The existing desktop/security stager inherits this
+environment and applies the normal signed-bundle gate on either target. Requirements still
 apply when existing image configuration/bundles are preserved; supplying a
 different release configuration cannot override retained trust or policy.
 

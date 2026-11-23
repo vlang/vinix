@@ -3,6 +3,7 @@ module main
 
 import json2
 import os
+import tools.packages.imageinputs
 import tools.packages.pkgcore
 
 fn invoke(program string, arguments []string) ! {
@@ -42,12 +43,11 @@ fn stage() ! {
 	mut staging := ''
 	mut compiler := ''
 	mut compiler_args := []string{}
-	mut configuration := os.getenv('VINIX_PACKAGE_IMAGE_CONFIG')
-	mut repositories := os.getenv('VINIX_PACKAGE_IMAGE_REPOSITORIES')
+	mut configuration := ''
+	mut repositories := ''
 	mut check := false
 	mut required_applications := []string{}
-	mut applications := os.getenv('VINIX_PACKAGE_IMAGE_APPLICATIONS')
-	mut applications_explicit := false
+	mut applications := ''
 	mut deployment_output := ''
 	mut arguments := os.args[1..].clone()
 	for arguments.len > 0 {
@@ -61,16 +61,14 @@ fn stage() ! {
 			'--cc' { compiler = arguments[1] }
 			'--cc-argv' { compiler_args = json2.decode[[]string](arguments[1])! }
 			'--require-app' {
-				if applications_explicit { return error('--applications and --require-app are alternative application requirement inputs') }
+				if applications != '' { return error('--applications and --require-app are alternative application requirement inputs') }
 				if required_applications.len == 4096 { return error('--require-app supports at most 4096 application IDs') }
-				applications = '' // explicit IDs override an environment file
 				required_applications << arguments[1]
 			}
 			'--applications' {
 				if arguments[1] == '' { return error('--applications requires a reviewed application requirements file') }
 				if required_applications.len > 0 { return error('--applications and --require-app are alternative application requirement inputs') }
 				applications = arguments[1]
-				applications_explicit = true
 			}
 			'--export-deployment' {
 				if arguments[1] == '' { return error('--export-deployment requires a new output file') }
@@ -90,6 +88,12 @@ fn stage() ! {
 	}
 	if architecture !in ['aarch64', 'x86_64'] || staging == '' || staging == '/' || !os.is_dir(staging) {
 		return error('staging needs an existing target directory and supported architecture')
+	}
+	env := os.environ()
+	if configuration == '' { configuration = imageinputs.environment_path(env, imageinputs.configuration, architecture) }
+	if repositories == '' { repositories = imageinputs.environment_path(env, imageinputs.repositories, architecture) }
+	if applications == '' && required_applications.len == 0 {
+		applications = imageinputs.environment_path(env, imageinputs.applications, architecture)
 	}
 	if deployment_output != '' && (!check || (required_applications.len == 0 && applications == '')) {
 		return error('--export-deployment requires --check and selected application requirements')

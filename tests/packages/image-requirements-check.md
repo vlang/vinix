@@ -114,6 +114,27 @@ check therefore still fails on this baseline. The same state directory holds
 `image-lock-final.sha256`, whose SHA-256 is
 `440778bf079fc5c1df9ab283083f20c0c78fb16c7e35640bf7ac0883d743608d`.
 
+## Per-target release staging
+
+The real staging CLI passed for AArch64 and x86-64 with format-2 locks. The
+fixture tested each target override, generic fallback, explicit option
+precedence and refusal of invalid selected paths. The application assertions
+passed under ASan/UBSan with leak detection disabled. The cache assertions
+checked that changes to the selected path, bytes or leaf type invalidate the
+AArch64 image keys and that x86-64 settings leave those keys unchanged.
+
+A normal stage for each target used one environment containing both reviewed
+configurations, separate signed repository paths and both reviewed locks.
+Each output retained its exact lock and signed repository bytes, contained
+three static target tools and left consumer package state empty. These runs
+staged into small image roots. Paired desktop ISO build and boot were outside
+this run.
+
+The source patch against `ab420ef6f`, host logs, preflight reports and staged
+artifact hashes are in `~/.local/state/vinix/r14-target-1CoopZ`. The SHA-256 of
+`checks.sha256` is
+`497c515bf92b66ed75b64c94841fbff2531324da1fa486962cd76697c2c04b8b`.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the

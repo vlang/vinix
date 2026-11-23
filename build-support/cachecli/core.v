@@ -48,6 +48,11 @@ pub fn publish(path string, text string) ! {
 }
 
 fn content(argv []string) !int {
+	if argv.len > 0 && argv[0] == '--package-image' {
+		if argv.len != 2 { return error_with_code('usage: content-key --package-image aarch64|x86_64', 2) }
+		println(cachekey.package_image_key(argv[1], os.environ())!)
+		return 0
+	}
 	metadata := argv.len > 0 && argv[0] == '--metadata'
 	paths := if metadata { argv[1..] } else { argv }
 	if paths.len == 0 {
