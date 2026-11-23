@@ -54,6 +54,8 @@ fn tree_hashes(root string) !map[string]string {
  for directory in ['tools/accounts', 'tools/packages', 'desktop/ptycore', 'tests/hardware-platform/hwhost', 'tests/hardware-platform/plainiso', 'tests/packages/neovim-native'] {
  for path in os.walk_ext(root + '/' + directory, '.v') { if !path.ends_with('_test.v') { hashes[path] = digest(path)! } }
  }
+ plist := root + '/compat/ios/plist/plist.v'
+ hashes[plist] = digest(plist)!
  hashes[root + '/tests/packages/neovim-native-check.v'] = digest(root + '/tests/packages/neovim-native-check.v')!
  return hashes
 }
@@ -67,8 +69,13 @@ fn verify_sources(root string, expected map[string]string) ! {
 	if current != expected { return error('source inventory changed before qualification completed') }
 }
 
-fn build_program(v string, clang string, sysroot string, gcc string, source_root string, source string,
-	name string, arch string, work string, dynamic bool) !string {
+fn process_runtime_source(vlib string) string {
+	source := vlib + '/os/execute_capture_nix.c'
+	return if os.is_file(source) { source } else { vlib + '/os/execute_capture_nix.h' }
+}
+
+fn build_program(v string, clang string, sysroot string, gcc string, process_runtime string,
+	source_root string, source string, name string, arch string, work string, dynamic bool) !string {
 	directory := work + '/build-' + name
 	os.mkdir_all(directory)!
 	cfile := directory + '/' + name + '.c'
@@ -79,7 +86,7 @@ fn build_program(v string, clang string, sysroot string, gcc string, source_root
 	// implementation is added to the generated C.
 	vlib := os.dir(v) + '/vlib'
 	os.write_file(directory + '/runtime.c', '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +
-		vlib + '/os/execute_capture_nix.h"\n#define V_SYNC_THREAD_SCOPE\n#include "' + vlib + '/sync/thread_helper.h"\n')!
+		process_runtime + '"\n#define V_SYNC_THREAD_SCOPE\n#include "' + vlib + '/sync/thread_helper.h"\n')!
 	mut flags := [clang, '--target=' + arch + '-linux-musl', '--sysroot=' + sysroot,
 		'--gcc-install-dir=' + gcc, '-fuse-ld=lld', '-O1', '-w', '-fno-stack-protector',
 		'-Wno-error=incompatible-pointer-types',
@@ -122,8 +129,10 @@ fn check() ! {
 	clang := os.find_abs_path_of_executable(os.getenv_opt('CLANG') or { '/opt/homebrew/opt/llvm/bin/clang' })!
 	sources := tree_hashes(root)!
 	mut inputs := sources.clone()
+	vlib := os.dir(host.v) + '/vlib'
+	process_runtime := process_runtime_source(vlib)
 	for path in [os.executable(), host.v, clang, kernel, host.qemu, host.firmware, sandbox,
-		os.dir(host.v) + '/vlib/os/execute_capture_nix.h', os.dir(host.v) + '/vlib/sync/thread_helper.h',
+		vlib + '/os/execute_capture_nix.h', vlib + '/sync/thread_helper.h', process_runtime,
 		required(options, '--public-key')!] { inputs[path] = digest(path)! }
 	if host.firmware_vars != '' { inputs[host.firmware_vars] = digest(host.firmware_vars)! }
 	if arch == 'x86_64' { for _, path in plainiso.inputs(root)! { inputs[path] = digest(path)! } }
@@ -143,6 +152,8 @@ fn check() ! {
 		os.mkdir_all(source + '/' + os.dir(name))!
 		invoke(['cp', '-Rp', root + '/' + name, source + '/' + name], work + '/copy-' + os.base(name) + '.log')!
 	}
+	os.mkdir_all(source + '/compat/ios/plist')!
+	os.cp(root + '/compat/ios/plist/plist.v', source + '/compat/ios/plist/plist.v')!
 	os.mkdir_all(source + '/tests/packages/neovim-native')!
 	for name in ['neovim-native-check.v', 'neovim-native/main.v'] { os.cp(root + '/tests/packages/' + name, source + '/tests/packages/' + name)! }
 	os.write_file(work + '/inputs-before-build.json', json2.encode(inputs))!
@@ -155,13 +166,13 @@ fn check() ! {
 	os.mkdir_all(extras + '/usr/share/neovim-update')!
 	for name in ['index.json', 'index.sig'] { os.cp(update_repository + '/' + name, extras + '/usr/share/neovim-update/' + name)! }
 	os.write_file(extras + '/usr/share/neovim-update/public-key', key)!
-	account := build_program(host.v, clang, sysroot, gcc, source, source + '/tools/accounts/account.v', 'vinix-account', arch, work, false)!
+	account := build_program(host.v, clang, sysroot, gcc, process_runtime, source, source + '/tools/accounts/account.v', 'vinix-account', arch, work, false)!
 	os.cp(account, extras + '/usr/sbin/vinix-account')!
-	session := build_program(host.v, clang, sysroot, gcc, source, source + '/tools/accounts/session.v', 'vinix-session', arch, work, false)!
+	session := build_program(host.v, clang, sysroot, gcc, process_runtime, source, source + '/tools/accounts/session.v', 'vinix-session', arch, work, false)!
 	os.cp(session, extras + '/usr/sbin/vinix-session')!
-	package := build_program(host.v, clang, sysroot, gcc, source, source + '/tools/packages/main.v', 'vinix-package', arch, work, false)!
+	package := build_program(host.v, clang, sysroot, gcc, process_runtime, source, source + '/tools/packages/main.v', 'vinix-package', arch, work, false)!
 	os.cp(package, extras + '/usr/bin/vinix-package')!
-	guest := build_program(host.v, clang, sysroot, gcc, source, source + '/tests/packages/neovim-native/main.v', 'guest', arch, work, false)!
+	guest := build_program(host.v, clang, sysroot, gcc, process_runtime, source, source + '/tests/packages/neovim-native/main.v', 'guest', arch, work, false)!
 	config := pkgcore.Config{architecture: arch, launch_user: 'alex', policy: pkgcore.Policy{offline: true, reserve_bytes: 0},
 		repositories: [pkgcore.Repository{id: 'neovim-fixture', url: 'file://' + repository, public_key: key}]}
 	os.write_file(extras + '/etc/vinix-packages/config.json', json2.encode(config))!

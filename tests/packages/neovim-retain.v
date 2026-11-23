@@ -46,6 +46,8 @@ fn retain() ! {
 		host.v, host.qemu, host.firmware,
 		os.find_abs_path_of_executable(os.getenv_opt('CLANG') or { '/opt/homebrew/opt/llvm/bin/clang' })!,
 		os.dir(host.v) + '/vlib/os/execute_capture_nix.h', os.dir(host.v) + '/vlib/sync/thread_helper.h']
+	process_runtime := os.dir(host.v) + '/vlib/os/execute_capture_nix.c'
+	if os.is_file(process_runtime) { required_inputs << process_runtime }
 	if host.firmware_vars != '' { required_inputs << host.firmware_vars }
 	if arch == 'x86_64' { for _, path in plainiso.inputs(root)! { required_inputs << path } }
 	else {
@@ -59,7 +61,8 @@ fn retain() ! {
 			if !path.ends_with('_test.v') { required_inputs << path }
 		}
 	}
-	required_inputs << root + '/tests/packages/neovim-native-check.v'
+	plist := 'compat/ios/plist/plist.v'
+	required_inputs << [root + '/tests/packages/neovim-native-check.v', root + '/' + plist]
 	inputs := json2.decode[map[string]string](os.read_file(run + '/inputs.json')!)!
 	verified := json2.decode[map[string]string](os.read_file(run + '/inputs-verified.json')!)!
 	if inputs != verified { return error('completed input verification differs from admitted inputs') }
@@ -78,6 +81,9 @@ fn retain() ! {
 			return error('frozen fixture source differs from admitted source')
 		}
 	}
+	if digest(run + '/source/' + plist)! != inputs[root + '/' + plist] {
+		return error('frozen property-list source differs from admitted source')
+	}
 	for directory in ['tools/accounts', 'tools/packages', 'desktop/ptycore'] {
 		for path in os.walk_ext(root + '/' + directory, '.v') {
 			if !path.ends_with('_test.v') && digest(run + '/source/' + path[root.len + 1..])! != inputs[path] {
@@ -88,6 +94,7 @@ fn retain() ! {
 	outputs := json2.decode[map[string]string](os.read_file(run + '/outputs.json')!)!
 	mut required_outputs := ['inputs-before-build.json', 'inputs.json', 'inputs-verified.json', 'result.json',
 		'source/tests/packages/neovim-native-check.v', 'source/tests/packages/neovim-native/main.v',
+		'source/' + plist,
 		'boot/initramfs.tar', 'boot/serial.log', 'boot/qemu.log', 'boot/qmp.log', 'boot/image.log']
 	for name in ['guest', 'vinix-account', 'vinix-session', 'vinix-package'] {
 		for file in [name, name + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log', 'cc.log.argv.json'] {

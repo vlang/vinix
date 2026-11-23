@@ -38,7 +38,7 @@ fn terminal_read(fd int, marker string) !string {
 	defer { unsafe { output.free() } }
 	mut buffer := [4096]u8{}
 	for _ in 0 .. 12000 {
-		got := C.read(fd, &buffer[0], usize(buffer.len))
+		got := C.read(fd, &buffer[0], uint(buffer.len))
 		if got > 0 {
 			if output.len + int(got) > 1024 * 1024 { return error('terminal output exceeded 1 MiB') }
 			for i in 0 .. int(got) { output << buffer[i] }
@@ -51,7 +51,7 @@ fn terminal_read(fd int, marker string) !string {
 }
 
 fn terminal_write(fd int, text string) ! {
-	if C.write(fd, text.str, usize(text.len)) != text.len { return error('short terminal write') }
+	if C.write(fd, text.str, uint(text.len)) != text.len { return error('short terminal write') }
 }
 
 fn terminal_diagnostics() {
