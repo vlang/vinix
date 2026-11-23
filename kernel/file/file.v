@@ -740,15 +740,19 @@ pub fn (mut this Handle) write(buf voidptr, count u64) ?i64 {
 // message any family takes: a stream takes them as it takes any, and a
 // datagram too long to send is refused by its family, with EMSGSIZE, rather
 // than cut in two here.
-pub fn (mut this Handle) write_from_user(address u64, count u64) ?i64 {
-	if count == 0 {
+pub fn (mut this Handle) write_from_user(address u64, requested u64) ?i64 {
+	if requested == 0 {
 		return this.write(unsafe { nil }, 0)
 	}
-	if !usercopy.user_range(address, count) {
+	if !usercopy.user_range(address, requested) {
 		errno.set(errno.efault)
 		return none
 	}
-	limit := if stat.issock(this.resource.stat.mode) {
+	bound := resource.write_request_limit(mut this.resource)
+	count := if bound != 0 && bound < requested { bound } else { requested }
+	limit := if bound != 0 {
+		count
+	} else if stat.issock(this.resource.stat.mode) {
 		user_io_message_max + 1
 	} else {
 		user_io_chunk
@@ -1386,6 +1390,15 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 
 // Same borrowed ownership and validated-range contract as the read helper.
 pub fn pwrite_pinned_descriptor(mut fd FD, buf voidptr, count u64, offset i64) (u64, u64) {
+	return pwrite_pinned(mut fd, buf, count, offset, true)
+}
+
+// A bounded vector write supplies its complete kernel buffer in one call.
+pub fn pwrite_pinned_from_kernel(mut fd FD, buf voidptr, count u64, offset i64) (u64, u64) {
+	return pwrite_pinned(mut fd, buf, count, offset, false)
+}
+
+fn pwrite_pinned(mut fd FD, buf voidptr, requested u64, offset i64, from_user bool) (u64, u64) {
 	mut handle := fd.handle
 	if handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
@@ -1410,21 +1423,34 @@ pub fn pwrite_pinned_descriptor(mut fd FD, buf voidptr, count u64, offset i64) (
 	}
 	if !security.user_device_write_allowed(mut res) { return errno.err, errno.get() }
 
+	bound := resource.write_request_limit(mut res)
+	count := if bound != 0 && bound < requested { bound } else { requested }
 	allowed := limited_write_count(res, u64(offset), count) or {
 		return errno.err, errno.get()
 	}
 	if allowed == 0 { return 0, 0 }
-	scratch := proc.reserve_kernel(.scratch, (if allowed < user_io_chunk { allowed } else { user_io_chunk }) * 2 + 128) or { return errno.err, errno.get() }
- defer { kbudget.release(scratch) }
- buffer := unsafe { malloc(if allowed < user_io_chunk { allowed } else { user_io_chunk }) }
-	if buffer == unsafe { nil } {
+	size := if bound != 0 || allowed < user_io_chunk { allowed } else { user_io_chunk }
+	scratch := if from_user {
+		proc.reserve_kernel(.scratch, size * 2 + 128) or { return errno.err, errno.get() }
+	} else {
+		kbudget.Charge{}
+	}
+	defer { if from_user { kbudget.release(scratch) } }
+	buffer := if from_user { unsafe { malloc(size) } } else { buf } @[freed]
+	if from_user && buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
-	defer { krandom.explicit_bzero(buffer, uint(if allowed < user_io_chunk { allowed } else { user_io_chunk })); unsafe { free(buffer) } }
+	defer {
+		if from_user {
+			krandom.explicit_bzero(buffer, uint(size))
+			unsafe { free(buffer) }
+		}
+	}
 	mut done := u64(0)
 	for done < allowed {
-		chunk := if allowed - done < user_io_chunk { allowed - done } else { user_io_chunk }
-		if !usercopy.copy_from_user(buffer, u64(buf) + done, chunk) {
+		chunk := if allowed - done < size { allowed - done } else { size }
+		address := u64(buf) + done
+		if from_user && !usercopy.copy_from_user(buffer, address, chunk) {
 			if done != 0 { return done, 0 }
 			return errno.err, errno.efault
 		}
@@ -1433,7 +1459,8 @@ pub fn pwrite_pinned_descriptor(mut fd FD, buf voidptr, count u64, offset i64) (
 			return errno.err, errno.get()
 		}
 		handle.l.acquire()
-		written := res.write(voidptr(handle), buffer, u64(offset) + done, chunk) or {
+		data := if from_user { buffer } else { voidptr(address) }
+		written := res.write(voidptr(handle), data, u64(offset) + done, chunk) or {
 			handle.l.release()
 			security.end_user_device_write(block_token)
 			if done != 0 { return done, 0 }

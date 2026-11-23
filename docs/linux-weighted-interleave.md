@@ -15,12 +15,12 @@ write completes as a no-op. A numeric write takes effect immediately for
 future allocations using existing policies. One allocation uses a consistent
 weight set. [Linux sysfs attribute implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/sysfs/file.c)
 
-An oversized write consumes one native page from a fully mapped buffer.
-Vinix's generic write path checks and copies the requested buffer before
-dispatching to the attribute. The no-address `MPOL_F_NODE` query returns the
-first node in the weighted mask for the indexed subset. The allocation-order
-cursor for kernel and page-cache allocations, shared mapping phase, optional
-mode flags, and translated or 32-bit policy calls remain open.
+An oversized write consumes at most one native page. The I/O layer bounds
+the payload copy for scalar, positioned, and vectored writes. The no-address
+`MPOL_F_NODE` query returns the first node in the weighted mask for the
+indexed subset. The allocation-order cursor for kernel and page-cache
+allocations, shared mapping phase, optional mode flags, and translated or
+32-bit policy calls remain open.
 
 ## Qualification
 
@@ -53,3 +53,37 @@ FRESH-DIR --cases weighted --numa` on Vinix. The Linux reference takes
 The restored and verified archive is
 `~/.cache/vinix-r15/weighted/qualification.tar.zst`, with SHA-256
 `434e24b0dcb476706e3550dce31fad6cee2a01fbe58c35eb4d02d9c05f9311f4`.
+
+## Guarded write buffers
+
+The descriptor and user address range are validated before the payload is
+copied. A guard page beyond the consumed prefix can be skipped. An
+inaccessible byte inside the prefix returns `EFAULT` before the weight
+changes. A vectored write validates every header, joins the consumed
+segments, and submits them as one store. Positioned writes preserve the
+descriptor offset. [Linux 6.12.51 kernfs write implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/kernfs/file.c)
+
+The `weighted` fixture checks these rules through `write`, `pwrite`,
+`writev`, `pwritev`, and `pwritev2` at the current offset. It checks faults
+in both the consumed payload and an unused vector header.
+
+Both production kernels were built from `365a9d4c3` plus the archived
+source patch. The same fixture ELF per architecture passed on Vinix and
+Linux 6.12.51 in single- and two-node guests. The previous Vinix kernels
+returned `EFAULT` on the first guarded scalar write on both architectures.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `b063f28ec904b432` | `0fd885423b282d94` |
+| x86-64 | `bd01348e276cbf03` | `54d9f13491dba4fe` |
+
+The `iovimport`, `iovposition`, `iovstream`, and `iovpacket` regressions
+passed on both architectures, including their allocation-retention checks.
+Independent review checked the borrowed descriptor and buffer lifetimes,
+scratch cleanup, and permission checks around the copy. The allocation
+checker reproduced the baseline failures and the same 307 AArch64 and
+255 x86-64 allocation sites.
+
+The restored and verified archive is
+`~/.cache/vinix-r15/weight-store/qualification.tar.zst`, with SHA-256
+`f7d2ce17f0e23ccdee7564c463991f5af876ab7845b1fcf3c44f783c26153bb8`.

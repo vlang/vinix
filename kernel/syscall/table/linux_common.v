@@ -262,6 +262,10 @@ fn linux_writev_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) 
 		fd.handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 		return errno.err, errno.eopnotsupp
 	}
+	bound := resource.write_request_limit(mut fd.handle.resource)
+	if bound != 0 {
+		return linux_bounded_writev(mut fd, vector, iovcnt, bound, -1)
+	}
 
 	// One buffer and one write for anything up to linux_writev_max, which is
 	// every header-and-payload a protocol sends. The vector's lengths are the
@@ -320,6 +324,34 @@ fn linux_writev_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) 
 		written += ret
 	}
 	return written, 0
+}
+
+// A bounded backend receives the prefix of the combined iterator as one
+// store. Copy the entire prefix before calling it, so a fault cannot leave
+// an incomplete value in the attribute.
+fn linux_bounded_writev(mut fd file.FD, vector LinuxIOVector, iovcnt int, bound u64, offset i64) (u64, u64) {
+	size := if vector.total < bound { vector.total } else { bound }
+	bytes := vmstorage.allocation_bytes(size) or { return errno.err, errno.enomem }
+	charge := proc.reserve_kernel(.scratch, bytes) or { return errno.err, errno.get() }
+	defer { kbudget.release(charge) }
+	buffer := unsafe { memory.malloc_packed_fallible(size) } @[freed]
+	if buffer == unsafe { nil } { return errno.err, errno.enomem }
+	defer {
+		krandom.explicit_bzero(buffer, uint(size))
+		unsafe { free(buffer) }
+	}
+	mut filled := u64(0)
+	for i := 0; i < iovcnt && filled < size; i++ {
+		iov := unsafe { vector.data[i] }
+		length := if iov.len < size - filled { iov.len } else { size - filled }
+		if length == 0 { continue }
+		if !usercopy.copy_from_user(voidptr(u64(buffer) + filled), iov.base, length) {
+			return errno.err, errno.efault
+		}
+		filled += length
+	}
+	if offset == -1 { return fs.write_pinned_descriptor(mut fd, buffer, size, false) }
+	return file.pwrite_pinned_from_kernel(mut fd, buffer, size, offset)
 }
 
 // uname(buf): struct utsname, six 65-byte fields. `version` and `machine`

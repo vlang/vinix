@@ -453,6 +453,10 @@ fn (mut this SysFSResource) read(handle voidptr, buf voidptr, loc u64, count u64
 	return i64(actual_count)
 }
 
+fn (this &SysFSResource) write_request_limit() u64 {
+	return if this.kind == .node_interleave_weight { page_size } else { u64(0) }
+}
+
 fn (mut this SysFSResource) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	if this.kind == .node_interleave_weight {
 		if count == 0 { return i64(0) }

@@ -150,6 +150,26 @@ pub fn backend_is_read_only(mut res Resource) bool {
 	return false
 }
 
+// Some attributes consume one bounded request. The caller may copy only this
+// prefix and must submit it in one operation, including for vector writes.
+pub interface BoundedWriteResource {
+	write_request_limit() u64
+}
+
+struct BoundedWriteScratch {
+mut:
+	backend BoundedWriteResource
+}
+
+pub fn write_request_limit(mut res Resource) u64 {
+	if mut res is BoundedWriteResource {
+		mut scratch := unsafe { &BoundedWriteScratch(C.__builtin_alloca(sizeof(BoundedWriteScratch))) }
+		unsafe { scratch.backend = BoundedWriteResource(res) }
+		return scratch.backend.write_request_limit()
+	}
+	return 0
+}
+
 // Dropping the last reference to a removed file is what frees its inode and
 // blocks on a filesystem that keeps no journal; sync(2) waits for that.
 pub interface DiskReleaseResource {

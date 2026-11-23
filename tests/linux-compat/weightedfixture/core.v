@@ -19,14 +19,17 @@ fn C.dprintf(i32, &char, ...) i32
 fn C.fflush(voidptr) i32
 fn C.fork() i32
 fn C.fstat(i32, &C.stat) i32
+fn C.lseek(i32, i64, i32) i64
 fn C.madvise(voidptr, u64, i32) i32
 fn C.mkdir(&char, u32) i32
 fn C.mincore(voidptr, u64, &u8) i32
 fn C.mmap(voidptr, u64, i32, i32, i32, i64) voidptr
+fn C.mprotect(voidptr, u64, i32) i32
 fn C.mount(&char, &char, &char, u64, voidptr) i32
 fn C.munmap(voidptr, u64) i32
 fn C.open(&char, i32, ...) i32
 fn C.pause() i32
+fn C.pwrite(i32, voidptr, u64, i64) i64
 fn C.puts(&char) i32
 fn C.read(i32, voidptr, u64) i64
 fn C.setuid(u32) i32
@@ -47,6 +50,11 @@ const allowed_flag = u64(4)
 struct C.stat {
 	st_mode u32
 	st_size i64
+}
+
+struct StoreIOVec {
+	base u64
+	length u64
 }
 
 fn need(ok bool, label &char) {
@@ -112,6 +120,60 @@ fn check_weight_file(page u64) {
 	set_weight(0, c'0')
 }
 
+fn check_guarded_stores(page u64) {
+	unsafe {
+		buffer := C.mmap(nil, 2 * page, C.PROT_READ | C.PROT_WRITE,
+			C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+		need(buffer != voidptr(-1), c'map guarded write buffer')
+		base := u64(buffer)
+		guard := base + page
+		need(C.mprotect(voidptr(guard), page, C.PROT_NONE) == 0, c'guard second payload page')
+		fd := C.open(weight_path(0), C.O_WRONLY | C.O_CLOEXEC)
+		need(fd >= 0, c'open bounded weight store')
+
+		*(&u8(base)) = `5`
+		need(C.write(fd, buffer, page + 1) == i64(page) && read_weight(0) == 5,
+			c'write copies only the page before the guard')
+		need(result(C.write(fd, voidptr(base + 1), page)) == -C.EFAULT && read_weight(0) == 5,
+			c'guard inside the consumed page rejects the entire store')
+		*(&u8(base)) = `6`
+		need(C.pwrite(fd, buffer, page + 1, 7) == i64(page) && read_weight(0) == 6,
+			c'pwrite clips the payload before copying')
+		need(C.lseek(fd, 0, C.SEEK_CUR) == i64(page), c'pwrite preserves descriptor offset')
+
+		*(&u8(base)) = `1`
+		*(&u8(base + 1)) = `2`
+		mut vector := [StoreIOVec{base: base, length: 1},
+			StoreIOVec{base: base + 1, length: page - 1}, StoreIOVec{base: guard, length: 1}]!
+		need(C.syscall(i64(C.SYS_writev), i64(fd), &vector[0], i64(3)) == i64(page)
+			&& read_weight(0) == 12, c'writev combines the consumed segments in one store')
+		*(&u8(base)) = `2`
+		*(&u8(base + 1)) = `3`
+		vector[1] = StoreIOVec{base: base + 1, length: page}
+		need(C.syscall(i64(C.SYS_pwritev), i64(fd), &vector[0], i64(2), u64(17), u64(0)) == i64(page)
+			&& read_weight(0) == 23, c'pwritev clips inside a segment and stores the combined value')
+		need(C.lseek(fd, 0, C.SEEK_CUR) == i64(2 * page), c'pwritev preserves descriptor offset')
+		*(&u8(base)) = `4`
+		need(C.syscall(i64(C.SYS_pwritev2), i64(fd), &vector[0], i64(2), ~u64(0), u64(0), u64(0))
+			== i64(page) && read_weight(0) == 43, c'pwritev2 at current offset uses the same bounded store')
+		need(C.lseek(fd, 0, C.SEEK_CUR) == i64(3 * page), c'pwritev2 advances current offset by one page')
+
+		vector[1] = StoreIOVec{base: guard, length: 1}
+		need(result(C.syscall(i64(C.SYS_writev), i64(fd), &vector[0], i64(2))) == -C.EFAULT,
+			c'writev faults within the consumed prefix')
+		need(result(C.syscall(i64(C.SYS_pwritev), i64(fd), &vector[0], i64(2), u64(0), u64(0)))
+			== -C.EFAULT, c'pwritev faults before publishing a partial value')
+		mut header := &StoreIOVec(guard - sizeof(StoreIOVec))
+		*header = StoreIOVec{base: base, length: page}
+		need(result(C.syscall(i64(C.SYS_writev), i64(fd), header, i64(2))) == -C.EFAULT,
+			c'a fault in an unused vector header still fails the syscall')
+		need(read_weight(0) == 43, c'failed stores preserve the last value')
+		need(C.close(fd) == 0 && C.munmap(buffer, 2 * page) == 0, c'release guarded store controls')
+	}
+	set_weight(0, c'0')
+	C.puts(c'LINUX WEIGHTED STORES: PASS')
+}
+
 fn check_weights(page u64, other bool) {
 	need(read_weight(0) == 1, c'node zero defaults to weight one')
 	if other { need(read_weight(1) == 1, c'second node defaults to weight one') }
@@ -131,6 +193,7 @@ fn check_weights(page u64, other bool) {
 	set_weight(0, c'0\n')
 	need(read_weight(0) == 1, c'zero restores the default weight')
 	check_weight_file(page)
+	check_guarded_stores(page)
 	child := C.fork()
 	need(child >= 0, c'fork an unprivileged weight reader')
 	if child == 0 {

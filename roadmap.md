@@ -2814,6 +2814,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   changes, out-of-order faults, and range overrides on both architectures.
   See [the weighted interleave receipts](docs/linux-weighted-interleave.md).
 
+- [x] Bound NUMA weight stores before copying their payloads. Qualify scalar
+  and vector stores with guarded buffers, fault-before-store behavior, and
+  positioned offsets on both architectures.
+  See [the guarded-write receipts](docs/linux-weighted-interleave.md#guarded-write-buffers).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

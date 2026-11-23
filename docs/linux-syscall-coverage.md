@@ -720,7 +720,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | --- | --- |
 | `kernel/c/pthread.h` | `349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2` |
 | `kernel/event/event.v` | `1f95b365a5abcfe7fdf93b8b57bcbcee11e6d6327d0f20fef358bfde5fbffcf0` |
-| `kernel/file/file.v` | `0dccc3abba1c6d8f834cb960592bbe0e1733f308b5950ee343f5bfa98be97f12` |
+| `kernel/file/file.v` | `17e97308c5d0ef1ce71f55099d61968b7467a946399d376f3802b240691f7cee` |
 | `kernel/fs/cachestat.v` | `a91f13d49f8fddfd26f3acf44014ccafec290ccfdae0865ec17e5fdfe424ab11` |
 | `kernel/fs/memfd_policy.v` | `33534ea5547c7d52ce3fbb2d0d195955d60351b065ec992549496b6b9b7cc1f2` |
 | `kernel/fs/mount.v` | `3e12a582c553f6bfaaf0b6a17d62f662d6f403191b16abf877d6a9859604c0d6` |
@@ -733,7 +733,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/removed.v` | `b9da77e43848e2a691b7c01245d705f5f1240592d633c63f1675979e296ba435` |
 | `kernel/fs/stat.v` | `32383658a8c70553b16ca2c62169db483e6dbb2ca49fe3eb6436e5cb35a755a8` |
 | `kernel/fs/statmount.v` | `82bc993d71311a804006c2f04f6e03afe1cc2e7e52bf8eec7df6d9cfd5f4b9d2` |
-| `kernel/fs/sysfs.v` | `d747b52e4b9150ec2f19c3941f51a0457515af37739df40b4da8a4e73054cb08` |
+| `kernel/fs/sysfs.v` | `197e20b5b28b41d415e1d907175f4510f670f64174b4c8a82d409bf25c324cfa` |
 | `kernel/fs/sysfs_numa.v` | `85b05aacc4debf0b40ef2bdfa9afd4b126ec4dbf8f8e9d0fed63a8a2b5cfe9ed` |
 | `kernel/fs/tmpfs.v` | `6f82a74212ecedee58a8e9796af3c87b5e4e81f7398832b4c941c26e90de7e40` |
 | `kernel/fs/vfs.v` | `bd61cba1a55ea010c79441353e459b5089a3def9f1198b39361016470bf2665a` |
@@ -788,7 +788,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/proc/state.v` | `13039f5719e97d5589ffb4b21c1f0d94eac376392236024ebd850e6c39bcf92d` |
 | `kernel/proc/thread_attach.v` | `5209866e21780214bd9994a32410c5ed7a670a3760a1a2e977db1af280e888d0` |
 | `kernel/resource/cache.v` | `a2e88369886887a92609f58948f56a5b8116afc3e2fd5b6c2f1bdd364ea376de` |
-| `kernel/resource/resource.v` | `452fdd1a8f4395ba6b74205d22b54e81c458e0ac0b4f5014d06afcbd006a338a` |
+| `kernel/resource/resource.v` | `cea8b7c7c6669855668e23b534a17b89ce471864b86fbd353dec78158ab17e4c` |
 | `kernel/sched/inherit.v` | `efb3e2767be81c4064db53948dbf229c09118bfc05482ef7b39e678df18e2f82` |
 | `kernel/sched/reap.v` | `58ba75716ed70697e25209943e38d798b8b4f297a4b8d8e5eb63a38d21411423` |
 | `kernel/sched/sched_amd64.v` | `366fde02740384365fb5bf82fb287dbc8f54d1d51bd62486c9d93e73dc370fdb` |
@@ -798,8 +798,8 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/syscall/table/clock_control_arm64.v` | `d68badaf3327b07ec56fd424204fda71615ac7f3387d0c7fa1823be83d42969b` |
 | `kernel/syscall/table/container.v` | `2c3ac96ebc1b8213bc293b71acb79404e89e3b8f7f31594bbf034e41b7645e39` |
 | `kernel/syscall/table/container_arm64.v` | `13b4623072c1c966af706d8f8954c7273f5827ee912247496e80154ad4a6dc36` |
-| `kernel/syscall/table/linux_common.v` | `6550cc7f7c90a95cbfd695ebeaba1bb19359b4a9ef894712031c6648e236d788` |
-| `kernel/syscall/table/linux_compat.v` | `f7bd11f5ad30281c2ffa06b9833fde39a0b30c2ae895d3aca1e2577e4f94e5a8` |
+| `kernel/syscall/table/linux_common.v` | `213c612fb0c41f01acf691667601dbdf8bcaf58eddbddd60c5599479abadde8e` |
+| `kernel/syscall/table/linux_compat.v` | `b131d4b0024245d592b1b05844d9367f4feaa6598d6bc87e62aa4dca9f80b5ab` |
 | `kernel/syscall/table/linux_table_amd64.v` | `d39a3b803ebb3441e6aeb8b762323ae1b21eb6ea8a06b8c0775c0597606f62e2` |
 | `kernel/syscall/table/mempolicy.v` | `09fc9c2a1045d00f6ace354eb6212c7264ca0b7cc4d02b71b3a16445fc25322b` |
 | `kernel/syscall/table/mmap_aslr_amd64.v` | `8670ac6d0f56c37f91402b0a6311b746c9bc7471fdda97e6aa2d96939cfe45ce` |

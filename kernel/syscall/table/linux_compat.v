@@ -84,6 +84,13 @@ fn linux_positioned_iov(fdnum int, iov_ptr u64, iovcnt int, offset i64, write bo
 		fd.handle.mac_check(if write { proc.mac_write } else { proc.mac_read }) or { return errno.err, errno.get() }
 		return errno.err, errno.eopnotsupp
 	}
+	if write {
+		bound := resource.write_request_limit(mut fd.handle.resource)
+		if bound != 0 {
+			fd.handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
+			return linux_bounded_writev(mut fd, vector, iovcnt, bound, offset)
+		}
+	}
 
 	mut total := u64(0)
 	for i := 0; i < iovcnt; i++ {
