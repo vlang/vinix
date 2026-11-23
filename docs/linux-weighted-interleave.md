@@ -18,8 +18,8 @@ weight set. [Linux sysfs attribute implementation](https://github.com/gregkh/lin
 An oversized write consumes at most one native page. The I/O layer bounds
 the payload copy for scalar, positioned, and vectored writes. The no-address
 `MPOL_F_NODE` query returns the next allocation-order node. General kernel
-allocation and the block cache, explicit tmpfs and memfd range policies,
-optional mode flags, and translated or 32-bit policy calls remain open.
+allocation and the block cache, private file-mapping policies, optional
+mode flags, and translated or 32-bit policy calls remain open.
 
 ## Qualification
 
@@ -239,3 +239,39 @@ same 307 AArch64 and 255 x86-64 allocation sites.
 The restored and verified archive is
 `~/.cache/vinix-r15/shared-policy/qualification.tar.zst`, with SHA-256
 `e3883665639fcaed5a8d29503964c54c4838133645fe1742cd0028274dcaf734`.
+
+## Shared tmpfs and memfd range policies
+
+`mbind` on a shared tmpfs or memfd mapping installs a policy by file
+offset. The inode retains it after the installer unmaps, so independent
+views and writes into sparse holes use the same policy. A range edit can
+replace or clear an interior interval while preserving its outer fragments.
+Weighted placement uses the inode number plus the file page index.
+Clearing an interval restores the ordinary allocation path. Changing a
+policy affects future allocations. [Linux shmem policy and allocation](https://github.com/gregkh/linux/blob/v6.12.51/mm/shmem.c)
+
+The fixture installs overlapping weighted and bind intervals through an
+offset view of a memfd and a mounted tmpfs file. It clears an interior
+slice, unmaps the installer, writes into a bound hole, and checks policy,
+data, and node location through a new view. It pins the task's fallback to
+node zero to distinguish explicitly governed pages. The qualified path
+covers `MAP_SHARED`. Private file mappings, shared home-node overrides,
+and migration remain open.
+
+Both production kernels were built from `00b57ad54` plus the archived
+source patch. The same fixture ELF per architecture passed on Vinix and
+Linux 6.12.51 in two-node guests.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `a7eef657f92f3224` | `9b9736c7c9c7c719` |
+| x86-64 | `61354865a4dcb80c` | `d6deab9e2d24c645` |
+
+The `memfdseals` and `shmabi` regressions passed on both architectures.
+Independent review checked inode and policy lifetimes, budget ownership,
+and lock ordering. The allocation checker reproduced the baseline
+failures and the same 307 AArch64 and 255 x86-64 allocation sites.
+
+The archive was decoded and compared with the full evidence tree in place.
+It is at `~/.cache/vinix-r15/tmpfs-policy/qualification.tar.zst`, with
+SHA-256 `b146a08efcd40de3c4d407fbdc09a48d2dd2192653948ff749e7c887fe491017`.

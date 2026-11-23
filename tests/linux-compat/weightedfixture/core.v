@@ -298,6 +298,52 @@ fn check_policies(page u64, other bool) {
 	if other { set_weight(1, c'0') }
 }
 
+fn check_file_policy(fd i32, ino u64, page u64, other bool) {
+	unsafe {
+		need(C.ftruncate(fd, i64(36 * page)) == 0, c'extend file for explicit policies')
+		view := u64(C.mmap(nil, 15 * page, C.PROT_READ | C.PROT_WRITE,
+			C.MAP_SHARED, fd, i64(20 * page)))
+		need(view != ~u64(0), c'map the file policy installer')
+		mask := if other { u64(3) } else { u64(1) }
+		last := if other { u64(2) } else { u64(1) }
+		set_weight(0, c'3')
+		if other { set_weight(1, c'2') }
+		need(set_policy(weighted_mode, 1) == 0, c'force the task fallback to node zero')
+		bind_shared(view, 15 * page, weighted_mode, mask)
+		bind_shared(view + 5 * page, 2 * page, bind_mode, last)
+		bind_shared(view + 9 * page, 2 * page, default_mode, 0)
+		need(C.munmap(voidptr(view), 15 * page) == 0, c'remove the policy installer')
+		byte := u8(72)
+		need(C.pwrite(fd, &byte, 1, i64(25 * page)) == 1, c'write into a bound hole without a mapping')
+
+		base := u64(C.mmap(nil, 17 * page, C.PROT_READ, C.MAP_SHARED, fd, i64(19 * page)))
+		need(base != ~u64(0), c'remap the file through an independent offset')
+		for step in 0 .. 17 {
+			index := u64(step * 7 % 17) + 19
+			address := base + (index - 19) * page
+			need(*(&u8(address)) == if index == 25 { byte } else { u8(0) },
+				c'remapped data and sparse zeros survive')
+			node, _ := get_policy(address, node_flag | address_flag)
+			if index == 19 || index == 35 || (index >= 29 && index < 31) {
+				need(policy_is(address, address_flag, default_mode, 0) && node == 0,
+					c'cleared and uncovered file offsets use task fallback')
+			} else if index >= 25 && index < 27 {
+				need(policy_is(address, address_flag, bind_mode, last)
+					&& node == if other { i32(1) } else { i32(0) },
+					c'file binding places both a written and a faulted hole')
+			} else {
+				want := if !other || (ino + index) % 5 < 3 { i32(0) } else { i32(1) }
+				need(policy_is(address, address_flag, weighted_mode, mask) && node == want,
+					c'file policy follows the inode and page offset after unmap')
+			}
+		}
+		need(C.munmap(voidptr(base), 17 * page) == 0 && set_policy(default_mode, 0) == 0,
+			c'release the file policy probe')
+		set_weight(0, c'0')
+		if other { set_weight(1, c'0') }
+	}
+}
+
 fn check_shared_file(fd i32, page u64, other bool) {
 	unsafe {
 		mut info := C.stat{}
@@ -332,10 +378,12 @@ fn check_shared_file(fd i32, page u64, other bool) {
 		node, _ := get_policy(address, node_flag | address_flag)
 		need(node == want, c'sparse write places the same backing page as a weighted fault')
 
-		need(C.munmap(voidptr(alias), 15 * page) == 0 && C.munmap(voidptr(whole), 18 * page) == 0
-			&& C.close(fd) == 0, c'release shared backing and aliases')
+		need(C.munmap(voidptr(alias), 15 * page) == 0 && C.munmap(voidptr(whole), 18 * page) == 0,
+			c'release shared backing aliases')
 		set_weight(0, c'0')
 		if other { set_weight(1, c'0') }
+		check_file_policy(fd, info.st_ino, page, other)
+		need(C.close(fd) == 0, c'close the shared backing')
 	}
 }
 
@@ -350,6 +398,7 @@ fn check_shared_placement(page u64, other bool) {
 		need(C.unlink(file) == 0 && C.umount(path) == 0 && C.rmdir(path) == 0,
 			c'remove the tmpfs and its mountpoint')
 		C.puts(c'LINUX WEIGHTED SHMEM: PASS')
+		C.puts(c'LINUX WEIGHTED FILE POLICY: PASS')
 	}
 }
 

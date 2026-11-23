@@ -2838,6 +2838,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   an interval on both architectures.
   See [the shared range receipts](docs/linux-weighted-interleave.md#shared-anonymous-range-policies).
 
+- [x] Apply shared `mbind` policies by inode offset to tmpfs and memfd.
+  Qualify independent remaps, overlapping and cleared ranges, sparse file
+  writes, and task fallback on both architectures.
+  See [the shared file receipts](docs/linux-weighted-interleave.md#shared-tmpfs-and-memfd-range-policies).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

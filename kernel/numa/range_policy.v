@@ -83,7 +83,7 @@ pub fn alloc_mapped_file_page() voidptr {
 		caller.numa_interleave.remaining = interleave_weight(node)
 	}
 	caller.numa_interleave.remaining--
-	return alloc_policy_node(node, false, true)
+	return alloc_policy_node(node, false, true, false)
 }
 
 // The native Linux memory policy syscalls read maxnode-1 bits.
@@ -146,14 +146,29 @@ pub fn alloc_range_page(range_policy proc.NumaPolicy, index u64, zero bool) void
 		caller := proc.current_thread()
 		if caller != unsafe { nil } { policy = caller.numa_policy }
 	}
-	if !memory.user_room(1) { return unsafe { nil } }
+	return alloc_policy_page(policy, index, zero, false)
+}
+
+pub fn alloc_shared_policy_page(policy proc.NumaPolicy, index u64, file_data bool) voidptr {
+	if !numa_multinode {
+		return if file_data { memory.pmm_alloc_file(1) } else { memory.pmm_alloc_user(1) }
+	}
+	return alloc_policy_page(policy, index, true, file_data)
+}
+
+fn alloc_policy_page(policy proc.NumaPolicy, index u64, zero bool, file_data bool) voidptr {
+	if file_data {
+		if !memory.file_room(1) { return unsafe { nil } }
+	} else if !memory.user_room(1) {
+		return unsafe { nil }
+	}
 	match policy.mode {
 		mpol_bind, mpol_preferred_many {
 			home := if policy.home_node >= 0 { int(policy.home_node) } else { current_node() }
 			strict := policy.mode == mpol_bind
 			page := alloc_from_policy_mask(home, policy.mask, strict, zero)
 			if strict || page != unsafe { nil } { return page }
-			return alloc_policy_node(home, false, zero)
+			return alloc_policy_node(home, false, zero, file_data)
 		}
 		mpol_interleave {
 			mut count := u64(0)
@@ -163,19 +178,19 @@ pub fn alloc_range_page(range_policy proc.NumaPolicy, index u64, zero bool) void
 			mut slot := index % count
 			for node in 0 .. node_count() {
 				if policy.mask & (u64(1) << node) == 0 { continue }
-				if slot == 0 { return alloc_policy_node(node, false, zero) }
+				if slot == 0 { return alloc_policy_node(node, false, zero, file_data) }
 				slot--
 			}
 		}
 		mpol_preferred {
-			return alloc_policy_node(first_node_in(policy.mask), false, zero)
+			return alloc_policy_node(first_node_in(policy.mask), false, zero, file_data)
 		}
 		mpol_weighted_interleave {
-			return alloc_policy_node(weighted_interleave_node(policy.mask, index), false, zero)
+			return alloc_policy_node(weighted_interleave_node(policy.mask, index), false, zero, file_data)
 		}
 		else {}
 	}
-	return alloc_policy_node(current_node(), false, zero)
+	return alloc_policy_node(current_node(), false, zero, file_data)
 }
 
 fn alloc_from_policy_mask(home int, mask u64, strict bool, zero bool) voidptr {
@@ -190,7 +205,7 @@ fn alloc_from_policy_mask(home int, mask u64, strict bool, zero bool) voidptr {
 		// Preferred-many tries only immediately available memory in its mask.
 		// The unrestricted second pass can use normal allocator reclaim.
 		page := if strict {
-			alloc_policy_node(nearest, true, zero)
+			alloc_policy_node(nearest, true, zero, false)
 		} else {
 			memory.pmm_try_alloc_on_node(1, nearest, zero)
 		}
@@ -200,11 +215,11 @@ fn alloc_from_policy_mask(home int, mask u64, strict bool, zero bool) voidptr {
 	return unsafe { nil }
 }
 
-fn alloc_policy_node(node int, strict bool, zero bool) voidptr {
+fn alloc_policy_node(node int, strict bool, zero bool, file_data bool) voidptr {
 	page := if zero {
 		memory.pmm_alloc_on_node(1, node, strict)
 	} else {
 		memory.pmm_alloc_nozero_on_node(1, node, strict)
 	}
-	return note_node_exhaustion(page, strict)
+	return if file_data { page } else { note_node_exhaustion(page, strict) }
 }

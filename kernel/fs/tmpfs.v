@@ -57,6 +57,9 @@ pub mut:
 	attr_bits u32
 	shared_mapping_ranges u64
 	writable_mapping_ranges u64
+	// Pagemap callers can query or edit policies without taking the data lock.
+	policy_lock klock.Lock
+	shared_policies numa.SharedPolicies
 }
 
 // Cover the resource and its interface box with room for slab rounding.
@@ -312,6 +315,19 @@ fn (mut this TmpFSResource) lazy_shared_mapping() bool {
 	return true
 }
 
+fn (mut this TmpFSResource) shared_policy_at(offset u64) (i32, u64) {
+	this.policy_lock.acquire()
+	defer { this.policy_lock.release() }
+	policy := this.shared_policies.lookup(offset)
+	return policy.mode, policy.mask
+}
+
+fn (mut this TmpFSResource) replace_shared_policy(begin u64, end u64, mode i32, mask u64) ? {
+	this.policy_lock.acquire()
+	defer { this.policy_lock.release() }
+	this.shared_policies.replace(proc.kernel_owner(), begin, end, proc.NumaPolicy{mode: mode, mask: mask})?
+}
+
 // A page of the file's. One taken for a write is file data, which leaves
 // programs their memory: the write fails with ENOSPC before it takes that.
 // One taken for a shared mapping of a file nothing names is the mapping
@@ -415,8 +431,15 @@ fn (mut this TmpFSResource) materialize_page_locked(index int, file_data bool) b
 	if this.pages[index] != 0 {
 		return true
 	}
-	node := numa.weighted_task_node(this.stat.ino + u64(index))
-	phys := tmpfs_page(file_data, node)
+	this.policy_lock.acquire()
+	policy := this.shared_policies.lookup(u64(index) * page_size)
+	this.policy_lock.release()
+	policy_index := this.stat.ino + u64(index)
+	phys := if policy.mode == numa.mpol_default {
+		tmpfs_page(file_data, numa.weighted_task_node(policy_index))
+	} else {
+		numa.alloc_shared_policy_page(policy, policy_index, file_data)
+	}
 	if phys == unsafe { nil } {
 		return false
 	}
@@ -698,6 +721,7 @@ fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 		memory.free(this.storage)
 	}
 	free_xattrs(this.xattrs)
+	this.shared_policies.release()
 	kbudget.release(this.kernel_charge)
 
 	unsafe {

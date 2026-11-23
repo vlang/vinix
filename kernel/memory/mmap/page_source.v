@@ -57,7 +57,7 @@ fn range_page_source(local &MmapRangeLocal, virt u64) RangePageSource {
 	key := shadow_address(local, virt)
 	// Like a shmem fault, an allocation already in flight can use its
 	// policy snapshot while another alias changes the backing policy.
-	if local.shared_anonymous() { source.policy = owner.shared_policy_locked(key) }
+	if local.shared_anonymous() { source.policy = owner.shared_policies.lookup(key) }
 	node := paged_find(owner.paged_pages, key)
 	if node != unsafe { nil } {
 		source.backing = voidptr(node.backing)
