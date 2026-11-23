@@ -340,6 +340,33 @@ identities are in
 Its SHA-256 is `0fcdefaf6bd8967fcb1903811d4acebe9432ed823ad0951b359e11b400b9f6cf`.
 All 244 entries in the extracted `qualification.sha256` passed.
 
+### Release receipts use the staged ISOs
+
+At `08a2c8409`, the release driver captures the assets before package
+verification. The package verifier hashes and extracts the same private
+ISO that the boot runner and uploader receive. Standalone
+`package-receipt verify` makes its own read-only ISO copy in its temporary
+workspace and removes the copy on exit.
+
+All fifteen release-driver fixtures passed. The build, boot and GitHub
+steps used local stubs, and the extraction wrapper invoked real `xorriso`.
+While the wrapper ran, it temporarily changed the public amd64 ISO. The
+previous driver at `a05b8c454` tried to extract that file and failed. The
+updated driver extracted from the same staged ISO that it handed to the
+boot and upload steps. A package-bearing release with `--no-test` passed
+with the same receipt and upload paths.
+
+All 33 receipt controls passed for each architecture in production and
+ASan/UBSan builds. Standalone checks on both builds and architectures
+also retained byte-identical receipts when the public ISO changed during
+extraction, cleaned up the private copies and refused writable inputs to
+`verify-staged`.
+
+The paired inputs, source revisions, complete controls and release logs
+are in `~/.local/state/vinix/r14-release-receipt-capture-uonSbh/qualification.tar.gz`.
+Its SHA-256 is `82b815920dbd0edc6a22cf0367549dd6a3bc14e0de59774b2e613593e013ced3`.
+All 1,366 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
