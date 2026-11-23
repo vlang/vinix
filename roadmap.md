@@ -2764,6 +2764,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Qualify fork, remap, protection changes and mmap/seal races on both native
   architectures. See [the write seal receipts](docs/linux-memfd-write-seals.md).
 
+- [x] Implement native `cachestat` for tmpfs, memfds and cacheless kernel
+  files. Qualify sparse ranges, shared faults, permission checks and the
+  fixed-width result on both architectures. See [the cachestat receipts](docs/linux-cachestat.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

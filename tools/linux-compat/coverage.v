@@ -218,6 +218,7 @@ fn coverage(root string) !Coverage {
 		'kernel/file/file.v', 'kernel/resource/resource.v', 'kernel/resource/cache.v',
 		'kernel/socket/unix/unix.v', 'kernel/pipe/pipe.v', 'kernel/pipe/usercopy.v', 'kernel/fs/vfs.v', 'kernel/fs/mount_policy.v',
 		'kernel/fs/mount.v', 'kernel/fs/tmpfs.v', 'kernel/fs/procfs.v', 'kernel/fs/memfd_policy.v',
+		'kernel/fs/cachestat.v',
 		'kernel/fs/namespaces.v', 'kernel/fs/removed.v',
 		'kernel/proc/proc.v', 'kernel/proc/proc_arm64.v', 'kernel/proc/proc_amd64.v',
 		'kernel/proc/pidns.v',
