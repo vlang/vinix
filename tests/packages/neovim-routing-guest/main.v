@@ -172,6 +172,10 @@ fn verify_approved_install(document pkgprotocol.DeploymentDocument, password str
 			if os.is_link('/var/lib/vinix-packages/current') { break }
 		}
 		if time.sys_mono_now() >= deadline {
+			println('HWTEST INFO package change dispatched ${log.contains(approval_success)}')
+			if budget := os.read_file('/proc/kernel-resources') {
+				println('HWTEST INFO package install kernel reservations\n' + budget)
+			}
 			if memory := os.read_file('/proc/meminfo') { println('HWTEST INFO package install memory\n' + memory) }
 			return error('approved package change did not activate a generation')
 		}

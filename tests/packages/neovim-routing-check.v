@@ -7,6 +7,7 @@ import hwhost
 import json2
 import os
 import plainiso
+import strconv
 
 const desktop_files = [
 	'usr/bin/vinix-desktop',
@@ -22,15 +23,16 @@ const approved_install = 'HWTEST PASS approved Software generation verified and 
 
 fn parse_options(values []string) !map[string]string {
 	required := ['--arch', '--kernel', '--staging', '--config', '--deployment', '--bundle', '--out']
+	plain := ['--arch', '--approve', '--memory-mib']
 	mut options := map[string]string{}
 	for argument in values {
 		name := argument.all_before('=')
 		value := argument.all_after('=')
-		if (name !in required && name != '--approve')
+		if (name !in required && name !in plain)
 			|| !argument.contains('=') || value == '' || name in options {
-			return error('expected distinct --arch, --kernel, --staging, --config, --deployment, --bundle, --out and optional --approve options')
+			return error('expected distinct --arch, --kernel, --staging, --config, --deployment, --bundle, --out and optional --approve and --memory-mib options')
 		}
-		options[name] = if name in ['--arch', '--approve'] { value } else { os.abs_path(value) }
+		options[name] = if name in plain { value } else { os.abs_path(value) }
 	}
 	if !required.all(it in options) || options['--arch'] !in ['aarch64', 'x86_64'] {
 		return error('missing inputs or unsupported architecture')
@@ -122,6 +124,9 @@ fn check() ! {
 	options := parse_options(os.args[1..])!
 	arch := options['--arch']
 	approve := options['--approve'] == 'true'
+	memory_option := options['--memory-mib'] or { if approve { '2048' } else { '1024' } }
+	memory_mib := strconv.atoi(memory_option) or { return error('--memory-mib must be a positive integer') }
+	if memory_mib < 1 { return error('--memory-mib must be a positive integer') }
 	root := hwhost.find_root(@FILE)!
 	host := hwhost.find_host(root, arch, '')!
 	work := options['--out']
@@ -231,7 +236,7 @@ fn check() ! {
 	}
 	runtime_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
 	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{kernel: options['--kernel'], guest: guest,
-		state: boot, timeout: 300, memory_mib: if approve { 2048 } else { 1024 }, keep: true})
+		state: boot, timeout: 300, memory_mib: memory_mib, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	if !outcome.passed || outcome.interrupted || outcome.reason != '' { return error(outcome.reason) }
 	for path, expected in inputs {

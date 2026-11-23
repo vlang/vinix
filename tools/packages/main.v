@@ -623,24 +623,29 @@ fn checked(arguments []string) !int {
 
 fn ignore_progress(_ pkgprotocol.Progress) {}
 
+fn write_progress(event pkgprotocol.Progress, mut stream os.File) {
+	event.validate() or { unsafe { err.free() }; return }
+	// A deployment can emit several frames per file. Encode straight into a
+	// single owned buffer so the package worker retires each frame after writing.
+	mut frame := []u8{cap: pkgprotocol.progress_limit}
+	defer { unsafe { frame.free() } }
+	for byte in pkgprotocol.progress_prefix { frame << byte }
+	json2.encode_append(event, mut frame)
+	frame << `\n`
+	stream.write(frame) or { unsafe { err.free() }; return }
+	stream.flush()
+}
+
 fn print_progress(event pkgprotocol.Progress) {
-	event.validate() or { return }
-	text := json2.encode(event)
-	frame := pkgprotocol.progress_prefix + text
-	println(frame)
-	flush_stdout()
-	unsafe { text.free(); frame.free() }
+	mut stream := os.stdout()
+	write_progress(event, mut stream)
 }
 
 // Keep the complete health snapshot on stdout, including with --json. Health
 // is read-only, so its separate progress channel never needs admin transport.
 fn print_health_progress(event pkgprotocol.Progress) {
-	event.validate() or { return }
-	text := json2.encode(event)
-	frame := pkgprotocol.progress_prefix + text
-	eprintln(frame)
-	flush_stderr()
-	unsafe { text.free(); frame.free() }
+	mut stream := os.stderr()
+	write_progress(event, mut stream)
 }
 
 #include <sys/wait.h>
