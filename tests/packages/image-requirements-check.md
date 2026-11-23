@@ -1025,6 +1025,25 @@ The paired inputs, baseline and native runs, and sanitizer checks are in
 Its SHA-256 is `6682793b06dbf4e56a293b381e5eb523b5946df1ee56031db6996189c80a6649`.
 All 1,598 entries in the extracted `qualification.sha256` passed.
 
+### Draft readback after an upload failure
+
+At `162976d95`, an unsuccessful upload command triggers same-ID draft
+readback. The driver requires all recorded asset digests and the remote tag
+commit before continuing. A local staging or verification failure still
+stops before upload readback.
+
+All 167 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. A response lost after the last ISO was accepted
+left the old driver reporting failure. The native run verified the same
+draft and preserved every earlier upload. Partial uploads stayed
+unpublished. ASan/UBSan checked the distinct exit statuses for a local
+verification failure and an accepted upload with a lost response.
+
+The paired inputs, baseline and native runs, and sanitizer checks are in
+`~/.local/state/vinix/r14-release-upload-readback-rXh6NI/qualification.tar.gz`.
+Its SHA-256 is `7d5497ce59f4012b4443e9cecd6a4321b021bf6da9911d33821c6fe324de5f34`.
+All 1,632 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
