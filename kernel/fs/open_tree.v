@@ -57,7 +57,7 @@ fn open_tree_path(dirfd int, path string, follow bool, flags int) ?&file.FD {
 		return open_tree_from_fd(base, flags)
 	}
 	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
-	target := pin_open_tree_path(base, dirfd, path, follow, identity)?
+	target := pin_path_at(base, dirfd, path, follow, identity)?
 	defer { release_path_target(target) }
 	mut node := unsafe { target.node }
 	if !policy_check(node, proc.policy_inspect) { return none }
@@ -71,15 +71,15 @@ fn open_tree_path(dirfd int, path string, follow bool, flags int) ?&file.FD {
 	return fd_create_from_node(mut node, flags, identity, false)
 }
 
-fn pin_open_tree_path(base &file.FD, dirfd int, path string, follow bool,
+fn pin_path_at(base &file.FD, dirfd int, path string, follow bool,
 	identity &lib.MountContext) ?PathTarget {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
 	mut parent := if base == unsafe { nil } {
 		parent_and_mount_for(dirfd, path, identity)?
 	} else {
-		if !stat.isdir(base.handle.resource.stat.mode) || base.handle.node == unsafe { nil } {
-			errno.set(errno.enotdir)
+		if base.handle.node == unsafe { nil } || (path.len != 0 && !stat.isdir(base.handle.resource.stat.mode)) {
+			errno.set(if path.len == 0 { errno.einval } else { errno.enotdir })
 			return none
 		}
 		lib.copy_mount_context(identity, &base.handle.mount)

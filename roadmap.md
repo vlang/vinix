@@ -2802,6 +2802,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   descriptor reservation, and metadata-only pipe and terminal references on
   both architectures. See [the open_tree receipts](docs/linux-open-tree.md).
 
+- [x] Implement native `move_mount` for attached trees. Qualify descriptor and
+  pathname endpoints, retained mount identities, and namespace and mount-stack
+  checks on both architectures. See [the move_mount receipts](docs/linux-move-mount.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

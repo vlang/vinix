@@ -9,7 +9,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 
 ## aarch64
 
-266/312 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
+267/312 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
 
 | Number | Linux name | Handler | Dispatch status | Registered by |
 | --- | --- | --- | --- | --- |
@@ -303,7 +303,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | 426 | io_uring_enter | `vacant` | unavailable |  |
 | 427 | io_uring_register | `vacant` | unavailable |  |
 | 428 | open_tree | `fs.syscall_open_tree` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
-| 429 | move_mount | `vacant` | unavailable |  |
+| 429 | move_mount | `fs.syscall_move_mount` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
 | 430 | fsopen | `vacant` | unavailable |  |
 | 431 | fsconfig | `vacant` | unavailable |  |
 | 432 | fsmount | `vacant` | unavailable |  |
@@ -335,7 +335,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 
 ## x86_64
 
-305/369 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
+306/369 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
 
 | Number | Linux name | Handler | Dispatch status | Registered by |
 | --- | --- | --- | --- | --- |
@@ -679,7 +679,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | 426 | io_uring_enter | `vacant` | unavailable |  |
 | 427 | io_uring_register | `vacant` | unavailable |  |
 | 428 | open_tree | `fs.syscall_open_tree` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
-| 429 | move_mount | `vacant` | unavailable |  |
+| 429 | move_mount | `fs.syscall_move_mount` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
 | 430 | fsopen | `vacant` | unavailable |  |
 | 431 | fsconfig | `vacant` | unavailable |  |
 | 432 | fsmount | `vacant` | unavailable |  |
@@ -723,11 +723,12 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/file/file.v` | `0dccc3abba1c6d8f834cb960592bbe0e1733f308b5950ee343f5bfa98be97f12` |
 | `kernel/fs/cachestat.v` | `a91f13d49f8fddfd26f3acf44014ccafec290ccfdae0865ec17e5fdfe424ab11` |
 | `kernel/fs/memfd_policy.v` | `33534ea5547c7d52ce3fbb2d0d195955d60351b065ec992549496b6b9b7cc1f2` |
-| `kernel/fs/mount.v` | `c51f9a577492272b2f84d4d7ecd34509b9efd8f413b15a90064842a241446265` |
+| `kernel/fs/mount.v` | `5f12e86f7fd557b94a93cfe7b80434b500b098e256cc312ef2211551830af62b` |
 | `kernel/fs/mount_policy.v` | `8ac39791e4d1a2139da5510ecb4de5737665c405be0b671fe8825dbbf95e4ae4` |
 | `kernel/fs/mount_query.v` | `ccb58a7ec7504bf0d43cba1228462a22c459f0a94fe2eaef369b3638329663b5` |
+| `kernel/fs/move_mount.v` | `999840de5cb64d6699ad11bb1b4231bc4e92be72665654460852f1aa26707bcf` |
 | `kernel/fs/namespaces.v` | `103e08343fb43a520807f500c0aec549141b8a20b4d8a527896e4a2294f9dfea` |
-| `kernel/fs/open_tree.v` | `c5955292dfdb479668d53c803fdb3bf25eadb0b5cb66f7a9223835626acadefc` |
+| `kernel/fs/open_tree.v` | `0c194f803b90388619ffe76caf0a63f6444b6b6e00edf138acfb267e607212d1` |
 | `kernel/fs/procfs.v` | `9bf239a8ec4fe916f5514f0f7b1c44ce56512f4c609aed9a4bb853e369ab8d0e` |
 | `kernel/fs/removed.v` | `b9da77e43848e2a691b7c01245d705f5f1240592d633c63f1675979e296ba435` |
 | `kernel/fs/stat.v` | `32383658a8c70553b16ca2c62169db483e6dbb2ca49fe3eb6436e5cb35a755a8` |
@@ -789,14 +790,14 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/syscall/table/container_arm64.v` | `13b4623072c1c966af706d8f8954c7273f5827ee912247496e80154ad4a6dc36` |
 | `kernel/syscall/table/linux_common.v` | `6550cc7f7c90a95cbfd695ebeaba1bb19359b4a9ef894712031c6648e236d788` |
 | `kernel/syscall/table/linux_compat.v` | `f7bd11f5ad30281c2ffa06b9833fde39a0b30c2ae895d3aca1e2577e4f94e5a8` |
-| `kernel/syscall/table/linux_table_amd64.v` | `f2bec7845c51c333ecbb6b48020b728669b34de3e06d587531c6d331e77d3d1e` |
+| `kernel/syscall/table/linux_table_amd64.v` | `7c6b5387e346b98c85beab170bfee59f99587cb241c5b295d7231d0273840e7e` |
 | `kernel/syscall/table/mmap_aslr_amd64.v` | `8670ac6d0f56c37f91402b0a6311b746c9bc7471fdda97e6aa2d96939cfe45ce` |
 | `kernel/syscall/table/pipe_usercopy_amd64.v` | `48c1bdd554d3dfc05a544f3d18df0d284fe3e1a074621abcf8c1688cb416e8d0` |
 | `kernel/syscall/table/process_madvise.v` | `ec71833c8a6cb05f99bcd5b48a06acc09010a8289f617fcd11d0e39c0ad7dde3` |
 | `kernel/syscall/table/security_amd64.v` | `5b6929162ebb0682c2c98cf9aab4cf12aa62021576b898ec60ab804b2a63749a` |
 | `kernel/syscall/table/storage_amd64.v` | `ad3b72a321de8a00e39b1584e1ef2cdcff73157cbe1a99f4b9350ffd342bfb63` |
 | `kernel/syscall/table/storage_arm64.v` | `e4e8be0aa3679c61a824290f2741e91d8172b8cad4d291448602d5468e983da6` |
-| `kernel/syscall/table/syscall_table_arm64.v` | `4872aca9d5ffc0708c589a344a1dbc410bf7c06e17061ff52cbfd8c2bb4e06c8` |
+| `kernel/syscall/table/syscall_table_arm64.v` | `d751b54505cca084ee423d70b8534694bc862c127a1c75eede476304efd793ff` |
 | `kernel/syscall/table/sysv_message.v` | `0c7c2f8912ab1903a717699975d954352d0ab8350d74915fde581a957ca7323d` |
 | `kernel/syscall/table/trace_amd64.v` | `886f920865046fc589e5e923fd2ae9c1bf1ed0a6731b5344026b480470b3cd18` |
 | `kernel/time/time.v` | `e68d5b75abe21d155335517daa52c64cd551559350cf66bd6e0716ddfdadfc52` |
@@ -813,7 +814,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/userland.v` | `2f0a2f5ec802ef73db0bb442366458c4074d61de0d14688a84fec4b89fa66893` |
 | `kernel/userland/userland_arm64.v` | `0f79600e49706d5e54a9ca8eb11bd1ebcc20b5d69af3c1f4f0455310bcde9098` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
-| `tools/linux-compat/coverage.v` | `d88ebf87aed7971ec24d855e056a3f5ffbb2e7adcb2e956a8d293dc69e5003e9` |
+| `tools/linux-compat/coverage.v` | `4a191db374b9fd0c37cad2246d129875e47fde7c17c9b5f2f69e9ed6ae80fa1b` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/linux-6.12-syscalls.h` | `6fefc57e8aad1780c8e022b80d92c78280b06e221829cd85d6775b14e40256fb` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

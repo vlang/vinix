@@ -64,6 +64,8 @@ pub mut:
 	id      int
 	public_id int
 	covered &VFSNode = unsafe { nil }
+	// A moved-to vnode has a counted pin when it lacks a permanent mount pin.
+	covered_ref bool
 	root    &VFSNode = unsafe { nil }
 	// Bind roots retain the original filesystem root for relative path queries.
 	filesystem_root &VFSNode = unsafe { nil }
@@ -349,10 +351,12 @@ pub fn copy_mount_table_for(parent &MountTable, unprivileged bool) &MountTable {
 				table.overrides[key] = voidptr(entry.root)
 			}
 		}
+		if entry.covered_ref { retain_handle_node(voidptr(entry.covered)) }
 		table.mounts << &Mount{
 			id:      entry.id
 			public_id: allocate_mount_id()
 			covered: entry.covered
+			covered_ref: entry.covered_ref
 			root:    entry.root
 			filesystem_root: entry.filesystem_root
 			parent:  entry.parent
@@ -1109,6 +1113,17 @@ fn prepare_pivot(mut table MountTable, old_entry &Mount, new_entry &Mount,
 		&& pivot_context(mut table, put_entry, old_entry, new_entry, put_entry, put_context)
 }
 
+// The caller holds the entry lock and releases the returned pin after
+// publishing the new route. Detached entries still own their current vnode.
+fn replace_mount_covered_locked(mut entry Mount, covered &VFSNode) voidptr {
+	if voidptr(entry.covered) == voidptr(covered) { return unsafe { nil } }
+	drop := if entry.covered_ref { voidptr(entry.covered) } else { unsafe { nil } }
+	entry.covered_ref = !covered.mount_covered && !covered.mount_root
+	if entry.covered_ref { retain_handle_node(voidptr(covered)) }
+	entry.covered = unsafe { covered }
+	return drop
+}
+
 fn publish_pivot(mut table MountTable, _old_entry &Mount, _new_entry &Mount,
 	put_old &VFSNode, new_context &lib.MountContext, put_context &lib.MountContext) {
 	mut old_entry := unsafe { _old_entry }
@@ -1125,16 +1140,18 @@ fn publish_pivot(mut table MountTable, _old_entry &Mount, _new_entry &Mount,
 	// continue to name the original inode rather than following a redirect.
 	if !self_root { attach_mount(mut table, mut old_covered, new_entry.root) }
 	new_entry.lock.acquire()
-	new_entry.covered = if self_root { new_entry.root } else { old_covered }
+	drop_new := replace_mount_covered_locked(mut new_entry, if self_root { new_entry.root } else { old_covered })
 	lib.copy_mount_context(&new_entry.parent, new_context)
 	new_entry.parent.depth--
 	new_entry.move_epoch++
 	new_entry.lock.release()
 	old_entry.lock.acquire()
-	old_entry.covered = destination
+	drop_old := replace_mount_covered_locked(mut old_entry, destination)
 	lib.copy_mount_context(&old_entry.parent, put_context)
 	old_entry.move_epoch++
 	old_entry.lock.release()
+	if drop_new != unsafe { nil } { release_handle_node(drop_new) }
+	if drop_old != unsafe { nil } { release_handle_node(drop_old) }
 }
 
 // Called with table.lock held. Detached records remain permanent, so a child
@@ -1227,7 +1244,7 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	source_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	source_root := get_node_and_mount(parent, source, true, source_mount)?
 	mut table := table_of(calling_process())
-	mut entry := attached_namespace_mount(mut table, lib.mount_context_top(source_mount))
+	entry := attached_namespace_mount(mut table, lib.mount_context_top(source_mount))
 	if entry == unsafe { nil } || entry.detached || voidptr(entry.root) != voidptr(source_root) || entry.locked {
 		errno.set(errno.einval)
 		return none
@@ -1243,7 +1260,14 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	if target_node == unsafe { nil } {
 		return none
 	}
-	if stat.isdir(source_root.resource.stat.mode) != stat.isdir(target_node.resource.stat.mode) {
+	return move_attached_mount_locked(mut table, entry, mut target_node, target_mount)
+}
+
+// The VFS lock protects the resolved target through validation and publication.
+fn move_attached_mount_locked(mut table MountTable, _entry &Mount, mut target_node VFSNode,
+	target_mount &lib.MountContext) ? {
+	mut entry := unsafe { _entry }
+	if stat.isdir(entry.root.resource.stat.mode) != stat.isdir(target_node.resource.stat.mode) {
 		errno.set(errno.einval)
 		return none
 	}
@@ -1258,11 +1282,12 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	}
 	attach_mount_locked(mut table, mut target_node, entry.root)
 	entry.lock.acquire()
-	entry.covered = target_node
 	if is_mqueue_inode(target_node) { target_node.mount_covered = true }
+	drop := replace_mount_covered_locked(mut entry, target_node)
 	lib.copy_mount_context(&entry.parent, target_mount)
 	entry.move_epoch++
 	entry.lock.release()
+	if drop != unsafe { nil } { release_handle_node(drop) }
 }
 
 fn remount(parent &VFSNode, target string, flags u64, options string) ? {

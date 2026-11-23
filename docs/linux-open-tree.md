@@ -14,8 +14,11 @@ to pipe ends and PTY slaves preserve the original endpoints and their readiness.
 [Linux 6.12.51 implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/namespace.c#L2717)
 
 `OPEN_TREE_CLONE` returns `EPERM` without mount-namespace capability and
-`EOPNOTSUPP` when permitted. Detached tree creation and fd-based attachment
-remain open. Anonymous pipes work with `AT_EMPTY_PATH` and a followed procfs
+`EOPNOTSUPP` when permitted. Existing attached trees can be moved by descriptor.
+Detached tree creation and attachment remain open.
+[Native move_mount](linux-move-mount.md)
+
+Anonymous pipes work with `AT_EMPTY_PATH` and a followed procfs
 descriptor link. Other anonymous resources without a vnode return
 `EOPNOTSUPP`. `AT_NO_AUTOMOUNT` is accepted within Vinix's current VFS
 model, which has no automount triggers.
