@@ -812,6 +812,26 @@ checks are in
 Its SHA-256 is `7ba1b7e6be0c292783c177d35b4c9c9598bb890f72cbe4f18b809fb8670c5fd6`.
 All 1,467 entries in the extracted `qualification.sha256` passed.
 
+### Duplicate creation records after draft recovery
+
+At `8ea86f4ae`, successful `--resume-draft=ID` compares a leftover creation
+record with the record reconstructed from the saved draft. It removes the
+exact duplicate after verification and reports a conflict or unreadable
+file. The old driver verified the same draft and left the duplicate behind.
+
+All 110 fixture checks passed with signed inputs for both architectures and
+local GitHub stubs. Matching records were removed after verified draft recovery,
+publication and confirmation of an already published release. Verification
+failures, conflicting records and symbolic links retained their files. A native
+driver run removed the matching record and retained the ID-based recovery file.
+ASan/UBSan covered a byte-only difference, aliases, a FIFO and an exact retry.
+
+The paired inputs, before and after runs, recovery records and sanitizer
+checks are in
+`~/.local/state/vinix/r14-release-retire-creation-eJtDOK/qualification.tar.gz`.
+Its SHA-256 is `17541f7e9e9dc57aa3d640acbe834d74dfb05ca7b48030e799e800efe7bf6e0a`.
+All 1,494 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
