@@ -632,6 +632,27 @@ The paired inputs, run logs and focused controls are in
 Its SHA-256 is `02acbc8058f3dfe4d9eb96fb3361828bab7b0567ada6e47f029e9fc0a6b726ba`.
 All 1,258 entries in the extracted `qualification.sha256` passed.
 
+### GitHub release asset size limit
+
+At `09a215f4e`, the release driver rejects any GitHub upload payload of
+2 GiB or more. It checks the initial files before capture or hashing,
+and checks the private staging files before creating a tag or draft.
+The upload helper also checks payloads that still need to be sent when
+recovering a draft. [GitHub release limits](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas)
+
+All 65 release fixtures passed with signed inputs for both architectures,
+compiled host helpers and local GitHub stubs. The publishing paths with
+and without boot tests both refused an oversized X11 bundle before
+recording checksums or changing remote state. All 11 focused cases passed
+in production and ASan/UBSan builds. Sparse-file controls accepted
+2,147,483,647 bytes and refused 2,147,483,648 bytes during capture, draft
+recovery and upload handoff.
+
+The paired inputs, release fixture logs and focused controls are in
+`~/.local/state/vinix/r14-release-asset-size-2h9S9M/qualification.tar.gz`.
+Its SHA-256 is `87f3e90b43ffec25d6d630ee595e38bbcde26894584cae2143299a91659422e7`.
+All 1,272 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
