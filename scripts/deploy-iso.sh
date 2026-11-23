@@ -393,15 +393,28 @@ done
 "$ASSET_WORK/release-assets" record "$OUT" "$ASSET_WORK/package-pins" \
     "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}" > "$ASSET_WORK/SHA256SUMS"
 
+ASSET_STAGE="$ASSET_WORK/upload"
+staged_images=()
+for image in "${IMAGES[@]}"; do
+    staged_images+=("$ASSET_STAGE/${image##*/}")
+done
+
+stage_release_assets() {
+    step "Preparing verified release copies"
+    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
+}
+
 # ── Boot tests ─────────────────────────────────────────────────────────────
 
 TEST_SUMMARY=''
 if [ "$RUN_TESTS" -eq 1 ]; then
+    stage_release_assets
     step "Boot-testing the images"
     rm -rf "$OUT/test"
-    if ! "$SRC/scripts/test-iso.sh" --out="$OUT/test" "${IMAGES[@]}" | tee "$OUT/test.log"; then
+    if ! "$SRC/scripts/test-iso.sh" --out="$OUT/test" "${staged_images[@]}" | tee "$OUT/test.log"; then
         die "the boot tests failed; nothing was published (logs in $OUT/test)"
     fi
+    "$ASSET_WORK/release-assets" check "$ASSET_STAGE" "$ASSET_WORK/SHA256SUMS"
     TEST_SUMMARY="$(sed -n 's/^  PASS  //p' "$OUT/test.log")"
 fi
 
@@ -555,24 +568,22 @@ fi
 
 cmp -s "$ASSET_WORK/SHA256SUMS" "$OUT/SHA256SUMS" ||
     die "SHA256SUMS changed after verification"
-step "Preparing verified copies for upload"
-UPLOAD="$ASSET_WORK/upload"
-"$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" \
-    "$ASSET_WORK/RELEASE_NOTES.md" "$UPLOAD"
-upload_images=()
-upload_bundles=()
-for image in "${IMAGES[@]}"; do
-    upload_images+=("$UPLOAD/${image##*/}")
-done
+if [ "$RUN_TESTS" -eq 1 ]; then
+    "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
+else
+    stage_release_assets
+fi
+mv "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
+staged_bundles=()
 for bundle in ${BUNDLES[@]+"${BUNDLES[@]}"}; do
-    upload_bundles+=("$UPLOAD/${bundle##*/}")
+    staged_bundles+=("$ASSET_STAGE/${bundle##*/}")
 done
 
 create_args=(release create "$TAG" --repo "$REPO" --target "$COMMIT"
-    --title "Vinix $TAG" --notes-file "$UPLOAD/RELEASE_NOTES.md")
+    --title "Vinix $TAG" --notes-file "$ASSET_STAGE/RELEASE_NOTES.md")
 [ "$DRAFT" -eq 1 ] && create_args+=(--draft)
 [ "$PRERELEASE" -eq 1 ] && create_args+=(--prerelease)
-gh "${create_args[@]}" "${upload_images[@]}" "$UPLOAD/SHA256SUMS" ${upload_bundles[@]+"${upload_bundles[@]}"}
+gh "${create_args[@]}" "${staged_images[@]}" "$ASSET_STAGE/SHA256SUMS" ${staged_bundles[@]+"${staged_bundles[@]}"}
 
 step "Published"
 gh release view "$TAG" --repo "$REPO" --json url --jq .url

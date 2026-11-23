@@ -67,7 +67,7 @@ fn check_assets(directory string, manifest string) ! {
 	}
 }
 
-fn stage_assets(directory string, manifest string, notes string, destination string) ! {
+fn stage_assets(directory string, manifest string, destination string) ! {
 	entries := read_manifest(manifest)!
 	if entries.len == 0 { return error('release checksum manifest is empty') }
 	os.mkdir(destination, mode: 0o700)!
@@ -77,9 +77,8 @@ fn stage_assets(directory string, manifest string, notes string, destination str
 		if pkgcore.hash_file(path)! != digest {
 			return error('release asset changed after verification: ' + name)
 		}
+		os.chmod(path, 0o400)!
 	}
-	pkgcore.copy_file(manifest, os.join_path(destination, 'SHA256SUMS'), 0, ~u64(0))!
-	pkgcore.copy_file(notes, os.join_path(destination, 'RELEASE_NOTES.md'), 0, ~u64(0))!
 }
 
 fn run() ! {
@@ -89,10 +88,10 @@ fn run() ! {
 	if os.args.len == 4 && os.args[1] == 'check' {
 		return check_assets(os.args[2], os.args[3])
 	}
-	if os.args.len == 6 && os.args[1] == 'stage' {
-		return stage_assets(os.args[2], os.args[3], os.args[4], os.args[5])
+	if os.args.len == 5 && os.args[1] == 'stage' {
+		return stage_assets(os.args[2], os.args[3], os.args[4])
 	}
-	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NOTES NEW_DESTINATION')
+	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NEW_DESTINATION')
 }
 
 fn main() {

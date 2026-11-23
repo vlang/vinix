@@ -606,11 +606,13 @@ Before boot testing, the driver records `SHA256SUMS` for the complete asset
 list, including X11 and iOS payloads and their checksum sidecars. It checks
 each sidecar against its payload and carries the verified ISO and package
 receipt digests into the list. The driver rechecks the assets after boot
-testing. For publication, it compares the public checksum list with the
-recorded copy and verifies a private copy of each asset against that list.
-GitHub reads the verified copies, the recorded list, and the generated release
-notes from the private directory. Allow enough free space under
-`build-release/work` for a second copy of the release assets during upload.
+testing. When boot tests run, the driver verifies private, read-only copies and
+passes the staged ISOs to the boot runner. Publication uses the same copies
+and rechecks the public assets and checksum list. With `--no-test`, the driver
+prepares the verified copies at publication. GitHub reads the verified assets,
+the recorded checksum list, and the generated release notes from the private
+directory. Allow space under `build-release/work` for a second copy of the
+assets while boot testing or publishing.
 Set `TMPDIR` to a filesystem with room for ISO extraction and signed bundle
 verification when the system temporary filesystem is small.
 

@@ -80,6 +80,29 @@ fn capture_upload(out string, scenario string) ! {
 	os.write_file(out + '/fixture-upload', args.join('\n') + '\n')!
 }
 
+fn capture_boot(out string, scenario string) ! {
+	if os.args.len < 3 || os.args[1] != '--out=' + out + '/test' {
+		return error('unexpected boot test invocation')
+	}
+	images := os.args[2..]
+	public_image := out + '/vinix-amd64.iso'
+	if scenario == 'public-iso-during-boot' {
+		original := os.read_file(public_image)!
+		os.write_file(public_image, 'temporary public ISO\n')!
+		digests := images.map(checksum_line(it)!)
+		os.write_file(public_image, original)!
+		os.write_file(out + '/fixture-boot-digests', digests.join('\n') + '\n')!
+	} else {
+		os.write_file(out + '/fixture-boot-digests', images.map(checksum_line(it)!).join('\n') + '\n')!
+	}
+	os.write_file(out + '/fixture-boot', images.join('\n') + '\n')!
+	if scenario == 'boot-copy-changed' {
+		replacement := os.dir(images[0]) + '/fixture-replacement'
+		os.write_file(replacement, 'changed boot copy\n')!
+		os.mv(replacement, images[0])!
+	}
+}
+
 fn run_stub(name string) !int {
 	out := os.getenv('VINIX_ASSET_TEST_OUT')
 	scenario := os.getenv('VINIX_ASSET_TEST_CASE')
@@ -95,7 +118,7 @@ fn run_stub(name string) !int {
 			os.cp(os.getenv('VINIX_ASSET_TEST_ARM64_ISO'), os.getenv('VINIX_AARCH64_ISO'))!
 		}
 		'test-iso.sh' {
-			os.write_file(out + '/fixture-boot', 'boot test ran\n')!
+			capture_boot(out, scenario)!
 			match scenario {
 				'x11-after-boot' { os.write_file(out + '/' + x11, 'changed X11 fixture\n')! }
 				'ios-pair-after-boot' {
@@ -157,7 +180,8 @@ fn prepare_driver(repository string, root string) ! {
 		'-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Release fixture'])!
 }
 
-fn verify_handoff(out string, with_packages bool, mutated bool) ! {
+fn verify_handoff(out string, with_packages bool, scenario string) ! {
+	mutated := scenario == 'output-change-during-upload'
 	mut names := ['vinix-amd64.iso', 'vinix-arm64.iso', x11, x11 + '.sha256', arm_x11,
 		arm_x11 + '.sha256', ios, ios + '.sha256']
 	if with_packages { names << ['vinix-packages-amd64.json', 'vinix-packages-arm64.json'] }
@@ -188,6 +212,21 @@ fn verify_handoff(out string, with_packages bool, mutated bool) ! {
 	listed.sort()
 	uploaded.sort()
 	if uploaded != listed { return error('release handoff bytes differ from the verified assets') }
+	if scenario == 'publish-no-test' {
+		if os.exists(out + '/fixture-boot') || notes.contains('### Tested before release') {
+			return error('release booted images with --no-test')
+		}
+		return
+	}
+	mut boot_digests := os.read_lines(out + '/fixture-boot-digests')!
+	boot_digests.sort()
+	if boot_digests != uploaded.filter(it.ends_with('.iso')) {
+		return error('boot test read different ISO bytes from the uploader')
+	}
+	upload_images := os.read_lines(out + '/fixture-upload')!.filter(it.starts_with('/') && it.ends_with('.iso'))
+	if os.read_lines(out + '/fixture-boot')! != upload_images {
+		return error('boot test and uploader used different ISO copies')
+	}
 }
 
 fn run() ! {
@@ -210,10 +249,12 @@ fn run() ! {
 	base['VINIX_UI2_SOURCE'] = root + '/ui2'
 	base['VINIX_ASSET_TEST_AMD64_ISO'] = am + '/image.iso'
 	base['VINIX_ASSET_TEST_ARM64_ISO'] = arm + '/image.iso'
-	for scenario in ['legacy', 'packages', 'output-change-during-upload', 'bad-build-sidecar',
-		'x11-after-boot', 'ios-pair-after-boot', 'receipt-after-boot', 'sidecar-at-handoff',
-		'manifest-at-handoff', 'build-only']! {
-		with_packages := scenario in ['packages', 'receipt-after-boot', 'output-change-during-upload']!
+	for scenario in ['public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
+		'bad-build-sidecar', 'boot-copy-changed', 'x11-after-boot', 'ios-pair-after-boot',
+		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff', 'build-only',
+		'publish-no-test']! {
+		with_packages := scenario in ['packages', 'receipt-after-boot', 'output-change-during-upload',
+			'public-iso-during-boot']!
 		mut environment := base.clone()
 		if with_packages {
 			for arch, dir in {'X86_64': am, 'AARCH64': arm} {
@@ -228,14 +269,16 @@ fn run() ! {
 		mut args := [root + '/scripts/deploy-iso.sh', '--tag=fixture-' + scenario, '--yes',
 			'--repo=local/fixture']
 		if scenario == 'build-only' { args << ['--arch=amd64', '--no-publish'] }
+		if scenario == 'publish-no-test' { args << ['--no-test'] }
 		code, log := command('/bin/bash', args, root, environment)
 		os.write_file(work + '/' + scenario + '.log', log)!
 		if os.ls(root + '/build-release/work')!.any(it.starts_with('release-assets.')) {
 			return error('release left a private staging directory: ' + scenario)
 		}
-		if scenario in ['legacy', 'packages', 'output-change-during-upload']! {
+		if scenario in ['legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
+			'publish-no-test']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
-			verify_handoff(out, with_packages, scenario == 'output-change-during-upload')!
+			verify_handoff(out, with_packages, scenario)!
 		} else if scenario == 'build-only' {
 			if code != 0 || os.exists(out + '/fixture-upload') || !os.exists(out + '/RELEASE_NOTES.md') {
 				return error('build-only fixture failed\n' + log)
