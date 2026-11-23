@@ -6,7 +6,10 @@ module spkcore
 const simulated_shutdown_gpio = u64(1)
 
 // Only the simulated amplifier shutdown pin is available to the controller.
-__global drain_test_gpio u32
+__global (
+	drain_test_gpio u32
+	write_test_pcm [8]i16
+)
 
 fn drain_test_read(_ voidptr, address u64) u32 {
 	if address != simulated_shutdown_gpio {
@@ -37,4 +40,29 @@ pub fn drain_test_shutdown_asserted() bool {
 
 pub fn end_drain_test() {
 	spk_controller = Speakers{}
+}
+
+fn write_test_now(_ voidptr) u64 {
+	return 1
+}
+
+pub fn begin_write_test() {
+	begin_drain_test()
+	write_test_pcm = [8]i16{}
+	spk_controller.cfg.tx_buffer = unsafe { u64(&write_test_pcm[0]) }
+	spk_controller.tx_ring = u32(sizeof(write_test_pcm))
+	spk_controller.io.now_us = write_test_now
+	spk_controller.volume = 100
+}
+
+pub fn write_test_prefix_matches(input &i16) bool {
+	if spk_controller.written != sizeof(write_test_pcm) || spk_controller.reserved != 0 {
+		return false
+	}
+	for index, sample in write_test_pcm {
+		if sample != unsafe { input[index] } {
+			return false
+		}
+	}
+	return true
 }

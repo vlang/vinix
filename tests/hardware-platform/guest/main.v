@@ -42,7 +42,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'drivers-sleep' { scenario_drivers_sleep(mut t) }
 		'hda-stall' { scenario_hda_stall(mut t) }
 		'virtio-sound-stall' { scenario_virtio_sound_stall(mut t) }
-		'apple-speaker-drain' {} // The controller checks the boot-time kernel results.
+		'apple-speaker-drain', 'apple-speaker-write' {} // The controller checks the boot-time kernel results.
 		'nvme-sleep' { scenario_nvme_sleep(mut t) }
 		'firmware' { scenario_firmware(mut t) }
 		'hibernate' { scenario_hibernate(mut t) }

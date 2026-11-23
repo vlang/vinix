@@ -1020,7 +1020,7 @@ fn nap(ns i64) Nap {
 	}
 	event.await_one(mut timer.event, true) or { return pending_signal() }
 	$if apple_speaker_drain_fixture ? {
-		fault_during_drain_tail(ns)
+		fault_during_speaker_wait(ns)
 	}
 	return .slept
 }
@@ -1131,22 +1131,16 @@ fn (mut s SpeakerStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 		}
 		mut length := u32(0)
 		region := C.vinix_apple_speakers_reserve(&length)
-		s.unlock()
 		if length == 0 {
+			s.unlock()
 			if time.monotonic_ns() - last_progress > drain_stall_ns {
 				print('apple-speakers: playback stopped moving\n')
-				s.lock()
-				C.vinix_apple_speakers_commit(0)
-				s.unlock()
 				if done > 0 {
 					return i64(done)
 				}
 				errno.set(errno.eio)
 				return none
 			}
-			s.lock()
-			C.vinix_apple_speakers_commit(0)
-			s.unlock()
 			katomic.store(mut &speaker_caller_phase, phase_write_wait)
 			napped := nap(running_period_ns)
 			katomic.store(mut &speaker_caller_phase, phase_write)
@@ -1175,8 +1169,12 @@ fn (mut s SpeakerStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 		if n > count - done {
 			n = count - done
 		}
+		// Keep the bounded kernel-buffer copy and commit in the same locked
+		// transaction as reserve, so stop and protection cannot retire it.
+		$if apple_speaker_drain_fixture ? {
+			fault_if_write_unlocked(mut s)
+		}
 		unsafe { C.memcpy(voidptr(region), voidptr(u64(buf) + done), n) }
-		s.lock()
 		C.vinix_apple_speakers_commit(u32(n))
 		s.unlock()
 		done += n

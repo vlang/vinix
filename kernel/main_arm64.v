@@ -347,6 +347,7 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	if qemu_platform {
 		$if apple_speaker_drain_fixture ? {
 			speakers.test_drain_faults()
+			speakers.test_write_fault()
 		}
 		virtio_snd.initialise(memory.get_hhdm_offset())
 	} else if devicetree.is_available() {

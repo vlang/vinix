@@ -1193,6 +1193,18 @@ pub const scenarios = [
 		timeout:  60
 	},
 	Scenario{
+		name:     'apple-speaker-write'
+		about:    'Apple speaker OSS writes commit the exact PCM prefix before a protection fault'
+		arches:   ['aarch64']
+		define:   'apple_speaker_drain_fixture'
+		required: ['HWTEST START apple-speaker-write',
+			'apple-speakers write test: exactly one ring committed before fault',
+			'apple-speakers write test: later write returned EIO with shutdown latched',
+			'HWTEST PASS apple-speaker-write']
+		ending:   .poweroff
+		timeout:  60
+	},
+	Scenario{
 		name:     'drivers-sleep'
 		about:    'HD Audio and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM'
 		arches:   ['x86_64']

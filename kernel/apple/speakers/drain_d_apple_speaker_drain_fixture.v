@@ -5,15 +5,38 @@ module speakers
 
 import apple.speakers.spkcore
 import errno
+import katomic
 
-__global fault_on_drain_tail bool
+__global (
+	fault_on_drain_tail bool
+	fault_on_write_wait bool
+	check_write_lock bool
+)
 
-fn fault_during_drain_tail(ns i64) {
+fn fault_during_speaker_wait(ns i64) {
 	if fault_on_drain_tail && ns == drain_tail_ns {
 		fault_on_drain_tail = false
-		speaker_stream.lock()
+	} else if fault_on_write_wait && ns == running_period_ns {
+		fault_on_write_wait = false
+	} else {
+		return
+	}
+	speaker_stream.lock()
+	C.vinix_apple_speakers_fail()
+	speaker_stream.unlock()
+}
+
+fn fault_if_write_unlocked(mut s SpeakerStream) {
+	if !check_write_lock {
+		return
+	}
+	check_write_lock = false
+	// Model a service iteration that takes the lock after reserve. It can
+	// run here only if the write released the lock before copying.
+	if katomic.cas(mut s.mutex, u64(0), u64(1)) {
 		C.vinix_apple_speakers_fail()
-		speaker_stream.unlock()
+		s.unlock()
+		print('HWTEST FAIL apple-speaker-write: protection interleaved with a reserved copy\n')
 	}
 }
 
@@ -61,4 +84,33 @@ pub fn test_drain_faults() {
 	} else {
 		C.kprintf(c'HWTEST FAIL apple-speaker-drain: tail fault drain returned %llu\n', tail_result)
 	}
+}
+
+pub fn test_write_fault() {
+	saved_errno := errno.get()
+	defer {
+		check_write_lock = false
+		fault_on_write_wait = false
+		spkcore.end_drain_test()
+		errno.set(saved_errno)
+	}
+	spkcore.begin_write_test()
+	input := [i16(12), -24, 36, -48, 60, -72, 84, -96, 108, -120, 132, -144]!
+	buffer := unsafe { &input[0] }
+	check_write_lock = true
+	fault_on_write_wait = true
+	written := speaker_stream.sync_write(buffer, 0, 24) or { -i64(errno.get()) }
+	if check_write_lock || fault_on_write_wait || written != 16
+		|| !spkcore.write_test_prefix_matches(buffer) {
+		C.kprintf(c'HWTEST FAIL apple-speaker-write: faulted write returned %lld\n', written)
+		return
+	}
+	print('apple-speakers write test: exactly one ring committed before fault\n')
+	errno.set(errno.einval)
+	refused := speaker_stream.sync_write(buffer, 0, 4) or { -i64(errno.get()) }
+	if refused != -i64(errno.eio) || !spkcore.drain_test_shutdown_asserted() {
+		C.kprintf(c'HWTEST FAIL apple-speaker-write: latched fault write returned %lld\n', refused)
+		return
+	}
+	print('apple-speakers write test: later write returned EIO with shutdown latched\n')
 }
