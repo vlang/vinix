@@ -65,7 +65,7 @@ fn orphan_node(mut node VFSNode, mode u32) {
 	}
 	if stat.isdir(mode) { overlay_detach_work(mut node) }
 	hold_parent(mut node)
-	if pinned(node) { return }
+	if pinned(node) && !node.retained_resource { return }
 	// CGroup.node is a permanent controller identity, also read by asynchronous
 	// accounting. Its existing mount-lifetime charge owns this directory.
 	if stat.isdir(mode) && is_cgroup_resource(node.resource) { return }
@@ -91,6 +91,7 @@ fn retain_handle_node(node voidptr) {
 // Called when a handle or executable mapping drops its node.
 fn release_handle_node(node voidptr) {
 	mut n := unsafe { &VFSNode(node) }
+	if is_mqueue_inode(n) { node_reference_releasing(node) }
 	if !katomic.dec(mut &n.handles) && n.orphan {
 		retire_node(mut n)
 	}
@@ -226,6 +227,10 @@ pub fn reap_removed() {
 		mut node := item.node
 		in_use := running[index]
 		index++
+		if node.retained_resource {
+			reap_mqueue_child(mut node)
+			continue
+		}
 		if pinned(node) {
 			// Mounted or linked from /proc since it was retired: it
 			// stays.
@@ -284,6 +289,32 @@ pub fn reap_removed() {
 		nodes.free()
 		running.free()
 	}
+}
+
+// A bind record keeps its historical node and name, while a live mount, an
+// overlay or an open description keeps the queue itself usable. Serialize
+// the final check with bind and move, which can publish new mount references.
+fn reap_mqueue_child(mut node VFSNode) {
+	if !vfs_lock.test_and_acquire() {
+		retire(RetiredItem{node: unsafe { node }})
+		return
+	}
+	defer { vfs_lock.release() }
+	busy := mqueue_has_views(node) || mqueue_child_mounted_on(node)
+		|| katomic.load(&node.handles) != 0 || katomic.load(&node.overlay_refs) != 0
+	released := katomic.load(&node.directory_released)
+	now := time.monotonic_ns()
+	if busy || (released != 0 && (now < released || now - released < removed_grace_ns)) {
+		retire(RetiredItem{node: unsafe { node }})
+		return
+	}
+	if !pinned(node) {
+		free_node(node)
+		return
+	}
+	res := node.resource
+	node.resource = retired_mqueue_resource
+	release_resource_after_grace(res)
 }
 
 // sync(2) promises that a file removed before it is gone from the disk as
@@ -360,10 +391,10 @@ fn queued_references(res &resource.Resource) int {
 	return count
 }
 
-// Called before a cwd/root owner drops its reference, under its own lock.
+// Called before a path owner drops its last route or description.
 // Never wait on VFS/table locks here. Concurrent owners cannot move the last
 // release time backwards, and no allocation is needed on this repeated path.
-fn directory_releasing(pointer voidptr) {
+fn node_reference_releasing(pointer voidptr) {
 	if pointer == unsafe { nil } { return }
 	mut node := unsafe { &VFSNode(pointer) }
 	now := time.monotonic_ns()

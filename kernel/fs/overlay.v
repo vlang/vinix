@@ -742,7 +742,12 @@ pub fn overlay_copy_up(node &VFSNode) ? {
 // upper layer's copy, made first if there is none yet.
 fn resource_to_change(node &VFSNode) ?&resource.Resource {
 	overlay_copy_up(node)?
-	return node.resource
+	res := node.resource
+	if res != unsafe { nil } && voidptr(res) == voidptr(retired_mqueue_resource) {
+		errno.set(errno.enoent)
+		return none
+	}
+	return res
 }
 
 // The same for a change made through an open file.

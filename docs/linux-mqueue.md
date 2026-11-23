@@ -220,11 +220,44 @@ Hashes are SHA-256 prefixes. The archive is
 `~/.cache/vinix-r15/mq-namespace-lifetime/qualification.tar.zst`, with SHA-256
 `e447e04584c7c2814fd29261e9ff7d553f6b76444bb5287a23dd1b7001c8bbc6`.
 
+### Bind mounts of individual queues
+
+A queue file bind retains the queue and its creator's `RLIMIT_MSGQUEUE`
+charge after unlink. A mount namespace copy has its own reference. An open
+description remains usable after lazy detach. When the last reference is
+gone, Vinix releases the backing queue, unread messages, and quota after the
+VFS grace period. A queue once covered by a file bind also releases its
+charge after uncover and unlink. [Linux queue eviction](https://github.com/gregkh/linux/blob/v6.12.51/ipc/mqueue.c#L488)
+
+The probe adds 16 checks for file bind lifetime and quota. It verifies the
+charge while only the bind holds the unlinked queue, then copies the mount
+namespace and opens the queue there after the original bind is unmounted.
+The copied mount is lazily detached. The probe checks quota and receives the
+queued byte after waiting for a maintenance pass, then checks that the quota
+can be reused after close. A second queue tests the mount over its name.
+
+Optimized Vinix kernels from `7f1b43b05` plus this change and Linux 6.12.51
+passed all 285 + 16 checks with the same probe ELF on each architecture.
+The previous x86-64 kernel failed the copied file bind check. `open`,
+`namespace` and `mount` passed on both Vinix kernels. The allocation checker
+found two boot-time allocations for the shared retired resource. Its other
+allow-list failures matched the baseline.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `c03f172f31e9ae6a` | `b0f4f58fb76fbaca` | `7fc4c2f2084a440a` | `68eb26d067c6ab83` |
+| x86-64 | `d395211e712e891e` | `158fe726e30dde88` | `a51c6c5e4c86f192` | `e30a116c165dd9d2` |
+
+Hashes are SHA-256 prefixes. The archive is
+`~/.cache/vinix-r15/mq-file-bind-lifetime/qualification.tar.zst`, with SHA-256
+`f8df1cf4828691af73b9b28ef593a7aa0f686e6602db1ea3dcacb69c95636e56`.
+
 ## Limits
 
 - Retired queue nodes keep their references through the VFS grace period.
-  Nodes used by bind mounts can retain their queue charges after detach
-  under the existing VFS mount lifetime model.
+  Historical mount records retain their vnode and name metadata. A locked
+  queue-file bind with a retained redirect can keep its queue until the mount
+  namespace tears down.
 - A locked child mount can remain reachable through a detached parent. The
   current reaper tracks descriptors and paths to the queue attachment itself.
 - The mqueue device number is shared across IPC namespaces. Nested bind

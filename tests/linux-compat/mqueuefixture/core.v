@@ -1155,9 +1155,9 @@ fn use_copied_queue_mount(mut s State, ready i32, proceed i32) i32 {
 	}
 }
 
-fn check_namespace_quota(mut s State, expect_busy bool) i32 {
+fn check_namespace_quota(mut s State, uid u32, expect_busy bool) i32 {
 	unsafe {
-		if C.setgid(1022) != 0 || C.setuid(1022) != 0 { return 1 }
+		if C.setgid(uid) != 0 || C.setuid(uid) != 0 { return 1 }
 		mut limit := &u64(s.words + 10)
 		limit[0] = 1000
 		limit[1] = 819200
@@ -1194,7 +1194,7 @@ fn surviving_mount(mut s State) {
 		created := C.open(c'/tmp/mq-survive/new-queue', C.O_CREAT | C.O_EXCL | C.O_RDWR, 0o600)
 		check(mut s, c'defunct namespace refuses creation', created == -1 && *C.__errno_location() == C.EACCES, created)
 		child = C.fork()
-		if child == 0 { C._exit(check_namespace_quota(mut s, true)) }
+		if child == 0 { C._exit(check_namespace_quota(mut s, 1022, true)) }
 		status = -1
 		check(mut s, c'surviving queue still charged to its creator', child > 0
 			&& C.waitpid(child, &status, 0) == child && status == 0, status)
@@ -1226,10 +1226,101 @@ fn surviving_mount(mut s State) {
 		check(mut s, c'copied mount and lazily detached directory fd keep names', child > 0
 			&& C.waitpid(child, &status, 0) == child && status == 0, status)
 		child = C.fork()
-		if child == 0 { C._exit(check_namespace_quota(mut s, false)) }
+		if child == 0 { C._exit(check_namespace_quota(mut s, 1022, false)) }
 		status = -1
 		check(mut s, c'last detached view releases queue charge', child > 0
 			&& C.waitpid(child, &status, 0) == child && status == 0, status)
+	}
+}
+
+fn make_bound_queue(mut s State, uid u32, name &char) i32 {
+	unsafe {
+		if C.setgid(uid) != 0 || C.setuid(uid) != 0 { return 1 }
+		q := mq_open(name, o_creat | o_excl | o_rdwr, 0o644, set_attr(s.attr, 0, 1, 904, 0))
+		if q < 0 || mq_send(q, c'b', 1, 2, nil) != 0 || C.close(i32(q)) != 0 { return 2 }
+		return 0
+	}
+}
+
+fn use_copied_file_bind(mut s State, ready i32, proceed i32) i32 {
+	unsafe {
+		if C.syscall(isize(C.SYS_unshare), clone_newns) != 0 { return 1 }
+		if C.write(ready, c'r', 1) != 1 || C.read(proceed, s.buf, 1) != 1 { return 2 }
+		fd := C.open(c'/tmp/mq-file-alias', C.O_RDONLY)
+		if fd < 0 || C.fstat(fd, s.st) != 0 || s.st.st_nlink != 0 { return 3 }
+		if C.umount2(c'/tmp/mq-file-alias', C.MNT_DETACH) != 0 { return 4 }
+		sleep_ms(6500)
+		child := C.fork()
+		if child == 0 { C._exit(check_namespace_quota(mut s, 1023, true)) }
+		mut status := i32(-1)
+		if child < 0 || C.waitpid(child, &status, 0) != child || status != 0 { return 5 }
+		if mq_receive(fd, s.buf, 904, nil, deadline(mut s, 1000)) != 1 || s.buf[0] != `b` { return 6 }
+		return if C.close(fd) == 0 { 0 } else { 7 }
+	}
+}
+
+fn check_queue_quota(mut s State, description &char, uid u32, busy bool) {
+	unsafe {
+		child := C.fork()
+		if child == 0 { C._exit(check_namespace_quota(mut s, uid, busy)) }
+		mut status := i32(-1)
+		check(mut s, description, child > 0 && C.waitpid(child, &status, 0) == child && status == 0, status)
+	}
+}
+
+fn bound_file_lifetime(mut s State) {
+	unsafe {
+		s.label = c'mqueuefs file bind lifetime'
+		check(mut s, c'create queue mount', C.mkdir(c'/tmp/mq-file-view', 0o755) == 0
+			&& C.mount(c'none', c'/tmp/mq-file-view', c'mqueue', 0, nil) == 0, 0)
+		alias := C.open(c'/tmp/mq-file-alias', C.O_CREAT | C.O_EXCL | C.O_WRONLY, 0o600)
+		check(mut s, c'create regular bind target', alias >= 0 && C.close(alias) == 0, alias)
+		mut child := C.fork()
+		if child == 0 { C._exit(make_bound_queue(mut s, 1023, c'bound-file')) }
+		mut status := i32(-1)
+		check(mut s, c'create charged queue', child > 0 && C.waitpid(child, &status, 0) == child && status == 0, status)
+		check(mut s, c'bind individual queue', C.mount(c'/tmp/mq-file-view/bound-file', c'/tmp/mq-file-alias', nil,
+			C.MS_BIND, nil) == 0, 0)
+		check(mut s, c'unlink original name', mq_unlink(c'bound-file') == 0
+			&& mq_open(c'bound-file', o_rdonly, 0, nil) == -C.ENOENT, 0)
+		check_queue_quota(mut s, c'bind alone retains unlinked queue charge', 1023, true)
+		mut ready := [2]i32{}
+		mut proceed := [2]i32{}
+		pipes := C.pipe(&ready[0]) == 0 && C.pipe(&proceed[0]) == 0
+		child = if pipes { C.fork() } else { -1 }
+		if child == 0 {
+			C.close(ready[0])
+			C.close(proceed[1])
+			C._exit(use_copied_file_bind(mut s, ready[1], proceed[0]))
+		}
+		copied := if child > 0 {
+			C.close(ready[1])
+			C.close(proceed[0])
+			C.read(ready[0], s.buf, 1) == 1
+		} else { false }
+		check(mut s, c'copy mount namespace', copied, 0)
+		check(mut s, c'unmount original bind', C.umount(c'/tmp/mq-file-alias') == 0, 0)
+		if child > 0 {
+			if copied { C.write(proceed[1], c'p', 1) }
+			C.close(proceed[1])
+			C.close(ready[0])
+		}
+		status = -1
+		check(mut s, c'copied bind and lazy fd keep queue usable', child > 0
+			&& C.waitpid(child, &status, 0) == child && status == 0, status)
+		check_queue_quota(mut s, c'detach and last close release bound queue charge', 1023, false)
+
+		child = C.fork()
+		if child == 0 { C._exit(make_bound_queue(mut s, 1024, c'covered-file')) }
+		status = -1
+		check(mut s, c'create charged cover target', child > 0 && C.waitpid(child, &status, 0) == child && status == 0, status)
+		check(mut s, c'bind regular file over queue', C.mount(c'/tmp/mq-file-alias', c'/tmp/mq-file-view/covered-file', nil,
+			C.MS_BIND, nil) == 0, 0)
+		check(mut s, c'covered name cannot be unlinked', mq_unlink(c'covered-file') == -C.EBUSY, 0)
+		check(mut s, c'unmount covering file and unlink queue', C.umount(c'/tmp/mq-file-view/covered-file') == 0
+			&& mq_unlink(c'covered-file') == 0, 0)
+		check_queue_quota(mut s, c'uncover and unlink release queue charge', 1024, false)
+		check(mut s, c'unmount queue filesystem', C.umount(c'/tmp/mq-file-view') == 0, 0)
 	}
 }
 
@@ -1263,6 +1354,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		namespaces(mut s)
 		mount_view(mut s)
 		surviving_mount(mut s)
+		bound_file_lifetime(mut s)
 		C.printf(c'LINUX MQUEUE SUMMARY: checks=%d failures=%d\n', s.checks, s.failures)
 		if s.failures == 0 {
 			C.puts(if reference { c'LINUX MQUEUE REFERENCE: PASS' } else { c'LINUX MQUEUE: PASS' })

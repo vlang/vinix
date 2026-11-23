@@ -2682,6 +2682,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Reclaim queue quota after the final view is released. See
   [the mount lifetime receipts](docs/linux-mqueue.md#mounts-that-outlive-their-ipc-namespace).
 
+- [x] Preserve unlinked queues through file bind mounts, copied mount
+  namespaces and lazy detach with a held description. Reclaim queue quota
+  after the final bind or description goes away. See
+  [the file bind receipts](docs/linux-mqueue.md#bind-mounts-of-individual-queues).
+
 - [x] Implement native futex2 vector waits, masked waits and wakes, and
   compare-requeue. Qualify 128-entry waits, shared and private keys, absolute
   deadlines, signal restart, and legacy futex interoperability on AArch64 and

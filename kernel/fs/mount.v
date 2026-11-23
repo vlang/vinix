@@ -77,6 +77,9 @@ pub mut:
 	// final Handle reference and filesystem close callbacks have been released.
 	descriptions u64
 	mqueue_view bool
+	// Keep the device number for mountinfo readers that already have this
+	// record when the last reference to a bound queue goes away.
+	mqueue_device u64
 	// Under lock: ordinary unmount closes regular-file writer admission before
 	// checking the backend. Lazy detach leaves retained routes writable.
 	unmount_closed bool
@@ -246,6 +249,18 @@ fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source st
 	return entry
 }
 
+// A namespace copy sees the redirect and the mount that owns it together.
+fn publish_mount_attachment(mut table MountTable, mut covered VFSNode, root &VFSNode,
+	source string, fstype string, flags u64, options string, parent &lib.MountContext, locked_flags u64) ? {
+	table.lock.acquire()
+	defer { table.lock.release() }
+	if table.released { errno.set(errno.enoent); return none }
+	mut entry := new_mount_record(covered, root, source, fstype, flags, options, parent)
+	entry.locked_flags |= locked_flags
+	attach_mount_locked(mut table, mut covered, root)
+	append_mount_record_locked(mut table, mut entry)
+}
+
 fn new_mount_record(covered &VFSNode, root &VFSNode, source string,
 	fstype string, flags u64, options string, parent_mount &lib.MountContext) &Mount {
 	mut entry := &Mount{
@@ -265,10 +280,11 @@ fn new_mount_record(covered &VFSNode, root &VFSNode, source string,
 fn append_mount_record_locked(mut table MountTable, mut entry Mount) {
 	root := entry.root
 	covered := entry.covered
-	if is_mqueue_directory(root) {
-		mut directory := unsafe { root }
-		hold_mqueue_view(mut directory)
+	if is_mqueue_inode(root) {
+		mut queue_node := unsafe { root }
+		hold_mqueue_view(mut queue_node)
 		entry.mqueue_view = true
+		entry.mqueue_device = root.resource.stat.dev
 	}
 	if voidptr(covered) != voidptr(root) {
 		mut root_node := unsafe { root }
@@ -303,23 +319,23 @@ pub fn copy_mount_table_for(parent &MountTable, unprivileged bool) &MountTable {
 	for entry in source.mounts {
 		mut original := unsafe { entry }
 		original.lock.acquire()
-		// A cwd in a lazily detached queue directory still uses the original
-		// attachment. A copy must not hide it with an unowned mount identity.
-		if entry.detached && is_mqueue_directory(entry.root) {
+		// A retained route in a lazily detached mqueue mount still needs the
+		// original attachment. Do not replace it with an unowned identity.
+		if entry.detached && is_mqueue_inode(entry.root) {
 			original.lock.release()
 			continue
 		}
 		if entry.mqueue_view {
-			mut directory := entry.root
-			hold_mqueue_view(mut directory)
+			mut queue_node := entry.root
+			hold_mqueue_view(mut queue_node)
 			// Preserve the inherited redirect when the original namespace
-			// later removes its attachment to this mqueue directory.
+			// later detaches the mount of this mqueue inode.
 			mut covered := entry.covered
 			if source.initial && covered != unsafe { nil }
-				&& voidptr(covered.mountpoint) == voidptr(directory) {
+				&& voidptr(covered.mountpoint) == voidptr(entry.root) {
 				key := u64(voidptr(covered))
 				if key !in table.overrides { katomic.inc(mut &covered.ns_mounts) }
-				table.overrides[key] = voidptr(directory)
+				table.overrides[key] = voidptr(entry.root)
 			}
 		}
 		table.mounts << &Mount{
@@ -333,6 +349,7 @@ pub fn copy_mount_table_for(parent &MountTable, unprivileged bool) &MountTable {
 			fstype:  entry.fstype
 			flags:   entry.flags
 			mqueue_view: entry.mqueue_view
+			mqueue_device: entry.mqueue_device
 			options: entry.options
 			locked:  entry.locked || (unprivileged && voidptr(entry.covered) != voidptr(entry.root))
 			locked_flags: entry.locked_flags | if unprivileged { entry.flags & ms_lockable } else { u64(0) }
@@ -796,7 +813,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		defer { vfs_lock.release() }
 		require_mount_destination(mut table, target_mount, mounting_root)?
 		require_linked(target_node)?
-		publish_mqueue_mount(mut table, mut target_node, mount_node, shown_source,
+		publish_mount_attachment(mut table, mut target_node, mount_node, shown_source, kind,
 			mount_flags, options, target_mount, 0)?
 	} else {
 		attach_mount(mut table, mut target_node, mount_node)
@@ -934,18 +951,14 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 		})
 		return none
 	}
-	if is_mqueue_directory(source_node) {
+	if is_mqueue_inode(source_node) {
 		origin := path_from_root(source_node, vfs_root) or { pathname(source_node) }
 		defer { unsafe { origin.free() } }
-		return publish_mqueue_mount(mut table, mut target_node, source_node, origin,
+		return publish_mount_attachment(mut table, mut target_node, source_node, origin, 'mqueue',
 			mount_flags(source_mount) | flags, 'bind', target_mount, source_locked_flags)
 	}
-	// Binding a directory onto itself -- how a runtime turns its root into a
-	// mount point -- changes nothing about where paths lead.
-	if voidptr(source_node) != voidptr(target_node) {
-		attach_mount(mut table, mut target_node, source_node)
-	}
 	origin := path_from_root(source_node, vfs_root) or { pathname(source_node) }
+	defer { unsafe { origin.free() } }
 	mut fstype := 'none'
 	table.lock.acquire()
 	for i := table.mounts.len - 1; i >= 0; i-- {
@@ -956,10 +969,8 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 		}
 	}
 	table.lock.release()
-	mut bound := record_mount(mut table, target_node, source_node, origin, fstype,
-		mount_flags(source_mount) | flags, 'bind', target_mount)
-	bound.locked_flags = source_locked_flags
-	unsafe { origin.free() }
+	return publish_mount_attachment(mut table, mut target_node, source_node, origin, fstype,
+		mount_flags(source_mount) | flags, 'bind', target_mount, source_locked_flags)
 }
 
 fn is_beneath(node &VFSNode, ancestor &VFSNode) bool {
@@ -1218,13 +1229,17 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	}
 	if volume_mount_node(target_node) { errno.set(errno.ebusy); return none }
 	validate_mount_move(mut table, entry, target_mount)?
+	table.lock.acquire()
+	defer { table.lock.release() }
+	if table.released { errno.set(errno.enoent); return none }
 	mut old_covered := entry.covered
 	if voidptr(old_covered) != voidptr(entry.root) {
-		detach_mount(mut table, mut old_covered)
+		detach_mount_locked(mut table, mut old_covered)
 	}
-	attach_mount(mut table, mut target_node, entry.root)
+	attach_mount_locked(mut table, mut target_node, entry.root)
 	entry.lock.acquire()
 	entry.covered = target_node
+	if is_mqueue_inode(target_node) { target_node.mount_covered = true }
 	lib.copy_mount_context(&entry.parent, target_mount)
 	entry.move_epoch++
 	entry.lock.release()
@@ -1321,7 +1336,11 @@ fn unmount(parent &VFSNode, target string, flags u64) ? {
 				detach_mount_locked(mut table, mut covered)
 			}
 			table.lock.release()
-			if remove { retire_mqueue_view(mut candidate, false) }
+			// A locked file redirect stays attached inside the detached tree.
+			// Its table keeps the queue reference until it drops that redirect.
+			if uncover || (remove && is_mqueue_directory(candidate.root)) {
+				retire_mqueue_view(mut candidate, false)
+			}
 		}
 		return
 	}
@@ -1646,7 +1665,9 @@ pub fn mountinfo_text(pid int) string {
 				parent_id = other.entry.id
 			}
 		}
-		dev := if entry.root != unsafe { nil } && entry.root.resource != unsafe { nil } {
+		dev := if entry.mqueue_device != 0 {
+			entry.mqueue_device
+		} else if entry.root != unsafe { nil } && entry.root.resource != unsafe { nil } {
 			entry.root.resource.stat.dev
 		} else {
 			u64(0)

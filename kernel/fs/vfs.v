@@ -90,9 +90,9 @@ pub mut:
 	parent_held u32
 	// A removed directory keeps its namespace resource reference until reap.
 	directory_resource bool
-	// Mounted queue aliases keep the resource as long as the retired node.
+	// The retired queue node owns its resource until its last use and grace.
 	retained_resource bool
-	// Active and still-reachable detached mount views of an mqueue directory.
+	// Active and still-reachable detached mounts of this mqueue inode.
 	mqueue_views u64
 	directory_released u64
 	overlay_refs  int
@@ -174,7 +174,7 @@ pub fn initialise() {
 	vfs_root = create_node(&TmpFS(unsafe { nil }), &VFSNode(unsafe { nil }), '', false)
 	file.on_handle_released(release_handle_node)
 	mmap.on_executable_node(retain_handle_node, release_handle_node)
-	proc.on_directory_released(directory_releasing)
+	proc.on_directory_released(node_reference_releasing)
 	file.on_mount_flags(raw_mount_flags)
 	file.on_mount_writer_released(release_mount_writer)
 
@@ -209,6 +209,10 @@ fn reduce_node_on_mount(node &VFSNode, follow_symlinks bool, depth int, effectiv
 fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effective bool, identity &lib.MountContext, resolve u64) &VFSNode {
 	if depth > 64 { errno.set(errno.eloop); return unsafe { nil } }
 	if node == unsafe { nil } { errno.set(errno.enoent); return unsafe { nil } }
+	if node.resource != unsafe { nil } && voidptr(node.resource) == voidptr(retired_mqueue_resource) {
+		errno.set(errno.enoent)
+		return unsafe { nil }
+	}
 	if unsafe { node.redir != 0 } {
 		return reduce_node_resolved(node.redir, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
@@ -945,6 +949,10 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
  mut node_transferred := false
  defer { if !node_transferred { release_handle_node(voidptr(node)) } }
  mut node_resource := node.resource
+ if node_resource != unsafe { nil } && voidptr(node_resource) == voidptr(retired_mqueue_resource) {
+  errno.set(errno.enoent)
+  return none
+ }
  retain_open_origin(mut node_resource)?
  mut origin_transferred := false
  defer { if !origin_transferred { resource.release_resource(mut node_resource) } }
@@ -981,8 +989,8 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
 		}
 	}
 	fd.handle.created = created
-	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
-	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
+	fd.handle.mac_device = stat.ischr(node_resource.stat.mode) || stat.isblk(node_resource.stat.mode)
+	fd.handle.mac_block_device = stat.isblk(node_resource.stat.mode)
 	fd.handle.seat_gated = node.seat
 	fd.handle.seat_owner = current_process.login_session
 	fd.handle.node = voidptr(node)
@@ -991,7 +999,7 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
  if !origin_transferred { fd.handle.origin_resource = node_resource }
  origin_transferred = true
 	access := flags & resource.o_accmode
-	if flags & resource.o_path == 0 && stat.isreg(node.resource.stat.mode)
+	if flags & resource.o_path == 0 && stat.isreg(node_resource.stat.mode)
 		&& (access == resource.o_wronly || access == resource.o_rdwr) {
 		writer := retain_mount_writer(identity) or {
 			fd.unref()

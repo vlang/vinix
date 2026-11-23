@@ -4,7 +4,9 @@ module fs
 
 import katomic
 import errno
-import lib
+import event.eventstruct
+import klock
+import resource
 import stat
 
 __global (
@@ -15,6 +17,7 @@ __global (
 	mqueue_lookup fn (&VFSNode, string) &VFSNode
 	mqueue_snapshot fn (&VFSNode) []&VFSNode
 	mqueue_last_view fn (&VFSNode)
+	retired_mqueue_resource &resource.Resource
 )
 
 // The IPC module owns the namespace and queue registry. These callbacks run
@@ -30,6 +33,7 @@ pub fn register_mqueue_filesystem(filesystem &FileSystem, mount fn () ?&VFSNode,
 	mqueue_lookup = lookup
 	mqueue_snapshot = snapshot
 	mqueue_last_view = last_view
+	retired_mqueue_resource = &resource.Resource(&RetiredQueue{stat: stat.Stat{mode: stat.ifreg}})
 }
 
 pub fn hold_mqueue_view(mut node VFSNode) {
@@ -41,24 +45,13 @@ pub fn mqueue_has_views(node &VFSNode) bool {
 }
 
 fn drop_mqueue_view(mut node VFSNode) {
-	if !katomic.dec(mut &node.mqueue_views) { mqueue_last_view(node) }
+	directory := is_mqueue_directory(node)
+	if !directory { node_reference_releasing(voidptr(node)) }
+	if !katomic.dec(mut &node.mqueue_views) && directory { mqueue_last_view(node) }
 }
 
-// A mount namespace copy must observe both the redirect and its view owner.
-// The table's release flag also prevents publication after its last owner left.
-fn publish_mqueue_mount(mut table MountTable, mut covered VFSNode, root &VFSNode,
-	source string, flags u64, options string, parent &lib.MountContext, locked_flags u64) ? {
-	table.lock.acquire()
-	defer { table.lock.release() }
-	if table.released { errno.set(errno.enoent); return none }
-	mut entry := new_mount_record(covered, root, source, 'mqueue', flags, options, parent)
-	entry.locked_flags |= locked_flags
-	attach_mount_locked(mut table, mut covered, root)
-	append_mount_record_locked(mut table, mut entry)
-}
-
-// A detached directory can still be reached through a description, cwd, or
-// process root. The reaper waits for those routes outside the mount table lock.
+// Detached mounts can still be reached through descriptions, cwd or process
+// root. The reaper waits for those routes outside the mount table lock.
 fn retire_mqueue_view(mut entry Mount, immediate bool) {
 	entry.lock.acquire()
 	owned := entry.mqueue_view
@@ -91,10 +84,13 @@ fn reap_mqueue_view(mut entry Mount) {
 	drop_mqueue_view(mut root)
 }
 
-fn is_mqueue_directory(node &VFSNode) bool {
+fn is_mqueue_inode(node &VFSNode) bool {
 	return node != unsafe { nil } && mqueue_filesystem != unsafe { nil }
 		&& voidptr(node.filesystem) == voidptr(mqueue_filesystem)
-		&& node.resource != unsafe { nil } && stat.isdir(node.resource.stat.mode)
+}
+
+fn is_mqueue_directory(node &VFSNode) bool {
+	return is_mqueue_inode(node) && node.resource != unsafe { nil } && stat.isdir(node.resource.stat.mode)
 }
 
 pub fn mqueue_child_mounted_on(node &VFSNode) bool {
@@ -112,3 +108,26 @@ pub fn retire_mqueue_child(mut node VFSNode) {
 	node.retained_resource = true
 	orphan_node(mut node, stat.ifreg)
 }
+
+// Mount history may live indefinitely. Its vnode still carries a usable
+// stat field for a walk that had already selected the old mount, and the
+// resource rejects operations on the retired queue.
+struct RetiredQueue {
+mut:
+	stat stat.Stat
+	refcount int
+	l klock.Lock
+	event eventstruct.Event
+	status int
+	can_mmap bool
+}
+
+fn (mut _q RetiredQueue) open(_flags int) ?&resource.Resource { errno.set(errno.enoent); return none }
+fn (mut _q RetiredQueue) grow(_handle voidptr, _size u64) ? { errno.set(errno.enoent); return none }
+fn (mut _q RetiredQueue) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 { errno.set(errno.enoent); return none }
+fn (mut _q RetiredQueue) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 { errno.set(errno.enoent); return none }
+fn (mut _q RetiredQueue) ioctl(_handle voidptr, _req u64, _arg voidptr) ?int { errno.set(errno.enoent); return none }
+fn (mut _q RetiredQueue) link(_handle voidptr) ? { errno.set(errno.enoent); return none }
+fn (mut _q RetiredQueue) unlink(_handle voidptr) ? { errno.set(errno.enoent); return none }
+fn (mut _q RetiredQueue) unref(_handle voidptr) ? {}
+fn (mut _q RetiredQueue) mmap(_handle voidptr, _page u64, _flags int) voidptr { return unsafe { nil } }
