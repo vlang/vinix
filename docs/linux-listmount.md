@@ -20,7 +20,8 @@ Vinix enumerates the active records in the caller's mount table. Existing
 mount propagation approximations still apply. In particular, initial
 namespace attachments reached only through fallback pathname lookup after
 a namespace copy are outside that copy's enumeration. Foreign mount
-namespace queries return `ENOENT`. `statmount` remains unavailable.
+namespace queries return `ENOENT`. Use [`statmount`](linux-statmount.md) to
+read metadata for the returned IDs.
 
 ## Qualification
 

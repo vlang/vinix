@@ -2791,6 +2791,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   subtree enumeration, pagination in both directions, and mount moves and
   detach on both architectures. See [the listmount receipts](docs/linux-listmount.md).
 
+- [x] Implement native `statmount` for the caller's mount namespace. Qualify
+  attachment metadata, bind roots and mountpoints, and the effects of moves,
+  detach, and chroot on both architectures. See [the statmount receipts](docs/linux-statmount.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

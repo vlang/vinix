@@ -414,6 +414,7 @@ pub fn init_syscall_table() {
 	syscall_table[454] = voidptr(futex.syscall_futex2_wake) // futex_wake
 	syscall_table[455] = voidptr(futex.syscall_futex2_wait) // futex_wait
 	syscall_table[456] = voidptr(futex.syscall_futex2_requeue) // futex_requeue
+	syscall_table[457] = voidptr(fs.syscall_statmount) // statmount
 	syscall_table[458] = voidptr(fs.syscall_listmount) // listmount
 	syscall_table[462] = voidptr(mmap.syscall_mseal) // mseal
 	syscall_table[235] = voidptr(syscall_linux_utimes) // utimes

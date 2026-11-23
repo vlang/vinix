@@ -20,8 +20,8 @@ directory routes into the namespace copy. IDs identify mounts within one boot.
 
 Anonymous descriptions without mount records still omit mount fields. DMA-BUF
 continues to report the ID of its internal filesystem. The reported unique IDs
-can select a subtree in [`listmount`](linux-listmount.md). `statmount` remains
-unimplemented.
+can select a subtree in [`listmount`](linux-listmount.md) or identify the
+attachment in [`statmount`](linux-statmount.md).
 
 ## Qualification
 

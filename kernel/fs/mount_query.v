@@ -20,7 +20,7 @@ mut:
 	size u32
 	spare u32
 	id u64
-	cursor u64
+	parameter u64
 	namespace_id u64
 }
 
@@ -70,12 +70,12 @@ pub fn syscall_listmount(_ voidptr, address u64, output u64, count u64, flags u3
 	limit := memory.user_address_limit()
 	if output > limit || bytes > limit - output { return errno.err, errno.efault }
 	mut request := read_mount_id_request(address) or { return errno.err, errno.get() }
-	if request.cursor != 0 && request.cursor <= mount_unique_id_offset {
+	if request.parameter != 0 && request.parameter <= mount_unique_id_offset {
 		return errno.err, errno.einval
 	}
 	reverse := flags & listmount_reverse != 0
 	// Linux starts the forward search at cursor + 1 in an unsigned word.
-	if !reverse && request.cursor == u64(-1) { request.cursor = 0 }
+	if !reverse && request.parameter == u64(-1) { request.parameter = 0 }
 	if count <= listmount_stack_ids {
 		mut stack := [listmount_stack_ids]u64{}
 		return listmount_to_user(request, output, count, reverse, unsafe { &stack[0] })
@@ -97,16 +97,27 @@ fn listmount_to_user(request MountIdRequest, output u64, count u64, reverse bool
 	return length, 0
 }
 
-fn listmount_snapshot(request MountIdRequest, count u64, reverse bool, ids &u64) ?u64 {
-	vfs_lock.acquire()
-	defer { vfs_lock.release() }
-	process := calling_process()
-	ns := proc.mount_namespace_of(process)
-	if request.namespace_id != 0 && (ns == unsafe { nil } || request.namespace_id != ns.id) {
+struct MountQueryView {
+	namespace_id u64
+	owner_user u64
+	table &MountTable
+	root &VFSNode
+	identity voidptr
+}
+
+fn query_mount_namespace(namespace_id u64) ?&proc.Namespace {
+	ns := proc.mount_namespace_of(calling_process())
+	if ns == unsafe { nil } || (namespace_id != 0 && namespace_id != ns.id) {
 		errno.set(errno.enoent)
 		return none
 	}
-	mut table := if ns == unsafe { nil } || ns.data == unsafe { nil } {
+	return ns
+}
+
+// The VFS lock protects vnode ancestry while this snapshot is used.
+fn mount_query_view(ns &proc.Namespace) ?MountQueryView {
+	process := calling_process()
+	table := if ns.data == unsafe { nil } {
 		initial_mount_table
 	} else {
 		unsafe { &MountTable(ns.data) }
@@ -126,14 +137,37 @@ fn listmount_snapshot(request MountIdRequest, count u64, reverse bool, ids &u64)
 		errno.set(errno.eagain)
 		return none
 	}
-	mut origin := root
+	return MountQueryView{
+		namespace_id: ns.id
+		owner_user: ns.owner_user
+		table: table
+		root: root
+		identity: lib.mount_context_top(context)
+	}
+}
+
+fn mount_query_visible_locked(view MountQueryView, root_entry &Mount, entry &Mount) bool {
+	return root_entry != unsafe { nil } && mount_path_beneath_locked(view.table, entry.root, entry, view.root, root_entry)
+}
+
+fn mount_query_privileged(view MountQueryView) bool {
+	return proc.has_namespace_capability(calling_process(), proc.cap_sys_admin, view.owner_user)
+}
+
+fn listmount_snapshot(request MountIdRequest, count u64, reverse bool, ids &u64) ?u64 {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	ns := query_mount_namespace(request.namespace_id)?
+	view := mount_query_view(ns)?
+	mut table := unsafe { view.table }
+	mut origin := view.root
 	table.lock.acquire()
 	if table.released {
 		table.lock.release()
 		errno.set(errno.enoent)
 		return none
 	}
-	root_entry := mount_by_route_locked(table, lib.mount_context_top(context), true)
+	root_entry := mount_by_route_locked(table, view.identity, true)
 	mut anchor := root_entry
 	if request.id != listmount_root {
 		anchor = find_public_mount_locked(table, request.id)
@@ -143,9 +177,7 @@ fn listmount_snapshot(request MountIdRequest, count u64, reverse bool, ids &u64)
 			return none
 		}
 		origin = anchor.root
-		owner := if ns == unsafe { nil } { proc.user_namespace_of(unsafe { nil }) } else { ns.owner_user }
-		if (root_entry == unsafe { nil } || !mount_path_beneath_locked(table, origin, anchor, root, root_entry))
-			&& !proc.has_namespace_capability(process, proc.cap_sys_admin, owner) {
+		if !mount_query_visible_locked(view, root_entry, anchor) && !mount_query_privileged(view) {
 			table.lock.release()
 			errno.set(errno.eperm)
 			return none
@@ -181,7 +213,7 @@ fn write_mount_ids_locked(table &MountTable, origin &VFSNode, anchor &Mount, req
 		if entry.detached { continue }
 		id := unique_mount_id(entry)
 		if id == request.id { continue }
-		if request.cursor != 0 && (if reverse { id >= request.cursor } else { id <= request.cursor }) {
+		if request.parameter != 0 && (if reverse { id >= request.parameter } else { id <= request.parameter }) {
 			continue
 		}
 		if mount_path_beneath_locked(table, entry.root, entry, origin, anchor) {

@@ -65,6 +65,8 @@ pub mut:
 	public_id int
 	covered &VFSNode = unsafe { nil }
 	root    &VFSNode = unsafe { nil }
+	// Bind roots retain the original filesystem root for relative path queries.
+	filesystem_root &VFSNode = unsafe { nil }
 	parent  lib.MountContext
 	move_epoch u64
 	lock klock.Lock
@@ -253,12 +255,15 @@ fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source st
 
 // A namespace copy sees the redirect and the mount that owns it together.
 fn publish_mount_attachment(mut table MountTable, mut covered VFSNode, root &VFSNode,
-	source string, fstype string, flags u64, options string, parent &lib.MountContext, locked_flags u64) ? {
+	source string, fstype string, flags u64, options string, parent &lib.MountContext, original &Mount) ? {
 	table.lock.acquire()
 	defer { table.lock.release() }
 	if table.released { errno.set(errno.enoent); return none }
 	mut entry := new_mount_record(covered, root, source, fstype, flags, options, parent)
-	entry.locked_flags |= locked_flags
+	if original != unsafe { nil } {
+		entry.filesystem_root = original.filesystem_root
+		entry.locked_flags |= original.locked_flags
+	}
 	attach_mount_locked(mut table, mut covered, root)
 	append_mount_record_locked(mut table, mut entry)
 }
@@ -268,6 +273,7 @@ fn new_mount_record(covered &VFSNode, root &VFSNode, source string,
 	mut entry := &Mount{
 		covered: unsafe { covered }
 		root:    unsafe { root }
+		filesystem_root: unsafe { root }
 		source:  source.clone()
 		fstype:  fstype.clone()
 		flags:   flags & ms_per_mount
@@ -348,6 +354,7 @@ pub fn copy_mount_table_for(parent &MountTable, unprivileged bool) &MountTable {
 			public_id: allocate_mount_id()
 			covered: entry.covered
 			root:    entry.root
+			filesystem_root: entry.filesystem_root
 			parent:  entry.parent
 			move_epoch: entry.move_epoch
 			detached: entry.detached
@@ -820,7 +827,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		require_mount_destination(mut table, target_mount, mounting_root)?
 		require_linked(target_node)?
 		publish_mount_attachment(mut table, mut target_node, mount_node, shown_source, kind,
-			mount_flags, options, target_mount, 0)?
+			mount_flags, options, target_mount, unsafe { nil })?
 	} else {
 		attach_mount(mut table, mut target_node, mount_node)
 		record_mount(mut table, target_node, mount_node, shown_source,
@@ -934,7 +941,6 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 	}
 	// A bind keeps the restrictions locked on its source (Linux clone_mnt
 	// copies MNT_LOCK_*), so a copy cannot be remounted writable.
-	source_locked_flags := source_entry.locked_flags
 	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if !starting_mount(parent, target_mount) { return none }
 	_, mut target_node, _ := walk_path_on_mount(parent, target, 0, true, target_mount)
@@ -961,22 +967,12 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 		origin := path_from_root(source_node, vfs_root) or { pathname(source_node) }
 		defer { unsafe { origin.free() } }
 		return publish_mount_attachment(mut table, mut target_node, source_node, origin, 'mqueue',
-			mount_flags(source_mount) | flags, 'bind', target_mount, source_locked_flags)
+			mount_flags(source_mount) | flags, 'bind', target_mount, source_entry)
 	}
 	origin := path_from_root(source_node, vfs_root) or { pathname(source_node) }
 	defer { unsafe { origin.free() } }
-	mut fstype := 'none'
-	table.lock.acquire()
-	for i := table.mounts.len - 1; i >= 0; i-- {
-		entry := table.mounts[i]
-		if !entry.detached && is_beneath(source_node, entry.root) {
-			fstype = entry.fstype
-			break
-		}
-	}
-	table.lock.release()
-	return publish_mount_attachment(mut table, mut target_node, source_node, origin, fstype,
-		mount_flags(source_mount) | flags, 'bind', target_mount, source_locked_flags)
+	return publish_mount_attachment(mut table, mut target_node, source_node, origin, source_entry.fstype,
+		mount_flags(source_mount) | flags, 'bind', target_mount, source_entry)
 }
 
 fn is_beneath(node &VFSNode, ancestor &VFSNode) bool {
