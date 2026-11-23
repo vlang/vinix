@@ -2,8 +2,26 @@
 module main
 
 import crypto.sha256
+import json2
 import os
 import tools.packages.pkgcore
+
+struct UploadedAsset {
+	name   string
+	state  string
+	digest string
+}
+
+struct DraftRelease {
+	id         u64
+	tag_name   string
+	name       string
+	draft      bool
+	prerelease bool
+	body       string
+	html_url   string
+	assets     []UploadedAsset
+}
 
 fn valid_asset_name(name string) bool {
 	if name == '' || name[0] in [u8(`.`), `-`]! { return false }
@@ -98,6 +116,28 @@ fn stage_assets(directory string, manifest string, destination string) ! {
 	}
 }
 
+fn verify_draft(directory string, response string, id string, tag string, prerelease bool) !string {
+	draft := json2.decode[DraftRelease](pkgcore.read_metadata(response)!)!
+	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
+	if draft.id.str() != id || !draft.draft || draft.tag_name != tag || draft.name != 'Vinix ' + tag
+		|| draft.body != notes || draft.prerelease != prerelease || draft.html_url == '' {
+		return error('GitHub draft metadata changed after creation')
+	}
+	manifest := os.join_path(directory, 'SHA256SUMS')
+	mut expected := read_manifest(manifest)!
+	if expected.len == 0 { return error('release checksum manifest is empty') }
+	expected['SHA256SUMS'] = pkgcore.hash_file(manifest)!
+	for asset in draft.assets {
+		digest := expected[asset.name] or { return error('unexpected GitHub draft asset: ' + asset.name) }
+		if asset.state != 'uploaded' || asset.digest != 'sha256:' + digest {
+			return error('GitHub draft asset differs from the verified upload: ' + asset.name)
+		}
+		expected.delete(asset.name)
+	}
+	if expected.len > 0 { return error('missing GitHub draft assets: ' + expected.keys().join(', ')) }
+	return draft.html_url
+}
+
 fn run() ! {
 	if os.args.len >= 5 && os.args[1] == 'record' {
 		return record_assets(os.args[2], os.args[3], os.args[4..])
@@ -111,7 +151,11 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'stage' {
 		return stage_assets(os.args[2], os.args[3], os.args[4])
 	}
-	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | capture DIRECTORY NEW_DESTINATION ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NEW_DESTINATION')
+	if os.args.len == 7 && os.args[1] == 'verify-draft' && os.args[6] in ['true', 'false']! {
+		println(verify_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6] == 'true')!)
+		return
+	}
+	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | capture DIRECTORY NEW_DESTINATION ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NEW_DESTINATION | verify-draft DIRECTORY RESPONSE ID TAG PRERELEASE')
 }
 
 fn main() {

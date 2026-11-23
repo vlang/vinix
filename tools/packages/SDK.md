@@ -621,9 +621,13 @@ supports directory `flock`.
 For publication, the driver checks that an existing GitHub tag resolves to the
 built commit. Automatic tag selection skips names reserved by either a tag or
 a release. After confirmation and asset verification the driver creates any
-missing tag at the built commit, checks the resulting ref, and passes
-`--verify-tag` to GitHub CLI. This also applies to draft releases. A failed
-upload can leave the tag in place for a retry with the same tag and commit.
+missing tag at the built commit and checks the resulting ref. The driver
+creates a draft and uploads the assets. It reads that draft by its numeric ID
+and checks the tag name, title, notes, prerelease setting, and the exact set of
+uploaded assets against the local SHA-256 digests, including `SHA256SUMS`.
+It rechecks the tag's commit after upload and publishes that draft by ID.
+`--draft` keeps the verified release as a draft. An upload or verification
+failure leaves the draft available for inspection.
 Set `TMPDIR` to a filesystem with room for ISO extraction and signed bundle
 verification when the system temporary filesystem is small. Standalone
 `package-receipt verify` also keeps its private ISO copy in that filesystem.

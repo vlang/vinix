@@ -33,9 +33,9 @@ fn resolve_tag(repo string, tag string) !string {
 	return sha
 }
 
-fn prepare_tag(repo string, tag string, commit string) ! {
+fn check_tag(repo string, tag string, commit string, create bool) ! {
 	mut actual := resolve_tag(repo, tag)!
-	if actual == '' {
+	if actual == '' && create {
 		// A concurrent creator can win this request. Accept only the verified
 		// final ref, regardless of the create response.
 		_, message := api(['repos/${repo}/git/refs', '--method', 'POST', '-f', 'ref=refs/tags/' + tag,
@@ -46,6 +46,7 @@ fn prepare_tag(repo string, tag string, commit string) ! {
 			return error('could not verify the created GitHub tag ' + tag + detail)
 		}
 	}
+	if actual == '' { return error('GitHub tag ${tag} is missing before publication') }
 	if actual != commit { return error('GitHub tag ${tag} points to ${actual}, expected ${commit}') }
 }
 
@@ -54,10 +55,10 @@ fn run() ! {
 		println(resolve_tag(os.args[2], os.args[3])!)
 		return
 	}
-	if os.args.len == 5 && os.args[1] == 'prepare' {
-		return prepare_tag(os.args[2], os.args[3], os.args[4])
+	if os.args.len == 5 && os.args[1] in ['prepare', 'verify']! {
+		return check_tag(os.args[2], os.args[3], os.args[4], os.args[1] == 'prepare')
 	}
-	return error('usage: release-tag resolve REPO TAG | prepare REPO TAG COMMIT')
+	return error('usage: release-tag resolve REPO TAG | prepare REPO TAG COMMIT | verify REPO TAG COMMIT')
 }
 
 fn main() {

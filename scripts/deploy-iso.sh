@@ -569,7 +569,7 @@ fi
 
 # ── Publish ────────────────────────────────────────────────────────────────
 
-step "Publishing $TAG to github.com/$REPO"
+step "Preparing $TAG for github.com/$REPO"
 kind=release
 [ "$PRERELEASE" -eq 1 ] && kind=pre-release
 [ "$DRAFT" -eq 1 ] && kind="draft $kind"
@@ -600,18 +600,36 @@ else
     step "Preparing verified release copies"
     "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
 fi
-mv "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
+cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
 staged_bundles=()
 for bundle in ${BUNDLES[@]+"${BUNDLES[@]}"}; do
     staged_bundles+=("$ASSET_STAGE/${bundle##*/}")
 done
 
 "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
-create_args=(release create --repo "$REPO" --verify-tag --target "$COMMIT"
-    --title "Vinix $TAG" --notes-file "$ASSET_STAGE/RELEASE_NOTES.md")
-[ "$DRAFT" -eq 1 ] && create_args+=(--draft)
-[ "$PRERELEASE" -eq 1 ] && create_args+=(--prerelease)
-gh "${create_args[@]}" -- "$TAG" "${staged_images[@]}" "$ASSET_STAGE/SHA256SUMS" ${staged_bundles[@]+"${staged_bundles[@]}"}
+prerelease=false
+[ "$PRERELEASE" -eq 1 ] && prerelease=true
+release_api="repos/$REPO/releases"
+release_id="$(gh api "$release_api" --method POST -f "tag_name=$TAG" \
+    -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_STAGE/RELEASE_NOTES.md" \
+    -F draft=true -F "prerelease=$prerelease" --jq .id)"
+case "$release_id" in
+    ''|0|*[!0-9]*) die "GitHub returned an invalid draft release ID" ;;
+esac
+step "Uploading assets to GitHub draft $release_id"
+gh release upload --repo "$REPO" -- "$TAG" "${staged_images[@]}" "$ASSET_STAGE/SHA256SUMS" ${staged_bundles[@]+"${staged_bundles[@]}"}
+gh api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
+draft_url="$("$ASSET_WORK/release-assets" verify-draft "$ASSET_WORK" "$ASSET_WORK/draft.json" \
+    "$release_id" "$TAG" "$prerelease")"
+"$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
 
-step "Published"
-gh release view --repo "$REPO" --json url --jq .url -- "$TAG"
+if [ "$DRAFT" -eq 1 ]; then
+    step "Saved verified draft"
+    echo "$draft_url"
+else
+    release_url="$(gh api "$release_api/$release_id" --method PATCH -F draft=false \
+        --jq 'select(.draft == false) | .html_url')"
+    [ -n "$release_url" ] || die "GitHub did not confirm publication of draft $release_id"
+    step "Published"
+    echo "$release_url"
+fi
