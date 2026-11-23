@@ -62,9 +62,11 @@ ASan/UBSan for the app/file fixture, real package CLI and signed CLI maintenance
 Leak detection is disabled; no whole-plan heap-retention claim is made.
 
 The [guest controller](image-requirements-runtime-check.v) builds the real stager
-and eight assertion programs. Both guests must complete all fourteen report
-markers, all eight processes and guest-initiated QMP shutdown. Each receipt pins
-twelve artifacts: kernel, PID 1, nine binaries and raw serial output.
+and eight assertion programs. Each worker announces its start and forwards its
+output to serial as it runs. Both guests must complete all fifteen report markers,
+including the per-target CLI verdict, all eight processes and guest-initiated
+QMP shutdown. Each receipt pins the kernel, PID 1, nine fixture binaries and raw
+serial output.
 
 ```sh
 v -o /tmp/image-requirements-check tests/packages/image-requirements-check.v
@@ -150,6 +152,20 @@ the 180-second deadline. Both used the retained release kernels from
 fixture binaries and the AArch64 receipt. The SHA-256 of
 `qualification-guest.sha256` is
 `809c2dca6d46e2829c5e327c39cda9322e60516ddba2833a79a1307b8e80552a`.
+
+## Paired guest qualification
+
+Two replays of the retained x86-64 image completed all eight workers with one
+and two virtual CPUs. Fresh builds from `7bf207117` plus the streaming runner
+change then passed the maintained suite on the same `cf4e76718` release kernels.
+AArch64 completed in **124.2 seconds** and x86-64 in **132.8 seconds** with a
+300-second x86-64 deadline. Both runs recorded every worker start and verdict,
+the target-specific CLI verdict and guest-initiated QMP shutdown.
+
+The runner source patch, retained image replay logs, new guest inputs, receipts
+and serial/QMP logs are in `~/.local/state/vinix/r14-x86-3wLLds`. The SHA-256
+of `qualification.sha256` is
+`b9ab2f87ccf4f49d74550f6e82e6e392726bf093ed2936aa769c358d49652c41`.
 
 ## Qualification, 2026-10-16
 

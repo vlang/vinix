@@ -34,6 +34,7 @@ fn image_requirements_suite() hwhost.Suite {
 				'IMAGE REQUIREMENTS FILE schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS',
 				'IMAGE REQUIREMENTS LOCK both targets retain an older reviewed version and sequence floor, refuse changed pins or closure, and publish through the matching capture PASS',
 				'IMAGE REQUIREMENTS FILE CLI both-host inherited/explicit selection, inline override, mutual exclusion and normal/check compiler gates preserve unchanged images PASS',
+				'PACKAGE IMAGE TARGET CLI signed deployment locks, all three target overrides, generic fallback and explicit precedence PASS',
 				'IMAGE APPLICATIONS reproducible both-host joint locks, signed provenance, runtime/shared closure, app-kind selection and independent reports PASS',
 				'IMAGE APPLICATIONS individually valid conflicting runtimes, missing/wrong-host/nonapp roots, duplicate/invalid/oversized sets and absent bundles refuse without publication; retry PASS',
 				'IMAGE APPLICATIONS organization permissions/allowlist/pins and captured payload integrity remain mandatory before app resolution; restoration/retry PASS',
