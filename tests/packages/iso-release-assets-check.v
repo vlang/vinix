@@ -251,7 +251,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			return error('expected paginated draft lookup')
 		}
 		println('99900\t${tag}-other')
-		if os.exists(local) && scenario != 'create-delayed' {
+		if os.exists(local) && scenario !in ['create-delayed', 'publish-prepared-delayed']! {
 			println('${draft_id}\t${tag}')
 			if scenario == 'resume-create-ambiguous' { println('99901\t${tag}') }
 		}
@@ -265,7 +265,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			return error('expected releases POST with notes')
 		}
 		body := args[12]
-		prerelease := scenario in ['draft-only', 'publish-prepared']!
+		prerelease := scenario in ['draft-only', 'publish-prepared', 'publish-prepared-delayed']!
 		if args[3..17] != ['--method', 'POST', '-f', 'tag_name=' + tag, '-f',
 			'target_commitish=' + commit, '-f', 'name=Vinix ' + tag, '-F', body, '-F',
 			'draft=true', '-F', 'prerelease=' + prerelease.str()]
@@ -299,7 +299,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		}
 		os.mkdir(remote + '/uploads')!
 		os.write_file(local, json2.encode(draft))!
-		if scenario in ['create-response-lost', 'create-delayed']! {
+		if scenario in ['create-response-lost', 'create-delayed', 'publish-prepared-delayed']! {
 			eprintln('fixture lost the creation response')
 			return 1
 		}
@@ -515,7 +515,7 @@ fn run_stub(name string) !int {
 			println('fixture size')
 		}
 		'gh' {
-			if scenario == 'prepared' || scenario.starts_with('verify-prepared') {
+			if scenario in ['prepared', 'prepared-recovery']! || scenario.starts_with('verify-prepared') {
 				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
 				os.write_file(remote + '/unexpected-gh', os.args[1..].join('\n'))!
 				return error('local prepared release operation invoked GitHub')
@@ -588,7 +588,7 @@ fn prepare_driver(repository string, root string) ! {
 		'-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Release fixture'])!
 }
 
-fn verify_handoff(out string, with_packages bool, scenario string) ! {
+fn verify_handoff(out string, with_packages bool, scenario string, published_notes string) ! {
 	mutated := scenario == 'output-change-during-upload'
 	mut names := ['vinix-amd64.iso', 'vinix-arm64.iso', x11, x11 + '.sha256', arm_x11,
 		arm_x11 + '.sha256', ios, ios + '.sha256']
@@ -615,7 +615,10 @@ fn verify_handoff(out string, with_packages bool, scenario string) ! {
 		}
 	}
 	listed << ['${sha256.hexhash(manifest)}  SHA256SUMS',
-		'${sha256.hexhash(notes)}  RELEASE_NOTES.md']
+		'${sha256.hexhash(published_notes)}  RELEASE_NOTES.md']
+	if scenario != 'publish-prepared' && notes != published_notes {
+		return error('release output notes differ from the published notes')
+	}
 	mut uploaded := os.read_lines(out + '/fixture-upload-digests')!
 	listed.sort()
 	uploaded.sort()
@@ -853,13 +856,65 @@ fn check_prepared_release(root string, work string, out string, remote string, e
 	mut publishing := environment.clone()
 	publishing['VINIX_ASSET_TEST_REVIEW'] = review_file
 	recovery_attempt(root, work, publishing, 'publish-prepared', review_args, '')!
-	verify_handoff(out, true, 'publish-prepared')!
 	published := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	verify_handoff(out, true, 'publish-prepared', published.body)!
+	recovery_attempt(root, work, environment, 'verify-prepared-published', verification_args, '')!
 	if !published.prerelease || published.draft || !published.body.starts_with(prepared.notes)
 		|| os.read_file(tag_file(remote, tag))! != commit || os.read_file(record_path)! != record
+		|| os.read_file(out + '/fixture-original-notes')! != prepared.notes
+		|| os.read_file(work + '/verify-prepared-published.log')! != review_text
 		|| !os.exists(remote + '/publish-attempt')
 		|| os.read_file(review_file)! != 'review changed after the driver captured it\n' {
 		return error('publication did not use the prepared release metadata')
+	}
+}
+
+fn check_prepared_recovery(root string, work string, out string, remote string, environment map[string]string) ! {
+	tag := environment['VINIX_ASSET_TEST_TAG']
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	verify := ['--verify-prepared=' + tag]
+	recovery_attempt(root, work, environment, 'verify-prepared-before-recovery', verify, '')!
+	review := work + '/verify-prepared-before-recovery.log'
+	expected := os.read_file(review)!
+	record_path := out + '/.prepared-release.json'
+	record := os.read_file(record_path)!
+	prepared := json2.decode[FixtureCreation](record)!
+	intent_path := out + '/.draft-creation.json'
+	recovery_path := root + '/build-release/work/draft-' + id + '.json'
+	recovery_attempt(root, work, environment, 'publish-prepared-delayed', ['--publish-prepared=' + tag,
+		'--prepared-review=' + review], 'no GitHub draft found')!
+	intent := os.read_file(intent_path)!
+	creation := json2.decode[FixtureCreation](intent)!
+	if intent != os.read_file(remote + '/creation-record')! || os.exists(recovery_path)
+		|| !creation.notes.starts_with(prepared.notes + '\n<!-- Vinix release attempt: ')
+		|| os.ls(remote + '/uploads')!.len != 0 {
+		return error('interrupted prepared publication lost its draft creation metadata')
+	}
+	attempt := os.read_file(remote + '/release-attempt')!
+	recovery_attempt(root, work, environment, 'verify-prepared-interrupted', verify, '')!
+	recovery_attempt(root, work, environment, 'resume-create-prepared', ['--resume-create=' + tag,
+		'--draft'], '')!
+	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	recovery := json2.decode[FixtureCreation](os.read_file(recovery_path)!)!
+	if os.exists(intent_path) || !draft.draft || draft.id.str() != id || recovery.id != draft.id
+		|| draft.body != creation.notes || recovery.notes != creation.notes
+		|| draft.assets.len != os.read_lines(out + '/SHA256SUMS')!.len + 1
+		|| os.exists(remote + '/publish-attempt') {
+		return error('creation recovery did not retain the original prepared draft')
+	}
+	recovery_attempt(root, work, environment, 'verify-prepared-recovered-draft', verify, '')!
+	resume_attempt(root, work, environment, 'resume-draft-prepared', [], '')!
+	recovery_attempt(root, work, environment, 'verify-prepared-recovered-publication', verify, '')!
+	published := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	if published.draft || published.id != draft.id || published.body != creation.notes
+		|| os.read_file(remote + '/release-attempt')! != attempt || !os.exists(remote + '/publish-attempt')
+		|| os.read_file(record_path)! != record || os.read_file(out + '/RELEASE_NOTES.md')! != prepared.notes {
+		return error('prepared recovery changed the original handoff or created another draft')
+	}
+	for phase in ['interrupted', 'recovered-draft', 'recovered-publication']! {
+		if os.read_file(work + '/verify-prepared-' + phase + '.log')! != expected {
+			return error('prepared verification changed after ' + phase)
+		}
 	}
 }
 
@@ -907,7 +962,7 @@ fn run() ! {
 		'public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
 		'bad-build-sidecar', 'boot-copy-changed', 'x11-after-boot', 'ios-pair-after-boot',
 		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff', 'build-only',
-		'publish-no-test', 'packages-no-test', 'prepared']
+		'publish-no-test', 'packages-no-test', 'prepared', 'prepared-recovery']
 	for index, scenario in scenarios {
 		with_packages := scenario in ['packages', 'receipt-after-boot', 'output-change-during-upload',
 			'public-iso-during-boot', 'public-iso-during-receipt', 'packages-no-test', 'prepared']!
@@ -961,7 +1016,9 @@ fn run() ! {
 		}
 		if scenario != 'tag-auto' { args << '--tag=' + tag }
 		if scenario == 'draft-only' { args << ['--draft', '--prerelease'] }
-		if scenario == 'prepared' { args << ['--prepare-only', '--prerelease'] }
+		if scenario in ['prepared', 'prepared-recovery']! {
+			args << ['--prepare-only', '--prerelease', '--ref=' + commit]
+		}
 		if scenario == 'build-only' { args << ['--arch=amd64', '--no-publish'] }
 		if scenario in ['publish-no-test', 'packages-no-test', 'oversize-no-test']! { args << ['--no-test'] }
 		code, log := command('/bin/bash', args, root, environment)
@@ -981,8 +1038,8 @@ fn run() ! {
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test', 'tag-existing', 'tag-auto',
 			'tag-raced-match', 'draft-only', 'publish-response-lost', 'create-response-lost', 'repo-inferred']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
-			verify_handoff(out, with_packages, scenario)!
 			draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+			verify_handoff(out, with_packages, scenario, draft.body)!
 			if draft.draft != (scenario == 'draft-only')
 				|| os.exists(remote + '/publish-attempt') != (scenario != 'draft-only')
 				|| os.exists(out + '/.draft-creation.json') {
@@ -1000,6 +1057,11 @@ fn run() ! {
 				return error('could not prepare a release\n' + log)
 			}
 			check_prepared_release(root, work, out, remote, environment)!
+		} else if scenario == 'prepared-recovery' {
+			if code != 0 || !log.contains('Saved prepared release ' + tag) {
+				return error('could not prepare a release for recovery\n' + log)
+			}
+			check_prepared_recovery(root, work, out, remote, environment)!
 		} else if scenario in release_list_refusals {
 			after_build := scenario in ['release-appears-before-create', 'release-list-fails-before-create']!
 			diagnostic := if scenario in ['release-list-failed', 'release-list-fails-before-create']! {

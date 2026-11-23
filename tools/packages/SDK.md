@@ -660,7 +660,10 @@ The driver verifies the saved metadata and original assets and checks
 the recorded commit and tag on GitHub. It uploads private copies of the
 verified assets and uses the original release notes. Pass `--draft` to
 keep the verified release as a draft. The saved record protects the
-output directory from a second build with that tag.
+output directory from a second build with that tag. The local notes keep
+their reviewed bytes through publication and recovery. GitHub's notes and
+the recovery records also carry the draft attempt marker. You can rerun
+`--verify-prepared=TAG` after a publication attempt to verify the same handoff.
 
 To require a reviewed handoff, save the JSON from `--verify-prepared=TAG`
 and pass `--prepared-review=FILE` when publishing it. The driver captures

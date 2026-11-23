@@ -431,8 +431,11 @@ publish_staged_assets() {
     "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
     "$ASSET_WORK/release-assets" prepare-creation "$OUT" "$ASSET_WORK" "$REPO" \
         "$TAG" "$COMMIT" "$prerelease"
-    cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
-    mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
+    # The prepared handoff retains the notes covered by its verification report.
+    if [ -z "$PUBLISH_PREPARED" ]; then
+        cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
+        mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
+    fi
     echo "  If draft creation is interrupted, retry with --resume-create=$TAG"
     if ! github_api "$release_api" --method POST -f "tag_name=$TAG" \
         -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
