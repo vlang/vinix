@@ -189,6 +189,8 @@ fn main() {
 		return
 	}
 	println('HWTEST PASS ${name}')
+	// Let the host stop and finalize the WAV capture before QEMU exits.
+	C.usleep(2_000_000)
 	power_off()
 }
 

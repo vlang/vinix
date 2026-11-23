@@ -60,22 +60,31 @@ fn announce(run string) ! {
 	mark(run + '.ready', json2.encode(value))!
 }
 
-fn tone(mut client audiopcm.Client, frequency int) ! {
+fn pcm(mut client audiopcm.Client, frequency int, length int) ! {
 	mut bytes := []u8{len: 4096}
 	mut frame := 0
-	for frame < 48000 {
-		frames := if 48000 - frame < 1024 { 48000 - frame } else { 1024 }
-		for index in 0 .. frames {
-			sample := i16(math.sin(2 * math.pi * f64(frequency) * f64(frame + index) / 48000) * 12000)
-			bits := u16(sample)
-			for channel in 0 .. 2 {
-				bytes[index * 4 + channel * 2] = u8(bits)
-				bytes[index * 4 + channel * 2 + 1] = u8(bits >> 8)
+	for frame < length {
+		frames := if length - frame < 1024 { length - frame } else { 1024 }
+		if frequency != 0 {
+			for index in 0 .. frames {
+				bits := u16(i16(math.sin(2 * math.pi * f64(frequency) * f64(frame + index) / 48000) * 12000))
+				for channel in 0 .. 2 {
+					bytes[index * 4 + channel * 2] = u8(bits)
+					bytes[index * 4 + channel * 2 + 1] = u8(bits >> 8)
+				}
 			}
 		}
 		client.write(bytes[..frames * 4])!
 		frame += frames
 	}
+}
+
+fn tone(mut client audiopcm.Client, frequency int) ! {
+	// Some backends stop emitting samples when the stream is idle.
+	// Pass real silence through the same signed portal as the audible PCM.
+	pcm(mut client, 0, 60_000)!
+	pcm(mut client, frequency, 48_000)!
+	pcm(mut client, 0, 60_000)!
 	client.drain()!
 }
 

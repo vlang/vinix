@@ -10,6 +10,7 @@ import time
 import tests.packages.audioinputs
 import tests.packages.audiokernel
 import tests.packages.audioprepare
+import tests.packages.audiotest
 import tools.packages.pkgcore
 
 #include <stdlib.h>
@@ -326,8 +327,18 @@ fn audio_scenarios() []hwhost.Scenario {
 			forbidden:    ['AUDIO PAYLOAD FAIL', 'AUDIO LOGIN FAIL']
 			ending:       .poweroff
 			timeout:      240
-			qemu:         ['-audiodev',
-				'wav,id=pcm,path={state}/sound.wav,out.frequency=48000,out.channels=2,out.format=s16']
+			actions:      [
+				hwhost.Action{
+					after: 'HWTEST START ' + full
+					qmp: r'{"execute":"human-monitor-command","arguments":{"command-line":"wavcapture \"{state}/sound.wav\" pcm 48000 16 2"}}'
+					answer_lacks: 'Failed to'
+				},
+				hwhost.Action{
+					after: 'HWTEST PASS ' + full
+					qmp: '{"execute":"human-monitor-command","arguments":{"command-line":"stopcapture 0"}}'
+				},
+			]
+			qemu:         ['-audiodev', 'none,id=pcm,out.frequency=48000,out.channels=2,out.format=s16']
 			qemu_aarch64: ['-device', 'virtio-sound-device,audiodev=pcm,streams=1']
 			qemu_x86_64:  ['-device', 'intel-hda', '-device', 'hda-output,audiodev=pcm,mixer=off']
 		}
@@ -743,6 +754,11 @@ fn finish_check(options hwhost.Options, root string, out string, before map[stri
 		})
 		os.write_file(state + '/outcome.json', json2.encode(outcome) + '\n')!
 		println(hwhost.report(host.arch, outcome))
+		if outcome.passed {
+			audiotest.read(state + '/sound.wav') or {
+				return error('invalid finalized recording for ${scenario.name}: ${err.msg()}')
+			}
+		}
 		name := scenario.name.all_after('packages-audio-')
 		for key, file in {
 			'outcome':  'outcome.json'

@@ -226,6 +226,11 @@ fn run(program string, out string) ! {
 		return error('serial diagnostic did not admit the complete basic log: ' + serial_positive.output)
 	}
 	controls << serial_positive
+	recording := call(program, ['--diagnostic-recording', 'basic', os.dir(serial_path)], 'recording-positive', out)!
+	if recording.code != 0 || recording.output.trim_space() != 'AUDIO RECORDING DIAGNOSTIC PASS qualification=false scenario=basic tones=3' {
+		return error('recording diagnostic did not admit the complete basic evidence: ' + recording.output)
+	}
+	controls << recording
 	for name in ['missing-outcome.json', 'missing-serial.log', 'missing-sound.wav', 'missing-qemu.log', 'missing-qmp.log',
 		'failed-outcome', 'interrupted-outcome', 'reason-outcome', 'wrong-scenario', 'wrong-state', 'zero-seconds', 'long-seconds',
 		'missing-refusal', 'duplicate-marker', 'reordered-marker', 'wrong-identity', 'panic', 'wrong-shutdown', 'duplicate-shutdown',
@@ -239,6 +244,14 @@ fn run(program string, out string) ! {
 			return error('basic control did not refuse before output: ' + name + ': ' + result.output)
 		}
 		controls << result
+		if name == 'unfinalized-wav' || name == 'short-gap' {
+			recording_result := call(program, ['--diagnostic-recording', 'basic', work + '/run/packages-audio-basic'],
+				'recording-' + name, out)!
+			if recording_result.code == 0 || !recording_result.output.contains(reason) {
+				return error('recording diagnostic admitted altered evidence: ' + name)
+			}
+			controls << recording_result
+		}
 		if name in serial_mutations {
 			altered_serial := work + '/run/packages-audio-basic/serial.log'
 			serial_result := call(program, ['--diagnostic-serial', 'basic', altered_serial], 'serial-' + name, out)!

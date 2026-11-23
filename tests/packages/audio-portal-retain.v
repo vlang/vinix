@@ -540,6 +540,15 @@ fn retain(run string, out string, arch string, synthetic bool) ! {
 }
 
 fn main() {
+	if os.args.len > 1 && os.args[1] == '--diagnostic-recording' {
+		if os.args.len != 4 || os.args[2] !in ['basic', 'lifecycle', 'seat']! {
+			eprintln('use --diagnostic-recording basic|lifecycle|seat SCENARIO_DIRECTORY')
+			exit(1)
+		}
+		regions := scenario_evidence(os.real_path(os.args[3]), os.args[2]) or { eprintln(err); exit(1) }
+		println('AUDIO RECORDING DIAGNOSTIC PASS qualification=false scenario=${os.args[2]} tones=${regions.len}')
+		return
+	}
 	if os.args.len > 1 && os.args[1] == '--diagnostic-serial' {
 		if os.args.len != 4 || os.args[2] !in ['basic', 'lifecycle', 'seat']! {
 			eprintln('use --diagnostic-serial basic|lifecycle|seat SERIAL_LOG')
