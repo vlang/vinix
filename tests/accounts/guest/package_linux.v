@@ -25,7 +25,7 @@ fn package_collection_limit_probe(root string) !int {
 		return error('collector descriptor limit was not applied')
 	}
 	arguments := [c'/usr/bin/vinix-package', c'--root', &char(root.str), c'gc', &char(unsafe { nil })]!
-	C.execv(c'/usr/bin/vinix-package', unsafe { &arguments[0] })
+	C.execv(c'/usr/bin/vinix-package', voidptr(&arguments[0]))
 	return error('cannot execute the limited package collector')
 }
 

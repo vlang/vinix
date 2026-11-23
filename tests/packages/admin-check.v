@@ -21,10 +21,10 @@ fn suite(repository string) !hwhost.Suite {
 		name: 'package-administrator'
 		guest: 'tests/accounts/guest'
 		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring']
-		programs: [hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package' },
-			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd' },
+		programs: [hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package', flags: ['-enable-globals'] },
+			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd', flags: ['-enable-globals'] },
 			hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account' },
-			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session' }]
+			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session', flags: ['-enable-globals'] }]
 		files: [hwhost.RootFile{ path: 'etc/passwd', text: 'root:x:0:0:root:/root:/bin/sh\n' },
 			hwhost.RootFile{ path: 'etc/group', text: 'root:x:0:\ntty:x:5:\n' },
 			hwhost.RootFile{ path: 'etc/vinix/auth.conf', text: 'scrypt_ln = 10\n' },
@@ -67,7 +67,8 @@ fn check() !int {
 	os.cp(options.kernel, kernel)!
 	hwhost.watch_interrupts()
 	guest_dir := work + '/guest'
-	guest := hwhost.build_program(host, repository + '/' + definition.guest, guest_dir, 'init', definition.module_paths)!
+	guest := hwhost.build_program_with_flags(host, repository + '/' + definition.guest, guest_dir,
+		'init', definition.module_paths, ['-enable-globals'])!
 	root := hwhost.build_extras(host, definition, guest_dir)!
 	mut artifacts := []Artifact{}
 	for role, path in {'kernel': kernel, 'guest-init': guest, 'package-service': root + '/usr/bin/vinix-package',

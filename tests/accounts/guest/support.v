@@ -205,10 +205,11 @@ fn probe(what []string, db accountcore.Database, user accountcore.User) Ran {
 }
 
 fn load_db() accountcore.Database {
-	return accountcore.Store{}.load() or {
+	database := accountcore.Store{}.load() or {
 		println('cannot load the account database: ${err.msg()}')
-		accountcore.Database{}
+		return accountcore.Database{}
 	}
+	return database
 }
 
 fn must_user(db accountcore.Database, name string) accountcore.User {
