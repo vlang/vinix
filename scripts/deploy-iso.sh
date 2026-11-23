@@ -12,6 +12,7 @@
 #   --no-test          do not boot-test the images first
 #   --no-publish       build (and test) only
 #   --prepare-only    build and save a handoff for later publication
+#   --verify-prepared=TAG  check a saved handoff and report its asset digests
 #   --publish-prepared=TAG  verify and publish a saved handoff
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
 #   --resume-create=TAG  recover a draft whose creation response was lost
@@ -56,6 +57,7 @@ PRERELEASE=0
 RUN_TESTS=1
 PUBLISH=1
 PREPARE_ONLY=0
+VERIFY_PREPARED=''
 PUBLISH_PREPARED=''
 ASSUME_YES=0
 REPO=''
@@ -78,6 +80,10 @@ for arg in "$@"; do
         --no-test) RUN_TESTS=0; BUILD_OPTIONS=1 ;;
         --no-publish) PUBLISH=0; BUILD_OPTIONS=1 ;;
         --prepare-only) PREPARE_ONLY=1; PUBLISH=0; BUILD_OPTIONS=1 ;;
+        --verify-prepared=*)
+            VERIFY_PREPARED="${arg#*=}"
+            [ -n "$VERIFY_PREPARED" ] || { echo "ERROR: --verify-prepared requires a tag" >&2; exit 1; }
+            ;;
         --publish-prepared=*)
             PUBLISH_PREPARED="${arg#*=}"
             [ -n "$PUBLISH_PREPARED" ] || { echo "ERROR: --publish-prepared requires a tag" >&2; exit 1; }
@@ -148,12 +154,15 @@ file_size() {
 
 need git cc
 cd "$SCRIPT_DIR"
-if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED" ]; then
-    [ -z "$RESUME_DRAFT" ] || [ -z "$RESUME_CREATE" ] ||
-        die "choose one of --resume-draft and --resume-create"
-    [ -z "$PUBLISH_PREPARED" ] || [ -z "$RESUME_DRAFT$RESUME_CREATE" ] ||
-        die "choose either --publish-prepared or a recovery option"
-    [ "$BUILD_OPTIONS" -eq 0 ] || die "prepared publication and recovery accept --repo, --draft and --yes"
+post_build=0
+for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED"; do
+    if [ -n "$action" ]; then
+        [ "$post_build" -eq 0 ] || die "choose one verification, publication or recovery action"
+        post_build=1
+    fi
+done
+if [ "$post_build" -eq 1 ]; then
+    [ "$BUILD_OPTIONS" -eq 0 ] || die "build options cannot be used with verification, publication or recovery"
 else
     need curl clang ld.lld xorriso rsync mformat mmd mcopy
     COMMIT="$(git rev-parse --verify "$REF^{commit}")" || die "no such commit: $REF"
@@ -187,6 +196,13 @@ build_release_assets() {
         -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/tools/accounts" \
         -o "$ASSET_WORK/release-assets" "$SCRIPT_DIR/build-support/isoboot/release-assets.v"
 }
+
+if [ -n "$VERIFY_PREPARED" ]; then
+    git check-ref-format "refs/tags/$VERIFY_PREPARED" || die "invalid prepared release tag: $VERIFY_PREPARED"
+    build_release_assets
+    "$ASSET_WORK/release-assets" verify-prepared "$SCRIPT_DIR/build-release/$VERIFY_PREPARED" "$VERIFY_PREPARED" "$REPO"
+    exit 0
+fi
 
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true

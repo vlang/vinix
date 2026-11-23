@@ -37,6 +37,22 @@ struct DraftRecovery {
 	notes      string
 }
 
+struct PreparedAsset {
+	name   string
+	bytes  u64
+	sha256 string
+}
+
+struct PreparedVerification {
+	repo            string
+	tag             string
+	commit          string
+	prerelease      bool
+	manifest_sha256 string
+	notes_sha256    string
+	assets          []PreparedAsset
+}
+
 fn valid_asset_name(name string) bool {
 	if name == '' || name[0] in [u8(`.`), `-`]! { return false }
 	if name in ['SHA256SUMS', 'RELEASE_NOTES.md']! { return false }
@@ -47,7 +63,10 @@ fn valid_asset_name(name string) bool {
 }
 
 fn read_manifest(path string) !map[string]string {
-	text := pkgcore.read_metadata(path)!
+	return parse_manifest(pkgcore.read_metadata(path)!, path)
+}
+
+fn parse_manifest(text string, path string) !map[string]string {
 	mut entries := map[string]string{}
 	if text == '' { return entries }
 	if !text.ends_with('\n') { return error('invalid release checksum manifest: ' + path) }
@@ -265,11 +284,50 @@ fn restore_metadata(recovery DraftRecovery, directory string) ! {
 	println('${recovery.repo}\t${recovery.tag}\t${recovery.commit}\t${recovery.prerelease}')
 }
 
-fn restore_prepared(output string, tag string, directory string) ! {
+fn read_prepared(output string, tag string, repo string) !DraftRecovery {
 	path := os.join_path(output, '.prepared-release.json')
 	metadata := read_recovery(path)!
 	if metadata.id != 0 || metadata.tag != tag { return error('invalid prepared release record: ' + path) }
+	if repo != '' && repo != metadata.repo { return error('release ${tag} belongs to ${metadata.repo}') }
+	if pkgcore.read_metadata(os.join_path(output, 'SHA256SUMS'))! != metadata.manifest {
+		return error('prepared SHA256SUMS changed')
+	}
+	if pkgcore.read_metadata(os.join_path(output, 'RELEASE_NOTES.md'))! != metadata.notes {
+		return error('prepared release notes changed')
+	}
+	return metadata
+}
+
+fn restore_prepared(output string, tag string, directory string) ! {
+	metadata := read_prepared(output, tag, '')!
 	restore_metadata(metadata, directory)!
+}
+
+fn verify_prepared(output string, tag string, repo string) !PreparedVerification {
+	metadata := read_prepared(output, tag, repo)!
+	entries := parse_manifest(metadata.manifest, os.join_path(output, 'SHA256SUMS'))!
+	if entries.len == 0 { return error('release checksum manifest is empty') }
+	mut names := entries.keys()
+	names.sort()
+	sizes := asset_sizes(output, names, true)!
+	mut assets := []PreparedAsset{cap: names.len}
+	for name in names {
+		size := sizes[name]
+		digest := entries[name]
+		if !pkgcore.verified_file(os.join_path(output, name), pkgcore.Payload{bytes: size, sha256: digest}) {
+			return error('release asset changed after verification: ' + name)
+		}
+		assets << PreparedAsset{name: name, bytes: size, sha256: digest}
+	}
+	return PreparedVerification{
+		repo: metadata.repo
+		tag: tag
+		commit: metadata.commit
+		prerelease: metadata.prerelease
+		manifest_sha256: sha256.hexhash(metadata.manifest)
+		notes_sha256: sha256.hexhash(metadata.notes)
+		assets: assets
+	}
 }
 
 fn restore_draft(work string, id string, directory string) ! {
@@ -375,6 +433,10 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'restore-prepared' {
 		return restore_prepared(os.args[2], os.args[3], os.args[4])
 	}
+	if os.args.len == 5 && os.args[1] == 'verify-prepared' {
+		println(json2.encode(verify_prepared(os.args[2], os.args[3], os.args[4])!))
+		return
+	}
 	if os.args.len == 8 && os.args[1] == 'prepare-creation' {
 		return prepare_creation(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
 	}
@@ -404,7 +466,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
 }
 
 fn main() {

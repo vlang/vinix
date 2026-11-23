@@ -649,6 +649,12 @@ prerelease setting, checksums and notes in
 to `vlang/vinix` on GitHub.com. The embedded release tag must match the
 selected tag.
 
+Run `./scripts/deploy-iso.sh --verify-prepared=TAG` for a local check before
+publication. It verifies the saved metadata and reads each asset in place.
+The JSON report includes the repository, tag, commit, prerelease setting,
+hashes of the checksum list and notes, and the name, byte count and SHA-256
+of each asset. Use `--repo=OWNER/NAME` to check the recorded destination.
+
 Run `./scripts/deploy-iso.sh --publish-prepared=TAG` from the same checkout.
 The driver verifies the saved metadata and original assets and checks
 the recorded commit and tag on GitHub. It uploads private copies of the

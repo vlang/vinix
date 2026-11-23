@@ -45,6 +45,22 @@ struct FixtureCreation {
 	manifest string
 }
 
+struct FixtureVerifiedAsset {
+	name   string
+	bytes  u64
+	sha256 string
+}
+
+struct FixturePreparedVerification {
+	repo            string
+	tag             string
+	commit          string
+	prerelease      bool
+	manifest_sha256 string
+	notes_sha256    string
+	assets          []FixtureVerifiedAsset
+}
+
 struct FixtureRelease {
 	id u64
 	tag_name string
@@ -493,10 +509,10 @@ fn run_stub(name string) !int {
 			println('fixture size')
 		}
 		'gh' {
-			if scenario == 'prepared' {
+			if scenario == 'prepared' || scenario.starts_with('verify-prepared') {
 				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
 				os.write_file(remote + '/unexpected-gh', os.args[1..].join('\n'))!
-				return error('prepared build invoked GitHub')
+				return error('local prepared release operation invoked GitHub')
 			}
 			if os.args[1] == 'auth' {
 				if os.args[2..] != ['status', '--hostname=github.com'] {
@@ -742,6 +758,31 @@ fn check_prepared_release(root string, work string, out string, remote string, e
 		|| !prepared.notes.contains('### Tested before release') {
 		return error('prepared release lost its verified metadata or contacted GitHub')
 	}
+	verification_args := ['--verify-prepared=' + tag]
+	recovery_attempt(root, work, environment, 'verify-prepared', verification_args, '')!
+	report := json2.decode[FixturePreparedVerification](os.read_file(work + '/verify-prepared.log')!)!
+	if report.repo != prepared.repo || report.tag != tag || report.commit != commit
+		|| report.prerelease != prepared.prerelease
+		|| report.manifest_sha256 != sha256.hexhash(prepared.manifest)
+		|| report.notes_sha256 != sha256.hexhash(prepared.notes) {
+		return error('prepared verification report changed the recorded metadata')
+	}
+	mut checksums := map[string]string{}
+	for line in prepared.manifest.split_into_lines() {
+		checksums[line.all_after('  ')] = line.all_before('  ')
+	}
+	mut names := checksums.keys()
+	names.sort()
+	if report.assets.map(it.name) != names {
+		return error('prepared verification did not report the exact asset set')
+	}
+	for asset in report.assets {
+		if asset.sha256 != checksums[asset.name] || asset.bytes != os.file_size(out + '/' + asset.name) {
+			return error('prepared verification changed an asset digest or size: ' + asset.name)
+		}
+	}
+	recovery_attempt(root, work, environment, 'verify-prepared-repo',
+		[...verification_args, '--repo=local/other'], 'belongs to local/fixture')!
 	recovery_attempt(root, work, environment, 'prepared-rebuild', ['--tag=' + tag, '--prepare-only',
 		'--repo=local/fixture'], 'prepared release record already exists')!
 	mut wrong_tag := environment.clone()
@@ -765,9 +806,13 @@ fn check_prepared_release(root string, work string, out string, remote string, e
 			os.write_file(file, contents)!
 			return err
 		}
+		recovery_attempt(root, work, environment, 'verify-' + note, verification_args, diagnostic) or {
+			os.write_file(file, contents)!
+			return err
+		}
 		os.write_file(file, contents)!
 	}
-	if os.exists(remote + '/create-tag') || os.exists(remote + '/release-attempt')
+	if os.ls(remote)!.len != 0
 		|| os.exists(out + '/.draft-creation.json') || os.read_file(record_path)! != record {
 		return error('refused publication changed the prepared release')
 	}
@@ -978,6 +1023,8 @@ fn run() ! {
 				return error('build-only checksums differ from the output assets')
 			}
 			recovery_attempt(root, work, environment, 'prepared-record-required', ['--publish-prepared=' + tag],
+				'cannot read release draft recovery record')!
+			recovery_attempt(root, work, environment, 'verify-prepared-record-required', ['--verify-prepared=' + tag],
 				'cannot read release draft recovery record')!
 		} else {
 			diagnostic := match scenario {
