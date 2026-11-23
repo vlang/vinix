@@ -418,6 +418,33 @@ source revisions are in
 Its SHA-256 is `837cffe9fe405f2c159976fa724d9438ddf01f5a166ec91c2a056a51809508c1`.
 All 442 entries in the extracted `qualification.sha256` passed.
 
+### GitHub draft verification before publication
+
+At `2aae337e5`, the driver creates a draft, uploads the verified assets and
+reads back the draft by its numeric ID. It checks the release metadata, the
+exact asset set, each upload state and every SHA-256 digest, including the
+digest of `SHA256SUMS`. It resolves the tag again before publishing the draft
+by ID. A normal upload failure leaves the draft for inspection. With
+`--draft`, the verified release remains a draft.
+[GitHub release asset API](https://docs.github.com/en/rest/releases/assets#list-release-assets)
+
+All 33 release-driver fixtures passed using local stubs. The previous driver
+at `83ddc2585` proceeded to publish in the fixture where the tag moved during
+upload. The new driver retained the draft when the tag moved or disappeared,
+the draft metadata changed, the upload was interrupted, or the asset list
+contained a bad digest, an incomplete upload, a missing asset or an extra
+asset. The verified prerelease draft also passed.
+
+ASan/UBSan checks covered the exact draft, a wrong draft ID, modified release
+notes and digest mismatches for both an ISO and the checksum list. Read-only
+requests to GitHub's public API confirmed the numeric release ID and
+`sha256:` asset digest format.
+
+The paired inputs, run logs, draft states and source revision are in
+`~/.local/state/vinix/r14-release-draft-verification-N2InLu/qualification.tar.gz`.
+Its SHA-256 is `b0a8743b71f3c6170218bdc12db4a5ae5114fd4449f68d7c76ab633d84c8165a`.
+All 671 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
