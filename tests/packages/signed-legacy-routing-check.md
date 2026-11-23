@@ -264,3 +264,41 @@ roots matched the original logical bytes, paths, types, modes and links.
 Use `zstd --long=30 -dc` for `approval-runs.tar.zst` and
 `diagnostic/runs.tar.zst`. The SHA-256 of `qualification.sha256` is
 `c8748757b9e16263d8348d58e691ea96e947df8845d86ab88cddac59d187a57c`.
+
+## Mixed signed release approval
+
+The `--mixed-catalog=true` mode at `f5110171d` qualifies one offline release
+composed from the native SDK, Neovim 0.12.5, SQLite 3.53.4 and FFmpeg 8.0.1
+profiles. The publisher imported the four pinned profiles directly from their
+prepared roots using [`pack-catalog-profiles`](../../tools/packages/SDK.md#pack-from-independent-profile-directories).
+Changing the profile argument order preserved the exact catalog and provenance
+bytes. The disposable signed export contained 20 target variants.
+
+The release staging tool ran `--check --export-deployment` for each target
+with these seven `--require-app` values. Each export locked ten packages,
+including the three separate runtime dependencies. Both reported lock hashes
+matched the exported bytes, and both prospective image roots stayed empty.
+
+- `org.ffmpeg.cli`, `org.ffmpeg.probe`, `org.neovim.editor`, `org.sqlite.cli`
+- `org.vinix.counter`, `org.vinix.memo`, `org.vinix.package-hello`
+
+Run the graphical check above with the combined repository, exported lock and
+`--approve=true --mixed-catalog=true --memory-mib=1024`. The AArch64 and x86-64
+runs passed in 36.850 and 81.296 seconds respectively. They reused the
+qualified 1 GiB kernels and staged desktop tools. The real Software proposal
+covered the exact closure and required one administrator approval. After
+checking all ten installed packages and payloads, the fixture launched headless
+Neovim under UID 1000 and used Hello to read a granted document. SQLite reopened
+an ordinary-owned WAL database with the saved value and a clean integrity check.
+FFmpeg wrote private WAV data, and FFprobe refused the same path before a file
+grant and identified the generated PCM stream after the grant. The Neovim-only
+AArch64 replay also passed. Invalid mixed-mode values and mixed mode without
+approval refused before creating output.
+
+The complete QEMU roots, screenshots, staged input hashes, preflights, profile
+locks and FFmpeg prepared roots are retained in
+`~/.local/state/vinix/r14-mixed-HXXjpO`. Decode `runs.tar.zst` with
+`zstd --long=30 -dc` and `inputs.tar.zst` with `zstd --long=27 -dc`.
+All three run roots and both input roots matched the archived bytes, paths,
+types, modes and links. The SHA-256 of `qualification.sha256` is
+`f8be107585c5bfbb7ae04bd723c52a1460cff13f69751d1fc6d09ad84a4884ee`.

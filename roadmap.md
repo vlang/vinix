@@ -1075,6 +1075,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     verifies the installed lock and launches Neovim under the ordinary account
     on both targets, including the [1 GiB approval replay](tests/packages/signed-legacy-routing-check.md#approved-neovim-install-with-1-gib).
     Production publisher selection and other legacy applications remain open.
+  - [x] [Mixed signed release approval](tests/packages/signed-legacy-routing-check.md#mixed-signed-release-approval)
+    composes the native SDK, Neovim, SQLite and FFmpeg profiles into one
+    signed offline candidate. Both 1 GiB guests approve seven roots through
+    Software, verify the ten-package closure, and exercise native document
+    grants, Neovim, SQLite database persistence and FFmpeg/FFprobe isolation.
+    Installed-system maintenance of the combined catalog remains open.
   - [x] [Authenticated hosted X11 launches](tests/wine-host/README.md)
     create a private per-account authority and fresh random cookie, grant only
     its exact socket/authority, and forward the validated pair through the
