@@ -34,6 +34,9 @@ struct C.archive_entry {}
 fn C.archive_read_new() &C.archive
 fn C.archive_read_support_filter_all(&C.archive) int
 fn C.archive_read_support_filter_none(&C.archive) int
+fn C.archive_read_support_filter_gzip(&C.archive) int
+fn C.archive_filter_code(&C.archive, int) int
+fn C.archive_filter_count(&C.archive) int
 fn C.archive_read_support_format_raw(&C.archive) int
 @[c: 'archive_read_open_filename']
 fn C.vinix_tar_archive_read_open_filename(&C.archive, &char, u64) int
@@ -59,6 +62,7 @@ mut:
 	started           bool
 	ended             bool
 	ignore_zeros      bool
+	boot_ustar        bool
 	globals           map[string]string
 	metadata_limit    i64 = 0x7fffffff
 	allow_sparse      bool
@@ -110,31 +114,44 @@ pub fn from_descriptor_cancelled(descriptor i32, cancel fn () bool) !Reader {
 // libarchive only unwraps compression. Parsing names in V preserves their
 // exact UTF-8 bytes, including decomposed names on macOS.
 pub fn open(path string) !Reader {
-	return open_filtered(path, true)
+	return open_filtered(path, .all)
 }
 
 // APK v2 concatenates signature, control and payload gzip/tar streams. Its
 // reader must continue beyond tar end markers to the physical stream EOF.
 pub fn open_concatenated(path string) !Reader {
-	mut reader := open_filtered(path, true)!
+	mut reader := open(path)!
 	reader.ignore_zeros = true
 	return reader
 }
 
 // Boot module inputs are deliberately uncompressed, matching tar's r: mode.
 pub fn open_plain(path string) !Reader {
-	return open_filtered(path, false)
+	return open_filtered(path, .none)
 }
 
 // Upload validators know the entire physical input size. Reject an extension
 // claiming more bytes before allocating its metadata buffer.
 pub fn open_plain_bounded(path string, metadata_limit i64) !Reader {
-	mut reader := open_filtered(path, false)!
+	mut reader := open_plain(path)!
 	reader.metadata_limit = metadata_limit
 	return reader
 }
 
-fn open_filtered(path string, compressed bool) !Reader {
+// Release ISOs carry a gzip-compressed POSIX USTAR initramfs. Read its raw
+// headers without applying extensions that the boot unpacker may interpret
+// differently.
+pub fn open_boot_ustar(path string) !Reader {
+	return open_filtered(path, .boot_gzip)
+}
+
+enum ArchiveFilter {
+	none
+	all
+	boot_gzip
+}
+
+fn open_filtered(path string, filters ArchiveFilter) !Reader {
 	$if tarstream_fd_only ? {
 		return error('use a decompressed descriptor for this reader')
 	} $else {
@@ -142,10 +159,10 @@ fn open_filtered(path string, compressed bool) !Reader {
 		if stream == unsafe { nil } { return error('cannot allocate archive stream') }
 		mut opened := false
 		defer { if !opened { C.archive_read_free(stream) } }
-		filter := if compressed {
-			C.archive_read_support_filter_all(stream)
-		} else {
-			C.archive_read_support_filter_none(stream)
+		filter := match filters {
+			.all { C.archive_read_support_filter_all(stream) }
+			.none { C.archive_read_support_filter_none(stream) }
+			.boot_gzip { C.archive_read_support_filter_gzip(stream) }
 		}
 		if filter < 0 || C.archive_read_support_format_raw(stream) != 0
 			|| C.vinix_tar_archive_read_open_filename(stream, path.str, 10240) != 0 {
@@ -153,8 +170,17 @@ fn open_filtered(path string, compressed bool) !Reader {
 		}
 		mut entry := &C.archive_entry(unsafe { nil })
 		if C.archive_read_next_header(stream, &entry) != 0 { return filter_error(stream) }
+		if filters == .boot_gzip {
+			if C.archive_filter_code(stream, 0) != C.ARCHIVE_FILTER_GZIP {
+				return error('ISO initramfs must be gzip-compressed')
+			}
+			// Libarchive counts the input callback as a filter after the decoder.
+			if C.archive_filter_count(stream) != 2 {
+				return error('ISO initramfs must have one gzip compression layer')
+			}
+		}
 		opened = true
-		return Reader{ stream: stream }
+		return Reader{ stream: stream, boot_ustar: filters == .boot_gzip }
 	}
 }
 
@@ -248,6 +274,30 @@ fn number(data []u8, offset int, length int) !i64 {
 	}
 	value := field(data, offset, length).trim_space()
 	return if value == '' { i64(0) } else { strconv.parse_int(value, 8, 64)! }
+}
+
+// The kernel reads consecutive octal digits starting at the first byte.
+fn boot_octal(data []u8, offset int, length int) bool {
+	if data[offset] < `0` || data[offset] > `7` { return false }
+	mut padding := false
+	for index in offset + 1 .. offset + length {
+		byte := data[index]
+		if byte == 0 || byte == ` ` { padding = true }
+		else if padding || byte < `0` || byte > `7` { return false }
+	}
+	return true
+}
+
+fn check_boot_header(data []u8) ! {
+	for index, byte in [u8(`u`), `s`, `t`, `a`, `r`, 0, `0`, `0`]! {
+		if data[257 + index] != byte { return error('ISO initramfs requires POSIX USTAR headers') }
+	}
+	if data[156] < `0` || data[156] > `6` {
+		return error('unsupported boot USTAR member type: ${data[156]}')
+	}
+	if !boot_octal(data, 100, 8) || !boot_octal(data, 124, 12) {
+		return error('invalid boot USTAR mode or size')
+	}
 }
 
 fn parse_header(data []u8) !tarcore.Member {
@@ -354,8 +404,12 @@ pub fn (mut reader Reader) next() !tarcore.Member {
 			reader.ended = true
 			return End{}
 		}
+		if reader.boot_ustar { check_boot_header(data)! }
 		mut member := parse_header(data)!
 		if member.size < 0 { return error('negative archive member size') }
+		if reader.boot_ustar && (member.mode > 0o7777 || (member.kind != `0` && member.size != 0)) {
+			return error('invalid boot USTAR mode or size')
+		}
 		if member.kind in [u8(`x`), `g`, `X`, `L`, `K`] {
 			if member.size > reader.metadata_limit || member.size > 0x7fffffff {
 				return error('archive metadata is too large')

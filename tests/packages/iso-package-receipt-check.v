@@ -3,6 +3,10 @@ module main
 
 import json2
 import os
+import strconv
+import tarcore
+import tarstream
+import time
 import tools.packages.pkgcore
 import tools.packages.pkgprotocol
 
@@ -26,21 +30,124 @@ fn checked(argv []string) ! {
 	if code != 0 { return error(argv[0] + ': ' + output) }
 }
 
-fn make_iso(root string, work string, duplicate bool) !string {
+fn repair_checksum(mut header []u8) {
+	for index in 148 .. 156 { header[index] = ` ` }
+	mut sum := i64(0)
+	for byte in header { sum += i64(byte) }
+	text := strconv.format_int(sum, 8)
+	for index in 148 .. 154 { header[index] = `0` }
+	for index, byte in text { header[154 - text.len + index] = byte }
+	header[154] = 0
+}
+
+fn rewrite_archive(archive string, scenario string) ! {
+	mut reader := tarstream.open_plain(archive)!
+	defer { reader.close() }
+	changed := archive + '.changed'
+	mut writer := tarcore.create_stream(changed)!
+	defer { writer.close() }
+	mut parent := tarcore.Member{}
+	for {
+		mut member := reader.next() or {
+			if err is tarstream.End { break }
+			return err
+		}
+		if member.name == './etc/vinix-packages' && scenario in ['missing-parent', 'late-parent']! {
+			parent = member
+			continue
+		}
+		if member.name == './' + config {
+			match scenario {
+				'legacy-file' { member.kind = 0 }
+				'contiguous-file' { member.kind = `7` }
+				'pax-path' {
+					field := ' path=${member.name}\n'
+					line := (field.len + 2).str() + field
+					writer.add(tarcore.Member{name: 'extended', kind: `x`, size: line.len}, line.bytes())!
+					member.name = './ignored-config.json'
+				}
+				else {}
+			}
+		}
+		mut header := tarcore.header(member)!
+		if member.name == './' + config && scenario in ['non-ustar-header', 'spaced-size']! {
+			if scenario == 'non-ustar-header' { header[257] = 0 }
+			else { header[124] = ` ` }
+			repair_checksum(mut header)
+		}
+		writer.write(header)!
+		reader.copy_to(mut writer)!
+		writer.padding(member.size)!
+	}
+	if scenario == 'late-parent' { writer.add(parent, []u8{})! }
+	writer.finish()!
+	writer.close_checked()!
+	os.rename(changed, archive)!
+}
+
+fn make_iso(root string, work string, scenario string) !string {
 	tree := work + '/iso'
 	os.mkdir_all(tree + '/boot')!
 	archive := work + '/initramfs.tar'
 	checked(['tar', '--format=ustar', '-cf', archive, '-C', root, '.'])!
-	if duplicate { checked(['tar', '-rf', archive, '-C', root, config])! }
-	checked(['gzip', '-n', archive])!
-	os.rename(archive + '.gz', tree + '/boot/initramfs.tar.gz')!
+	if scenario == 'duplicate' { checked(['tar', '-rf', archive, '-C', root, config])! }
+	if scenario in ['missing-parent', 'late-parent', 'legacy-file', 'contiguous-file', 'pax-path',
+		'non-ustar-header', 'spaced-size']! { rewrite_archive(archive, scenario)! }
+	if scenario == 'wrong-compression' { checked(['bzip2', '-z', archive])! }
+	else { checked(['gzip', '-n', archive])! }
+	if scenario == 'nested-compression' {
+		os.rename(archive + '.gz', archive)!
+		checked(['gzip', '-n', archive])!
+	}
+	suffix := if scenario == 'wrong-compression' { '.bz2' } else { '.gz' }
+	os.rename(archive + suffix, tree + '/boot/initramfs.tar.gz')!
 	iso := work + '/image.iso'
 	checked(['xorriso', '-as', 'mkisofs', '-R', '-o', iso, tree])!
 	return iso
 }
 
+fn prepare_fixture(architecture string, out string) ! {
+	if architecture !in ['aarch64', 'x86_64']! { return error('unsupported fixture architecture') }
+	os.mkdir(out, mode: 0o700)!
+	root := out + '/staged'
+	os.mkdir(root, mode: 0o755)!
+	os.mkdir(out + '/bundle', mode: 0o755)!
+	os.mkdir_all(out + '/payload/bin')!
+	os.write_file(out + '/payload/bin/fixture', 'structural package fixture\n')!
+	os.chmod(out + '/payload/bin/fixture', 0o755)!
+	manifest := out + '/manifest.json'
+	os.write_file(manifest, json2.encode(pkgcore.Package{id: 'receipt-fixture', version: '1.0.0',
+		architecture: architecture, kind: 'native', name: 'Receipt fixture', license: 'MIT',
+		entrypoint: 'bin/fixture'}))!
+	pkgcore.pack(manifest, out + '/payload', out + '/publisher')!
+	seed := out + '/fixture-seed'
+	key := pkgcore.keygen(seed)!
+	defer { os.rm(seed) or {} }
+	mut release := pkgcore.publish_release(out + '/publisher', 'fixture', seed, 1,
+		time.now().unix() + 86_400, out + '/bundle/fixture')!
+	defer { release.close() }
+	input := out + '/config.json'
+	os.write_file(input, json2.encode(pkgcore.Config{architecture: architecture,
+		repositories: [pkgcore.Repository{id: 'fixture', public_key: key, url: 'file:///' + repositories + '/fixture'}]}))!
+	mut configuration := pkgcore.prepare_image_configuration(root, architecture, input)!
+	defer { configuration.close() }
+	mut bundle := configuration.prepare_repositories_in(out + '/bundle', out)!
+	defer { bundle.close() }
+	mut applications := configuration.prepare_applications(&bundle, ['receipt-fixture'])!
+	defer { applications.close() }
+	bundle.publish()!
+	configuration.publish()!
+	applications.publish(&bundle)!
+	bundle.retire()!
+}
+
 fn run() ! {
-	if os.args.len != 5 { return error('usage: iso-package-receipt-check RECEIPT_TOOL STAGED_PACKAGE_ROOT PLAN.json NEW_WORK') }
+	if os.args.len == 4 && os.args[1] == 'fixture' {
+		return prepare_fixture(os.args[2], os.abs_path(os.args[3]))
+	}
+	if os.args.len != 5 {
+		return error('usage: iso-package-receipt-check fixture ARCH NEW_INPUTS | RECEIPT_TOOL STAGED_PACKAGE_ROOT PLAN.json NEW_WORK')
+	}
 	tool := os.abs_path(os.args[1])
 	source := os.abs_path(os.args[2])
 	plan := os.abs_path(os.args[3])
@@ -49,7 +156,8 @@ fn run() ! {
 	os.mkdir(out, mode: 0o700)!
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	for scenario in ['match', 'wrong-configuration', 'missing-declaration', 'wrong-object', 'wrong-signature', 'stale-index',
-		'alias', 'duplicate']! {
+		'alias', 'duplicate', 'blocked-parent', 'search-only-parent', 'missing-parent', 'late-parent', 'legacy-file',
+		'contiguous-file', 'pax-path', 'non-ustar-header', 'spaced-size', 'wrong-compression', 'nested-compression']! {
 		work := out + '/' + scenario
 		root := work + '/root'
 		os.mkdir_all(root)!
@@ -96,9 +204,23 @@ fn run() ! {
 				diagnostic = 'invalid ISO package file'
 			}
 			'duplicate' { diagnostic = 'duplicate ISO package member' }
+			'blocked-parent' {
+				os.chmod(root + '/etc/vinix-packages', 0o700)!
+				diagnostic = 'invalid ISO package directory'
+			}
+			'search-only-parent' {
+				os.chmod(root + '/usr/share/vinix-packages', 0o711)!
+				diagnostic = 'invalid ISO package directory'
+			}
+			'missing-parent', 'late-parent' { diagnostic = 'ISO package directory must precede its members' }
+			'legacy-file', 'contiguous-file', 'pax-path' { diagnostic = 'unsupported boot USTAR member type' }
+			'non-ustar-header' { diagnostic = 'ISO initramfs requires POSIX USTAR headers' }
+			'spaced-size' { diagnostic = 'invalid boot USTAR mode or size' }
+			'wrong-compression' { diagnostic = 'ISO initramfs must be gzip-compressed' }
+			'nested-compression' { diagnostic = 'ISO initramfs must have one gzip compression layer' }
 			else {}
 		}
-		iso := make_iso(root, work, scenario == 'duplicate')!
+		iso := make_iso(root, work, scenario)!
 		code, output := command([tool, 'verify', iso, selection])
 		os.write_file(work + '/verifier.log', output)!
 		if scenario == 'match' {

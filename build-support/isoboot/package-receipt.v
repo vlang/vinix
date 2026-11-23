@@ -89,7 +89,7 @@ fn archive_path(name string) !string {
 }
 
 fn capture_package_members(archive string, root string, expected Selection) ! {
-	mut reader := tarstream.open(archive)!
+	mut reader := tarstream.open_boot_ustar(archive)!
 	defer { reader.close() }
 	mut seen := map[string]bool{}
 	mut allowance := u64(16 * 1024 * 1024)
@@ -107,19 +107,23 @@ fn capture_package_members(archive string, root string, expected Selection) ! {
 			'/usr/share/vinix-packages', repository_path]!
 		if !parent && path !in [config_path, declaration_path]! && !path.starts_with(repository_path + '/') { continue }
 		if path in seen { return error('duplicate ISO package member: ' + path) }
-		seen[path] = true
-		if parent || (path.starts_with(repository_path + '/') && member.kind == `5`) {
-			if member.kind != `5` || member.mode & 0o022 != 0 {
+		directory := os.dir(path)
+		if directory != '/' && !seen[directory] {
+			return error('ISO package directory must precede its members: ' + directory)
+		}
+		is_directory := member.kind == `5`
+		seen[path] = is_directory
+		if parent || (path.starts_with(repository_path + '/') && is_directory) {
+			if !is_directory || member.mode & 0o022 != 0 || (path != '/' && member.mode & 0o555 != 0o555) {
 				return error('invalid ISO package directory: ' + path)
 			}
-			os.mkdir_all(root + path, mode: 0o755)!
+			if path != '/' { os.mkdir(root + path, mode: 0o755)! }
 			continue
 		}
-		if !member.regular() || member.mode & 0o7777 != 0o644 || u64(member.size) > allowance {
+		if member.kind != `0` || member.mode != 0o644 || u64(member.size) > allowance {
 			return error('invalid ISO package file: ' + path)
 		}
 		allowance -= u64(member.size)
-		os.mkdir_all(os.dir(root + path), mode: 0o755)!
 		mut file := os.create(root + path)!
 		defer { file.close() }
 		for {
