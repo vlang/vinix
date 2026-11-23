@@ -1080,7 +1080,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     signed offline candidate. Both 1 GiB guests approve seven roots through
     Software, verify the ten-package closure, and exercise native document
     grants, Neovim, SQLite database persistence and FFmpeg/FFprobe isolation.
-    Installed-system maintenance of the combined catalog remains open.
+    The [installed maintenance check](tests/packages/signed-legacy-routing-check.md#mixed-catalog-maintenance-on-an-installed-disk)
+    passes on both architectures across three cold boots of a VJFS disk. It
+    checks graphical approval, a reviewed runtime-only upgrade and rollback,
+    uninstall, cached reinstall and exact retention of private data.
   - [x] [Authenticated hosted X11 launches](tests/wine-host/README.md)
     create a private per-account authority and fresh random cookie, grant only
     its exact socket/authority, and forward the validated pair through the

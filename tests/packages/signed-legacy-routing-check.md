@@ -302,3 +302,47 @@ locks and FFmpeg prepared roots are retained in
 All three run roots and both input roots matched the archived bytes, paths,
 types, modes and links. The SHA-256 of `qualification.sha256` is
 `f8be107585c5bfbb7ae04bd723c52a1460cff13f69751d1fc6d09ad84a4884ee`.
+
+## Mixed catalog maintenance on an installed disk
+
+Add `--update-bundle=PATH` to the mixed graphical fixture and select
+`--memory-mib=2048`. The update bundle is a second complete signed export from
+the same publisher. To reproduce it, build the SQLite profile with the retained
+math-enabled prepared roots and runtime version 1.1.0, leave the other three
+profile locks and roots unchanged, and publish the composition at sequence 2.
+The input comparison checks that only the two target variants of
+`org.vinix.sqlite-runtime` differ.
+
+The kernel installs the staged image on a blank 4 GiB VJFS disk. The same
+disk supplies root, account and package state for all three boots. The fixture
+checks `/dev/root`, the installed image ID and the exact staged init, package
+tools, sandbox, configuration and deployment declaration on every boot.
+
+| Boot | Required behavior |
+| --- | --- |
+| 1 | Approve the seven-root Software proposal and verify all ten packages. Save the SQLite database and WAV file as the ordinary account. |
+| 2 | Check the retained account, trust, generation, declaration and private-file hashes, owners and modes. Refresh the signed update and use the reviewed CLI to upgrade only SQLite's runtime. Roll back to the exact baseline, uninstall all seven roots and check launcher removal. Hide the configured repository's object directory and reinstall the complete closure from cache. |
+| 3 | Verify the retained cached generation, declaration and private data. Reopen the SQLite database and use FFprobe to read the retained WAV with its explicit file grant. |
+
+The baseline audit reports one changed row after upgrade and cached reinstall,
+an exact match after rollback and all packages missing after uninstall. The
+fixture also runs a real SQLite math query before and after each version change.
+The database contents, WAV bytes and image declaration remain identical through
+maintenance. All boots require a guest-originated QMP shutdown.
+
+At `757b0f112`, the AArch64 and x86-64 guests passed in 160.990 and 629.494
+seconds respectively, each with three guest-originated shutdown events. The
+AArch64 1 GiB RAM-root regression passed in 37.323 seconds. The installed
+fixture allows up to 600 seconds for activation after Software approval. Two
+earlier x86-64 TCG runs reached live verification and then activation before
+their shorter deadlines, with zero kernel reservation denials in both runs.
+
+Evidence is retained at
+`~/.local/state/vinix/r14-mixed-installed-RNA1pa/evidence`. The compressed
+run roots and input records matched their complete archived types, modes,
+links and bytes. To restore each original run, decode
+`installed-runs.tar.zst` with `zstd --long=30 -dc`, then decode the matching
+`*-system.vjfs.zst` to the disk path named in `*-disk.sha256`. Both decoded
+4 GiB disk images matched those recorded raw SHA-256 digests.
+The SHA-256 of `qualification.sha256` is
+`eff9b626e56d84940c160748676cf722f462aa263297dc2391db7e893f7b356c`.
