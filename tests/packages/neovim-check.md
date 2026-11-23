@@ -173,12 +173,39 @@ source, freezes the package CLI's property-list dependency, and uses the
 current V type for PTY I/O sizes. The controller and evidence retainer built,
 and all four guest programs linked as static executables for both targets.
 The baseline session link failed with the expected missing process symbol on
-both targets. Disk-write failures stopped both corrected AArch64 attempts
-while preparing the guest package store. The paired host results cover
-the disposable release. Its guest lifecycle, graphical routing and production
-publisher enrollment remain open.
+both targets. Disk-write failures stopped the first corrected AArch64 attempts
+while preparing the guest package store.
 
 Build inventories, exact locks, signed indexes, host checks and native build
 logs are in `~/.local/state/vinix/r14-neovim-0DPujO`. All 42,670 entries in
 `qualification.sha256` verified. The manifest's SHA-256 is
 `b047aabbe50d8287e07a1711099837c646d5b79cb69a4c502c44e48079b22240`.
+
+## Native lifecycle of the signed candidate
+
+The next AArch64 attempt built the package generation, then ran out of space
+while copying the initramfs to the firmware boot image. Commit `6689252fb`
+stages the package store directly in the fresh boot root, saving the extra
+108 MiB copy measured in the failed run.
+
+The unchanged signed release and update passed all five native markers on
+both targets using the kernels and sandbox binaries retained from the paired
+desktop ISO qualification. AArch64 took 16.026 seconds and x86-64 took
+92.583 seconds. The guests exercised ordinary-user headless and PTY execution,
+exact saves, live leases through uninstall and GC, signed runtime update and
+rollback, and offline reinstall with retained user data. The evidence validator
+accepted both complete runs and refused all 12 resealed corruptions on each
+target.
+
+Both runs used raw USTAR fixture media on a temporary RAM-backed host volume.
+They qualify the terminal lifecycle of the disposable release. Graphical
+acquisition routing and production publisher enrollment remain open.
+
+The full run and validation archives are retained in
+`~/.local/state/vinix/r14-neovim-native-rBB0NvkY/accepted`. The archives
+preserve the named run roots and their complete typed inventories. Both
+restored runs passed the unchanged validator at their original paths. For
+historical validator replay, extract all three archives under the original
+mount point `/Volumes/VinixNeovim-rBB0NvkY` and use the unchanged candidate
+bundle and pinned source checkout. The SHA-256 of `qualification.sha256` is
+`55ded656f2241b7ed1cd412f5fd80d082b27f0c78b6a186f54280af41f43d8ce`.
