@@ -732,6 +732,26 @@ checks are in
 Its SHA-256 is `544d83bbb66bfa075eb69a40aef400e9f7ae83643b905af30e23a56ef196b6b0`.
 All 1,357 entries in the extracted `qualification.sha256` passed.
 
+### Reviewed prepared ISO publication
+
+At `c3fa266da`, `--publish-prepared=TAG --prepared-review=FILE` captures
+the exact JSON emitted by `--verify-prepared=TAG` and compares it with a
+report generated from the metadata and verified upload staging files.
+
+All 88 release fixtures passed with signed inputs for both architectures
+and local GitHub stubs. Publication used the captured review after the
+caller’s copy changed. A report naming a different commit and a replacement
+ISO with a matching updated manifest and prepared record both failed before
+tag or draft creation. A run through the native compiler entry point
+accepted a relative review path containing spaces and saved a verified
+fixture draft. ASan/UBSan checks covered captured review bytes, staged
+digests, and refusal of changed sizes, content and symbolic review links.
+
+The inputs, fixture and native logs, staged evidence and sanitizer checks
+are in `~/.local/state/vinix/r14-release-prepared-review-EsOTdN/qualification.tar.gz`.
+Its SHA-256 is `2c83e59b450a95a4507d1fbbad953f44351060048f15a3766fb738a489aa02e8`.
+All 1,402 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
