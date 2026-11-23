@@ -1006,6 +1006,25 @@ The paired inputs, creation records, run logs and sanitizer checks are in
 Its SHA-256 is `3c018450e4f3eb04cb16f71fe438800756b087ca12f09b14fc8a51ed12015cf8`.
 All 1,551 entries in the extracted `qualification.sha256` passed.
 
+### Recovery after an unusable creation response
+
+At `8583a4b2e`, the driver looks up the draft by exact tag when a creation
+request returns an empty, malformed or otherwise unverifiable response.
+It checks the remote tag commit and validates the draft before recording
+its ID and uploading. The lookup does not resend the creation request.
+
+All 167 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. They included truncated JSON on the initial
+request and an empty retry response. The previous driver stopped at the
+empty response. The native run recovered the same draft, saved its ID and
+uploaded the verified assets. ASan/UBSan checked empty and truncated JSON,
+unrelated notes, an invalid upload endpoint and a nonempty draft.
+
+The paired inputs, baseline and native runs, and sanitizer checks are in
+`~/.local/state/vinix/r14-release-unusable-response-nOfdzG/qualification.tar.gz`.
+Its SHA-256 is `6682793b06dbf4e56a293b381e5eb523b5946df1ee56031db6996189c80a6649`.
+All 1,598 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
