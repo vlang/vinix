@@ -390,6 +390,34 @@ The fixtures, baseline and updated run logs, and source revisions are in
 Its SHA-256 is `bb089a99d910cabff72d37fbf0fb261ee065d46416e1df3569d934d3accf0698`.
 All 291 entries in the extracted `qualification.sha256` passed.
 
+### GitHub release tag verification
+
+At `0ea630c36`, the driver checks an existing tag against the commit being
+built and skips occupied tag and release names when choosing an automatic
+tag. At handoff it creates a missing ref at the built commit, checks the
+result, and invokes GitHub CLI with `--verify-tag`. GitHub's release API uses
+the requested target when it creates a missing tag.
+[GitHub release API](https://docs.github.com/en/rest/releases/releases#create-a-release)
+
+All 24 release-driver fixtures passed with local stubs. The previous driver
+at `0783b5d00` reached the upload command with a mismatched existing tag.
+The updated driver refused an initial mismatch before output creation and
+an intervening tag change before upload. It reused an existing matching
+tag, skipped a bare tag and a separate release during automatic selection,
+and accepted a concurrent creation only when the new ref matched the built
+commit. Lookup and creation failures also refused publication.
+
+The helper passed ASan/UBSan checks for absent and escaped tag names, tag
+creation, same-commit retry, and mismatch. A read-only call to GitHub's public
+API confirmed that the fully qualified annotated tag resolves to the
+underlying commit SHA.
+
+The baseline and updated runs, paired fixture inputs, API observations, and
+source revisions are in
+`~/.local/state/vinix/r14-release-tag-i1TnaU/qualification.tar.gz`.
+Its SHA-256 is `837cffe9fe405f2c159976fa724d9438ddf01f5a166ec91c2a056a51809508c1`.
+All 442 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
