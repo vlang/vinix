@@ -1178,7 +1178,7 @@ fn unshare_private_page_unlocked(mut pagemap memory.Pagemap, local_range &MmapRa
 	// fault, so it belongs on that thread's node rather than next to the shared
 	// page it was copied from.
 	index := range_policy_index(local_range, virt)
-	new_page := numa.alloc_range_page(local_range.policy, index, false)
+	new_page := numa.alloc_range_page(explicit_policy(local_range, virt), index, false)
 	if new_page == unsafe { nil } {
 		return none
 	}

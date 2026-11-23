@@ -209,6 +209,9 @@ fn (local &MmapRangeLocal) has_private_file_cow() bool {
 }
 
 fn range_policy_index(local &MmapRangeLocal, virt u64) u64 {
+	if uses_file_policy(local) {
+		return local.global.resource.stat.ino + u64(local.offset) / page_size + (virt - local.base) / page_size
+	}
 	if local.has_private_file_cow() {
 		return u64(local.offset) / page_size + (virt - local.base) / page_size
 	}

@@ -2848,6 +2848,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   independent cache aliases on both architectures.
   See [the private file receipts](docs/linux-weighted-interleave.md#private-file-copy-on-write-policies).
 
+- [x] Apply tmpfs and memfd inode policies to private page copies. Qualify
+  offset views, shared alias visibility, and placement under the updated
+  policy after fork on both architectures.
+  See [the private shmem receipts](docs/linux-weighted-interleave.md#private-tmpfs-and-memfd-range-policies).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

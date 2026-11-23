@@ -18,8 +18,9 @@ weight set. [Linux sysfs attribute implementation](https://github.com/gregkh/lin
 An oversized write consumes at most one native page. The I/O layer bounds
 the payload copy for scalar, positioned, and vectored writes. The no-address
 `MPOL_F_NODE` query returns the next allocation-order node. General kernel
-allocation and the block cache, private shmem mapping policies, optional
-mode flags, and translated or 32-bit policy calls remain open.
+allocation and the block cache, shmem read-fault cache sharing, shmem
+home-node overrides, page migration, optional mode flags, and translated
+or 32-bit policy calls remain open.
 
 ## Qualification
 
@@ -255,8 +256,8 @@ offset view of a memfd and a mounted tmpfs file. It clears an interior
 slice, unmaps the installer, writes into a bound hole, and checks policy,
 data, and node location through a new view. It pins the task's fallback to
 node zero to distinguish explicitly governed pages. The qualified path
-covers `MAP_SHARED`. Private file mappings, shared home-node overrides,
-and migration remain open.
+covers `MAP_SHARED`. The private mapping checks appear below. Shmem
+home-node overrides and migration remain open.
 
 Both production kernels were built from `00b57ad54` plus the archived
 source patch. The same fixture ELF per architecture passed on Vinix and
@@ -307,3 +308,40 @@ AArch64 and 255 x86-64 allocation sites.
 The archive was decoded and compared with the full evidence tree in place.
 It is at `~/.cache/vinix-r15/private-file-policy/qualification.tar.zst`, with
 SHA-256 `928cbb7b2e18f37326bb6b4631604020fc8d885f15d0cdc0c5a97260c31a6659`.
+
+## Private tmpfs and memfd range policies
+
+`mbind` through a private tmpfs or memfd view updates the inode's policy by
+file offset. Shared and private aliases can query the same policy. New
+private copies use the inode number plus the file page index for weighted
+placement. After fork, a write that copies a private page uses the current
+inode policy and preserves the parent's copy. Clearing the interval restores
+the ordinary task allocation policy for future faults.
+[Linux shmem policy lookup](https://github.com/gregkh/linux/blob/v6.12.51/mm/shmem.c)
+
+Vinix takes a private copy on the first read fault. A later policy update
+leaves that resident copy on its original node. Linux can keep the cache
+page mapped until the first private write.
+[Linux write-fault allocation](https://github.com/gregkh/linux/blob/v6.12.51/mm/memory.c)
+
+The probe applies weighted interleave through an offset private view of each
+backing type. It checks out-of-order writes into sparse pages through
+private and shared aliases, verifies that private writes leave backing data
+untouched, and changes the policy before a child writes to a page inherited
+from its parent. It also checks that clearing the range is visible to the
+shared alias.
+
+Both production kernels were built from `8c2553555` plus the archived source
+patch. The same probe ELF per architecture passed on Vinix and Linux 6.12.51
+in two-node guests. The allocation checker reproduced the baseline failures
+and the same 307 AArch64 and 255 x86-64 allocation sites.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `1d733fb8e865db19d` | `ac365cfb105e4dc3` |
+| x86-64 | `68b822355e375c40` | `4317d0b4e65d07c1` |
+
+The archive was decoded and compared with the full evidence tree in place.
+It is at `~/.cache/vinix-r15/private-shmem-policy/qualification.tar.zst`,
+with SHA-256
+`f1ae547dce821a7083212a85bfb21f5da9dbaecc3787296be1484d54dd12e38c`.

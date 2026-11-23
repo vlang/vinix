@@ -344,6 +344,60 @@ fn check_file_policy(fd i32, ino u64, page u64, other bool) {
 	}
 }
 
+fn check_private_shmem_policy(fd i32, ino u64, page u64, other bool) {
+	unsafe {
+		first := u64(36)
+		span := 15 * page
+		need(C.ftruncate(fd, i64((first + 15) * page)) == 0, c'extend backing for private policy')
+		base := u64(C.mmap(nil, span, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE, fd, i64(first * page)))
+		alias := u64(C.mmap(nil, span, C.PROT_READ, C.MAP_SHARED, fd, i64(first * page)))
+		need(base != ~u64(0) && alias != ~u64(0), c'map private and shared views of the sparse file')
+		set_weight(0, c'3')
+		if other { set_weight(1, c'2') }
+		mask := if other { u64(3) } else { u64(1) }
+		last := if other { u64(2) } else { u64(1) }
+		need(set_policy(weighted_mode, 1) == 0, c'keep the task fallback on node zero')
+		bind_shared(base, span, weighted_mode, mask)
+		mut first_node_offset := u64(0)
+		for step in 0 .. 15 {
+			index := u64(step * 7 % 15)
+			address := base + index * page
+			shared := alias + index * page
+			want := if !other || (ino + first + index) % 5 < 3 { i32(0) } else { i32(1) }
+			need(policy_is(address, address_flag, weighted_mode, mask)
+				&& policy_is(shared, address_flag, weighted_mode, mask),
+				c'private policy installation is visible through the inode alias')
+			need(fault(address) == want, c'private file copy uses the weighted backing index')
+			need(*(&u8(shared)) == 0 && *(&u8(address)) == 28, c'private writes keep backing bytes unchanged')
+			node, _ := get_policy(shared, node_flag | address_flag)
+			need(node == want, c'new shared page follows the private installer policy')
+			if want == 0 { first_node_offset = index * page }
+		}
+		bind_shared(base, span, bind_mode, last)
+		target := base + first_node_offset
+		node, _ := get_policy(target, node_flag | address_flag)
+		need(node == 0, c'policy update preserves the resident private page')
+		child := C.fork()
+		need(child >= 0, c'fork a private shmem copy')
+		if child == 0 {
+			*(&u8(target)) = 57
+			child_node, _ := get_policy(target, node_flag | address_flag)
+			need(child_node == if other { i32(1) } else { i32(0) },
+				c'fork copy uses the updated inode policy')
+			C._exit(0)
+		}
+		mut status := i32(-1)
+		need(C.waitpid(child, &status, 0) == child && status == 0 && *(&u8(target)) == 28,
+			c'fork copy keeps the parent data isolated')
+		bind_shared(base, span, default_mode, 0)
+		need(policy_is(alias, address_flag, default_mode, 0), c'private clear removes the inode policy')
+		need(C.munmap(voidptr(base), span) == 0 && C.munmap(voidptr(alias), span) == 0
+			&& set_policy(default_mode, 0) == 0, c'release private shmem policy views')
+		set_weight(0, c'0')
+		if other { set_weight(1, c'0') }
+	}
+}
+
 fn check_shared_file(fd i32, page u64, other bool) {
 	unsafe {
 		mut info := C.stat{}
@@ -383,6 +437,7 @@ fn check_shared_file(fd i32, page u64, other bool) {
 		set_weight(0, c'0')
 		if other { set_weight(1, c'0') }
 		check_file_policy(fd, info.st_ino, page, other)
+		check_private_shmem_policy(fd, info.st_ino, page, other)
 		need(C.close(fd) == 0, c'close the shared backing')
 	}
 }
@@ -399,6 +454,7 @@ fn check_shared_placement(page u64, other bool) {
 			c'remove the tmpfs and its mountpoint')
 		C.puts(c'LINUX WEIGHTED SHMEM: PASS')
 		C.puts(c'LINUX WEIGHTED FILE POLICY: PASS')
+		C.puts(c'LINUX WEIGHTED PRIVATE SHMEM: PASS')
 	}
 }
 

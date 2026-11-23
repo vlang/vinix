@@ -6,7 +6,7 @@ import resource
 
 fn uses_file_policy(local &MmapRangeLocal) bool {
 	res := local.global.resource
-	return local.flags & (map_shared | map_anonymous) == map_shared
+	return local.flags & map_anonymous == 0
 		&& res != unsafe { nil } && res is resource.SharedMappingPolicy
 }
 

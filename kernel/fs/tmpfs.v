@@ -315,10 +315,14 @@ fn (mut this TmpFSResource) lazy_shared_mapping() bool {
 	return true
 }
 
-fn (mut this TmpFSResource) shared_policy_at(offset u64) (i32, u64) {
+fn (mut this TmpFSResource) numa_policy_at(offset u64) proc.NumaPolicy {
 	this.policy_lock.acquire()
 	defer { this.policy_lock.release() }
-	policy := this.shared_policies.lookup(offset)
+	return this.shared_policies.lookup(offset)
+}
+
+fn (mut this TmpFSResource) shared_policy_at(offset u64) (i32, u64) {
+	policy := this.numa_policy_at(offset)
 	return policy.mode, policy.mask
 }
 
@@ -431,9 +435,7 @@ fn (mut this TmpFSResource) materialize_page_locked(index int, file_data bool) b
 	if this.pages[index] != 0 {
 		return true
 	}
-	this.policy_lock.acquire()
-	policy := this.shared_policies.lookup(u64(index) * page_size)
-	this.policy_lock.release()
+	policy := this.numa_policy_at(u64(index) * page_size)
 	policy_index := this.stat.ino + u64(index)
 	phys := if policy.mode == numa.mpol_default {
 		tmpfs_page(file_data, numa.weighted_task_node(policy_index))
@@ -501,11 +503,15 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 
 	// The process' own copy. With none to be had the fault fails, and a
 	// process is killed for the memory: this used to stop the kernel.
-	copy_page := memory.pmm_alloc_user(1)
+	file_size := u64(this.stat.size)
+	copy_page := if offset < file_size {
+		numa.alloc_range_page(this.numa_policy_at(offset), this.stat.ino + page, true)
+	} else {
+		memory.pmm_alloc_user(1)
+	}
 	if copy_page == unsafe { nil } {
 		return unsafe { nil }
 	}
-	file_size := u64(this.stat.size)
 	if offset < file_size {
 		copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
 		if this.paged {
