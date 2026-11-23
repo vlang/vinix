@@ -67,8 +67,7 @@ drops when whole cache pages are released.
 Revocation holds the affected page-map locks and the file-mapping registry
 through the translation invalidations. A contended map causes a retry
 before any translation changes. Borrowed initramfs snapshots of retained
-partial pages and shared futex identity across shrink and regrowth remain
-outside this qualification.
+partial pages remain outside this qualification.
 
 The probe covers offset aliases, a split private mapping, a checked copy
 into a cold private page, and a child that touches its inherited page
@@ -97,3 +96,37 @@ The resumed runs used the same final kernels as the resident-page probe.
 The qualification archive is at
 `~/.cache/vinix-r15/tmpfs-truncate/qualification.tar.zst`, with SHA-256
 `b33cc9215bfe7dc7c342210d1ee79c3f7c99ddc1d536d27a46ed94fe41a25089`.
+
+## Shared futex keys across shrink and regrowth
+
+Shared mappings of tmpfs and memfd identify a futex by an inode ID and a file
+byte offset. The page map lock keeps the mapping and its resident translation
+stable while the kernel takes that key. The queue stores only the numeric ID
+and offset. Shared wake requires a readable address, so a wake on a truncated
+page returns `EFAULT`. [Linux futex key lookup](https://raw.githubusercontent.com/gregkh/linux/v6.12.51/kernel/futex/core.c)
+
+The probe confirms a legacy `FUTEX_WAIT` is queued by moving it to a second
+word on the page with `FUTEX_CMP_REQUEUE`. It shrinks the file, checks the
+truncated address, then touches a different inode before regrowing the
+original file. It checks that another inode, page, or word cannot wake the
+waiter. A futex2 wake through a mapping of the second file page returns one.
+The probe runs this sequence on tmpfs and memfd after its 20 existing alias
+and flag checks.
+
+The production kernels were built from `92f3048d9` plus the archived patch.
+The previous Vinix kernels returned zero on the alias wake after regrowth.
+The same probe ELF passed on the corrected Vinix kernel and on Linux 6.12.51
+for each architecture.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `1d8fbe777141b3e8` | `2ebf0431d31f34fa` |
+| x86-64 | `7ec0a27f6205677b` | `0c222847b93995c0` |
+
+The `futexqueue`, `futex2`, `futex`, `futexbits`, `shmabi`, `mmap`, and
+`memfdseals` regressions passed on both architectures. The static allocation
+checker reproduced the baseline failures and the same 307 AArch64 and 255
+x86-64 sites. The generated Linux dispatch coverage check passed.
+
+The qualification archive is at `~/.cache/vinix-r15/tmpfs-futex/qualification.tar.zst`,
+with SHA-256 `4b1a3c8cf942adac1422767a38b8377d4251a3c8a72e557234c4e17325f673c2`.

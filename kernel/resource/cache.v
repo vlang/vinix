@@ -94,14 +94,19 @@ pub fn tracks_mapping_dirty(res Resource) bool {
 	return res is MappingDirtyResource
 }
 
-// The backend revokes mappings before releasing cache frames on shrink.
+// The backend revokes mappings before releasing cache frames on shrink. Its
+// immutable, nonzero inode ID also identifies shared futexes across refaults.
 pub interface MappingTruncateResource {
-mut:
-	truncates_mapped_pages()
+	mapping_truncate_id() u64
 }
 
-pub fn tracks_mapping_truncation(res Resource) bool {
-	return res is MappingTruncateResource
+pub fn mapping_truncate_id(mut res Resource) u64 {
+	if mut res is MappingTruncateResource {
+		capability := MappingTruncateResource(res)
+		stack := unsafe { &capability }
+		return stack.mapping_truncate_id()
+	}
+	return 0
 }
 
 pub interface MappingPageoutResource {

@@ -19,15 +19,22 @@ import usercopy
 struct Futex {
 mut:
 	waiters &Wait = unsafe { nil }
-	// The address space a private futex belongs to, or nil for a shared one,
-	// whose address is physical.
-	owner voidptr
-	addr  u64
-	private bool
+	key FutexKey
 	users int
-	// Other futexes whose keys share `addr`: the same virtual address in
-	// another process, most often another copy of the same program.
 	next &Futex = unsafe { nil }
+}
+
+struct FutexKey {
+	// Only virtual keys have an address-space owner. Shared keys use an
+	// inode and file byte offset, or a physical word for other backings.
+	owner voidptr
+	inode u64
+	offset u64
+	private bool
+}
+
+fn (key FutexKey) bucket() u64 {
+	return key.offset ^ (key.inode * u64(0x9e3779b97f4a7c15))
 }
 
 // A syscall frame owns the event, which can be shared by several wait nodes.
@@ -66,35 +73,30 @@ pub fn address_error(address u64, private bool) u64 {
 
 // Name the futex a user address refers to.
 //
-// A word in a MAP_SHARED mapping is the same futex in every process that maps
-// it, so it goes by its physical address. Anything else is private to this
-// address space and goes by its virtual address, as on Linux. Keying private
-// words physically too loses wakeups: fork shares pages copy-on-write, and the
-// first write afterwards moves the writer onto a fresh page. A thread already
-// asleep on the word stays filed under the old page while the thread that
-// wakes it looks under the new one -- which is how a Go program that has run a
-// subprocess ends up with a runtime thread asleep for good.
+// A shared tmpfs word keeps its key when truncate discards its frame. Other
+// MAP_SHARED backings use their physical word. Private mappings go by their
+// virtual address because a copy-on-write fault can replace the frame.
 // FUTEX_PRIVATE_FLAG always selects the address-space/virtual key. It is also
 // part of queue identity on private mappings: Linux's shared anonymous key
 // and explicit private key must not match one another.
-fn key_for(virt u64, private bool) ?(voidptr, u64) {
-	mut pagemap := proc.current_thread().process.pagemap
-	if private || !mmap.is_shared_address(pagemap, virt) {
-		return voidptr(pagemap), virt
+fn key_for(virt u64, private bool) ?FutexKey {
+	pagemap := proc.current_thread().process.pagemap
+	virtual_key := FutexKey{owner: voidptr(pagemap), offset: virt, private: private}
+	if private { return virtual_key }
+	mapping := mmap.futex_mapping(pagemap, virt) or {
+		// A shared page may still need a demand fault or have been evicted.
+		usercopy.read_u32(virt) or { return none }
+		mmap.futex_mapping(pagemap, virt)?
 	}
-	if phys := pagemap.virt2phys(virt) {
-		return unsafe { nil }, phys + (virt & (memory.page_size - 1))
-	}
-	// A shared page is mapped on first touch. Reading the word brings it in.
-	usercopy.read_u32(virt) or { return none }
-	phys := pagemap.virt2phys(virt) or { return none }
-	return unsafe { nil }, phys + (virt & (memory.page_size - 1))
+	if !mapping.shared { return virtual_key }
+	return FutexKey{inode: mapping.inode, offset: mapping.offset}
 }
 
 // Take a reference to the futex for `virt`. Only a waiter creates one: a
 // waker that finds none has nobody to wake.
 fn get(virt u64, create bool, private bool) ?&Futex {
-	owner, addr := key_for(virt, private)?
+	key := key_for(virt, private)?
+	bucket := key.bucket()
 
 	futex_lock.acquire()
 	defer {
@@ -102,11 +104,11 @@ fn get(virt u64, create bool, private bool) ?&Futex {
 	}
 
 	mut head := unsafe { &Futex(nil) }
-	if addr in futexes {
-		head = unsafe { futexes[addr] }
+	if bucket in futexes {
+		head = unsafe { futexes[bucket] }
 	}
 	for f := head; f != unsafe { nil }; f = f.next {
-		if f.owner == owner && f.private == private {
+		if f.key == key {
 			mut found := unsafe { f }
 			found.users++
 			return found
@@ -117,13 +119,11 @@ fn get(virt u64, create bool, private bool) ?&Futex {
 	}
 
 	f := &Futex{
-		owner: owner
-		addr:  addr
-		private: private
+		key:   key
 		users: 1
 		next:  head
 	}
-	futexes[addr] = f
+	futexes[bucket] = f
 	return f
 }
 
@@ -134,12 +134,13 @@ fn put(mut f Futex) {
 		futex_lock.release()
 		return
 	}
-	mut head := unsafe { futexes[f.addr] }
+	bucket := f.key.bucket()
+	mut head := unsafe { futexes[bucket] }
 	if head == f {
 		if f.next == unsafe { nil } {
-			futexes.delete(f.addr)
+			futexes.delete(bucket)
 		} else {
-			futexes[f.addr] = f.next
+			futexes[bucket] = f.next
 		}
 	} else {
 		for head.next != f {

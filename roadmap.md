@@ -2868,6 +2868,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   on both architectures.
   See [the resident truncation receipts](docs/linux-tmpfs-eof.md#truncation-of-resident-tmpfs-and-memfd-mappings).
 
+- [x] Preserve shared tmpfs and memfd futex keys across shrink and regrowth.
+  Qualify wake through an offset alias, inode and word isolation, and `EFAULT`
+  past EOF on both architectures.
+  See [the shared futex receipts](docs/linux-tmpfs-eof.md#shared-futex-keys-across-shrink-and-regrowth).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

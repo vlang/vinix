@@ -13,11 +13,11 @@ __global (
 
 fn register_file_global(global &MmapRangeGlobal) {
 	mut g := unsafe { global }
-	if !g.tracked_file && !g.tracked_truncation { return }
+	if !g.tracked_file && g.truncation_inode == 0 { return }
 	range_locals_lock.acquire()
 	defer { range_locals_lock.release() }
 	if g.file_registered { return }
-	if g.tracked_truncation {
+	if g.truncation_inode != 0 {
 		g.file_next = truncate_globals
 		truncate_globals = g
 	} else {
@@ -34,7 +34,7 @@ fn unregister_file_global_locked(mut g MmapRangeGlobal) {
 	if !g.file_registered { return }
 	if g.file_previous != unsafe { nil } {
 		g.file_previous.file_next = g.file_next
-	} else if g.tracked_truncation {
+	} else if g.truncation_inode != 0 {
 		truncate_globals = g.file_next
 	} else {
 		file_globals = g.file_next

@@ -641,8 +641,10 @@ their own `futexqueue` case.
 The `futexkeys` case maps one memfd at two shared addresses and one private
 address. Twenty timed pthread waits check that private queues ignore another
 virtual alias, shared queues wake through an alias, and private/shared flags
-identify separate queues on both mapping kinds. Priority-inheritance futex
-keys and cross-process shared-file page eviction remain separate checks.
+identify separate queues on both mapping kinds. Two additional waits are
+requeued within a shared page before shrinking a memfd or tmpfs file. The
+probe checks `EFAULT` past EOF, inode and word isolation, and futex2 wake
+through an offset alias after regrowth.
 
 The `futexbits` case checks twelve waiters with three distinct masks, including
 overflow listener storage, across three selective-wake rounds. Requests must

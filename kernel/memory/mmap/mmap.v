@@ -148,7 +148,7 @@ pub mut:
 	shared_policies numa.SharedPolicies
 	private_cow bool
 	tracked_file bool
-	tracked_truncation bool
+	truncation_inode u64
 	file_registered bool
 	file_previous &MmapRangeGlobal = unsafe { nil }
 	file_next &MmapRangeGlobal = unsafe { nil }
@@ -396,18 +396,6 @@ pub fn anonymous_resident_bytes(_pagemap &memory.Pagemap) u64 {
 		bytes += pagemap.resident_share(range.base, range.base + range.length)
 	}
 	return bytes
-}
-
-// Whether `addr` lies in a MAP_SHARED mapping, whose pages are the same
-// physical memory in every address space that maps them.
-pub fn is_shared_address(_pagemap &memory.Pagemap, addr u64) bool {
-	mut pagemap := unsafe { _pagemap }
-	pagemap.l.acquire()
-	defer {
-		pagemap.l.release()
-	}
-	local_range, _, _ := addr2range(pagemap, addr) or { return false }
-	return local_range.flags & map_shared != 0
 }
 
 // The caller must hold pagemap.l. MAP_FIXED_NOREPLACE and non-fixed address
@@ -806,7 +794,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 					owns_resource_ref: global_range.owns_resource_ref
 					owns_mapping_ref: global_range.owns_mapping_ref
 					tracked_file: global_range.tracked_file
-					tracked_truncation: global_range.tracked_truncation
+					truncation_inode: global_range.truncation_inode
 					private_cow: global_range.private_cow
 					no_write: global_range.no_write
 					no_exec: global_range.no_exec
@@ -1115,7 +1103,7 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64, retry_truncated 
 	}
 	old_phys := pagemap.virt2phys(virt) or {
 		// Truncate can revoke a COW PTE after the CPU took the write fault.
-		retry := retry_truncated && local_range.global.tracked_truncation
+		retry := retry_truncated && local_range.global.truncation_inode != 0
 		pagemap.l.release()
 		return retry
 	}
@@ -1141,7 +1129,7 @@ pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64, retry_truncated 
 		return false
 	}
 	if current.generation != source.local_generation {
-		retry := retry_truncated && current.global.tracked_truncation
+		retry := retry_truncated && current.global.truncation_inode != 0
 		pagemap.l.release()
 		return retry
 	}
@@ -1516,8 +1504,11 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	}
 	tracked_file := flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil }
 		&& resource.tracks_mapping_dirty(resource_)
-	tracked_truncation := flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil }
-		&& resource.tracks_mapping_truncation(resource_)
+	truncation_inode := if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil } {
+		resource.mapping_truncate_id(mut resource_)
+	} else {
+		u64(0)
+	}
 	if tracked_file && flags & map_shared != 0 { extra_pte |= memory.pte_file_tracked }
 	lazy_file := options.lazy_file || (flags & map_anonymous == 0
 		&& flags & map_shared != 0 && voidptr(resource_) != unsafe { nil }
@@ -1537,7 +1528,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		pte_extra: extra_pte
 		owns_mapping_ref: mapping_retained
 		tracked_file: tracked_file
-		tracked_truncation: tracked_truncation
+		truncation_inode: truncation_inode
 		private_cow: range_local.cow
 		owns_resource_ref: resource_retained
 		lazy_file: lazy_file

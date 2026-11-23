@@ -1,3 +1,4 @@
+@[has_globals]
 module fs
 
 import proc
@@ -25,6 +26,7 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
+	mapping_id u64
 
 	storage  &u8
 	capacity u64
@@ -66,6 +68,8 @@ pub mut:
 // Cover the resource and its interface box with room for slab rounding.
 // VFS nodes and names, sparse page metadata and file contents are charged separately.
 const tmpfs_resource_charge = u64(2) * (u64(sizeof(TmpFSResource)) + u64(sizeof(resource.Resource)))
+
+__global tmpfs_mapping_sequence u64
 
 fn (mut this TmpFSResource) attribute_bits() u32 {
 	return katomic.load(&this.attr_bits)
@@ -320,7 +324,9 @@ fn (mut this TmpFSResource) private_mapping_cow() bool {
 	return true
 }
 
-fn (mut this TmpFSResource) truncates_mapped_pages() {}
+fn (this &TmpFSResource) mapping_truncate_id() u64 {
+	return this.mapping_id
+}
 
 fn (mut this TmpFSResource) numa_policy_at(offset u64) proc.NumaPolicy {
 	this.policy_lock.acquire()
@@ -892,6 +898,7 @@ fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 
 	if stat.isreg(mode) {
 		new_resource.can_mmap = true
+		new_resource.mapping_id = katomic.inc(mut &tmpfs_mapping_sequence) + 1
 	}
 
 	new_resource.stat.size = 0
@@ -971,6 +978,7 @@ pub fn create_anonymous(mode u32) ?&resource.Resource {
 	}
 
 	new_resource.can_mmap = true
+	new_resource.mapping_id = katomic.inc(mut &tmpfs_mapping_sequence) + 1
 
 	new_resource.stat.size = 0
 	new_resource.stat.blocks = 0
