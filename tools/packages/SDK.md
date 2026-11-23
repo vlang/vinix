@@ -563,9 +563,9 @@ creating/removing its file or selecting identical bytes at another path changes
 the cache key. The AArch64 builder also keys its assembled image root from the
 effective target configuration, bundle and requirements so an input change can
 stage into a fresh root. The existing desktop/security stager inherits this
-environment and applies the normal signed-bundle gate on either target. Requirements still
-apply when existing image configuration/bundles are preserved; supplying a
-different release configuration cannot override retained trust or policy.
+environment and applies the normal signed-bundle gate on either target.
+Requirements still apply when existing image configuration/bundles are
+preserved, and the retained trust and policy govern the check.
 
 The staged format-2 declaration is available for ordinary Software review
 after boot. Installation still requires confirmation and administrator approval.

@@ -124,7 +124,8 @@ checked that changes to the selected path, bytes or leaf type invalidate the
 AArch64 image keys and that x86-64 settings leave those keys unchanged.
 
 A normal stage for each target used one environment containing both reviewed
-configurations, separate signed repository paths and both reviewed locks.
+configurations, separate repository paths and both reviewed locks. A disposable
+test publisher signed the repository.
 Each output retained its exact lock and signed repository bytes, contained
 three static target tools and left consumer package state empty. These runs
 staged into small image roots. Paired desktop ISO build and boot were outside
@@ -134,6 +135,21 @@ The source patch against `ab420ef6f`, host logs, preflight reports and staged
 artifact hashes are in `~/.local/state/vinix/r14-target-1CoopZ`. The SHA-256 of
 `checks.sha256` is
 `497c515bf92b66ed75b64c94841fbff2531324da1fa486962cd76697c2c04b8b`.
+
+All **30 host checks passed** at `da695e7ee`. The signed maintenance fixture
+uses the host `mode_t` width when creating FIFO refusal cases. The same state
+directory contains `qualification-final/qualification.json` and the complete
+host logs. The SHA-256 of `qualification-host.sha256` is
+`5d533b577885c0eac0f95cfe37137f3ce531f6d667cc009b152cba49b26f247b`.
+
+The AArch64 guest at `8f9b09ad2` completed all eight fixture processes in
+103.3 seconds and initiated QMP shutdown. The x86-64 guest at `da695e7ee`
+booted and reached test startup. Its first worker emitted no verdict before
+the 180-second deadline. Both used the retained release kernels from
+`cf4e76718`. The same state directory contains the raw serial and QMP logs,
+fixture binaries and the AArch64 receipt. The SHA-256 of
+`qualification-guest.sha256` is
+`809c2dca6d46e2829c5e327c39cda9322e60516ddba2833a79a1307b8e80552a`.
 
 ## Qualification, 2026-10-16
 

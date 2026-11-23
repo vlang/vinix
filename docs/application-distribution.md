@@ -106,12 +106,15 @@ deployment lock for normal reviewed offline installation. This adds a concrete
 catalog admission gate; production publisher/catalog migration and real graphical
 runtime acceptance remain open. See [qualification](../tests/packages/image-applications-check.md).
 
-Desktop builds can carry that advertised set in a reviewed format-1 deployment
-root manifest selected by `VINIX_PACKAGE_IMAGE_APPLICATIONS` or direct
-`--applications FILE`. The stager resolves those exact captured requirements
-before compiling or publishing, reports their source digest, and refuses exact
-format-2 locks rather than dropping their pins. The native desktop cache tracks
-the selection and contents. See [file/cache qualification](../tests/packages/image-requirements-check.md).
+Desktop builds can carry that advertised set in a format-1 root manifest or a
+reviewed format-2 deployment lock selected by `VINIX_PACKAGE_IMAGE_APPLICATIONS`
+or `--applications FILE`. The stager reports the exact source digest and checks
+the complete set before compiling or publishing. Format-2 inputs retain their
+approved pins and minimum signed sequences. For a paired ISO build, `_AARCH64`
+and `_X86_64` settings can select a different configuration, bundle and lock for
+each target. The AArch64 desktop caches track the effective selection and contents.
+See [the image contract](../tools/packages/SDK.md#release-image-configuration)
+and [file/cache qualification](../tests/packages/image-requirements-check.md).
 
 Preflight can explicitly export its exact resolved deployment with
 `--export-deployment NEW_FILE`. The canonical lock is saved atomically to a new

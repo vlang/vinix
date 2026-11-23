@@ -86,13 +86,15 @@ and [qualification](../../tests/packages/image-applications-check.md).
 
 Desktop/release builds can select the same gate declaratively with
 `VINIX_PACKAGE_IMAGE_APPLICATIONS=/absolute/requirements.json`, or use
-`stage.v --applications FILE`. This is a nonempty format-1 deployment root
-manifest for the selected architecture. Explicit file or inline-ID options
-override the environment; the two explicit forms cannot be combined. Reports
-retain the exact file digest, and the native desktop cache tracks its selection
-and contents. Exact format-2 locks are refused here so their pins cannot be
-discarded. See [the contract](SDK.md#application-requirements-files-in-desktop-builds)
-and [qualification](../../tests/packages/image-requirements-check.md).
+`stage.v --applications FILE`. Use a nonempty format-1 root manifest or a
+reviewed format-2 deployment lock for the target architecture. Staging preserves
+the lock's exact pins and minimum signed sequences. Pair an `_AARCH64` setting
+with an `_X86_64` setting to select inputs for both targets in one release build.
+An explicit file or a list of inline IDs overrides the environment. Choose one
+form per invocation. Reports retain the exact file digest, and the native desktop
+cache tracks its selection and contents.
+See [the contract](SDK.md#application-requirements-files-in-desktop-builds) and
+[qualification](../../tests/packages/image-requirements-check.md).
 
 `--check --export-deployment NEW_FILE` saves that exact resolved format-2 lock
 for ordinary Software/CLI deployment review. It requires selected app requirements
