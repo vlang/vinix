@@ -102,6 +102,7 @@ struct Delivery {
 mut:
 	pid    int
 	start  u64
+	exec_count u64
 	signal int
 	value  u64
 	socket &resource.Resource = unsafe { nil }
@@ -143,6 +144,7 @@ mut:
 	// The registered notification: the owner's global pid and start time.
 	notify_owner  int
 	notify_start  u64
+	notify_exec_count u64
 	notify_kind   int
 	notify_signal int
 	notify_value  u64
@@ -669,6 +671,7 @@ fn (mut this Queue) wait_locked(waiter &Waiter, sending bool, deadline &time.Tim
 fn (mut this Queue) clear_notification_locked() {
 	this.notify_owner = 0
 	this.notify_start = 0
+	this.notify_exec_count = 0
 	this.notify_kind = 0
 	this.notify_signal = 0
 	this.notify_value = 0
@@ -685,6 +688,7 @@ fn (mut this Queue) fire_notification_locked(mut delivery Delivery) {
 		sigev_signal {
 			delivery.pid = this.notify_owner
 			delivery.start = this.notify_start
+			delivery.exec_count = this.notify_exec_count
 			delivery.signal = this.notify_signal
 			delivery.value = this.notify_value
 		}
@@ -711,8 +715,8 @@ fn (mut this Queue) remove_notification_locked(mut delivery Delivery) {
 // Sends what the queue's lock saw to, and gives back the socket's reference.
 fn deliver(delivery &Delivery) {
 	if delivery.signal > 0 {
-		userland.signal_message_queue_owner(delivery.pid, delivery.start, delivery.signal,
-			delivery.value)
+		userland.signal_message_queue_owner(delivery.pid, delivery.start, delivery.exec_count,
+			delivery.signal, delivery.value)
 	}
 	if delivery.socket != unsafe { nil } {
 		mut socket := delivery.socket
@@ -1326,6 +1330,7 @@ pub fn syscall_mq_notify(_ voidptr, mqdes u64, sev_ptr u64) (u64, u64) {
 		queue.notify_start = process.start_time_ticks
 		queue.notify_kind = sev.notify
 		if sev.notify == sigev_signal {
+			queue.notify_exec_count = katomic.load(&process.exec_count)
 			queue.notify_signal = sev.signo
 			queue.notify_value = sev.value
 		}

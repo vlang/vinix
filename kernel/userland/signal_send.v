@@ -177,6 +177,7 @@ fn signal_process_locked_from(mut target proc.Process, signal int, source &proc.
 fn begin_exec_signals(mut target proc.Process, old_thread &proc.Thread) {
 	proc.lock_table()
 	target.threads_lock.acquire()
+	katomic.inc(mut &target.exec_count)
 	target.exec_transition = true
 	target.exec_pending_signals = katomic.load(&old_thread.pending_signals)
 	target.exec_signal_thread = unsafe { old_thread }
@@ -662,22 +663,29 @@ pub fn syscall_rt_tgsigqueueinfo(_ voidptr, tgid_word u64, tid_word u64, signal_
 // A POSIX message queue's SIGEV_SIGNAL notification: SI_MESGQ, with the
 // sending process as the registered one numbers it, the sender's real uid and
 // the registration's value. Like Linux it bypasses the permission check, and
-// goes only to the process that registered: `start` tells it from a later
-// process given the same pid.
-pub fn signal_message_queue_owner(pid int, start u64, signal int, value u64) {
+// matches the process and the executable that registered it.
+pub fn signal_message_queue_owner(pid int, start u64, exec_count u64, signal int, value u64) {
 	if pid <= 0 || pid >= proc.max_pid || signal <= 0 || signal > 64 {
 		return
 	}
-	mut target := proc.pin_process_at(pid)
-	if target == unsafe { nil } { return }
-	defer { proc.unpin_process(target) }
-	if target.exiting || target.start_time_ticks != start { return }
-	sender := proc.current_thread().process
-	source := proc.SignalSource{
-		code:  i32(proc.si_mesgq)
-		pid:   i32(proc.pid_in(sender, target.numbered_in))
-		uid:   sender.uid
-		value: value
+	posixtimer.lock_signal_info()
+	proc.lock_table()
+	mut target := proc.process_at(pid)
+	mut changed := false
+	// Match and enqueue under the same table lock used by begin_exec_signals.
+	if target != unsafe { nil } && !target.exiting && target.start_time_ticks == start
+		&& katomic.load(&target.exec_count) == exec_count {
+		sender := proc.current_thread().process
+		source := proc.SignalSource{
+			code:  i32(proc.si_mesgq)
+			pid:   i32(proc.pid_in(sender, target.numbered_in))
+			uid:   sender.uid
+			value: value
+		}
+		_, changed = signal_process_locked_from(mut target, signal, unsafe { &source })
+		if changed { proc.pin_process(target) }
 	}
-	signal_process_from(mut target, signal, unsafe { &source })
+	proc.unlock_table()
+	posixtimer.unlock_signal_info()
+	if changed { notify_signal_parent(target); proc.unpin_process(target) }
 }

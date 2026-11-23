@@ -23,7 +23,7 @@ pub fn set_process_group(pid int, pgid int) (u64, u64) {
 	if !mac_peer_allowed(caller, target) { return errno.err, errno.eperm }
 	if voidptr(target) != voidptr(caller) && target.ppid != caller.pid { return errno.err, errno.esrch }
 	if target.sid != caller.sid { return errno.err, errno.eperm }
-	if voidptr(target) != voidptr(caller) && katomic.load(&target.did_exec) != 0 { return errno.err, errno.eacces }
+	if voidptr(target) != voidptr(caller) && katomic.load(&target.exec_count) != 0 { return errno.err, errno.eacces }
 	if target.sid == target.pid { return errno.err, errno.eperm }
 	local := if pgid == 0 { pid_in(target, caller.numbered_in) } else { pgid }
 	mut group := if local == pid_in(target, caller.numbered_in) { target.pid } else { 0 }

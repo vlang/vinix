@@ -252,6 +252,38 @@ Hashes are SHA-256 prefixes. The archive is
 `~/.cache/vinix-r15/mq-file-bind-lifetime/qualification.tar.zst`, with SHA-256
 `f8df1cf4828691af73b9b28ef593a7aa0f686e6602db1ea3dcacb69c95636e56`.
 
+### Signal notifications across exec
+
+`SIGEV_SIGNAL` registrations record the current process image. A failed
+exec preserves signal delivery. After a successful exec, a registration on
+a retained descriptor still owns the queue's one notification slot. The
+next transition from empty to nonempty consumes that registration without
+sending the old signal to the replacement program. The replacement can then
+register and receive its own signal. [Linux mqueue notification](https://github.com/gregkh/linux/blob/v6.12.51/ipc/mqueue.c#L773)
+
+The probe adds five checks for failed exec, a retained registration across
+exec, and delivery from a new registration. Optimized Vinix kernels from
+`1e8d2c20a` plus this change and Linux 6.12.51 passed all 290 + 16 checks with
+identical probe ELFs on both architectures. The previous x86-64 kernel
+delivered the stale signal. `execown`, `execnames`, `sigqueue` and `groupabi`
+passed on both Vinix kernels. The first x86-64 `groupabi` run timed out after
+its privileged cohort. The same kernel and ELF passed with a 300-second
+timeout. The allocation checker's site counts and existing failures matched
+the baseline.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `98e3b317ea30fd51` | `c049d095dd91e2bb` | `94df431736b5badc` | `03d8b7e72fe0d0f5` |
+| x86-64 | `d300cd1e60ab32c2` | `a9ffb7e3def6d020` | `871a22f80e7d3d62` | `63d9eb063a4e823b` |
+
+Hashes are SHA-256 prefixes. The archives are under
+`~/.cache/vinix-r15/mq-notification-exec/`.
+
+- `qualification.tar.zst` has SHA-256
+  `c90e13cf4fddca9715e8492dae82f059e8942408d1fa101264386c253b34e97c`.
+- `groupabi-replay.tar.zst` has SHA-256
+  `b00c78ec2871bf3f6a0543648f5ff94abf0cf067e24aca8e41bf0901a6c54a51`.
+
 ## Limits
 
 - Retired queue nodes keep their references through the VFS grace period.
@@ -266,8 +298,6 @@ Hashes are SHA-256 prefixes. The archive is
   nice values, FIFO and arrival ties.
 - RLIMIT_MSGQUEUE is charged per real uid across all user namespaces; Linux
   charges per user namespace up its hierarchy.
-- A notification goes to the registered process even after it has executed a
-  new program while keeping a descriptor without close-on-exec; Linux skips it.
 - A SIGEV_THREAD cookie that does not fit the socket's receive limit when the
   notification fires is dropped; Linux reserves room at registration.
 - mq_open can still fail after making a queue if the open file's kernel budget

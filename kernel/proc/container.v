@@ -451,7 +451,6 @@ pub fn set_no_new_privs() {
 // carries no file capabilities: root gets everything its bounding set and
 // inheritable set allow, everybody else keeps only the ambient set.
 pub fn capabilities_after_exec(mut process Process) {
-	katomic.store(mut &process.did_exec, u32(1))
 	dumpability_after_exec(mut process)
 	katomic.store(mut &process.stack_policy_mode, u32(0))
 	katomic.store(mut &process.stack_policy_violations, u64(0))

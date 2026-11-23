@@ -87,6 +87,8 @@ fn C.strlen(&char) usize
 fn C.snprintf(&char, usize, &char, ...) i32
 fn C.close(i32) i32
 fn C.dup(i32) i32
+fn C.dup2(i32, i32) i32
+fn C.execve(&char, &&char, &&char) i32
 fn C.read(i32, voidptr, usize) isize
 fn C.write(i32, voidptr, usize) isize
 fn C.pread(i32, voidptr, usize, i64) isize
@@ -135,6 +137,9 @@ const sock_raw = 3
 const sock_stream = 1
 const rlimit_msgqueue = 12
 const clone_newipc = 0x08000000
+const notification_ready_fd = 100
+const notification_proceed_fd = 101
+const notification_queue_fd = 102
 const clone_newns = 0x00020000
 
 struct State {
@@ -841,6 +846,77 @@ fn notifications(mut s State) {
 	}
 }
 
+fn exec_notification_owner(mut s State, q i32, ready i32, proceed i32) i32 {
+	unsafe {
+		if C.dup2(q, notification_queue_fd) != notification_queue_fd
+			|| C.dup2(ready, notification_ready_fd) != notification_ready_fd
+			|| C.dup2(proceed, notification_proceed_fd) != notification_proceed_fd { return 1 }
+		C.close(q)
+		C.close(ready)
+		C.close(proceed)
+		if mq_notify(notification_queue_fd, set_signal_event(mut s, 0, usr1, 0x1111)) != 0 { return 2 }
+		mut args := [3]&char{}
+		args[0] = c'mqueue-probe'
+		args[1] = c'--notification-image'
+		mut env := [1]&char{}
+		if C.execve(c'/mnt/no-such-notification-image', &args[0], &env[0]) != -1
+			|| *C.__errno_location() != C.ENOENT { return 3 }
+		if mq_send(notification_queue_fd, c'f', 1, 0, nil) != 0 || take_usr1(mut s) != usr1
+			|| *&u64(s.info + 24) != 0x1111 || mq_receive(notification_queue_fd, s.buf, 16, nil, nil) != 1 { return 4 }
+		if mq_notify(notification_queue_fd, set_signal_event(mut s, 0, usr1, 0x2222)) != 0 { return 5 }
+		C.execve(c'/proc/self/exe', &args[0], &env[0])
+		return 6
+	}
+}
+
+fn notification_after_exec(mut s State) i32 {
+	unsafe {
+		if C.write(notification_ready_fd, c'e', 1) != 1 || C.read(notification_proceed_fd, s.buf, 1) != 1 { return 7 }
+		old := take_usr1(mut s)
+		if mq_receive(notification_queue_fd, s.buf, 16, nil, nil) != 1 || s.buf[0] != `n` { return 8 }
+		if mq_notify(notification_queue_fd, set_signal_event(mut s, 0, usr1, 0x3333)) != 0
+			|| mq_send(notification_queue_fd, c'r', 1, 0, nil) != 0 { return 9 }
+		if take_usr1(mut s) != usr1 || *&u64(s.info + 24) != 0x3333 { return 10 }
+		return if old == -C.EAGAIN { 0 } else { 11 }
+	}
+}
+
+fn notification_exec(mut s State) {
+	unsafe {
+		s.label = c'notification exec'
+		q := mq_open(c'notify-image', o_creat | o_excl | o_rdwr | o_nonblock, 0o600, set_attr(s.attr, 0, 1, 16, 0))
+		mut ready := [2]i32{}
+		mut proceed := [2]i32{}
+		prepared := q >= 0 && C.pipe(&ready[0]) == 0 && C.pipe(&proceed[0]) == 0
+		check(mut s, c'create queue and pipes', prepared, q)
+		child := if prepared { C.fork() } else { -1 }
+		if child == 0 {
+			C.close(ready[0])
+			C.close(proceed[1])
+			C._exit(exec_notification_owner(mut s, i32(q), ready[1], proceed[0]))
+		}
+		entered := if child > 0 {
+			C.close(ready[1])
+			C.close(proceed[0])
+			C.read(ready[0], s.buf, 1) == 1 && s.buf[0] == `e`
+		} else { false }
+		check(mut s, c'failed exec preserved signal and replacement image started', entered, child)
+		check(mut s, c'registration still owns queue across exec', entered
+			&& mq_notify(q, set_signal_event(mut s, 0, usr1, 1)) == -C.EBUSY, 0)
+		check(mut s, c'trigger pre-exec registration', entered && mq_send(q, c'n', 1, 0, nil) == 0
+			&& C.write(proceed[1], c'g', 1) == 1, 0)
+		if child > 0 {
+			C.close(ready[0])
+			C.close(proceed[1])
+		}
+		mut status := i32(-1)
+		waited := child > 0 && C.waitpid(child, &status, 0) == child
+		check(mut s, c'old signal dropped and new registration delivers', waited && status == 0, status)
+		C.close(i32(q))
+		mq_unlink(c'notify-image')
+	}
+}
+
 // As UID/GID 1000: permissions, limits and accounting.
 fn unprivileged(mut s State) {
 	unsafe {
@@ -1340,6 +1416,9 @@ pub fn run(argc i32, argv &&char) i32 {
 			text:  &u8(C.malloc(256))
 			st:    &C.stat(C.malloc(256))
 		}
+		if argc > 1 && C.strcmp(argv[1], c'--notification-image') == 0 {
+			C._exit(notification_after_exec(mut s))
+		}
 		C.memset(s.buf, 0, 70000)
 		queue_limit(mut s)
 		names(mut s)
@@ -1350,6 +1429,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		waiter_order(mut s, false)
 		attr_calls(mut s)
 		notifications(mut s)
+		notification_exec(mut s)
 		unprivileged(mut s)
 		namespaces(mut s)
 		mount_view(mut s)

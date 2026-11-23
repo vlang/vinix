@@ -342,8 +342,8 @@ pub mut:
 	// decides it from ADDR_NO_RANDOMIZE in the exec'ing thread's personality,
 	// and fork keeps it. Later mmap hints and the first break follow it.
 	layout_fixed bool
-	// A parent may no longer change its child's process group after exec.
-	did_exec u32
+	// Changes when exec commits. Zero also allows a parent to set the group.
+	exec_count u64
 	stack_policy_mode u32
 	stack_policy_violations u64
 	// The immutable syscall table is shared by fork children; this lock pins

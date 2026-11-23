@@ -2687,6 +2687,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   after the final bind or description goes away. See
   [the file bind receipts](docs/linux-mqueue.md#bind-mounts-of-individual-queues).
 
+- [x] Match Linux's `SIGEV_SIGNAL` registration lifetime across failed and
+  successful `execve` calls with a retained queue descriptor. See
+  [the exec notification receipts](docs/linux-mqueue.md#signal-notifications-across-exec).
+
 - [x] Implement native futex2 vector waits, masked waits and wakes, and
   compare-requeue. Qualify 128-entry waits, shared and private keys, absolute
   deadlines, signal restart, and legacy futex interoperability on AArch64 and
