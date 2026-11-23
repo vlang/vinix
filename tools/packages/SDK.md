@@ -1265,9 +1265,9 @@ combined catalog. Composition retains every manifest and selector unchanged.
 Sources acquire the profile prefix: `aarch64` from `sqlite` becomes
 `sqlite/aarch64`. This keeps unrelated loaders and libraries in separate prepared
 roots, even when they share filenames. Existing scoped sources can be composed
-again within the eight-component bound. Prepare ordinary directories matching
-these prefixes; links to profile/architecture directories are refused. Guest
-payload aliases inside each captured architecture root retain `pack-root` rules.
+again within the eight-component bound. For a grouped `pack-catalog` import,
+prepare ordinary directories matching these prefixes. Guest payload aliases
+inside each captured architecture root retain `pack-root` rules.
 
 `compose-catalog-for ARCH NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]`
 explicitly builds a single-host catalog from complete inputs with different
@@ -1319,6 +1319,33 @@ vinix-package compose-catalog /build/combined-lock sqlite /build/sqlite-lock/cat
 vinix-package pack-catalog /build/combined-lock/catalog.json /build/roots /build/combined-workspace
 vinix-package publish-release /build/combined-workspace company /secure/publisher.seed 1 EXPIRES_UNIX /build/combined-release
 ```
+
+#### Pack from independent profile directories
+
+`pack-catalog-profiles CATALOG.json NEW_WORKSPACE PROFILE PREPARED_ROOTS...`
+packs a composed lock directly from the existing prepared roots. Supply one
+directory for each outer profile prefix in the lock. For example, if `sqlite`
+and `media` already have prepared roots in different directories, use the
+combined lock from `compose-catalog` with the following command.
+
+```sh
+vinix-package pack-catalog-profiles /build/combined-lock/catalog.json /build/combined-workspace \
+  sqlite /build/sqlite-inputs/base media /build/ffmpeg-inputs/roots
+```
+
+`sqlite/aarch64` resolves to `aarch64` inside the supplied `sqlite` directory.
+Nested names such as `media/ffmpeg/x86_64` resolve under `media` and still require
+ordinary directories for each remaining component. A selected-host lock requires
+only its selected architecture and any shared sources. Missing, duplicate or
+unused profile mappings and unscoped sources refuse. Packing captures the roots,
+verifies the same inventory pins and publishes the same canonical workspace as
+the grouped import. Review and sign it through the existing publisher workflow.
+
+V callers use `pkgcore.pack_catalog_profiles` with an array of
+`pkgcore.CatalogProfileRoot` values. `CatalogInfo.close()` retires the owned
+reply. See [composition and packing qualification](../../tests/packages/composition-target-check.md).
+
+#### Composition receipts and ownership
 
 The composer checks destination space plus a 64 MiB reserve and atomically
 publishes a new private 0700 directory with `catalog.json` and `composition.json`.

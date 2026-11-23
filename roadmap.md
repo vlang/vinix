@@ -782,6 +782,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     combines complete single-host and dual-host profiles for a declared target,
     preserving shared packages, pinned declarations and full-input provenance.
     Unsupported hosts and invalid omitted variants refuse publication.
+    The composed lock can pack directly from independent prepared profile
+    directories. A signed Native SDK and SQLite catalog passed preflight and
+    reviewed offline installation for both targets.
   - [x] [Advertised image application requirements](tests/packages/image-applications-check.md)
     gate check and normal staging on jointly installable target applications
     from the selected signed bundle. Reports include exact deployment locks;

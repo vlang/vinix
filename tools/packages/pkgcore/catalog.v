@@ -16,6 +16,12 @@ pub:
 	packages []CatalogImport @[required]
 }
 
+pub struct CatalogProfileRoot {
+pub:
+	id string
+	directory string
+}
+
 pub struct CatalogInfo {
 pub:
 	format int = 1
@@ -180,6 +186,14 @@ pub fn pack_catalog(recipe_file string, source_roots string, destination string)
 	return catalog_build(recipe_file, source_roots, destination, CatalogOptions{})
 }
 
+// Pack a composed lock using the original prepared roots for each outer profile.
+pub fn pack_catalog_profiles(recipe_file string, profiles []CatalogProfileRoot, destination string) !CatalogInfo {
+	if profiles.len == 0 || profiles.len > 64 {
+		return error('catalog packing requires between 1 and 64 named profile roots')
+	}
+	return catalog_build_with_profiles(recipe_file, '', profiles, destination, CatalogOptions{})
+}
+
 // Admit metadata and budget unique objects before touching prepared roots or
 // creating a destination parent. One owner retires all partial plan state.
 fn prepare_catalog(text_input string) !CatalogPlan {
@@ -228,12 +242,53 @@ fn catalog_packed_matches(packed Package, expected Package) !bool {
 }
 
 fn catalog_build(recipe_file string, source_roots string, destination string, options CatalogOptions) !CatalogInfo {
+	return catalog_build_with_profiles(recipe_file, source_roots, [], destination, options)
+}
+
+fn capture_catalog_profiles(imports []CatalogImport, profiles []CatalogProfileRoot, mut descriptors map[string]int) ! {
+	mut paths := map[string]string{}
+	defer { unsafe { paths.free() } }
+	for profile in profiles {
+		if !identifier(profile.id) || profile.id in paths {
+			return error('catalog packing requires distinct valid profile IDs')
+		}
+		paths[profile.id] = profile.directory
+	}
+	for item in imports {
+		split := item.source.index_u8(`/`)
+		if split < 0 { return error('catalog packing with profile roots requires scoped sources: ${item.source}') }
+		id := item.source[..split]
+		defer { unsafe { id.free() } }
+		if id in descriptors { continue }
+		path := paths[id] or { return error('missing prepared root for catalog profile: ${id}') }
+		descriptors[id] = capture_prepared_root(path, 'catalog profile')!
+	}
+	if descriptors.len != paths.len { return error('catalog packing received an unused profile root') }
+}
+
+fn catalog_profile_source_root(profiles map[string]int, source string) !int {
+	// capture_catalog_profiles has validated and captured every outer prefix.
+	split := source.index_u8(`/`)
+	id := source[..split]
+	relative := source[split + 1..]
+	defer { unsafe { id.free(); relative.free() } }
+	return catalog_source_root(profiles[id], relative)
+}
+
+fn catalog_build_with_profiles(recipe_file string, source_roots string, profiles []CatalogProfileRoot, destination string, options CatalogOptions) !CatalogInfo {
 	input := read_metadata(recipe_file)!
 	mut plan := prepare_catalog(input) or { unsafe { input.free() }; return err }
 	unsafe { input.free() }
 	defer { plan.close() }
-	root := capture_prepared_root(source_roots, 'catalog')!
-	defer { C.close(root) }
+	mut profile_fds := map[string]int{}
+	defer { for _, fd in profile_fds { C.close(fd) }; unsafe { profile_fds.free() } }
+	root := if profiles.len == 0 {
+		capture_prepared_root(source_roots, 'catalog')!
+	} else {
+		capture_catalog_profiles(plan.recipe.packages, profiles, mut profile_fds)!
+		-1
+	}
+	defer { if root >= 0 { C.close(root) } }
 	target := export_target(destination, 'catalog workspace')!
 	parent := os.dir(target)
 	temporary := import_temporary_directory()
@@ -246,7 +301,9 @@ fn catalog_build(recipe_file string, source_roots string, destination string, op
 	defer { for _, fd in roots { C.close(fd) }; unsafe { roots.free() } }
 	for item in plan.recipe.packages {
 		if item.source in roots { continue }
-		fd := catalog_source_root(root, item.source)!
+		fd := if root >= 0 {
+			catalog_source_root(root, item.source)!
+		} else { catalog_profile_source_root(profile_fds, item.source)! }
 		roots[item.source] = fd
 	}
 	mut exporting := create_export_stage(parent, '.vinix-catalog', 'catalog workspace')!

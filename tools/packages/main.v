@@ -39,6 +39,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  keygen NEW_SEED_FILE | key-public SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
+	'  pack-catalog-profiles CATALOG.json NEW_WORKSPACE PROFILE PREPARED_ROOTS [PROFILE PREPARED_ROOTS...]\n' +
 	'  compose-catalog NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]\n' +
 	'  compose-catalog-for ARCH NEW_LOCK_DIRECTORY PROFILE CATALOG.json [PROFILE CATALOG.json...]\n' +
 	'  native-catalog VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
@@ -204,6 +205,19 @@ fn checked(arguments []string) !int {
 		'pack-catalog' {
 			if names.len != 3 { return error('pack-catalog requires a catalog recipe, prepared roots and a new workspace directory') }
 			mut info := pkgcore.pack_catalog(names[0], names[1], names[2])!
+			publisher_reply(mut info)
+			return 0
+		}
+		'pack-catalog-profiles' {
+			if names.len < 4 || names.len > 130 || names.len % 2 != 0 {
+				return error('pack-catalog-profiles requires a catalog recipe, new workspace and 1 to 64 PROFILE PREPARED_ROOTS pairs')
+			}
+			mut profiles := []pkgcore.CatalogProfileRoot{cap: (names.len - 2) / 2}
+			defer { unsafe { (&array(&profiles)).free() } }
+			for i := 2; i < names.len; i += 2 {
+				profiles << pkgcore.CatalogProfileRoot{ id: names[i], directory: names[i + 1] }
+			}
+			mut info := pkgcore.pack_catalog_profiles(names[0], profiles, names[1])!
 			publisher_reply(mut info)
 			return 0
 		}

@@ -52,6 +52,33 @@ notice participates in upgrade, rollback, clean uninstall and offline cache
 reinstall alongside real sandboxed Mach-O execution and retained private data.
 The controller requires both composition markers and guest-initiated poweroff.
 
+## Independent profile roots
+
+`pack-catalog-profiles` opens each named profile directory directly. The host
+fixtures verified exact parity with grouped packing, nested source prefixes,
+selected-host builds and literal CLI paths. They also covered missing, duplicate
+and unused mappings, symlinks, changed-payload cleanup and a replacement of the
+named directory after capture. All seventeen host checks passed, including
+the composition and Apple profile sanitizer suites.
+
+The release exercise combined the retained Native SDK roots and fresh SQLite
+3.53.4 roots built from the pinned source. The normal and production-mode CLIs
+packed the same catalog, manifests and objects from opposite mapping orders.
+A disposable publisher signed the ten-package catalog. Image preflight exported
+a four-application lock for each architecture, with five exact pins including
+the SQLite runtime. Separate host stores then accepted the reviewed offline
+deployments and passed the metadata audit and payload verification.
+
+All 35 grouped-packing allocation measurements matched the unchanged
+`fd4053c19` baseline on the selected compiler. The strict zero-retention check
+still fails on that baseline, including 12,992 retained bytes across 76 records
+for the complete case.
+
+The source patch, build inputs, signed bundle, target locks, test reports and
+integrity checks are in `~/.local/state/vinix/r14-roots-RvRCVg`. The SHA-256 of
+`qualification.sha256` is
+`a35a19adf1c011ae7b5c3e6fa284318fa16edb6d2255ea0ec7d03e0366103ab8`.
+
 ## Qualification, 2026-10-16
 
 All seventeen host checks passed with the retained V 0.5.2 compiler, including

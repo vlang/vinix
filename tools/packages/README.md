@@ -855,6 +855,9 @@ permissions and license declarations and rechecks targets and dependencies.
 `compose-catalog-for aarch64|x86_64` explicitly selects one supported host from
 complete profiles with different architecture sets, retaining shared packages
 and full input-lock provenance. Every input must support the selected host.
+`pack-catalog-profiles` packs the result directly from the prepared directory
+for each profile, with the same inventory pins and canonical workspace as
+`pack-catalog`.
 See [catalog composition](SDK.md#compose-application-catalogs) and
 [qualification](../../tests/packages/composition-check.md), including
 [explicit host selection](../../tests/packages/composition-target-check.md).

@@ -161,6 +161,77 @@ fn test_scoped_roots_are_captured_before_import_even_when_the_profile_namespace_
 	assert read_metadata(work + '/captured/objects/' + manifest.files[0].sha256)! == 'alpha aarch64'
 }
 
+fn test_pack_composed_catalog_from_independent_profile_roots_matches_grouped_workspace() {
+	work, sources := composition_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	inner := compose_catalog([sources[0]], work + '/inner')!
+	composed := compose_catalog([CatalogSource{ id: 'first', catalog: inner.catalog }, sources[1]], work + '/lock')!
+	grouped := work + '/roots/first'
+	os.mkdir(grouped)!
+	os.rename(work + '/roots/alpha', grouped + '/alpha')!
+	baseline := pack_catalog(composed.catalog, work + '/roots', work + '/baseline')!
+	first := work + '/detached first ; $literal'
+	os.rename(grouped, first)!
+	profiles := [CatalogProfileRoot{ id: 'beta', directory: work + '/roots/beta' },
+		CatalogProfileRoot{ id: 'first', directory: first }]
+	actual := pack_catalog_profiles(composed.catalog, profiles, work + '/mapped')!
+	assert actual.architectures == ['aarch64', 'x86_64']
+	assert actual.catalog_sha256 == baseline.catalog_sha256 && actual.package_count == 6
+	assert actual.object_count == baseline.object_count
+	assert read_metadata(actual.directory + '/catalog.json')! == read_metadata(baseline.directory + '/catalog.json')!
+	for sub in ['manifests', 'objects']! {
+		original := baseline.directory + '/' + sub
+		mapped := actual.directory + '/' + sub
+		mut originals := os.ls(original)!
+		originals.sort()
+		mut copies := os.ls(mapped)!
+		copies.sort()
+		assert copies == originals
+		for name in originals { assert hash_file(mapped + '/' + name)! == hash_file(original + '/' + name)! }
+	}
+	selected := compose_catalog_for('aarch64', sources, work + '/selected')!
+	assert pack_catalog_profiles(selected.catalog, [profiles[0], CatalogProfileRoot{ id: 'alpha', directory: first + '/alpha' }], work + '/only-arm')!.package_count == 4
+	assert !os.exists(work + '/roots/first')
+	println('PROFILE ROOT PACK: independent literal paths, nested and selected-host sources and exact workspace parity PASS')
+}
+
+fn test_pack_catalog_profiles_refuses_incomplete_mappings_aliases_and_changed_payloads() {
+	work, sources := composition_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	composed := compose_catalog(sources, work + '/lock')!
+	alpha := CatalogProfileRoot{ id: 'alpha', directory: work + '/roots/alpha' }
+	beta := CatalogProfileRoot{ id: 'beta', directory: work + '/roots/beta' }
+	for roots in [ []CatalogProfileRoot{}, [alpha], [alpha, alpha], [alpha, beta, CatalogProfileRoot{ id: 'unused', directory: work + '/absent' }],
+		[CatalogProfileRoot{ ...alpha, id: 'bad/profile' }, beta], [CatalogProfileRoot{ ...alpha, directory: work + '/absent' }, beta] ] {
+		if _ := pack_catalog_profiles(composed.catalog, roots, work + '/bad-parent/new') { assert false }
+		assert !os.exists(work + '/bad-parent')
+	}
+	if _ := pack_catalog_profiles(sources[0].catalog, [alpha], work + '/unscoped') { assert false }
+	assert !os.exists(work + '/unscoped')
+	for path in [alpha.directory, alpha.directory + '/aarch64']! {
+		os.rename(path, work + '/saved')!
+		os.symlink(work + '/saved', path)!
+		if _ := pack_catalog_profiles(composed.catalog, [alpha, beta], work + '/linked') { assert false } else {
+			assert err.msg().contains('ordinary directory')
+		}
+		assert !os.exists(work + '/linked')
+		os.rm(path)!
+		os.rename(work + '/saved', path)!
+	}
+	app := alpha.directory + '/aarch64/bin/app'
+	os.write_file(app, 'changed pinned source')!
+	if _ := pack_catalog_profiles(composed.catalog, [alpha, beta], work + '/retry') { assert false } else {
+		assert err.msg().contains('inventory differs')
+	}
+	assert !os.exists(work + '/retry') && os.ls(work)!.all(!it.starts_with('.vinix-catalog-'))
+	os.write_file(app, 'alpha aarch64')!
+	assert catalog_build_with_profiles(composed.catalog, '', [alpha, beta], work + '/retry', CatalogOptions{ checkpoint: composition_replace_namespace })!.package_count == 6
+	manifest := json2.decode[Package](read_metadata(work + '/retry/manifests/alpha-aarch64-1.0.0.json')!)!
+	assert read_metadata(work + '/retry/objects/' + manifest.files[0].sha256)! == 'alpha aarch64'
+	assert read_metadata(app)! == 'replacement namespace'
+	println('PROFILE ROOT PACK: mapping and alias refusals, pin drift cleanup and captured-root retry PASS')
+}
+
 fn test_composition_bounds_profile_count_and_nested_source_depth() {
 	work, sources := composition_fixture()!
 	defer { os.rmdir_all(work) or {} }
@@ -317,6 +388,27 @@ fn composition_command(argv []string) os.Result {
 	mut child := os.new_process(argv[0]); child.set_args(argv[1..]); child.set_redirect_stdio_merged()
 	child.run(); output := child.stdout_slurp(); child.wait(); code := child.code; child.close()
 	return os.Result{ exit_code: code, output: output }
+}
+
+fn test_pack_catalog_profiles_cli_accepts_literal_paths_and_refuses_extra_or_missing_profiles() {
+	cli := os.getenv('VINIX_PACKAGE_COMPOSITION_CLI'); if cli == '' { return }
+	work, sources := composition_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	composed := compose_catalog(sources, work + '/lock')!
+	literal := work + '/roots ; $literal'
+	os.rename(work + '/roots/alpha', literal)!
+	destination := work + '/workspace ; $literal'
+	pairs := ['alpha', literal, 'beta', work + '/roots/beta']
+	result := composition_command([cli, 'pack-catalog-profiles', composed.catalog, destination, ...pairs])
+	assert result.exit_code == 0, result.output
+	info := json2.decode[CatalogInfo](result.output)!
+	assert info.catalog_sha256 == composed.catalog_sha256 && info.package_count == 6
+	for arguments in [pairs[..2], [...pairs, 'extra'], [...pairs, 'extra', literal], [pairs[0], pairs[1], ...pairs]] {
+		refused := composition_command([cli, 'pack-catalog-profiles', composed.catalog, work + '/refused', ...arguments])
+		assert refused.exit_code != 0 && !refused.output.contains('V panic:'), refused.output
+		assert !os.exists(work + '/refused')
+	}
+	println('PROFILE ROOT PACK: production CLI argument validation and literal paths PASS')
 }
 
 fn test_selected_composition_cli_matches_api_with_literal_paths_and_refuses_invalid_requests() {
