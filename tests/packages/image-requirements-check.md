@@ -930,6 +930,25 @@ The paired inputs, native report, run logs and sanitizer checks are in
 Its SHA-256 is `896343ca88d2b513c6b92b9ea46b10e405591b92be7e5c231765e0fd2d6c339f`.
 All 1,512 entries in the extracted `qualification.sha256` passed.
 
+### Local verification of pending creation assets
+
+At `dbe742709`, `--verify-creation=TAG` checks the original assets against
+the pending creation record. It reports the recorded destination, commit,
+metadata digests, and verified asset names, sizes and digests as JSON.
+
+All 146 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. Verification rejected a different repository,
+an invalid or linked creation record, a changed ISO, and an already retired
+creation record. The native driver verified a pending record without a
+saved draft ID. Edited public metadata left its report unchanged, and
+every input file kept its digest. ASan/UBSan checked creation record
+identity, its marker and byte-identical reporting after restoration.
+
+The paired inputs, native report, run logs and sanitizer checks are in
+`~/.local/state/vinix/r14-release-verify-creation-tOjNLy/qualification.tar.gz`.
+Its SHA-256 is `297546a9cc02b0026cb4d90a6b8726390c9b8238c0d0db589f961f0aee3b9d89`.
+All 1,517 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
