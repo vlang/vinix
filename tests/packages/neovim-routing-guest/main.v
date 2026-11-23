@@ -21,6 +21,10 @@ const sqlite = 'org.sqlite.cli'
 const ffmpeg = 'org.ffmpeg.cli'
 const ffprobe = 'org.ffmpeg.probe'
 const hello = 'org.vinix.package-hello'
+const app_data = '/home/alex/.local/share/vinix-apps/'
+const mixed_database = app_data + sqlite + '/database.sqlite3'
+const mixed_media_name = 'mixed release; \$literal.wav'
+const mixed_media = app_data + ffmpeg + '/' + mixed_media_name
 
 struct VerifiedGeneration {
 	generation u64
@@ -164,7 +168,9 @@ fn verify_approved_install(document pkgprotocol.DeploymentDocument, password str
 	defer { approval_step('response', 4 * time.second) }
 
 	log_path := '/var/log/vinix/auth.log'
-	deadline := time.sys_mono_now() + 90 * time.second
+	// TCG needs extra time to verify and publish the full VJFS generation.
+	timeout := if os.is_file(installed_proof) { 600 * time.second } else { 90 * time.second }
+	deadline := time.sys_mono_now() + timeout
 	for {
 		log := os.read_file(log_path) or { '' }
 		if log.contains(password) { return error('administrator audit exposed the fixture password') }
@@ -222,27 +228,36 @@ fn verify_mixed_catalog() ! {
 	sqlite_args := [package, '--offline', 'run', sqlite]
 	created := checked(sqlite_args, '.bail on\nPRAGMA journal_mode=WAL; CREATE TABLE saved(value); INSERT INTO saved VALUES(42);\n')!
 	reopened := checked(sqlite_args, '.bail on\nSELECT sum(value) FROM saved; PRAGMA integrity_check;\n')!
-	app_data := '/home/alex/.local/share/vinix-apps/'
 	if created.trim_space() != 'wal' || reopened.trim_space() != '42\nok'
-		|| (os.stat(app_data + sqlite + '/database.sqlite3')!).uid != 1000 {
+		|| (os.stat(mixed_database)!).uid != 1000 {
 		return error('SQLite did not reopen a valid ordinary-owned private database')
 	}
 
-	media_name := 'mixed release; \$literal.wav'
 	checked([package, '--offline', 'run-args', ffmpeg, '--data-cwd', '--', '-v', 'error',
-		'-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.1', '-c:a', 'pcm_s16le', media_name], '')!
-	media := app_data + ffmpeg + '/' + media_name
-	if os.file_size(media) == 0 || (os.stat(media)!).uid != 1000 {
+		'-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.1', '-c:a', 'pcm_s16le', mixed_media_name], '')!
+	if os.file_size(mixed_media) == 0 || (os.stat(mixed_media)!).uid != 1000 {
 		return error('FFmpeg did not create ordinary-owned private media')
 	}
-	probe := ['--', '-v', 'error', '-select_streams', 'a:0', '-show_entries',
-		'stream=codec_name,sample_rate,channels', '-of', 'csv=p=0', media]
-	without_grant, _ := run_command([package, '--offline', 'run-args', ffprobe, ...probe], '')!
-	granted := checked([package, '--offline', 'run-args', ffprobe, '--file', media, ...probe], '')!
-	if without_grant == 0 || granted.trim_space() != 'pcm_s16le,44100,1' {
-		return error('FFprobe did not enforce the explicit grant or identify the generated audio')
+	without_grant, _ := probe_mixed_media(false)!
+	if without_grant == 0 {
+		return error('FFprobe opened private audio without a file grant')
 	}
+	verify_mixed_media()!
 	println('HWTEST PASS approved mixed catalog ran native SDK, SQLite, FFmpeg and FFprobe')
+}
+
+fn probe_mixed_media(grant bool) !(int, string) {
+	files := if grant { ['--file', mixed_media] } else { []string{} }
+	return run_command(['/usr/bin/vinix-package', '--offline', 'run-args', ffprobe, ...files,
+		'--', '-v', 'error', '-select_streams', 'a:0', '-show_entries',
+		'stream=codec_name,sample_rate,channels', '-of', 'csv=p=0', mixed_media], '')
+}
+
+fn verify_mixed_media() ! {
+	code, output := probe_mixed_media(true)!
+	if code != 0 || output.trim_space() != 'pcm_s16le,44100,1' {
+		return error('FFprobe did not identify the granted audio: ' + output)
+	}
 }
 
 fn route() ! {
@@ -252,6 +267,8 @@ fn route() ! {
 	os.setenv('PATH', '/usr/sbin:/usr/bin:/sbin:/bin', true)
 	os.setenv('HOME', '/root', true)
 	os.setenv('VINIX_SYSTEM_SESSION', '1', true)
+	installed := os.is_file(installed_proof)
+	if installed && resume_installed()! { return }
 	require_uninstalled()!
 	approve := os.exists(approval_input)
 	password := if approve { os.read_file(approval_input)! } else { 'test-only password' }
@@ -331,6 +348,11 @@ fn route() ! {
 			return error('approved install changed release inputs or called the legacy installer')
 		}
 		println('HWTEST PASS approved Software generation verified and Neovim launched as uid 1000')
+		if installed {
+			checkpoint_installed('approved')!
+			println('HWTEST PASS mixed release approved on installed disk')
+			poweroff_installed()!
+		}
 	}
 }
 

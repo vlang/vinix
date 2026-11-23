@@ -29,9 +29,9 @@ fn parse_options(values []string) !map[string]string {
 	for argument in values {
 		name := argument.all_before('=')
 		value := argument.all_after('=')
-		if (name !in required && name !in plain)
+		if (name !in required && name !in plain && name != '--update-bundle')
 			|| !argument.contains('=') || value == '' || name in options {
-			return error('expected distinct --arch, --kernel, --staging, --config, --deployment, --bundle, --out and optional --approve, --memory-mib and --mixed-catalog options')
+			return error('expected distinct --arch, --kernel, --staging, --config, --deployment, --bundle, --out and optional --approve, --memory-mib, --mixed-catalog and --update-bundle options')
 		}
 		options[name] = if name in plain { value } else { os.abs_path(value) }
 	}
@@ -46,6 +46,9 @@ fn parse_options(values []string) !map[string]string {
 	}
 	if options['--mixed-catalog'] == 'true' && options['--approve'] != 'true' {
 		return error('--mixed-catalog requires --approve=true')
+	}
+	if '--update-bundle' in options && options['--mixed-catalog'] != 'true' {
+		return error('--update-bundle requires --mixed-catalog=true')
 	}
 	return options
 }
@@ -62,6 +65,14 @@ fn copy_pinned(source string, target string, mut inputs map[string]string) ! {
 	os.mkdir_all(os.dir(target))!
 	os.cp(source, target)!
 	if digest(target)! != inputs[source] { return error('test input changed during capture: ' + source) }
+}
+
+fn copy_bundle(bundle string, destination string, mut inputs map[string]string) ! {
+	for name in ['index.json', 'index.sig'] { copy_pinned(bundle + '/' + name, destination + '/' + name, mut inputs)! }
+	for object in os.ls(bundle + '/objects')! {
+		if object.len != 64 || !object.bytes().all(it in '0123456789abcdef'.bytes()) { return error('invalid fixture object name') }
+		copy_pinned(bundle + '/objects/' + object, destination + '/objects/' + object, mut inputs)!
+	}
 }
 
 fn take_picture(marker string, name string, delay int) hwhost.Action {
@@ -132,6 +143,7 @@ fn check() ! {
 	arch := options['--arch']
 	approve := options['--approve'] == 'true'
 	mixed_catalog := options['--mixed-catalog'] == 'true'
+	installed := '--update-bundle' in options
 	memory_option := options['--memory-mib'] or { if approve { '2048' } else { '1024' } }
 	memory_mib := strconv.atoi(memory_option) or { return error('--memory-mib must be a positive integer') }
 	if memory_mib < 1 { return error('--memory-mib must be a positive integer') }
@@ -170,7 +182,8 @@ fn check() ! {
 	}
 	guest_source := work + '/source/main.v'
 	copy_pinned(root + '/tests/packages/neovim-routing-guest/main.v', guest_source, mut inputs)!
-	guest := hwhost.build_program_with_flags(host, guest_source, work + '/guest-build', 'init', ['.'],
+	copy_pinned(root + '/tests/packages/neovim-routing-guest/installed.v', work + '/source/installed.v', mut inputs)!
+	guest := hwhost.build_program_with_flags(host, work + '/source', work + '/guest-build', 'init', ['.'],
 		['-backend', 'c', '-prod', '-manualfree', '-enable-globals'])!
 
 	for name in desktop_files { copy_pinned(options['--staging'] + '/' + name, target + '/' + name, mut inputs)! }
@@ -191,11 +204,11 @@ fn check() ! {
 		return error('invalid fixture repository identifier')
 	}
 	destination := target + '/usr/share/vinix-packages/repositories/' + repository
-	bundle := options['--bundle']
-	for name in ['index.json', 'index.sig'] { copy_pinned(bundle + '/' + name, destination + '/' + name, mut inputs)! }
-	for object in os.ls(bundle + '/objects')! {
-		if object.len != 64 || !object.bytes().all(it in '0123456789abcdef'.bytes()) { return error('invalid fixture object name') }
-		copy_pinned(bundle + '/objects/' + object, destination + '/objects/' + object, mut inputs)!
+	copy_bundle(options['--bundle'], destination, mut inputs)!
+	if installed {
+		copy_bundle(options['--update-bundle'], target + '/usr/share/mixed-release-update', mut inputs)!
+		os.write_file(target + '/.vinix-image-id', 'vinix-mixed-release-installed-1\n')!
+		os.write_file(target + '/etc/mixed-release-repository', repository)!
 	}
 	os.chmod(target + '/usr/share/vinix-packages/applications.json', 0o644)!
 	os.mkdir_all(target + '/etc/vinix')!
@@ -210,6 +223,14 @@ fn check() ! {
 		os.write_file(target + '/etc/neovim-routing-approval', fixture_password)!
 	}
 	if mixed_catalog { os.write_file(target + '/etc/neovim-routing-mixed-catalog', '')! }
+	if installed {
+		mut proof := {'/sbin/init': digest(guest)!}
+		for name in [...desktop_files, 'usr/bin/vinix-sandbox', 'usr/share/vinix-packages/applications.json',
+			'etc/vinix-packages/config.json'] {
+			proof['/' + name] = digest(target + '/' + name)!
+		}
+		os.write_file(target + '/usr/share/mixed-release-image.json', json2.encode(proof))!
+	}
 
 	os.cp(guest, target + '/usr/bin/pkg')!
 	os.chmod(target + '/usr/bin/pkg', 0o755)!
@@ -232,21 +253,32 @@ fn check() ! {
 		}
 	}
 	if mixed_catalog { required << mixed_catalog_launches }
+	if installed {
+		required << ['HWTEST PASS mixed release approved on installed disk',
+			'HWTEST PASS mixed release update rollback uninstall and cached reinstall',
+			'HWTEST PASS mixed release cached generation and private data survived cold boot']
+	}
 	scenario := hwhost.Scenario{
 		name: 'Neovim graphical routing'
 		arches: [arch]
 		qemu: ['-nic', 'none']
+		qemu_aarch64: if installed { ['-drive', 'if=none,id=packages,format=raw,file={state}/system.vjfs',
+			'-device', 'virtio-blk-device,drive=packages'] } else { []string{} }
 		qemu_x86_64: ['-vga', 'std', '-device', 'qemu-xhci,id=gui-input', '-device', 'usb-kbd,bus=gui-input.0',
-			'-device', 'usb-tablet,bus=gui-input.0']
+			'-device', 'usb-tablet,bus=gui-input.0', ...if installed { ['-drive', 'if=ide,format=raw,file={state}/system.vjfs'] } else { []string{} }]
 		required: required
-		forbidden: ['HWTEST FAIL', 'Kernel panic', 'cannot start Software']
+		forbidden: ['HWTEST FAIL', 'Kernel panic', 'cannot start Software', ...if installed {
+			['sysdisk: updating the system on', 'running from memory'] } else { []string{} }]
 		actions: actions
 		screens: screens
-		ending: .running
+		cmdline: if installed { 'vinix.disk=auto' } else { '' }
+		disks: if installed { [hwhost.Disk{ name: 'system.vjfs', size_mib: 4096 }] } else { []hwhost.Disk{} }
+		reboots: if installed { [hwhost.Reboot{}, hwhost.Reboot{}] } else { []hwhost.Reboot{} }
+		ending: if installed { .poweroff } else { .running }
 	}
 	runtime_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
 	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{kernel: options['--kernel'], guest: guest,
-		state: boot, timeout: 300, memory_mib: memory_mib, keep: true})
+		state: boot, timeout: if installed { 2400 } else { 300 }, memory_mib: memory_mib, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	if !outcome.passed || outcome.interrupted || outcome.reason != '' { return error(outcome.reason) }
 	for path, expected in inputs {
@@ -263,7 +295,8 @@ fn check() ! {
 	}
 	os.write_file(work + '/pixels.json', json2.encode({'invalid_changed': refused_changes,
 		'proposal_changed': proposal_changes}) + '\n')!
-	println(if approve { 'NEOVIM GRAPHICAL APPROVAL PASS ' + arch } else { 'NEOVIM GRAPHICAL ROUTING PASS ' + arch })
+	println(if installed { 'MIXED INSTALLED MAINTENANCE PASS ' + arch }
+		else if approve { 'NEOVIM GRAPHICAL APPROVAL PASS ' + arch } else { 'NEOVIM GRAPHICAL ROUTING PASS ' + arch })
 }
 
 fn main() {
