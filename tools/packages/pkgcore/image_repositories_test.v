@@ -132,10 +132,10 @@ fn image_bundle_assert_replacement(work string, kind string, index string) ! {
 
 fn test_image_bundle_capture_and_publication_substitutions_preserve_inputs_and_retry() {
 	mut original := ImageCaptureLimit{}
-	assert C.getrlimit(C.RLIMIT_NOFILE, unsafe { &original }) == 0
+	assert C.getrlimit(C.RLIMIT_NOFILE, unsafe { voidptr(&original) }) == 0
 	limit := ImageCaptureLimit{ current: 32, maximum: original.maximum }
-	assert C.setrlimit(C.RLIMIT_NOFILE, unsafe { &limit }) == 0
-	defer { assert C.setrlimit(C.RLIMIT_NOFILE, unsafe { &original }) == 0 }
+	assert C.setrlimit(C.RLIMIT_NOFILE, unsafe { voidptr(&limit) }) == 0
+	defer { assert C.setrlimit(C.RLIMIT_NOFILE, unsafe { voidptr(&original) }) == 0 }
 	defer { for name in ['VINIX_IMAGE_CAPTURE_CASE', 'VINIX_IMAGE_CAPTURE_PHASE', 'VINIX_IMAGE_CAPTURE_KIND', 'VINIX_IMAGE_CAPTURE_FAIL']! { os.unsetenv(name) } }
 	mut cases := 0
 	for architecture in ['aarch64', 'x86_64']! {
