@@ -1068,9 +1068,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     sends explicit setup installs and stale legacy requests to Software's
     read-only signed release review when the protected target declaration
     selects `org.neovim.editor` as a locked root. Invalid declarations or
-    unavailable review delivery refuse fallback. Host behavior, sanitizer
-    checks and both compositor builds pass; production publisher selection,
-    other legacy applications and a new native routing UI check remain open.
+    unavailable review delivery refuse fallback. The
+    [paired native routing check](tests/packages/signed-legacy-routing-check.md#paired-native-neovim-setup-routing)
+    shows the complete signed proposal on both targets from the real Neovim
+    setup command. Production publisher selection and other legacy
+    applications remain open.
   - [x] [Authenticated hosted X11 launches](tests/wine-host/README.md)
     create a private per-account authority and fresh random cookie, grant only
     its exact socket/authority, and forward the validated pair through the
