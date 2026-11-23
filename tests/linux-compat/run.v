@@ -301,7 +301,7 @@ fn added_markers(name string, arch string, marker string) ?[]string {
 		'syslog' { [marker, 'LINUX SYSLOG SUMMARY: checks=35 failures=0', 'LINUX SYSLOG CHILD: checks=10 failures=0'] }
 		'sigqueue' { [marker, 'LINUX SIGQUEUE SUMMARY: checks=44 failures=0'] }
 		'fsuid' { [marker, 'LINUX FSUID SUMMARY: checks=20 failures=0', 'LINUX FSUID CHILD: checks=22 failures=0'] }
-		'mqueue' { [marker, 'LINUX MQUEUE SUMMARY: checks=257 failures=0', 'LINUX MQUEUE CHILD: checks=16 failures=0'] }
+		'mqueue' { [marker, 'LINUX MQUEUE SUMMARY: checks=269 failures=0', 'LINUX MQUEUE CHILD: checks=16 failures=0'] }
 		'futex2' { [marker, 'LINUX FUTEX2 SUMMARY: checks=86 failures=0'] }
 		'mseal' { [marker, 'LINUX MSEAL SUMMARY: checks=' + (if arch == 'aarch64' { '168' } else { '167' }) + ' failures=0'] }
 		'textbusy' { [marker, 'LINUX TEXTBUSY SUMMARY: writer and image lifetime controls passed'] }

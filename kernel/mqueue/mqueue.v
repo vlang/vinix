@@ -407,15 +407,26 @@ fn (mut this Queue) release() {
 	free_queue(mut this)
 }
 
-// The registry's references to the queues of an IPC namespace that is gone.
+// Retire the namespace's creation authority. Surviving mount views still
+// expose existing names, including to processes in different namespaces.
 pub fn destroy_namespace(ns u64) {
-	mut dead := &Queue(unsafe { nil })
 	mq_lock.acquire()
 	if ns in mq_roots {
 		mut root := unsafe { mq_roots[ns] }
 		root.linked = false
-		mq_roots.delete(ns)
+		if vfs.mqueue_has_views(root.node) {
+			mq_lock.release()
+			return
+		}
 	}
+	dead := unname_namespace_locked(ns)
+	mq_lock.release()
+	free_unnamed_queues(dead)
+}
+
+fn unname_namespace_locked(ns u64) &Queue {
+	mq_roots.delete(ns)
+	mut dead := &Queue(unsafe { nil })
 	mut queue := mq_queues
 	for queue != unsafe { nil } {
 		next := queue.all_next
@@ -425,7 +436,11 @@ pub fn destroy_namespace(ns u64) {
 		}
 		queue = next
 	}
-	mq_lock.release()
+	return dead
+}
+
+fn free_unnamed_queues(first &Queue) {
+	mut dead := unsafe { first }
 	for dead != unsafe { nil } {
 		next := dead.dead_next
 		free_queue(mut dead)

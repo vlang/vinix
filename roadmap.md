@@ -2675,6 +2675,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   between pathname access and queue syscalls. See
   [the mounted queue directory](docs/linux-mqueue.md#mounted-queue-directory).
 
+- [x] Preserve existing mqueue names through IPC namespace exit, directory
+  binds, namespace copies and lazy detach with a held directory description.
+  Reclaim queue quota after the final view is released. See
+  [the mount lifetime receipts](docs/linux-mqueue.md#mounts-that-outlive-their-ipc-namespace).
+
 - [x] Implement native futex2 vector waits, masked waits and wakes, and
   compare-requeue. Qualify 128-entry waits, shared and private keys, absolute
   deadlines, signal restart, and legacy futex interoperability on AArch64 and

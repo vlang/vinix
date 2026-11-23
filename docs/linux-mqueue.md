@@ -71,8 +71,8 @@ checked by the final probe.
   2.
 - mq_unlink: ENOENT, or EPERM unless the caller owns the queue, has
   filesystem uid 0 or CAP_FOWNER (the queues' sticky root directory).
-- Each IPC namespace has its own names; when the namespace goes away its
-  queues are unlinked.
+- Each IPC namespace has its own names. When the namespace ends, a surviving
+  mqueue directory keeps its existing names and refuses creation.
 
 ## Qualification
 
@@ -190,13 +190,43 @@ Hashes are SHA-256 prefixes. The archive is
 `~/.cache/vinix-r15/mq-filesystem/qualification.tar.zst`, with SHA-256
 `5f715cde39d8ddc6d61ac79d7d4e1d70d96f686d53f1b1a5c7bf6a07684d424c`.
 
+### Mounts that outlive their IPC namespace
+
+Existing names and messages remain accessible through a surviving mount after
+the last task leaves its IPC namespace. The directory returns `EACCES` for
+creation. A binding of the directory or an inherited mount namespace copy
+keeps the same queue registry. A lazy detach leaves the view usable through
+retained directory descriptions. When the final view goes away, Vinix removes
+its names and reclaims their quota after the VFS grace period. [Linux IPC namespace teardown](https://github.com/gregkh/linux/blob/v6.12.51/ipc/namespace.c#L140)
+
+The probe adds 12 checks. A task creates a queue and exits its private IPC
+namespace. Another task copies the directory bind into a new mount namespace,
+then opens the queue after the original attachment is gone and the copied
+attachment has been lazily detached. The probe tests the creator's quota
+before and after the retained descriptor closes. The previous x86-64 kernel
+lost the queue when the creator exited.
+
+Optimized Vinix kernels from `8d590dfd1` plus this change and Linux 6.12.51
+passed all 269 + 16 checks using the same ELF on both architectures. The
+`open` and `namespace` regressions passed on both Vinix kernels. The
+allocation checker's site counts and existing failures matched the baseline.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `6f5f94629442ed4a` | `d55c870ff5a0325b` | `e3f45c8417207d78` | `270599146dd02c9c` |
+| x86-64 | `388147104958bab1` | `85c8e14e428a2484` | `4ddc5f04cd7a2193` | `42737fbaa2f83703` |
+
+Hashes are SHA-256 prefixes. The archive is
+`~/.cache/vinix-r15/mq-namespace-lifetime/qualification.tar.zst`, with SHA-256
+`e447e04584c7c2814fd29261e9ff7d553f6b76444bb5287a23dd1b7001c8bbc6`.
+
 ## Limits
 
-- Vinix removes queue names when their IPC namespace ends. Linux can keep
-  those names accessible through a mount that remains attached.
 - Retired queue nodes keep their references through the VFS grace period.
   Nodes used by bind mounts can retain their queue charges after detach
   under the existing VFS mount lifetime model.
+- A locked child mount can remain reachable through a detached parent. The
+  current reaper tracks descriptors and paths to the queue attachment itself.
 - The mqueue device number is shared across IPC namespaces. Nested bind
   redirects use the VFS's shared-node behavior across mount aliases.
 - Ordinary priority inheritance follows Vinix's scheduler. The probe covers

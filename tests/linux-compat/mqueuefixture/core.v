@@ -101,6 +101,8 @@ fn C.recv(i32, voidptr, usize, i32) isize
 fn C.pipe(&i32) i32
 fn C.mount(&char, &char, &char, u64, voidptr) i32
 fn C.umount(&char) i32
+fn C.umount2(&char, i32) i32
+fn C.openat(i32, &char, i32, ...) i32
 fn C.mkdir(&char, u32) i32
 fn C.chmod(&char, u32) i32
 fn C.unlink(&char) i32
@@ -133,6 +135,7 @@ const sock_raw = 3
 const sock_stream = 1
 const rlimit_msgqueue = 12
 const clone_newipc = 0x08000000
+const clone_newns = 0x00020000
 
 struct State {
 mut:
@@ -1124,6 +1127,112 @@ fn mount_view_lifetime(mut s State, q i64, fd i32, view &char) {
 	}
 }
 
+fn make_surviving_namespace(mut s State) i32 {
+	unsafe {
+		if C.syscall(isize(C.SYS_unshare), clone_newipc) != 0 { return 1 }
+		if C.mount(c'none', c'/tmp/mq-survive', c'mqueue', 0, nil) != 0 { return 2 }
+		if C.setgid(1022) != 0 || C.setuid(1022) != 0 { return 3 }
+		q := mq_open(c'surviving-queue', o_creat | o_excl | o_rdwr, 0o644, set_attr(s.attr, 0, 1, 904, 0))
+		if q < 0 || mq_send(q, c'z', 1, 6, nil) != 0 || C.close(i32(q)) != 0 { return 4 }
+		return 0
+	}
+}
+
+fn use_copied_queue_mount(mut s State, ready i32, proceed i32) i32 {
+	unsafe {
+		if C.syscall(isize(C.SYS_unshare), clone_newns) != 0 { return 1 }
+		if C.write(ready, c'r', 1) != 1 || C.read(proceed, s.buf, 1) != 1 { return 2 }
+		dir := C.open(c'/tmp/mq-survive-bind', C.O_RDONLY | C.O_DIRECTORY)
+		if dir < 0 { return 3 }
+		if C.umount2(c'/tmp/mq-survive-bind', C.MNT_DETACH) != 0 { return 4 }
+		// A maintenance pass can now try to retire the lazy attachment.
+		sleep_ms(6500)
+		fd := C.openat(dir, c'surviving-queue', C.O_RDONLY)
+		if fd < 0 || C.fstat(fd, s.st) != 0 || s.st.st_nlink != 1 { return 5 }
+		if mq_receive(fd, s.buf, 904, nil, deadline(mut s, 1000)) != 1 || s.buf[0] != `z` { return 6 }
+		if C.close(fd) != 0 || C.close(dir) != 0 { return 7 }
+		return 0
+	}
+}
+
+fn check_namespace_quota(mut s State, expect_busy bool) i32 {
+	unsafe {
+		if C.setgid(1022) != 0 || C.setuid(1022) != 0 { return 1 }
+		mut limit := &u64(s.words + 10)
+		limit[0] = 1000
+		limit[1] = 819200
+		if C.syscall(isize(C.SYS_prlimit64), 0, rlimit_msgqueue, limit, nil) != 0 { return 2 }
+		attempts := if expect_busy { 1 } else { 80 }
+		for _ in 0 .. attempts {
+			q := mq_open(c'quota-after-mount', o_creat | o_excl | o_rdwr, 0o600, set_attr(s.attr, 0, 1, 904, 0))
+			if q >= 0 {
+				if mq_unlink(c'quota-after-mount') != 0 || C.close(i32(q)) != 0 { return 3 }
+				return if expect_busy { 4 } else { 0 }
+			}
+			if q != -C.EMFILE { return 5 }
+			if expect_busy { return 0 }
+			sleep_ms(250)
+		}
+		return 6
+	}
+}
+
+fn surviving_mount(mut s State) {
+	unsafe {
+		s.label = c'mqueuefs namespace lifetime'
+		check(mut s, c'mount directories', C.mkdir(c'/tmp/mq-survive', 0o755) == 0
+			&& C.mkdir(c'/tmp/mq-survive-bind', 0o755) == 0, 0)
+		mut child := C.fork()
+		if child == 0 { C._exit(make_surviving_namespace(mut s)) }
+		mut status := i32(-1)
+		check(mut s, c'queue creator and namespace exited', child > 0
+			&& C.waitpid(child, &status, 0) == child && status == 0, status)
+		check(mut s, c'foreign queue syscall sees no name', mq_open(c'surviving-queue', o_rdonly, 0, nil) == -C.ENOENT, 0)
+		fd := C.open(c'/tmp/mq-survive/surviving-queue', C.O_RDONLY)
+		check(mut s, c'surviving mount retains the queue and message', fd >= 0 && curmsgs(mut s, fd) == 1, fd)
+		C.close(fd)
+		created := C.open(c'/tmp/mq-survive/new-queue', C.O_CREAT | C.O_EXCL | C.O_RDWR, 0o600)
+		check(mut s, c'defunct namespace refuses creation', created == -1 && *C.__errno_location() == C.EACCES, created)
+		child = C.fork()
+		if child == 0 { C._exit(check_namespace_quota(mut s, true)) }
+		status = -1
+		check(mut s, c'surviving queue still charged to its creator', child > 0
+			&& C.waitpid(child, &status, 0) == child && status == 0, status)
+		check(mut s, c'bind the surviving directory', C.mount(c'/tmp/mq-survive', c'/tmp/mq-survive-bind', nil,
+			C.MS_BIND, nil) == 0, 0)
+		check(mut s, c'detach original mount', C.umount(c'/tmp/mq-survive') == 0, 0)
+		mut ready := [2]i32{}
+		mut proceed := [2]i32{}
+		pipes := C.pipe(&ready[0]) == 0 && C.pipe(&proceed[0]) == 0
+		child = if pipes { C.fork() } else { -1 }
+		if child == 0 {
+			C.close(ready[0])
+			C.close(proceed[1])
+			C._exit(use_copied_queue_mount(mut s, ready[1], proceed[0]))
+		}
+		copied := if child > 0 {
+			C.close(ready[1])
+			C.close(proceed[0])
+			C.read(ready[0], s.buf, 1) == 1
+		} else { false }
+		check(mut s, c'copy mount namespace', copied, 0)
+		check(mut s, c'detach bind from original namespace', C.umount(c'/tmp/mq-survive-bind') == 0, 0)
+		if child > 0 {
+			if copied { C.write(proceed[1], c'p', 1) }
+			C.close(proceed[1])
+			C.close(ready[0])
+		}
+		status = -1
+		check(mut s, c'copied mount and lazily detached directory fd keep names', child > 0
+			&& C.waitpid(child, &status, 0) == child && status == 0, status)
+		child = C.fork()
+		if child == 0 { C._exit(check_namespace_quota(mut s, false)) }
+		status = -1
+		check(mut s, c'last detached view releases queue charge', child > 0
+			&& C.waitpid(child, &status, 0) == child && status == 0, status)
+	}
+}
+
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
@@ -1153,6 +1262,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		unprivileged(mut s)
 		namespaces(mut s)
 		mount_view(mut s)
+		surviving_mount(mut s)
 		C.printf(c'LINUX MQUEUE SUMMARY: checks=%d failures=%d\n', s.checks, s.failures)
 		if s.failures == 0 {
 			C.puts(if reference { c'LINUX MQUEUE REFERENCE: PASS' } else { c'LINUX MQUEUE: PASS' })

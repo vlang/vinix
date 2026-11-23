@@ -92,6 +92,8 @@ pub mut:
 	directory_resource bool
 	// Mounted queue aliases keep the resource as long as the retired node.
 	retained_resource bool
+	// Active and still-reachable detached mount views of an mqueue directory.
+	mqueue_views u64
 	directory_released u64
 	overlay_refs  int
 	mount_covered bool

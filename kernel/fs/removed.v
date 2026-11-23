@@ -34,6 +34,7 @@ struct RetiredItem {
 	charge kbudget.Charge
 	resource &resource.Resource = unsafe { nil }
 	node  &VFSNode = unsafe { nil }
+	mqueue_mount &Mount = unsafe { nil }
 	// An overlay pointer removed from a still-live entry, released after grace.
 	overlay_backing &VFSNode = unsafe { nil }
 	bytes &u8      = unsafe { nil }
@@ -138,6 +139,7 @@ fn retire(item RetiredItem) {
 	removed_items.flags |= .noslices
 	removed_items << RetiredItem{
 		node:  item.node
+		mqueue_mount: item.mqueue_mount
 		overlay_backing: item.overlay_backing
 		bytes: item.bytes
 		charge: item.charge
@@ -202,6 +204,11 @@ pub fn reap_removed() {
 
 	mut index := 0
 	for item in items {
+		if item.mqueue_mount != unsafe { nil } {
+			mut entry := item.mqueue_mount
+			reap_mqueue_view(mut entry)
+			continue
+		}
 		if item.node == unsafe { nil } {
 			if item.overlay_backing != unsafe { nil } { overlay_release_node(item.overlay_backing) }
 			unsafe { free(item.bytes) }

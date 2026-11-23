@@ -25,7 +25,7 @@ __global (
 fn init() {
 	mq_filesystem = &vfs.FileSystem(&MQueueFS{})
 	vfs.register_mqueue_filesystem(mq_filesystem, mount_queue_directory, create_queue_file,
-		unlink_queue_file, lookup_queue_file, snapshot_queue_directory)
+		unlink_queue_file, lookup_queue_file, snapshot_queue_directory, last_queue_directory_view)
 }
 
 fn (mut _fs MQueueFS) instantiate() &vfs.FileSystem { return mq_filesystem }
@@ -66,7 +66,11 @@ fn mount_queue_directory() ?&vfs.VFSNode {
 	}
 	mq_lock.acquire()
 	defer { mq_lock.release() }
-	if id in mq_roots { return unsafe { mq_roots[id].node } }
+	if id in mq_roots {
+		mut existing := unsafe { mq_roots[id].node }
+		vfs.hold_mqueue_view(mut existing)
+		return existing
+	}
 	mut root := allocate_queue()?
 	mut node := vfs.create_node(mq_filesystem, unsafe { nil }, '', true)
 	node.resource = root.box
@@ -88,6 +92,9 @@ fn mount_queue_directory() ?&vfs.VFSNode {
 	root.stat.ctim = root.stat.atim
 	root.stat.mtim = root.stat.atim
 	node.create_dotentries(node)
+	// Transfer a temporary view pin to mount publication before dropping the
+	// IPC namespace reference. Another task may concurrently leave it.
+	vfs.hold_mqueue_view(mut node)
 	mq_roots[id] = root
 	mut queue := mq_queues
 	for queue != unsafe { nil } {
@@ -95,6 +102,17 @@ fn mount_queue_directory() ?&vfs.VFSNode {
 		queue = queue.all_next
 	}
 	return node
+}
+
+fn last_queue_directory_view(node &vfs.VFSNode) {
+	root := unsafe { &Queue(node.resource) }
+	mq_lock.acquire()
+	mut dead := &Queue(unsafe { nil })
+	if !root.linked && root.ipc_ns in mq_roots && !vfs.mqueue_has_views(node) {
+		dead = unname_namespace_locked(root.ipc_ns)
+	}
+	mq_lock.release()
+	free_unnamed_queues(dead)
 }
 
 fn dir_entry_changed(mut root Queue, delta i64, stamp time.TimeSpec) {
