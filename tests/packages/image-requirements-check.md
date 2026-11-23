@@ -445,6 +445,33 @@ The paired inputs, run logs, draft states and source revision are in
 Its SHA-256 is `b0a8743b71f3c6170218bdc12db4a5ae5114fd4449f68d7c76ab633d84c8165a`.
 All 671 entries in the extracted `qualification.sha256` passed.
 
+### Asset uploads use the created draft ID
+
+At `49e2634ae`, the release driver checks the upload URL in GitHub's
+draft-creation response against the expected GitHub.com repository and
+numeric draft ID. It streams the assets from the verified manifest to
+that endpoint in batches of up to five. The driver waits for all uploads
+in a failed batch before returning the draft ID and failed asset names
+in the error. [GitHub asset upload API](https://docs.github.com/en/rest/releases/assets#upload-a-release-asset)
+
+All 35 release fixtures passed with local GitHub stubs. The previous
+driver at `210fffe40` used a tag lookup and reached a replacement draft
+after the original disappeared. The updated driver stopped at the
+original upload endpoint. It also refused an upload URL containing a
+different ID before sending any assets.
+
+ASan/UBSan checks covered the exact manifest asset set, an interrupted
+batch and a foreign upload host. A loopback test with the real GitHub CLI
+confirmed the draft-specific request path, asset name, content length and
+exact binary request body. A public GitHub response confirmed the upload
+URL template.
+
+The paired inputs, simulated draft state, transport checks and source
+revisions are in
+`~/.local/state/vinix/r14-release-exact-upload-lJSNNM/qualification.tar.gz`.
+Its SHA-256 is `e26880c5849922bc488b8aeb77078e80dd9b74f459f60f00431109e2de40543d`.
+All 913 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
