@@ -527,6 +527,33 @@ revisions are in
 Its SHA-256 is `13cf06005a0453ff6b50cd0188df9aeb977fbcf3389365eb1c8ca2d15d0d956f`.
 All 1,395 entries in the extracted `qualification.sha256` passed.
 
+### GitHub.com release host selection
+
+At `f6385b307`, authentication, release lookup, tag verification, draft
+creation, upload and publication use an explicit GitHub.com host. The
+driver checks the URL of an inferred repository and requires `OWNER/NAME`
+for an explicit repository. An inferred Enterprise repository or malformed
+path stops the run before build or publication. Draft recovery uses the
+same host selection.
+[GitHub CLI host selection](https://cli.github.com/manual/gh_api)
+
+All 53 release fixture checks passed with `GH_HOST=enterprise.invalid`,
+local GitHub stubs, compiled host helpers, and signed inputs for both
+architectures. A GitHub.com repository discovered through `gh` published
+in the fixture, and a foreign URL, host-qualified argument and parent
+path component each stopped before any tag or draft was created.
+
+The installed GitHub CLI sent an unqualified read to the ambient host.
+With explicit host selection it sent the API read and release lookup to
+`api.github.com` and a HEAD request for the release asset endpoint to
+`uploads.github.com`. These controls used synthetic credentials.
+[GitHub CLI environment settings](https://cli.github.com/manual/gh_help_environment)
+
+The fixture inputs, run logs, remote state and request destinations are in
+`~/.local/state/vinix/r14-release-github-host-K2gT3T/qualification.tar.gz`.
+Its SHA-256 is `5f05dcf99b93e607ce17d52b9d2a8ae9364ebbbc147a9064b47fa68d46de158f`.
+All 1,102 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
