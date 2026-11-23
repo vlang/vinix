@@ -203,12 +203,13 @@ plan_package_selection() {
 
 PACKAGE_WORK=''
 PACKAGE_RECEIPTS=()
+ASSET_WORK="$(mktemp -d "$WORK/release-assets.XXXXXX")"
+trap 'rm -rf "$ASSET_WORK"' EXIT
 if [ -n "$PACKAGE_REVIEW" ] ||
    { [ "$BUILD_AMD64" -eq 1 ] && package_inputs_selected X86_64; } ||
    { [ "$BUILD_ARM64" -eq 1 ] && package_inputs_selected AARCH64; }; then
     step "Preflighting selected release package inputs"
-    PACKAGE_WORK="$(mktemp -d "$WORK/package-release.XXXXXX")"
-    trap 'rm -rf "$PACKAGE_WORK"' EXIT
+    PACKAGE_WORK="$ASSET_WORK"
     "$V" -backend c -prod -cc cc \
         -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/build-support|$SCRIPT_DIR/tools/accounts" \
         -o "$PACKAGE_WORK/receipt" "$SCRIPT_DIR/build-support/isoboot/package-receipt.v"
@@ -380,6 +381,18 @@ if [ -n "$PACKAGE_WORK" ]; then
     done
 fi
 
+# Capture the complete upload list before boot tests can change an output.
+step "Recording checksums for release assets"
+"$V" -backend c -prod -cc cc \
+    -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/tools/accounts" \
+    -o "$ASSET_WORK/release-assets" "$SCRIPT_DIR/build-support/isoboot/release-assets.v"
+: > "$ASSET_WORK/package-pins"
+for receipt in ${PACKAGE_RECEIPTS[@]+"${PACKAGE_RECEIPTS[@]}"}; do
+    "$PACKAGE_WORK/receipt" checksums "$PACKAGE_WORK/${receipt##*/}" >> "$ASSET_WORK/package-pins"
+done
+"$ASSET_WORK/release-assets" record "$OUT" "$ASSET_WORK/package-pins" \
+    "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}" > "$ASSET_WORK/SHA256SUMS"
+
 # ── Boot tests ─────────────────────────────────────────────────────────────
 
 TEST_SUMMARY=''
@@ -395,41 +408,13 @@ fi
 # ── Checksums and notes ────────────────────────────────────────────────────
 
 step "Writing checksums and release notes"
-sha256() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$@"
-    else
-        shasum -a 256 "$@"
-    fi
-}
-
-release_checksums() {
-    local image name arch receipt
-    for image in "${IMAGES[@]}"; do
-        name="${image##*/}"
-        arch="${name#vinix-}"
-        receipt="$PACKAGE_WORK/vinix-packages-${arch%.iso}.json"
-        if [ -n "$PACKAGE_WORK" ] && [ -f "$receipt" ]; then
-            "$PACKAGE_WORK/receipt" checksums "$receipt"
-        else
-            sha256 "$name"
-        fi
-    done
-}
-
 check_release_assets() {
-    (cd "$OUT" && sha256 -c "$PACKAGE_WORK/SHA256SUMS") ||
-        die "release ISO or package receipt changed after verification"
+    "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
 }
 
-if [ -n "$PACKAGE_WORK" ]; then
-    (cd "$OUT" && release_checksums) > "$PACKAGE_WORK/SHA256SUMS"
-    check_release_assets
-    cp "$PACKAGE_WORK/SHA256SUMS" "$PACKAGE_WORK/public-checksums"
-    mv -f "$PACKAGE_WORK/public-checksums" "$OUT/SHA256SUMS"
-else
-    (cd "$OUT" && release_checksums > SHA256SUMS)
-fi
+check_release_assets
+cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/public-checksums"
+mv -f "$ASSET_WORK/public-checksums" "$OUT/SHA256SUMS"
 cat "$OUT/SHA256SUMS"
 
 describe_boot() {
@@ -574,11 +559,9 @@ create_args=(release create "$TAG" --repo "$REPO" --target "$COMMIT"
     --title "Vinix $TAG" --notes-file "$OUT/RELEASE_NOTES.md")
 [ "$DRAFT" -eq 1 ] && create_args+=(--draft)
 [ "$PRERELEASE" -eq 1 ] && create_args+=(--prerelease)
-if [ -n "$PACKAGE_WORK" ]; then
-    check_release_assets
-    cmp -s "$PACKAGE_WORK/SHA256SUMS" "$OUT/SHA256SUMS" ||
-        die "SHA256SUMS changed after verification"
-fi
+check_release_assets
+cmp -s "$ASSET_WORK/SHA256SUMS" "$OUT/SHA256SUMS" ||
+    die "SHA256SUMS changed after verification"
 gh "${create_args[@]}" "${IMAGES[@]}" "$OUT/SHA256SUMS" ${BUNDLES[@]+"${BUNDLES[@]}"}
 
 step "Published"
