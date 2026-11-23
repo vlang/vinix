@@ -706,6 +706,32 @@ sanitizer controls are in
 Its SHA-256 is `ca98c64f43e2d1429b187cef2cb646e4e5a43a0e5dd92aa2774a12f2c800606f`.
 All 1,329 entries in the extracted `qualification.sha256` passed.
 
+### Local verification of a prepared release
+
+At `9e596e73a`, `--verify-prepared=TAG` compares the public checksum list
+and notes with the prepared record and verifies each original asset in
+place. Its JSON report lists the recorded repository, tag, commit and
+prerelease setting, both metadata digests and the sorted asset inventory
+with byte counts and SHA-256 values.
+
+All 85 release fixtures passed with signed inputs for both architectures,
+compiled host helpers and local GitHub stubs. The prepared verification
+reported the exact ten-asset set, including both package receipts. It
+refused a missing prepared record, a different repository and changes
+to the checksum list, notes or ISO. The fixture also checked for any
+GitHub CLI invocation during verification.
+
+A run through the normal compiler entry point produced a single JSON
+report and preserved the digests of every prepared file. ASan/UBSan
+produced the same report and checked refusal of a mismatched repository,
+a symbolic link in place of an asset and changed original bytes.
+
+The paired inputs, prepared verification reports, run logs and sanitizer
+checks are in
+`~/.local/state/vinix/r14-release-verify-prepared-Vi4Jdb/qualification.tar.gz`.
+Its SHA-256 is `544d83bbb66bfa075eb69a40aef400e9f7ae83643b905af30e23a56ef196b6b0`.
+All 1,357 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
