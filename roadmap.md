@@ -2843,6 +2843,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   writes, and task fallback on both architectures.
   See [the shared file receipts](docs/linux-weighted-interleave.md#shared-tmpfs-and-memfd-range-policies).
 
+- [x] Apply private ext2 mapping policies when writes copy a cache page.
+  Qualify file-relative placement, read-first and write-first faults, and
+  independent cache aliases on both architectures.
+  See [the private file receipts](docs/linux-weighted-interleave.md#private-file-copy-on-write-policies).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

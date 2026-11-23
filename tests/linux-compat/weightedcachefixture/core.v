@@ -25,6 +25,7 @@ fn C.mount(&char, &char, &char, u64, voidptr) i32
 fn C.munmap(voidptr, u64) i32
 fn C.open(&char, i32, ...) i32
 fn C.pause() i32
+fn C.pwrite(i32, voidptr, u64, i64) i64
 fn C.puts(&char) i32
 fn C.rmdir(&char) i32
 fn C.strcmp(&char, &char) i32
@@ -120,6 +121,60 @@ fn check_cache(base u64, alias u64, page u64, other bool, reference bool) {
 	if other { weight(1, c'0') }
 }
 
+fn policy_matches(address u64, mode i32, mask u64) bool {
+	mut actual_mode := i32(-1)
+	mut actual_mask := ~u64(0)
+	return C.syscall(i64(C.SYS_get_mempolicy), unsafe { &actual_mode }, unsafe { &actual_mask },
+		u64(64), address, u64(2)) == 0 && actual_mode == mode && actual_mask == mask
+}
+
+fn check_private_file_policy(fd i32, page u64, other bool) {
+	unsafe {
+		need(C.ftruncate(fd, i64(36 * page)) == 0, c'extend the private policy source')
+		need(set_policy(6, 1) == 0, c'keep cache allocation on node zero')
+		byte := u8(19)
+		for index in 20 .. 35 {
+			need(C.pwrite(fd, &byte, 1, i64(u64(index) * page)) == 1, c'write source bytes')
+		}
+		base := u64(C.mmap(nil, 17 * page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE, fd, i64(19 * page)))
+		cache := u64(C.mmap(nil, 17 * page, C.PROT_READ, C.MAP_PRIVATE, fd, i64(19 * page)))
+		need(base != ~u64(0) && cache != ~u64(0), c'map private file and cache alias')
+		for index in 1 .. 16 {
+			address := cache + u64(index) * page
+			need(*(&u8(address)) == byte && node_at(address, 3) == 0, c'cache data starts on node zero')
+		}
+
+		set_mask := if other { u64(3) } else { u64(1) }
+		weight(0, c'3')
+		if other { weight(1, c'2') }
+		need(C.syscall(i64(C.SYS_mbind), base + page, 15 * page, i64(6), &set_mask,
+			u64(64), u64(0)) == 0, c'bind explicit policy to private file offsets')
+		need(policy_matches(base, 0, 0) && policy_matches(base + 16 * page, 0, 0),
+			c'policy leaves surrounding private pages alone')
+		for step in 0 .. 15 {
+			index := u64(step * 7 % 15) + 1
+			address := base + index * page
+			need(policy_matches(address, 6, set_mask) && policy_matches(cache + index * page, 0, 0),
+				c'policy belongs to the selected private mapping')
+			if step % 2 == 0 {
+				need(*(&u8(address)) == byte && node_at(address, 3) == 0,
+					c'private reads share the existing cache page')
+			}
+			*(&u8(address)) = 42
+			want := if !other || (19 + index) % 5 < 3 { i32(0) } else { i32(1) }
+			need(node_at(address, 3) == want && *(&u8(address)) == 42,
+				c'copy-on-write placement follows the original file offset')
+			need(*(&u8(cache + index * page)) == byte && node_at(cache + index * page, 3) == 0,
+				c'private writes preserve original cache data and position')
+		}
+		need(C.munmap(voidptr(base), 17 * page) == 0 && C.munmap(voidptr(cache), 17 * page) == 0
+			&& set_policy(0, 0) == 0, c'release private file policy test')
+		weight(0, c'0')
+		if other { weight(1, c'0') }
+		C.puts(c'LINUX WEIGHTEDCACHE PRIVATE: PASS')
+	}
+}
+
 fn release_volume(path &char) {
 	for _ in 0 .. 100 {
 		if C.umount(path) == 0 {
@@ -165,8 +220,10 @@ pub fn run(argc i32, argv &&char) i32 {
 			&& C.madvise(base, 16 * page, C.MADV_RANDOM) == 0 && C.madvise(alias, 16 * page, C.MADV_RANDOM) == 0,
 			c'map two aliases without readahead')
 		check_cache(u64(base), u64(alias), page, other, reference)
-		need(C.munmap(base, 16 * page) == 0 && C.munmap(alias, 16 * page) == 0
-			&& C.close(fd) == 0 && C.unlink(file) == 0,
+		need(C.munmap(base, 16 * page) == 0 && C.munmap(alias, 16 * page) == 0,
+			c'release cache test views')
+		check_private_file_policy(fd, page, other)
+		need(C.close(fd) == 0 && C.unlink(file) == 0,
 			c'release the test mapping and file')
 		release_volume(path)
 		if other { C.puts(c'LINUX WEIGHTEDCACHE NUMA: PASS') }

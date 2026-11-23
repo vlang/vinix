@@ -204,7 +204,14 @@ fn (local &MmapRangeLocal) shared_anonymous() bool {
 	return local.flags & (map_shared | map_anonymous) == (map_shared | map_anonymous)
 }
 
+fn (local &MmapRangeLocal) has_private_file_cow() bool {
+	return local.flags & (map_shared | map_anonymous) == 0 && local.global.private_cow
+}
+
 fn range_policy_index(local &MmapRangeLocal, virt u64) u64 {
+	if local.has_private_file_cow() {
+		return u64(local.offset) / page_size + (virt - local.base) / page_size
+	}
 	shadow := shadow_address(local, virt)
 	if local.shared_anonymous() {
 		// Linux biases shared anonymous pages by the backing inode.

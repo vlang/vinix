@@ -114,7 +114,7 @@ fn bind_range_unlocked(mut pagemap memory.Pagemap, base u64, end u64, policy pro
 		next := min_u64(end, local.base + local.length)
 		if policy.mode != numa.mpol_default {
 			if (local.flags & (map_anonymous | map_brk_reservation) != map_anonymous
-				&& !uses_file_policy(local))
+				&& !local.has_private_file_cow() && !uses_file_policy(local))
 				|| !page_mapping_has_node(local) {
 				return errno.eopnotsupp
 			}

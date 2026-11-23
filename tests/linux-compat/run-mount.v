@@ -104,7 +104,10 @@ fn run_guest(state string, arch string, name string, source string, disk string,
   markers << ['LINUX TEXTBUSY DISK: cross-mount write exclusion passed',
    'LINUX TEXTBUSY DISK: persisted hardlink checks passed']
  }
- if name == 'weightedcache' && numa { markers << 'LINUX WEIGHTEDCACHE NUMA: PASS' }
+ if name == 'weightedcache' {
+  markers << 'LINUX WEIGHTEDCACHE PRIVATE: PASS'
+  if numa { markers << 'LINUX WEIGHTEDCACHE NUMA: PASS' }
+ }
  positive, negative := guesthost.verdict_policy(markers, [label + ' FAIL'], false)
  return guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 }

@@ -18,7 +18,7 @@ weight set. [Linux sysfs attribute implementation](https://github.com/gregkh/lin
 An oversized write consumes at most one native page. The I/O layer bounds
 the payload copy for scalar, positioned, and vectored writes. The no-address
 `MPOL_F_NODE` query returns the next allocation-order node. General kernel
-allocation and the block cache, private file-mapping policies, optional
+allocation and the block cache, private shmem mapping policies, optional
 mode flags, and translated or 32-bit policy calls remain open.
 
 ## Qualification
@@ -275,3 +275,35 @@ failures and the same 307 AArch64 and 255 x86-64 allocation sites.
 The archive was decoded and compared with the full evidence tree in place.
 It is at `~/.cache/vinix-r15/tmpfs-policy/qualification.tar.zst`, with
 SHA-256 `b146a08efcd40de3c4d407fbdc09a48d2dd2192653948ff749e7c887fe491017`.
+
+## Private file copy-on-write policies
+
+`mbind` on a private ext2 or VJFS mapping sets the policy on that view.
+Reads can use the existing file cache. When a write makes a private copy,
+the policy selects its node using the file page offset, including a
+nonzero mapping offset. Another mapping of the file keeps its own policy
+and sees the original data. [Linux indexed VMA policy lookup](https://github.com/gregkh/linux/blob/v6.12.51/mm/mempolicy.c)
+
+The probe primes the cache on node zero and applies weighted interleave to
+an interior range of a writable view. It covers both an initial write
+fault and a write after a read fault. It checks the node of each copy,
+the unaffected ranges and alias policies, and the cached data and node
+after each private write.
+
+Both production kernels were built from `b107daaed` plus the archived
+source patch. The same probe ELF per architecture passed on ext2 in Vinix
+and on ramfs in Linux 6.12.51 with two NUMA nodes. The cache cursor
+controls in the fixture and the separate `mmap` and `mbind` regressions
+passed on both architectures.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `61a109668f56edb0` | `2a109b3543574282` |
+| x86-64 | `80a969cd8454b591` | `1c780c55c55fe0e0` |
+
+The allocation checker reproduced the baseline failures and the same 307
+AArch64 and 255 x86-64 allocation sites.
+
+The archive was decoded and compared with the full evidence tree in place.
+It is at `~/.cache/vinix-r15/private-file-policy/qualification.tar.zst`, with
+SHA-256 `928cbb7b2e18f37326bb6b4631604020fc8d885f15d0cdc0c5a97260c31a6659`.
