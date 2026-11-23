@@ -314,6 +314,32 @@ revision are in
 Its SHA-256 is `7b5559ee4e51c0cd0ba00f737561ebdd688b5e802f02b66c6209046f2fc7ce54`.
 All 163 entries in the extracted `qualification.sha256` passed.
 
+### Boot tests and upload share the staged ISOs
+
+At `e805a0c99`, the driver verifies private, read-only copies before boot
+testing and gives the same ISO paths to the boot runner and uploader. The
+driver rechecks the staged bytes after the boot run. A build with
+`--no-publish` also tests private copies. With `--no-test`, staging happens
+at publication.
+
+All thirteen release-driver fixtures passed with local build, boot and GitHub
+stubs. The new regression overwrites the public amd64 ISO while the boot stub
+reads the two ISO inputs, then restores it before the stub returns. The
+previous driver at `d07366ed9` handed different bytes to boot and upload.
+The new driver handed both consumers the same staged paths and digests.
+Replacing a staged ISO before the boot stub returns stops publication.
+The explicit `--no-test` path also passed.
+
+The helper passed ASan/UBSan staging, source modification and digest refusal
+checks. QEMU attached the staged files as read-only optical media on x86-64
+and AArch64 with guest execution paused.
+
+Paired fixtures, baseline and fixed observations, and source and toolchain
+identities are in
+`~/.local/state/vinix/r14-release-tested-isos-LZf6r1/qualification.tar.gz`.
+Its SHA-256 is `0fcdefaf6bd8967fcb1903811d4acebe9432ed823ad0951b359e11b400b9f6cf`.
+All 244 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
