@@ -4,7 +4,7 @@
 #
 # Usage: ./scripts/deploy-iso.sh [options]
 #
-#   --tag=TAG          release tag (default: iso-YYYY-MM-DD, then -2, -3, ...)
+#   --tag=TAG          release tag (default: first unused iso-YYYY-MM-DD, then -2, -3, ...)
 #   --ref=REF          commit to release (default: HEAD); it must be pushed
 #   --arch=LIST        amd64, arm64, or amd64,arm64 (default)
 #   --draft            create the release as a draft
@@ -158,22 +158,34 @@ if [ "$PUBLISH" -eq 1 ]; then
     if ! gh api "repos/$REPO/commits/$COMMIT" --silent >/dev/null 2>&1; then
         die "$SHORT is not on github.com/$REPO yet; push it first"
     fi
+    "$V" -backend c -prod -cc cc -o "$ASSET_WORK/release-tag" \
+        "$SCRIPT_DIR/build-support/isoboot/release-tag.v"
 fi
 
 release_exists() {
-    [ "$PUBLISH" -eq 1 ] && gh release view "$1" --repo "$REPO" >/dev/null 2>&1
+    gh release view --repo "$REPO" -- "$1" >/dev/null 2>&1
 }
 
 if [ -z "$TAG" ]; then
     base_tag="iso-$(date +%Y-%m-%d)"
     TAG="$base_tag"
     n=2
-    while release_exists "$TAG"; do
+    while [ "$PUBLISH" -eq 1 ]; do
+        if ! release_exists "$TAG"; then
+            tag_commit="$("$ASSET_WORK/release-tag" resolve "$REPO" "$TAG")"
+            [ -n "$tag_commit" ] || break
+        fi
         TAG="$base_tag-$n"
         n=$((n + 1))
     done
-elif release_exists "$TAG"; then
-    die "release $TAG already exists on $REPO"
+elif [ "$PUBLISH" -eq 1 ]; then
+    git check-ref-format "refs/tags/$TAG" || die "invalid Git tag: $TAG"
+    if release_exists "$TAG"; then
+        die "release $TAG already exists on $REPO"
+    fi
+    tag_commit="$("$ASSET_WORK/release-tag" resolve "$REPO" "$TAG")"
+    [ -z "$tag_commit" ] || [ "$tag_commit" = "$COMMIT" ] ||
+        die "GitHub tag $TAG points to $tag_commit, expected $COMMIT"
 fi
 
 OUT="$SCRIPT_DIR/build-release/$TAG"
@@ -594,11 +606,12 @@ for bundle in ${BUNDLES[@]+"${BUNDLES[@]}"}; do
     staged_bundles+=("$ASSET_STAGE/${bundle##*/}")
 done
 
-create_args=(release create "$TAG" --repo "$REPO" --target "$COMMIT"
+"$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
+create_args=(release create --repo "$REPO" --verify-tag --target "$COMMIT"
     --title "Vinix $TAG" --notes-file "$ASSET_STAGE/RELEASE_NOTES.md")
 [ "$DRAFT" -eq 1 ] && create_args+=(--draft)
 [ "$PRERELEASE" -eq 1 ] && create_args+=(--prerelease)
-gh "${create_args[@]}" "${staged_images[@]}" "$ASSET_STAGE/SHA256SUMS" ${staged_bundles[@]+"${staged_bundles[@]}"}
+gh "${create_args[@]}" -- "$TAG" "${staged_images[@]}" "$ASSET_STAGE/SHA256SUMS" ${staged_bundles[@]+"${staged_bundles[@]}"}
 
 step "Published"
-gh release view "$TAG" --repo "$REPO" --json url --jq .url
+gh release view --repo "$REPO" --json url --jq .url -- "$TAG"

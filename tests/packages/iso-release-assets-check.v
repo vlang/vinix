@@ -2,6 +2,7 @@
 module main
 
 import crypto.sha256
+import net.urllib
 import os
 
 const x11 = 'vinix-x11-amd64.tar.gz'
@@ -9,6 +10,11 @@ const arm_x11 = 'vinix-x11-arm64.tar.gz'
 const ios = 'vinix-ios-runtime-arm64'
 const upload_changes = ['vinix-amd64.iso', x11, 'SHA256SUMS', 'RELEASE_NOTES.md']
 const changed_during_upload = 'changed during upload\n'
+const other_commit = '1234567890123456789012345678901234567890'
+
+fn tag_file(remote string, tag string) string {
+	return remote + '/' + sha256.hexhash(tag)
+}
 
 fn command(program string, args []string, root string, environment map[string]string) (int, string) {
 	mut child := os.new_process(program)
@@ -144,6 +150,48 @@ fn extract_iso(out string, scenario string) !int {
 	return code
 }
 
+fn github_api(scenario string) !int {
+	remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
+	commit := os.getenv('VINIX_ASSET_TEST_COMMIT')
+	path := os.args[2]
+	prefix := 'repos/local/fixture/'
+	if path == prefix + 'commits/' + commit && '--silent' in os.args { return 0 }
+	if path.starts_with(prefix + 'git/matching-refs/tags/') && os.args[3..] == ['--jq', '.[].ref'] {
+		if scenario == 'tag-read-failed' {
+			eprintln('fixture GitHub tag lookup failed')
+			return 1
+		}
+		tag := urllib.query_unescape(path.all_after('/git/matching-refs/tags/'))!
+		if os.exists(tag_file(remote, tag)) { println('refs/tags/' + tag) }
+		// A prefix match is present even when the exact tag is absent.
+		println('refs/tags/' + tag + '-another')
+		return 0
+	}
+	if path.starts_with(prefix + 'commits/refs/tags/') && os.args[3..] == ['--jq', '.sha'] {
+		tag := urllib.query_unescape(path.all_after('/commits/refs/tags/'))!
+		println(os.read_file(tag_file(remote, tag))!)
+		return 0
+	}
+	tag := os.getenv('VINIX_ASSET_TEST_TAG')
+	if path != prefix + 'git/refs' || os.args[3..] != ['--method', 'POST', '-f',
+		'ref=refs/tags/' + tag, '-f', 'sha=' + commit, '--silent'] {
+		return error('unexpected fixture GitHub API invocation: ' + os.args[1..].join(' '))
+	}
+	file := tag_file(remote, tag)
+	if os.exists(file) { return error('fixture attempted to create an existing tag') }
+	os.write_file(remote + '/create-tag', os.args[2..].join('\n') + '\n')!
+	if scenario == 'tag-create-failed' {
+		eprintln('fixture tag creation failed')
+		return 1
+	}
+	os.write_file(file, if scenario == 'tag-raced' { other_commit } else { commit })!
+	if scenario in ['tag-raced', 'tag-raced-match']! {
+		eprintln('fixture concurrent tag creation')
+		return 1
+	}
+	return 0
+}
+
 fn run_stub(name string) !int {
 	out := os.getenv('VINIX_ASSET_TEST_OUT')
 	scenario := os.getenv('VINIX_ASSET_TEST_CASE')
@@ -165,6 +213,10 @@ fn run_stub(name string) !int {
 		'test-iso.sh' {
 			capture_boot(out, scenario)!
 			match scenario {
+				'tag-moved' {
+					os.write_file(tag_file(os.getenv('VINIX_ASSET_TEST_REMOTE'),
+						os.getenv('VINIX_ASSET_TEST_TAG')), other_commit)!
+				}
 				'x11-after-boot' { os.write_file(out + '/' + x11, 'changed X11 fixture\n')! }
 				'ios-pair-after-boot' {
 					path := out + '/' + ios
@@ -185,12 +237,23 @@ fn run_stub(name string) !int {
 			println('fixture size')
 		}
 		'gh' {
-			if os.args[1] in ['auth', 'api']! { return 0 }
+			if os.args[1] == 'auth' { return 0 }
+			if os.args[1] == 'api' { return github_api(scenario) }
 			upload := out + '/fixture-upload'
 			if os.args[1..3] == ['release', 'view'] {
+				reserved := os.getenv('VINIX_ASSET_TEST_RESERVED_RELEASE')
+				if reserved != '' && os.args.last() == reserved { return 0 }
 				if !os.exists(upload) { return 1 }
 				println('https://example.invalid/fixture')
 			} else if os.args[1..3] == ['release', 'create'] {
+				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
+				tag := os.getenv('VINIX_ASSET_TEST_TAG')
+				os.write_file(remote + '/release-attempt', os.args[1..].join('\n') + '\n')!
+				separator := os.args.index('--')
+				if '--verify-tag' !in os.args || separator < 0 || os.args[separator + 1] != tag
+					|| os.read_file(tag_file(remote, tag))! != os.getenv('VINIX_ASSET_TEST_COMMIT') {
+					return error('release attempted before checking the exact remote tag commit')
+				}
 				capture_upload(out, scenario)!
 			} else { return error('unexpected fixture gh invocation') }
 		}
@@ -206,7 +269,8 @@ fn prepare_driver(repository string, root string) ! {
 		os.mkdir_all(root + '/' + directory)!
 	}
 	for path in ['scripts/deploy-iso.sh', 'build-support/find-v.sh', 'build-support/isoboot/release-assets.v',
-		'build-support/isoboot/package-receipt.v', 'build-support/isoboot/release-lock.v']! {
+		'build-support/isoboot/package-receipt.v', 'build-support/isoboot/release-lock.v',
+		'build-support/isoboot/release-tag.v']! {
 		os.cp(repository + '/' + path, root + '/' + path)!
 	}
 	os.write_file(root + '/ui2/v.mod', 'module fixture')!
@@ -299,7 +363,17 @@ fn run() ! {
 	base['VINIX_UI2_SOURCE'] = root + '/ui2'
 	base['VINIX_ASSET_TEST_AMD64_ISO'] = am + '/image.iso'
 	base['VINIX_ASSET_TEST_ARM64_ISO'] = arm + '/image.iso'
-	for scenario in ['workspace-lock', 'public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
+	commit_code, commit_output := command(os.find_abs_path_of_executable('git')!, ['rev-parse', 'HEAD'],
+		root, base)
+	if commit_code != 0 { return error('cannot resolve fixture commit: ' + commit_output) }
+	commit := commit_output.trim_space()
+	base['VINIX_ASSET_TEST_COMMIT'] = commit
+	date_code, date_output := command('/bin/date', ['+%Y-%m-%d'], root, base)
+	if date_code != 0 { return error('cannot resolve fixture date: ' + date_output) }
+	default_tag := 'iso-' + date_output.trim_space()
+	for scenario in ['tag-mismatch', 'tag-existing', 'tag-auto', 'tag-moved', 'tag-raced',
+		'tag-raced-match', 'tag-create-failed', 'tag-read-failed', 'workspace-lock',
+		'public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
 		'bad-build-sidecar', 'boot-copy-changed', 'x11-after-boot', 'ios-pair-after-boot',
 		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff', 'build-only',
 		'publish-no-test', 'packages-no-test']! {
@@ -313,11 +387,30 @@ fn run() ! {
 				environment['VINIX_PACKAGE_IMAGE_APPLICATIONS_' + arch] = dir + '/root/usr/share/vinix-packages/applications.json'
 			}
 		}
-		out := root + '/build-release/fixture-' + scenario
+		tag := match scenario {
+			'tag-existing' { 'release/fixture-tag+existing' }
+			'tag-auto' { default_tag + '-3' }
+			else { 'fixture-' + scenario }
+		}
+		remote := work + '/remote-' + scenario
+		os.mkdir(remote)!
+		match scenario {
+			'tag-auto' {
+				os.write_file(tag_file(remote, default_tag), other_commit)!
+				environment['VINIX_ASSET_TEST_RESERVED_RELEASE'] = default_tag + '-2'
+			}
+			'tag-mismatch' { os.write_file(tag_file(remote, tag), other_commit)! }
+			'tag-existing', 'tag-moved' { os.write_file(tag_file(remote, tag), commit)! }
+			else {}
+		}
+		out := root + '/build-release/' + tag
+		environment['VINIX_ASSET_TEST_TAG'] = tag
+		environment['VINIX_ASSET_TEST_REMOTE'] = remote
 		environment['VINIX_ASSET_TEST_OUT'] = out
 		environment['VINIX_ASSET_TEST_CASE'] = scenario
-		mut args := [root + '/scripts/deploy-iso.sh', '--tag=fixture-' + scenario, '--yes',
+		mut args := [root + '/scripts/deploy-iso.sh', '--yes',
 			'--repo=local/fixture']
+		if scenario != 'tag-auto' { args << '--tag=' + tag }
 		if scenario == 'build-only' { args << ['--arch=amd64', '--no-publish'] }
 		if scenario in ['publish-no-test', 'packages-no-test']! { args << ['--no-test'] }
 		code, log := command('/bin/bash', args, root, environment)
@@ -325,8 +418,15 @@ fn run() ! {
 		if os.ls(root + '/build-release/work')!.any(it.starts_with('release-assets.')) {
 			return error('release left a private staging directory: ' + scenario)
 		}
+		expect_create := scenario in ['tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
+			'workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
+			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test']!
+		if os.exists(remote + '/create-tag') != expect_create {
+			return error('unexpected GitHub tag creation for ' + scenario + '\n' + log)
+		}
 		if scenario in ['workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
-			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test']! {
+			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test', 'tag-existing', 'tag-auto',
+			'tag-raced-match']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
 			verify_handoff(out, with_packages, scenario)!
 			if scenario == 'workspace-lock' {
@@ -348,12 +448,17 @@ fn run() ! {
 			diagnostic := match scenario {
 				'bad-build-sidecar' { 'release bundle checksum differs from its payload' }
 				'manifest-at-handoff' { 'SHA256SUMS changed after verification' }
+				'tag-mismatch', 'tag-moved', 'tag-raced' { 'points to ${other_commit}, expected ${commit}' }
+				'tag-read-failed' { 'cannot read GitHub tag: fixture GitHub tag lookup failed' }
+				'tag-create-failed' { 'could not verify the created GitHub tag' }
 				else { 'release asset changed after verification' }
 			}
-			if code == 0 || !log.contains(diagnostic) || os.exists(out + '/fixture-upload') {
+			if code == 0 || !log.contains(diagnostic) || os.exists(remote + '/release-attempt') {
 				return error('release refusal fixture failed: ' + scenario + '\n' + log)
 			}
-			if os.exists(out + '/fixture-boot') != (scenario != 'bad-build-sidecar') {
+			early := scenario in ['tag-mismatch', 'tag-read-failed']!
+			if early && os.exists(out) { return error('GitHub tag preflight wrote release output') }
+			if os.exists(out + '/fixture-boot') != (!early && scenario != 'bad-build-sidecar') {
 				return error('unexpected boot test handoff: ' + scenario)
 			}
 		}
