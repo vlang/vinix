@@ -1491,12 +1491,10 @@ fn open_anonymous_descriptor(descriptor AnonymousDescriptor, flags int) (u64, u6
 }
 
 // stat(2) of the same: what the descriptor is open on.
-fn stat_anonymous_descriptor(descriptor AnonymousDescriptor, statbuf &stat.Stat) (u64, u64) {
+fn stat_anonymous_descriptor(descriptor AnonymousDescriptor, statbuf &stat.Stat, mount_info &StatMount) (u64, u64) {
 	mut fd := anonymous_descriptor_fd(descriptor) or { return errno.err, errno.get() }
 	defer { fd.unref() }
-	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
-	mut res := fd.handle.resource
-	return stat_resource(mut res, statbuf)
+	return stat_description(mut fd.handle, statbuf, mount_info)
 }
 
 pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
@@ -1827,6 +1825,10 @@ fn faccess_node(node &VFSNode, mode u32, effective bool, identity &lib.MountCont
 }
 
 pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, flags int) (u64, u64) {
+	return stat_at(dirfd, _path, statbuf, flags, unsafe { nil })
+}
+
+pub fn stat_at(dirfd int, _path charptr, statbuf &stat.Stat, flags int, mount_info &StatMount) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -1836,56 +1838,47 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
 	}
 
-	current_process := proc.current_thread().process
-
 	path := user_path(_path) or { return errno.err, errno.get() }
 	defer {
 		unsafe { path.free() }
 	}
 
-	mut statsrc := &resource.Resource(unsafe { nil })
-
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if path.len == 0 {
 		if flags & at_empty_path == 0 {
 			return errno.err, errno.enoent
 		}
 
 		if is_fdcwd(dirfd) {
-			node := unsafe { &VFSNode(proc.current_directory_of(current_process)) }
+			node := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
 			mac_node(node, proc.mac_inspect) or { return errno.err, errno.get() }
-			statsrc = node.resource
-		} else {
-			// The lookup holds the descriptor, which has to be given back.
-			mut fd := file.fd_from_fdnum(current_process, dirfd) or {
-				return errno.err, errno.get()
-			}
-			defer { fd.unref() }
-			fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
-			mut res := fd.handle.resource
-			return stat_resource(mut res, statbuf)
+			capture_stat_mount(mount_info, identity, voidptr(node))
+			mut res := node.resource
+			return stat_path_resource(mut res, statbuf)
 		}
-	} else {
-		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
-
-		follow_links := flags & at_symlink_nofollow == 0
-
-		node := get_node(parent, path, follow_links) or { return errno.err, errno.get() }
-		if !policy_check(node, proc.policy_inspect) {
-			return errno.err, errno.get()
-		}
-		if follow_links {
-			if descriptor := procfs_anonymous_descriptor(node) {
-				return stat_anonymous_descriptor(descriptor, statbuf)
-			}
-		}
-
-		statsrc = node.resource
+		return stat_fd(dirfd, statbuf, mount_info)
 	}
-
-	return stat_path_resource(mut statsrc, statbuf)
+	parent := parent_and_mount_for(dirfd, path, identity) or { return errno.err, errno.get() }
+	follow_links := flags & at_symlink_nofollow == 0
+	node := get_node_with_credentials_on_mount(parent, path, follow_links, true, identity) or {
+		return errno.err, errno.get()
+	}
+	if !policy_check(node, proc.policy_inspect) { return errno.err, errno.get() }
+	if follow_links {
+		if descriptor := procfs_anonymous_descriptor(node) {
+			return stat_anonymous_descriptor(descriptor, statbuf, mount_info)
+		}
+	}
+	capture_stat_mount(mount_info, identity, voidptr(node))
+	mut res := node.resource
+	return stat_path_resource(mut res, statbuf)
 }
 
 pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
+	return stat_fd(fdnum, statbuf, unsafe { nil })
+}
+
+pub fn stat_fd(fdnum int, statbuf &stat.Stat, mount_info &StatMount) (u64, u64) {
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -1898,10 +1891,7 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	defer {
 		fd.unref()
 	}
-	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
-
-	mut res := fd.handle.resource
-	return stat_resource(mut res, statbuf)
+	return stat_description(mut fd.handle, statbuf, mount_info)
 }
 
 pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr, flags int) (u64, u64) {

@@ -60,7 +60,9 @@ const umount_nofollow = 8
 @[heap]
 pub struct Mount {
 pub mut:
+	// Namespace copies keep the route key and receive a new userspace ID.
 	id      int
+	public_id int
 	covered &VFSNode = unsafe { nil }
 	root    &VFSNode = unsafe { nil }
 	parent  lib.MountContext
@@ -116,7 +118,7 @@ fn allocate_mount_id() int {
 	return katomic.inc(mut &mount_id_counter) + 1
 }
 
-const mount_unique_id_offset = u64(1) << 31
+pub const mount_unique_id_offset = u64(1) << 31
 
 // The DMA-BUF filesystem has one internal mount, so a stat snapshot's
 // filesystem device ID also identifies that mount.
@@ -263,8 +265,10 @@ fn publish_mount_attachment(mut table MountTable, mut covered VFSNode, root &VFS
 
 fn new_mount_record(covered &VFSNode, root &VFSNode, source string,
 	fstype string, flags u64, options string, parent_mount &lib.MountContext) &Mount {
+	id := allocate_mount_id()
 	mut entry := &Mount{
-		id:      allocate_mount_id()
+		id:      id
+		public_id: id
 		covered: unsafe { covered }
 		root:    unsafe { root }
 		source:  source.clone()
@@ -340,6 +344,7 @@ pub fn copy_mount_table_for(parent &MountTable, unprivileged bool) &MountTable {
 		}
 		table.mounts << &Mount{
 			id:      entry.id
+			public_id: allocate_mount_id()
 			covered: entry.covered
 			root:    entry.root
 			parent:  entry.parent
@@ -1654,7 +1659,7 @@ pub fn mountinfo_text(pid int) string {
 		entry := item.entry
 		// The parent is the mount this one sits in: the closest one whose
 		// mount point is a prefix of this one's.
-		mut parent_id := entry.id
+		mut parent_id := entry.public_id
 		mut best := -1
 		for other in visible {
 			if other.entry.id == entry.id {
@@ -1662,7 +1667,7 @@ pub fn mountinfo_text(pid int) string {
 			}
 			if mount_path_under(item.path, other.path) && other.path.len > best {
 				best = other.path.len
-				parent_id = other.entry.id
+				parent_id = other.entry.public_id
 			}
 		}
 		dev := if entry.mqueue_device != 0 {
@@ -1672,7 +1677,7 @@ pub fn mountinfo_text(pid int) string {
 		} else {
 			u64(0)
 		}
-		text.add_decimal(entry.id)
+		text.add_decimal(entry.public_id)
 		text.add_byte(` `)
 		text.add_decimal(parent_id)
 		text.add(' 0:')

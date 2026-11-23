@@ -218,6 +218,7 @@ fn coverage(root string) !Coverage {
 		'kernel/syscall/table/process_madvise.v', 'kernel/proc/inspect.v',
 		'kernel/file/file.v', 'kernel/resource/resource.v', 'kernel/resource/cache.v',
 		'kernel/socket/unix/unix.v', 'kernel/pipe/pipe.v', 'kernel/pipe/usercopy.v', 'kernel/fs/vfs.v', 'kernel/fs/mount_policy.v',
+		'kernel/fs/stat.v',
 		'kernel/fs/mount.v', 'kernel/fs/tmpfs.v', 'kernel/fs/procfs.v', 'kernel/fs/memfd_policy.v',
 		'kernel/fs/cachestat.v',
 		'kernel/fs/namespaces.v', 'kernel/fs/removed.v',

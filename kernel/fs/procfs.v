@@ -2234,7 +2234,7 @@ fn fdinfo_text(pid int, fdnum int) string {
 	mut mount_id := 0
 	top := lib.mount_context_top(&handle.mount)
 	if top != unsafe { nil } {
-		mount_id = unsafe { &Mount(top) }.id
+		mount_id = unsafe { &Mount(top) }.public_id
 	} else if prime {
 		mount_id = dma_buf_mount_id
 	}

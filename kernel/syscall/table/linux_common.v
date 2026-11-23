@@ -991,6 +991,7 @@ fn syscall_linux_dup3(gpr_state voidptr, oldfd int, newfd int, flags int) (u64, 
 const statx_basic_stats = u32(0x7ff)
 const statx_mnt_id = u32(0x1000)
 const statx_mnt_id_unique = u32(0x4000)
+const statx_attr_mount_root = u64(0x2000)
 const statx_reserved = u32(0x80000000)
 const statx_no_automount = u32(0x800)
 const statx_sync_type = u32(0x6000)
@@ -1003,11 +1004,17 @@ fn write_statx_timestamp(dst u64, sec i64, nsec i64) {
 	}
 }
 
-fn convert_stat_to_statx(src &stat.Stat, mask u32, user_dst u64) bool {
+fn convert_stat_to_statx(src &stat.Stat, attachment fs.StatMount, mask u32, user_dst u64) bool {
 	mut buf := [256]u8{}
 	dst := unsafe { u64(&buf[0]) }
 	unique := mask & statx_mnt_id_unique != 0
-	mount_id := fs.dma_buf_mount_id_for_device(src.dev, unique)
+	mount_id := if attachment.id == 0 {
+		fs.dma_buf_mount_id_for_device(src.dev, unique)
+	} else if unique {
+		fs.mount_unique_id_offset + attachment.id
+	} else {
+		attachment.id
+	}
 	mount_mask := if unique { statx_mnt_id_unique } else { statx_mnt_id }
 	result_mask := statx_basic_stats | if mount_id != 0 { mount_mask } else { u32(0) }
 	unsafe {
@@ -1015,7 +1022,7 @@ fn convert_stat_to_statx(src &stat.Stat, mask u32, user_dst u64) bool {
 
 		*&u32(dst + 0) = result_mask
 		*&u32(dst + 4) = u32(src.blksize)
-		*&u64(dst + 8) = 0 // stx_attributes
+		*&u64(dst + 8) = if attachment.root { statx_attr_mount_root } else { u64(0) }
 		*&u32(dst + 16) = u32(src.nlink)
 		*&u32(dst + 20) = src.uid
 		*&u32(dst + 24) = src.gid
@@ -1023,7 +1030,7 @@ fn convert_stat_to_statx(src &stat.Stat, mask u32, user_dst u64) bool {
 		*&u64(dst + 32) = src.ino
 		*&u64(dst + 40) = u64(src.size)
 		*&u64(dst + 48) = u64(src.blocks)
-		*&u64(dst + 56) = 0 // stx_attributes_mask
+		*&u64(dst + 56) = if mount_id != 0 { statx_attr_mount_root } else { u64(0) }
 
 		write_statx_timestamp(dst + 64, src.atim.tv_sec, src.atim.tv_nsec)
 		write_statx_timestamp(dst + 80, 0, 0) // stx_btime: not tracked
@@ -1042,7 +1049,7 @@ fn convert_stat_to_statx(src &stat.Stat, mask u32, user_dst u64) bool {
 // statx(dirfd, path, flags, mask, buf). The mask is a request, and a kernel is
 // free to answer with more than was asked for as long as stx_mask says what it
 // actually filled.
-fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, mask u32, buf u64) (u64, u64) {
+fn syscall_linux_statx(_ voidptr, dirfd int, path charptr, flags int, mask u32, buf u64) (u64, u64) {
 	query_flags := u32(flags)
 	allowed := u32(fs.at_symlink_nofollow | fs.at_empty_path) | statx_no_automount | statx_sync_type
 	if mask & statx_reserved != 0 || query_flags & statx_sync_type == statx_sync_type
@@ -1052,6 +1059,7 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, ma
 
 	mut vinix_stat := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
 	unsafe { *vinix_stat = stat.Stat{} }
+	attachment := fs.StatMount{}
 	// NULL is the descriptor-only spelling for nonnegative descriptor words.
 	// It must use the held descriptor path, not a kernel string passed to the
 	// user-path reader. Negative words retain the pathname EFAULT behavior.
@@ -1059,15 +1067,15 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, ma
 	mut err := u64(0)
 	if path == unsafe { nil } && i32(u32(dirfd)) >= 0
 		&& query_flags & ~(statx_no_automount | statx_sync_type) == u32(fs.at_empty_path) {
-		ret, err = fs.syscall_fstat(gpr_state, int(u32(dirfd)), vinix_stat)
+		ret, err = fs.stat_fd(int(u32(dirfd)), vinix_stat, unsafe { &attachment })
 	} else {
-		ret, err = fs.syscall_fstatat(gpr_state, int(u32(dirfd)), path, vinix_stat, int(query_flags))
+		ret, err = fs.stat_at(int(u32(dirfd)), path, vinix_stat, int(query_flags), unsafe { &attachment })
 	}
 	if err != 0 {
 		return ret, err
 	}
 
-	if !convert_stat_to_statx(vinix_stat, mask, buf) {
+	if !convert_stat_to_statx(vinix_stat, attachment, mask, buf) {
 		return errno.err, errno.efault
 	}
 	return 0, 0

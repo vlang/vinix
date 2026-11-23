@@ -2783,6 +2783,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).
 
+- [x] Report native `statx` mount IDs and mount-root attributes. Qualify bind
+  aliases, inherited descriptors, mount namespace copies, and lazy detach on
+  both architectures. See [the mount identity receipts](docs/linux-statx-mount-id.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both
