@@ -184,7 +184,7 @@ fn test_root_service_exercises_complete_ordinary_launch_callers() {
 	listener := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
 	assert listener >= 0
 	defer { C.close(listener) }
-	assert C.bind(listener, unsafe { &address }, u32(sizeof(C.sockaddr_un))) == 0
+	assert C.bind(listener, voidptr(&address), u32(sizeof(C.sockaddr_un))) == 0
 	assert C.listen(listener, 8) == 0
 	os.chmod(path, 0o666)!
 	arguments := ['run-args', 'example.app', '--file', '/home/a space.txt', '--', '', '--literal=a space; $(data)', '💡']
