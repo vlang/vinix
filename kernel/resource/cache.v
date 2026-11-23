@@ -153,21 +153,28 @@ mut:
 }
 
 // New ranges may require authorization that an existing VMA no longer needs.
+pub struct MappingAdmission {
+pub mut:
+	flags int
+	writable bool
+}
+
 pub interface MappingAdmissionResource {
 mut:
-	admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool
+	admit_mapping_range(handle voidptr, offset u64, length u64, mut request MappingAdmission) bool
 	mapping_can_grow() bool
 }
 
-pub fn admit_mapping_range(mut res Resource, handle voidptr, offset u64, length u64, flags int) bool {
+pub fn admit_mapping_range(mut res Resource, handle voidptr, offset u64, length u64,
+	mut request MappingAdmission) bool {
 	if mut res is MappingAdmissionResource {
 		errno.set(errno.einval)
 		mut admission := MappingAdmissionResource(res)
 		mut stack_admission := unsafe { &admission }
-		admitted := stack_admission.admit_mapping_range(handle, offset, length, flags)
+		admitted := stack_admission.admit_mapping_range(handle, offset, length, mut request)
 		return admitted
 	}
-	return retain_mapping_range(mut res, handle, offset, length, flags)
+	return retain_mapping_range(mut res, handle, offset, length, request.flags)
 }
 
 pub fn mapping_can_grow(mut res Resource) bool {

@@ -55,6 +55,7 @@ pub mut:
 	// chattr's immutable and append-only bits; see fs/attributes.v.
 	attr_bits u32
 	shared_mapping_ranges u64
+	writable_mapping_ranges u64
 }
 
 // Cover the resource and its interface box with room for slab rounding.
@@ -75,18 +76,43 @@ fn (mut this TmpFSResource) set_attribute_bits(bits u32) ? {
 	katomic.store(mut &this.attr_bits, bits & resource.attributes_kept)
 }
 
-// Admission counts entire shared ranges, including pages not yet faulted.
-// Conservatively exclude read-only shared aliases as well: they can otherwise
-// gain write permission later. Private ELF/COW mappings do not change the file.
+fn (mut this TmpFSResource) admit_mapping_range(_handle voidptr, _offset u64, _length u64,
+	mut request resource.MappingAdmission) bool {
+	if request.flags & mmap.map_shared == 0 { return true }
+	this.l.acquire()
+	defer { this.l.release() }
+	if this.seals & (f_seal_write | f_seal_future_write) != 0 {
+		if request.writable {
+			errno.set(errno.eperm)
+			return false
+		}
+		request.flags |= mmap.map_no_write
+	}
+	return this.retain_shared_range_locked(request.flags)
+}
+
+fn (mut this TmpFSResource) mapping_can_grow() bool {
+	return true
+}
+
+// Each global range, and any in-flight fault using it, retains the original
+// permissions. The count includes writable-capable ranges without faulted pages.
 fn (mut this TmpFSResource) retain_mapping_range(_handle voidptr, _offset u64, _length u64, flags int) bool {
 	if flags & mmap.map_shared == 0 { return true }
 	this.l.acquire()
 	defer { this.l.release() }
+	return this.retain_shared_range_locked(flags)
+}
+
+fn (mut this TmpFSResource) retain_shared_range_locked(flags int) bool {
 	if this.attr_bits & resource.attributes_kept != 0 {
 		errno.set(errno.eperm)
 		return false
 	}
 	this.shared_mapping_ranges++
+	if flags & mmap.map_no_write == 0 {
+		this.writable_mapping_ranges++
+	}
 	return true
 }
 
@@ -99,6 +125,13 @@ fn (mut this TmpFSResource) release_mapping_range(_handle voidptr, _offset u64, 
 		return
 	}
 	this.shared_mapping_ranges--
+	if flags & mmap.map_no_write == 0 {
+		if this.writable_mapping_ranges == 0 {
+			lib.kpanic(unsafe { nil }, c'tmpfs: writable mapping reference underflow')
+			return
+		}
+		this.writable_mapping_ranges--
+	}
 }
 
 // A file larger than this lives in individual pages rather than in one buffer.
@@ -158,7 +191,16 @@ fn (mut this TmpFSResource) add_seals(seals u32) ? {
 		errno.set(errno.eperm)
 		return none
 	}
+	if seals & f_seal_write != 0 && this.seals & f_seal_write == 0 && this.writable_mapping_ranges != 0 {
+		errno.set(errno.ebusy)
+		return none
+	}
 	this.seals |= seals
+	// Linux checks for busy mappings only for an explicitly requested write
+	// seal. An execute seal on an executable inode then implies four seals.
+	if seals & f_seal_exec != 0 && this.stat.mode & 0o111 != 0 {
+		this.seals |= f_seal_shrink | f_seal_grow | f_seal_write | f_seal_future_write
+	}
 }
 
 // Tmpfs metadata and file contents already live in the resource's in-memory

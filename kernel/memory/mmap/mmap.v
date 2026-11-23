@@ -53,8 +53,8 @@ fn validate_protection(prot int) ? {
 // portion up to brk_current is charged to RLIMIT_AS; the inaccessible reserve
 // exists solely to keep unrelated mappings out of future heap addresses.
 const map_brk_reservation = 0x20000000
-// Asked by the caller for a shared mapping of a file opened without write
-// access, which mprotect() then may not make writable; see no_write.
+// Shared file mappings with a write ceiling from access, policy or seals.
+// Retained ranges carry the ceiling across splits, faults, fork and remap.
 pub const map_no_write = 0x40000000
 // Internal permission ceiling for files mapped through a noexec mount.
 pub const map_no_exec = 0x10000000
@@ -1336,12 +1336,13 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		errno.set(errno.eperm)
 		return none
 	}
-	no_write := (mac_no_write || options.no_write || requested_flags & map_no_write != 0)
+	mut no_write := (mac_no_write || options.no_write || requested_flags & map_no_write != 0)
 		&& flags & map_shared != 0 && flags & map_anonymous == 0
 	if no_write && prot & prot_write != 0 {
 		errno.set(errno.eacces)
 		return none
 	}
+	if no_write { flags |= map_no_write }
 
 	// Every user mapping, the program's own segments included, is made here,
 	// so the resolver is in place before anything can copy from one.
@@ -1455,7 +1456,12 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		mapping_retained = if options.inherit_mapping_ref {
 			resource.retain_mapping_range(mut resource_, range_handle, u64(offset), length, flags)
 		} else {
-			resource.admit_mapping_range(mut resource_, range_handle, u64(offset), length, flags)
+			mut request := unsafe { &resource.MappingAdmission(C.vinix_stack_alloc(sizeof(resource.MappingAdmission))) }
+			unsafe { *request = resource.MappingAdmission{flags: flags, writable: prot & prot_write != 0} }
+			admitted := resource.admit_mapping_range(mut resource_, range_handle, u64(offset), length, mut request)
+			flags = request.flags
+			no_write = flags & map_no_write != 0
+			admitted
 		}
 		if !mapping_retained {
 			unsafe { free_local_range(range_local) }

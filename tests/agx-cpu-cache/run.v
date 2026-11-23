@@ -28,8 +28,11 @@ fn main() {
 	os.cp(repo + '/kernel/drm/gem/backing.v', scratch + '/drm/gem/backing.v')!
 	os.cp(overlays['--ram-source'] or { repo + '/kernel/memory/ram_cache_arm64.v' }, scratch + '/memory/ram_cache.v')!
 	drm := os.read_file(repo + '/kernel/drm/drm.v')!
+	mappings := os.read_file(repo + '/kernel/resource/cache.v')!
 	os.write_file(scratch + '/drm/prime.v', 'module drm\nimport memory.mmap\n' +
-		section(drm, 'fn (mut this GemPrimeResource) mapping_attributes(', 'fn (mut this GemPrimeResource) read(')!)!
+		section(mappings, 'pub struct MappingAdmission {', 'pub interface MappingAdmissionResource {')! +
+		section(drm, 'fn (mut this GemPrimeResource) mapping_attributes(', 'fn (mut this GemPrimeResource) read(')!
+			.replace('resource.MappingAdmission', 'MappingAdmission'))!
 	virtual := os.read_file(repo + '/kernel/memory/virtual_arm64.v')!
 	os.write_file(scratch + '/memory/bbm.v', 'module memory\nimport aarch64.cpu\n' +
 		section(virtual, 'fn install_arm64_pte(', 'pub fn (mut pagemap Pagemap) map_page(')!)!

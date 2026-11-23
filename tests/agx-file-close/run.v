@@ -80,16 +80,19 @@ fn checks() !int {
 	os.write_file('${scratch}/gpu/agx/mmu/identity.v', 'module mmu\nimport klock\nimport gpu.agx.vm as agxvm\n' +
 		section(mmu_source, '__global context_identity_lock', '// Driver-owned backing')!)!
 	drm_source := os.read_file('${repo}/kernel/drm/drm.v')!
+	mappings := os.read_file('${repo}/kernel/resource/cache.v')!
 	gem_source := os.read_file('${repo}/kernel/drm/gem/gem.v')!
 	os.write_file('${scratch}/drm/gem/prime_fences.v', 'module gem\nimport memory\n' +
 		section(gem_source, 'pub struct PrimeFence {', '@[heap]\npub struct GemObject')!)!
 	os.cp_all(repo + '/tests/drm-wire/fixture/errno', scratch + '/errno', false)!
 	os.cp(repo + '/tests/agx-modern-ioctl/drm.v', scratch + '/drm/modern_fixture.v')!
 	os.write_file(scratch + '/drm/wire.v', 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport memory.mmap\nimport errno\n' +
+		section(mappings, 'pub struct MappingAdmission {', 'pub interface MappingAdmissionResource {')! +
 		section(drm_source, 'pub fn static_ioctl_table(', '// Store a driver definition')! +
 		section(drm_source, 'fn decode_ioctl_cmd(', '// The node is /dev/dri/')! +
 		section(drm_source, 'fn ioctl_gem_close(', 'fn ioctl_syncobj_create(')! +
-		section(drm_source, 'fn (mut this DrmNode) mapping_attributes(', 'fn (mut this DrmNode) read(')! +
+		section(drm_source, 'fn (mut this DrmNode) mapping_attributes(', 'fn (mut this DrmNode) read(')!
+			.replace('resource.MappingAdmission', 'MappingAdmission') +
 		section(drm_source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!)!
 	priority := os.read_file('${repo}/kernel/gpu/agx/fw/workqueue.v')!
 	os.mkdir_all('${scratch}/gpu/agx/fw')!

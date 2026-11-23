@@ -2753,6 +2753,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   native architectures.
   See [the memfd policy receipts](docs/linux-memfd-policy.md).
 
+- [x] Enforce memfd write and future-write seals across writable shared
+  mappings, and apply the seals implied by `F_SEAL_EXEC` on executable inodes.
+  Qualify fork, remap, protection changes and mmap/seal races on both native
+  architectures. See [the write seal receipts](docs/linux-memfd-write-seals.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

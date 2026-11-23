@@ -22,11 +22,13 @@ fn main() {
 	source := os.read_file(os.getenv_opt('DRM_WIRE_SOURCE') or { '${repo}/kernel/drm/drm.v' })!
 	devtmpfs_source := os.read_file(os.getenv_opt('DRM_DEVTMPFS_SOURCE') or { '${repo}/kernel/fs/devtmpfs.v' })!
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
+	mappings := os.read_file('${repo}/kernel/resource/cache.v')!
 	activity_source := os.read_file(os.getenv_opt('DRM_ACTIVITY_SOURCE') or { '${repo}/kernel/drm/activity.v' })!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
 	production += 'import katomic\nimport lib\n'
 	production += '#include <alloca.h>\nfn C.alloca(u64) voidptr\n'
 	production += section(resource_source, 'pub const o_path = ', 'pub const o_accmode = ')!
+	production += section(mappings, 'pub struct MappingAdmission {', 'pub interface MappingAdmissionResource {')!
 	production += section(source, 'pub const driver_gem', 'pub struct DrmIoctl {')!
 	production += section(source, 'pub const default_driver_date', 'pub struct DrmDriver {')!
 	production += section(source, 'fn copy_version_field(', 'fn ioctl_syncobj_create(')!
@@ -61,7 +63,7 @@ fn main() {
 	production += section(devtmpfs_source, 'fn matching_device_node(', 'pub fn devtmpfs_get_root(')!
 		.replace('resource.Resource', 'NodeBox').replace('node.resource.stat.nlink', 'node.resource.node.stat.nlink')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!
-		.replace('mmap.map_shared', 'map_shared')
+		.replace('mmap.map_shared', 'map_shared').replace('resource.MappingAdmission', 'MappingAdmission')
 	production += section(source, 'pub fn register_driver(', 'fn copy_version_field(')!
 		.replace('syncobj.shared_timeline_stub()', 'shared_timeline_stub()').replace('C.kprintf(', 'C.printf(')
 		.replace('driver.ioctls.free()', 'release_test_driver_ioctls(driver.ioctls)')

@@ -96,9 +96,10 @@ fn (mut this MknodDeviceResource) mmap(handle voidptr, page u64, flags int) void
 	return backing.mmap(handle, page, flags)
 }
 
-fn (mut this MknodDeviceResource) admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool {
+fn (mut this MknodDeviceResource) admit_mapping_range(handle voidptr, offset u64, length u64,
+	mut request resource.MappingAdmission) bool {
 	mut backing := this.backing
-	return resource.admit_mapping_range(mut backing, handle, offset, length, flags)
+	return resource.admit_mapping_range(mut backing, handle, offset, length, mut request)
 }
 
 fn (mut this MknodDeviceResource) mapping_can_grow() bool {

@@ -41,9 +41,7 @@ Hashes are SHA-256 prefixes. The archive is
 
 ## Limits
 
-`MFD_HUGETLB` remains open. The automatic shrink,
-grow, write, and future-write seals that Linux applies when `F_SEAL_EXEC`
-is added to an already executable inode remain open. [Linux 6.12.51 implied seals](https://github.com/gregkh/linux/blob/v6.12.51/mm/memfd.c#L245)
+`MFD_HUGETLB` remains open. [Write seals and execute-seal implications](linux-memfd-write-seals.md)
 
 See [PID namespace memfd policy](linux-memfd-policy.md) for when the kernel
 applies `MFD_NOEXEC_SEAL` automatically.

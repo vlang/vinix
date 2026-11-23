@@ -10,7 +10,8 @@ pub fn prime_cache_attributes(object &gem.GemObject) u64 {
 
 pub fn prime_admit(object &gem.GemObject, offset u64, length u64, flags int) bool {
 	mut resource := GemPrimeResource{obj: unsafe { object }}
-	return resource.admit_mapping_range(unsafe { nil }, offset, length, flags)
+	mut request := MappingAdmission{flags: flags}
+	return resource.admit_mapping_range(unsafe { nil }, offset, length, mut request)
 }
 
 pub fn prime_mapping_can_grow(object &gem.GemObject) bool {

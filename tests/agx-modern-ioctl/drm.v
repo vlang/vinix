@@ -39,7 +39,8 @@ pub fn invoke(dev &DrmDevice, handle u64, cmd u32, size u32, direction u32, data
 
 pub fn admit_mapping(dev &DrmDevice, handle voidptr, offset u64, length u64, flags int) int {
 	mut node := DrmNode{dev: unsafe { dev }}
-	return if node.admit_mapping_range(handle, offset, length, flags) { 0 } else { -int(errno.get()) }
+	mut request := MappingAdmission{flags: flags}
+	return if node.admit_mapping_range(handle, offset, length, mut request) { 0 } else { -int(errno.get()) }
 }
 
 pub fn mapping_can_grow(dev &DrmDevice) bool {

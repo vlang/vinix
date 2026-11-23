@@ -638,14 +638,15 @@ fn check_unregistered_mapping_admission() {
 		old := register_driver_with_data(&driver, voidptr(1)) or { panic('initial registration failed') }
 		mapping_device = unsafe { old }
 		mut old_node := unsafe { old.node }
-		assert old_node.admit_mapping_range(handle, 0, 4096, map_shared) && old_node.mapping_can_grow()
+		mut request := MappingAdmission{flags: map_shared}
+		assert old_node.admit_mapping_range(handle, 0, 4096, mut request) && old_node.mapping_can_grow()
 		unregister_device(old)
 		replacement := register_driver_with_data(&DrmDriver{}, voidptr(2)) or { panic('replacement registration failed') }
 		assert replacement.dev_id == old.dev_id
 		mut new_node := unsafe { replacement.node }
-		assert new_node.admit_mapping_range(handle, 0, 4096, map_shared) && new_node.mapping_can_grow()
+		assert new_node.admit_mapping_range(handle, 0, 4096, mut request) && new_node.mapping_can_grow()
 		errno.set(0)
-		assert !old_node.admit_mapping_range(handle, 0, 4096, map_shared) && errno.get() == errno.enodev
+		assert !old_node.admit_mapping_range(handle, 0, 4096, mut request) && errno.get() == errno.enodev
 		assert !old_node.mapping_can_grow()
 		assert old_node.retain_mapping_range(handle, 0, 4096, map_shared)
 		assert mapping_refs == if driver.mmap_retain != unsafe { nil } { 2 } else { 0 }

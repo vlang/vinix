@@ -199,10 +199,11 @@ fn (mut this GemPrimeResource) mapping_attributes(_handle voidptr, _offset u64) 
 	return if this.obj != unsafe { nil } { this.obj.pte_extra } else { 0 }
 }
 
-fn (mut this GemPrimeResource) admit_mapping_range(_handle voidptr, offset u64, length u64, flags int) bool {
+fn (mut this GemPrimeResource) admit_mapping_range(_handle voidptr, offset u64, length u64,
+	mut request resource.MappingAdmission) bool {
 	obj := this.obj
 	return obj != unsafe { nil } && length != 0 && offset <= obj.size
-		&& length <= obj.size - offset && (!obj.file_scoped || flags & mmap.map_shared != 0)
+		&& length <= obj.size - offset && (!obj.file_scoped || request.flags & mmap.map_shared != 0)
 }
 
 fn (mut this GemPrimeResource) mapping_can_grow() bool {
@@ -781,19 +782,20 @@ fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
 	return this.dev.driver.mmap(this.dev, handle, page, flags)
 }
 
-fn (mut this DrmNode) admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool {
+fn (mut this DrmNode) admit_mapping_range(handle voidptr, offset u64, length u64,
+	mut request resource.MappingAdmission) bool {
 	if this.dev == unsafe { nil } || !this.dev.is_registered() {
 		errno.set(errno.enodev)
 		return false
 	}
 	if handle != unsafe { nil } && this.dev.driver != unsafe { nil }
 		&& this.dev.driver.mmap_admit != unsafe { nil } {
-		code := this.dev.driver.mmap_admit(this.dev, handle, offset, length, flags & mmap.map_shared != 0)
+		code := this.dev.driver.mmap_admit(this.dev, handle, offset, length, request.flags & mmap.map_shared != 0)
 		if code == 0 { return true }
 		errno.set(u64(-code))
 		return false
 	}
-	return this.retain_mapping_range(handle, offset, length, flags)
+	return this.retain_mapping_range(handle, offset, length, request.flags)
 }
 
 fn (mut this DrmNode) mapping_can_grow() bool {
