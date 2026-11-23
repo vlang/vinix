@@ -41,6 +41,40 @@ fn repair_checksum(mut header []u8) {
 	header[154] = 0
 }
 
+fn append_link_members(mut writer tarcore.Writer, scenario string) ! {
+	members := match scenario {
+		'unrelated-hard-links' {
+			[tarcore.Member{name: './ordinary-file'},
+				tarcore.Member{name: './ordinary-link', kind: `1`, linkname: './ordinary-file'},
+				tarcore.Member{name: './ordinary-chain', kind: `1`, linkname: '/ordinary-link'},
+				tarcore.Member{name: './ordinary-symlink', kind: `2`, linkname: 'ordinary-file'}]
+		}
+		'package-hard-link' {
+			[tarcore.Member{name: './package-copy', kind: `1`, linkname: '/' + config}]
+		}
+		'hard-link-directory' {
+			[tarcore.Member{name: './ordinary-directory', kind: `5`},
+				tarcore.Member{name: './directory-link', kind: `1`, linkname: 'ordinary-directory'}]
+		}
+		'hard-link-forward' {
+			[tarcore.Member{name: './ordinary-link', kind: `1`, linkname: 'ordinary-file'},
+				tarcore.Member{name: './ordinary-file'}]
+		}
+		'hard-link-symlink' {
+			[tarcore.Member{name: './ordinary-file'},
+				tarcore.Member{name: './ordinary-symlink', kind: `2`, linkname: 'ordinary-file'},
+				tarcore.Member{name: './ordinary-link', kind: `1`, linkname: 'ordinary-symlink'}]
+		}
+		'symlink-parent' {
+			[tarcore.Member{name: './ordinary-directory', kind: `5`},
+				tarcore.Member{name: './ordinary-symlink', kind: `2`, linkname: 'ordinary-directory'},
+				tarcore.Member{name: './ordinary-symlink/child'}]
+		}
+		else { return }
+	}
+	for member in members { writer.add(member, []u8{})! }
+}
+
 fn rewrite_archive(archive string, scenario string) ! {
 	mut reader := tarstream.open_plain(archive)!
 	defer { reader.close() }
@@ -81,6 +115,7 @@ fn rewrite_archive(archive string, scenario string) ! {
 		writer.padding(member.size)!
 	}
 	if scenario == 'late-parent' { writer.add(parent, []u8{})! }
+	append_link_members(mut writer, scenario)!
 	writer.finish()!
 	writer.close_checked()!
 	os.rename(changed, archive)!
@@ -166,7 +201,10 @@ fn make_iso(root string, work string, scenario string) !string {
 		append_case_shadow(archive, root, work, scenario)!
 	}
 	if scenario in ['missing-parent', 'late-parent', 'legacy-file', 'contiguous-file', 'pax-path',
-		'non-ustar-header', 'spaced-size']! { rewrite_archive(archive, scenario)! }
+		'non-ustar-header', 'spaced-size', 'unrelated-hard-links', 'package-hard-link',
+		'hard-link-directory', 'hard-link-forward', 'hard-link-symlink', 'symlink-parent']! {
+		rewrite_archive(archive, scenario)!
+	}
 	if scenario == 'wrong-compression' { checked(['bzip2', '-z', archive])! }
 	else { checked(['gzip', '-n', archive])! }
 	if scenario == 'nested-compression' {
@@ -234,7 +272,9 @@ fn run() ! {
 		'alias', 'duplicate', 'blocked-parent', 'search-only-parent', 'missing-parent', 'late-parent', 'legacy-file',
 		'contiguous-file', 'pax-path', 'non-ustar-header', 'spaced-size', 'wrong-compression', 'nested-compression',
 		'concatenated-gzip-prefix', 'concatenated-gzip-suffix', 'trailing-gzip-bytes', 'bad-gzip-crc',
-		'bad-gzip-size', 'truncated-gzip-trailer', 'case-shadow-index', 'case-shadow-object']! {
+		'bad-gzip-size', 'truncated-gzip-trailer', 'case-shadow-index', 'case-shadow-object',
+		'unrelated-hard-links', 'package-hard-link', 'hard-link-directory', 'hard-link-forward',
+		'hard-link-symlink', 'symlink-parent']! {
 		work := out + '/' + scenario
 		root := work + '/root'
 		os.mkdir_all(root)!
@@ -301,12 +341,17 @@ fn run() ! {
 			'bad-gzip-crc', 'bad-gzip-size' { diagnostic = 'invalid ISO initramfs gzip stream' }
 			'truncated-gzip-trailer' { diagnostic = 'truncated ISO initramfs gzip stream' }
 			'case-shadow-index', 'case-shadow-object' { diagnostic = 'invalid ISO repository member' }
+			'package-hard-link' { diagnostic = 'ISO hard link targets a package member' }
+			'hard-link-directory', 'hard-link-forward', 'hard-link-symlink' {
+				diagnostic = 'ISO hard link requires an earlier regular file'
+			}
+			'symlink-parent' { diagnostic = 'ISO initramfs member traverses a symbolic link' }
 			else {}
 		}
 		iso := make_iso(root, work, scenario)!
 		code, output := command([tool, 'verify', iso, selection])
 		os.write_file(work + '/verifier.log', output)!
-		if scenario == 'match' {
+		if scenario in ['match', 'unrelated-hard-links']! {
 			if code != 0 { return error('matching ISO refused: ' + output) }
 			report := json2.decode[json2.Any](output)!.as_map()
 			mut document := pkgprotocol.decode_deployment_document(os.read_file(root + '/' + declaration)!)!

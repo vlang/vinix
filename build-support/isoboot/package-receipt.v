@@ -120,10 +120,36 @@ fn package_member_kind(path string) !PackageMemberKind {
 	return error('invalid ISO repository member: ' + path)
 }
 
+fn check_archive_parents(path string, entries map[string]u8) ! {
+	for index in 1 .. path.len {
+		if path[index] == `/` && entries[path[..index]] == `2` {
+			return error('ISO initramfs member traverses a symbolic link: ' + path)
+		}
+	}
+}
+
+fn record_archive_member(path string, kind u8, link_name string, mut entries map[string]u8) ! {
+	mut recorded := kind
+	if kind == `1` {
+		// USTAR hard link targets are names relative to the archive root.
+		target := archive_path(link_name.trim_left('/'))!
+		if package_member_kind(target)! != .unrelated {
+			return error('ISO hard link targets a package member: ' + target)
+		}
+		check_archive_parents(target, entries)!
+		if entries[target] != `0` {
+			return error('ISO hard link requires an earlier regular file: ' + target)
+		}
+		recorded = `0`
+	}
+	// Boot keeps an earlier existing entry's type when a later create fails.
+	if path !in entries && recorded in [u8(`0`), `2`, `5`]! { entries[path] = recorded }
+}
+
 fn capture_package_members(archive string, root string, expected Selection) ! {
 	mut reader := tarstream.open_boot_ustar(archive)!
 	defer { reader.close() }
-	mut seen := map[string]bool{}
+	mut entries := map[string]u8{}
 	mut allowance := u64(16 * 1024 * 1024)
 	for publisher in expected.publishers {
 		allowance += publisher.payload_bytes + 16 * 1024 * 1024
@@ -135,19 +161,23 @@ fn capture_package_members(archive string, root string, expected Selection) ! {
 			return err
 		}
 		path := archive_path(member.name)!
+		check_archive_parents(path, entries)!
 		kind := package_member_kind(path)!
-		if kind == .unrelated { continue }
-		if path in seen { return error('duplicate ISO package member: ' + path) }
+		if kind == .unrelated {
+			record_archive_member(path, member.kind, member.linkname, mut entries)!
+			continue
+		}
+		if path in entries { return error('duplicate ISO package member: ' + path) }
 		directory := os.dir(path)
-		if directory != '/' && !seen[directory] {
+		if directory != '/' && entries[directory] != `5` {
 			return error('ISO package directory must precede its members: ' + directory)
 		}
-		seen[path] = kind == .directory
 		if kind == .directory {
 			if member.kind != `5` || member.mode & 0o022 != 0 || (path != '/' && member.mode & 0o555 != 0o555) {
 				return error('invalid ISO package directory: ' + path)
 			}
 			if path != '/' { os.mkdir(root + path, mode: 0o755)! }
+			entries[path] = `5`
 			continue
 		}
 		if member.kind != `0` || member.mode != 0o644 || u64(member.size) > allowance {
@@ -162,6 +192,7 @@ fn capture_package_members(archive string, root string, expected Selection) ! {
 			if file.write(buffer[..count])! != count { return error('short ISO package capture: ' + path) }
 		}
 		os.chmod(root + path, 0o644)!
+		entries[path] = `0`
 	}
 }
 
