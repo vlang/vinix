@@ -20,6 +20,7 @@ struct DraftRelease {
 	prerelease bool
 	body       string
 	html_url   string
+	upload_url string
 	assets     []UploadedAsset
 }
 
@@ -116,6 +117,41 @@ fn stage_assets(directory string, manifest string, destination string) ! {
 	}
 }
 
+fn upload_draft(directory string, manifest string, response string, repo string, tag string) !u64 {
+	draft := json2.decode[DraftRelease](pkgcore.read_metadata(response)!)!
+	endpoint := 'https://uploads.github.com/repos/${repo}/releases/${draft.id}/assets'
+	if draft.id == 0 || !draft.draft || draft.tag_name != tag || draft.assets.len != 0
+		|| draft.upload_url.to_lower() != endpoint.to_lower() + '{?name,label}' {
+		return error('GitHub returned an invalid draft upload destination')
+	}
+	entries := read_manifest(manifest)!
+	if entries.len == 0 { return error('release checksum manifest is empty') }
+	mut names := entries.keys()
+	names << 'SHA256SUMS'
+	gh := os.find_abs_path_of_executable('gh')!
+	eprintln('Uploading assets to GitHub draft ${draft.id}')
+	for start := 0; start < names.len; start += 5 {
+		end := if start + 5 < names.len { start + 5 } else { names.len }
+		batch := names[start..end]
+		mut children := []&os.Process{cap: batch.len}
+		for name in batch {
+			mut child := os.new_process(gh)
+			child.set_args(['api', endpoint, '--method', 'POST', '-H', 'Content-Type: application/octet-stream',
+				'-f', 'name=' + name, '--input', os.join_path(directory, name), '--silent'])
+			child.run()
+			children << child
+		}
+		mut failed := []string{}
+		for index, mut child in children {
+			if child.pid > 0 { child.wait() }
+			if child.code != 0 || child.pid <= 0 { failed << batch[index] }
+			child.close()
+		}
+		if failed.len > 0 { return error('upload failed for GitHub draft ${draft.id}: ' + failed.join(', ')) }
+	}
+	return draft.id
+}
+
 fn verify_draft(directory string, response string, id string, tag string, prerelease bool) !string {
 	draft := json2.decode[DraftRelease](pkgcore.read_metadata(response)!)!
 	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
@@ -151,11 +187,15 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'stage' {
 		return stage_assets(os.args[2], os.args[3], os.args[4])
 	}
+	if os.args.len == 7 && os.args[1] == 'upload-draft' {
+		println(upload_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])!)
+		return
+	}
 	if os.args.len == 7 && os.args[1] == 'verify-draft' && os.args[6] in ['true', 'false']! {
 		println(verify_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6] == 'true')!)
 		return
 	}
-	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | capture DIRECTORY NEW_DESTINATION ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NEW_DESTINATION | verify-draft DIRECTORY RESPONSE ID TAG PRERELEASE')
+	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | capture DIRECTORY NEW_DESTINATION ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NEW_DESTINATION | upload-draft DIRECTORY MANIFEST RESPONSE REPO TAG | verify-draft DIRECTORY RESPONSE ID TAG PRERELEASE')
 }
 
 fn main() {

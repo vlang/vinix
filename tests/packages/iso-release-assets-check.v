@@ -14,13 +14,20 @@ const changed_during_upload = 'changed during upload\n'
 const other_commit = '1234567890123456789012345678901234567890'
 const draft_id = u64(71439)
 const release_url = 'https://example.invalid/fixture'
-const draft_refusals = ['tag-moved-during-upload', 'tag-removed-during-upload', 'draft-bad-digest',
+const upload_endpoint = 'https://uploads.github.com/repos/local/fixture/releases/71439/assets'
+const draft_refusals = ['draft-tag-rebound', 'draft-wrong-upload-url',
+	'tag-moved-during-upload', 'tag-removed-during-upload', 'draft-bad-digest',
 	'draft-incomplete-asset', 'draft-missing-asset', 'draft-extra-asset', 'draft-changed', 'upload-interrupted']
 
 struct FixtureAsset {
 	name string
 	state string
 	digest string
+}
+
+struct FixtureUpload {
+	path string
+	asset FixtureAsset
 }
 
 struct FixtureRelease {
@@ -30,6 +37,7 @@ struct FixtureRelease {
 	html_url string = release_url
 	body string
 	prerelease bool
+	upload_url string = upload_endpoint + '{?name,label}'
 mut:
 	draft bool = true
 	assets []FixtureAsset
@@ -105,18 +113,8 @@ fn reject_workspace_contender(out string, phase string) ! {
 	}
 }
 
-fn capture_upload(out string, scenario string) ![]FixtureAsset {
-	args := os.args[1..]
-	notes_option := args.index('--notes-file')
-	mut files := args.filter(it.starts_with('/'))
-	if notes_option >= 0 { files = files.filter(it != args[notes_option + 1]) }
-	if files.len == 0 { return error('release handoff is missing upload files') }
+fn capture_public_output(out string, scenario string) ! {
 	if scenario == 'workspace-lock' { reject_workspace_contender(out, 'upload')! }
-	stage := os.dir(files[0])
-	notes := stage + '/RELEASE_NOTES.md'
-	if stage == out || files.any(os.dir(it) != stage) {
-		return error('release handoff did not use a common private staging directory')
-	}
 	os.cp(out + '/SHA256SUMS', out + '/fixture-original-manifest')!
 	os.cp(out + '/RELEASE_NOTES.md', out + '/fixture-original-notes')!
 	if scenario == 'output-change-during-upload' {
@@ -124,12 +122,26 @@ fn capture_upload(out string, scenario string) ![]FixtureAsset {
 			os.write_file(out + '/' + name, changed_during_upload)!
 		}
 	}
-	mut digests := files.map(checksum_line(it)!)
-	assets := digests.map(FixtureAsset{name: it[66..], state: 'uploaded', digest: 'sha256:' + it[..64]})
-	digests << checksum_line(notes)!
+}
+
+fn read_uploaded_assets(out string, directory string) ![]FixtureAsset {
+	mut names := os.ls(directory)!
+	names.sort()
+	mut uploads := []FixtureUpload{}
+	for name in names {
+		uploads << json2.decode[FixtureUpload](os.read_file(directory + '/' + name)!)!
+	}
+	if uploads.len == 0 { return error('draft has no recorded uploads') }
+	files := uploads.map(it.path)
+	stage := os.dir(files[0])
+	if stage == out || files.any(os.dir(it) != stage) {
+		return error('release handoff did not use a common private staging directory')
+	}
+	mut digests := uploads.map(it.asset.digest[7..] + '  ' + it.asset.name)
+	digests << checksum_line(stage + '/RELEASE_NOTES.md')!
 	os.write_file(out + '/fixture-upload-digests', digests.join('\n') + '\n')!
-	os.write_file(out + '/fixture-upload', args.join('\n') + '\n')!
-	return assets
+	os.write_file(out + '/fixture-upload', files.join('\n') + '\n')!
+	return uploads.map(it.asset)
 }
 
 fn capture_boot(out string, scenario string) ! {
@@ -182,30 +194,46 @@ fn github_release_api(remote string, path string, scenario string) !int {
 	local := remote + '/draft.json'
 	if path == 'releases' {
 		os.write_file(remote + '/release-attempt', os.args[1..].join('\n') + '\n')!
-		if os.args.len != 19 || !os.args[12].starts_with('body=@') {
+		legacy := os.args.len == 19 && os.args[17..] == ['--jq', '.id']
+		if (!legacy && os.args.len != 17) || !os.args[12].starts_with('body=@') {
 			return error('expected releases POST with notes')
 		}
 		body := os.args[12]
 		prerelease := scenario == 'draft-only'
-		if os.args[3..] != ['--method', 'POST', '-f', 'tag_name=' + tag, '-f',
+		if os.args[3..17] != ['--method', 'POST', '-f', 'tag_name=' + tag, '-f',
 			'target_commitish=' + commit, '-f', 'name=Vinix ' + tag, '-F', body, '-F',
-			'draft=true', '-F', 'prerelease=' + prerelease.str(), '--jq', '.id']
+			'draft=true', '-F', 'prerelease=' + prerelease.str()]
 			|| os.read_file(tag_file(remote, tag))! != commit {
 			return error('draft created before checking the exact remote tag commit')
 		}
-		os.write_file(local, json2.encode(FixtureRelease{
+		draft := FixtureRelease{
 			tag_name: tag
 			name: 'Vinix ' + tag
 			body: os.read_file(body[6..])!
 			prerelease: prerelease
-		}))!
-		println(draft_id)
+			upload_url: if scenario == 'draft-wrong-upload-url' {
+				upload_endpoint.replace('/71439/', '/71440/') + '{?name,label}'
+			} else { upload_endpoint + '{?name,label}' }
+		}
+		os.mkdir(remote + '/uploads')!
+		os.write_file(local, json2.encode(draft))!
+		println(if legacy { draft_id.str() } else { json2.encode(draft) })
 		return 0
 	}
 	if path != 'releases/' + draft_id.str() { return error('unexpected draft release ID') }
 	mut draft := json2.decode[FixtureRelease](os.read_file(local)!)!
 	if os.args.len == 3 {
+		draft.assets = read_uploaded_assets(os.getenv('VINIX_ASSET_TEST_OUT'), remote + '/uploads')!
+		first := draft.assets[0]
+		match scenario {
+			'draft-bad-digest' { draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)} }
+			'draft-incomplete-asset' { draft.assets[0] = FixtureAsset{...first, state: 'starter'} }
+			'draft-missing-asset' { draft.assets.delete(0) }
+			'draft-extra-asset' { draft.assets << FixtureAsset{...first, name: 'extra.iso'} }
+			else {}
+		}
 		if scenario == 'draft-changed' { draft = FixtureRelease{...draft, tag_name: tag + '-changed'} }
+		os.write_file(local, json2.encode(draft))!
 		println(json2.encode(draft))
 		return 0
 	}
@@ -222,28 +250,36 @@ fn github_release_api(remote string, path string, scenario string) !int {
 
 fn upload_fixture(out string, remote string, scenario string) !int {
 	tag := os.getenv('VINIX_ASSET_TEST_TAG')
-	if os.args[3..7] != ['--repo', 'local/fixture', '--', tag] {
+	if os.args.len != 12 { return error('unexpected draft upload request') }
+	file := os.args[10]
+	name := os.file_name(file)
+	if os.args[2..] != [upload_endpoint, '--method', 'POST', '-H', 'Content-Type: application/octet-stream',
+		'-f', 'name=' + name, '--input', file, '--silent'] {
 		return error('unexpected draft upload request')
 	}
-	local := remote + '/draft.json'
-	mut draft := json2.decode[FixtureRelease](os.read_file(local)!)!
-	if !draft.draft || draft.tag_name != tag { return error('upload does not target the draft') }
-	draft.assets = capture_upload(out, scenario)!
-	first := draft.assets[0]
-	match scenario {
-		'tag-moved-during-upload' { os.write_file(tag_file(remote, tag), other_commit)! }
-		'tag-removed-during-upload' { os.rm(tag_file(remote, tag))! }
-		'draft-bad-digest' { draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)} }
-		'draft-incomplete-asset' { draft.assets[0] = FixtureAsset{...first, state: 'starter'} }
-		'draft-missing-asset', 'upload-interrupted' { draft.assets.delete(0) }
-		'draft-extra-asset' { draft.assets << FixtureAsset{...first, name: 'extra.iso'} }
-		else {}
-	}
-	os.write_file(local, json2.encode(draft))!
-	if scenario == 'upload-interrupted' {
-		eprintln('fixture upload interrupted')
+	if scenario == 'draft-tag-rebound' {
+		eprintln('fixture original draft upload URL no longer exists')
 		return 1
 	}
+	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	if !draft.draft || draft.tag_name != tag { return error('upload does not target the draft') }
+	if name == 'vinix-amd64.iso' {
+		capture_public_output(out, scenario)!
+		match scenario {
+			'tag-moved-during-upload' { os.write_file(tag_file(remote, tag), other_commit)! }
+			'tag-removed-during-upload' { os.rm(tag_file(remote, tag))! }
+			'upload-interrupted' {
+				eprintln('fixture upload interrupted')
+				return 1
+			}
+			else {}
+		}
+	}
+	digest := checksum_line(file)![..64]
+	os.write_file(remote + '/uploads/' + name, json2.encode(FixtureUpload{
+		path: file
+		asset: FixtureAsset{name: name, state: 'uploaded', digest: 'sha256:' + digest}
+	}))!
 	return 0
 }
 
@@ -252,6 +288,9 @@ fn github_api(scenario string) !int {
 	commit := os.getenv('VINIX_ASSET_TEST_COMMIT')
 	path := os.args[2]
 	prefix := 'repos/local/fixture/'
+	if path.starts_with('https://') {
+		return upload_fixture(os.getenv('VINIX_ASSET_TEST_OUT'), remote, scenario)
+	}
 	if path.starts_with(prefix + 'releases') {
 		return github_release_api(remote, path[prefix.len..], scenario)
 	}
@@ -345,17 +384,10 @@ fn run_stub(name string) !int {
 				if reserved != '' && os.args.last() == reserved { return 0 }
 				if !os.exists(upload) { return 1 }
 				println('https://example.invalid/fixture')
-			} else if os.args[1..3] == ['release', 'create'] {
-				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
-				tag := os.getenv('VINIX_ASSET_TEST_TAG')
-				os.write_file(remote + '/release-attempt', os.args[1..].join('\n') + '\n')!
-				capture_upload(out, scenario)!
-				if scenario == 'tag-moved-during-upload' {
-					os.write_file(tag_file(remote, tag), other_commit)!
-				}
-				os.write_file(remote + '/publish-attempt', 'created and published in one call\n')!
-			} else if os.args[1..3] == ['release', 'upload'] {
-				return upload_fixture(out, os.getenv('VINIX_ASSET_TEST_REMOTE'), scenario)
+			} else if os.args[1..3] == ['release', 'upload'] && scenario == 'draft-tag-rebound' {
+				os.write_file(os.getenv('VINIX_ASSET_TEST_REMOTE') + '/replacement-upload',
+					'tag lookup uploaded to a replacement release\n')!
+				return error('fixture tag lookup reached a replacement draft')
 			} else { return error('unexpected fixture gh invocation') }
 		}
 		else { return error('unknown release fixture program: ' + name) }
@@ -561,6 +593,8 @@ fn run() ! {
 				'tag-mismatch', 'tag-moved', 'tag-raced', 'tag-moved-during-upload' { 'points to ${other_commit}, expected ${commit}' }
 				'tag-read-failed' { 'cannot read GitHub tag: fixture GitHub tag lookup failed' }
 				'tag-create-failed' { 'could not verify the created GitHub tag' }
+				'draft-tag-rebound' { 'fixture original draft upload URL no longer exists' }
+				'draft-wrong-upload-url' { 'GitHub returned an invalid draft upload destination' }
 				'tag-removed-during-upload' { 'is missing before publication' }
 				'draft-bad-digest', 'draft-incomplete-asset' { 'GitHub draft asset differs from the verified upload' }
 				'draft-missing-asset' { 'missing GitHub draft assets' }
@@ -575,6 +609,11 @@ fn run() ! {
 			}
 			if draft_refusal && !json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!.draft {
 				return error('release refusal did not retain its draft: ' + scenario)
+			}
+			if scenario in ['draft-tag-rebound', 'draft-wrong-upload-url']! {
+				if os.exists(remote + '/replacement-upload') || os.ls(remote + '/uploads')!.len != 0 {
+					return error('refused upload modified another draft: ' + scenario)
+				}
 			}
 			early := scenario in ['tag-mismatch', 'tag-read-failed']!
 			if early && os.exists(out) { return error('GitHub tag preflight wrote release output') }

@@ -601,23 +601,16 @@ else
     "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
 fi
 cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
-staged_bundles=()
-for bundle in ${BUNDLES[@]+"${BUNDLES[@]}"}; do
-    staged_bundles+=("$ASSET_STAGE/${bundle##*/}")
-done
 
 "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true
 release_api="repos/$REPO/releases"
-release_id="$(gh api "$release_api" --method POST -f "tag_name=$TAG" \
+gh api "$release_api" --method POST -f "tag_name=$TAG" \
     -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_STAGE/RELEASE_NOTES.md" \
-    -F draft=true -F "prerelease=$prerelease" --jq .id)"
-case "$release_id" in
-    ''|0|*[!0-9]*) die "GitHub returned an invalid draft release ID" ;;
-esac
-step "Uploading assets to GitHub draft $release_id"
-gh release upload --repo "$REPO" -- "$TAG" "${staged_images[@]}" "$ASSET_STAGE/SHA256SUMS" ${staged_bundles[@]+"${staged_bundles[@]}"}
+    -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"
+release_id="$("$ASSET_WORK/release-assets" upload-draft "$ASSET_STAGE" "$ASSET_WORK/SHA256SUMS" \
+    "$ASSET_WORK/created-draft.json" "$REPO" "$TAG")"
 gh api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
 draft_url="$("$ASSET_WORK/release-assets" verify-draft "$ASSET_WORK" "$ASSET_WORK/draft.json" \
     "$release_id" "$TAG" "$prerelease")"

@@ -622,9 +622,11 @@ For publication, the driver checks that an existing GitHub tag resolves to the
 built commit. Automatic tag selection skips names reserved by either a tag or
 a release. After confirmation and asset verification the driver creates any
 missing tag at the built commit and checks the resulting ref. The driver
-creates a draft and uploads the assets. It reads that draft by its numeric ID
-and checks the tag name, title, notes, prerelease setting, and the exact set of
-uploaded assets against the local SHA-256 digests, including `SHA256SUMS`.
+creates a draft and checks the upload URL returned for its repository and draft
+ID. The driver streams the assets to that URL, then reads the draft by its
+numeric ID. It checks the tag name, title, notes, prerelease setting, and exact
+set of uploaded assets against the local SHA-256 digests, including
+`SHA256SUMS`.
 It rechecks the tag's commit after upload and publishes that draft by ID.
 `--draft` keeps the verified release as a draft. An upload or verification
 failure leaves the draft available for inspection.
