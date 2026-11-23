@@ -339,3 +339,31 @@ The raw logs, waveforms, build logs and selected digests are in
 `~/.local/state/vinix/r14-hda-stall-yBvEPW/qualification.tar.gz`.
 Its SHA-256 is `a2826aabe3e03479429b8c5ffd5c45738aea6909f3f39fd9e464f3a201023b02`.
 The extracted files passed every entry in `qualification.sha256`.
+
+## VirtIO sound stall recovery
+
+At `38e65d19f`, a VirtIO sound control timeout blocks further requests on
+the shared control page. If STOP or RELEASE fails, or RELEASE leaves PCM
+descriptors outstanding, the driver waits for an acknowledged device reset
+before rebuilding both queues in their existing DMA storage. If the reset
+also times out, a subsequent open can retry it on the first write.
+
+The AArch64 `virtio-sound-stall` guest completed two cycles with
+`VFLAGS=-d virtio_snd_stall`. Both stalled writes preserved the queued
+16 KiB prefix. The following writes and explicit drains returned
+`ETIMEDOUT` in 2.003–2.006 seconds. In the first cycle, the withheld STOP
+and reset requests timed out during close. The next stream recovered on
+its first write. In the second cycle, close reset the device after the STOP
+timeout. Both fresh 48 kHz streams accepted and drained more than one
+ring of PCM, and the guest shut down.
+
+The ordinary AArch64 kernel passed basic, lifecycle and seat playback
+with the strict waveform and shutdown checks. Its logs showed no
+recovery resets. The x86-64 HD Audio stall fixture and all fourteen
+hardware harness host suites also passed. Physical Apple speaker faults
+and independently reviewed kernel seals remain open.
+
+The raw scenario outputs, build logs and selected digests are in
+`~/.local/state/vinix/r14-virtio-sound-stall-HAaRJd/qualification.tar.gz`.
+Its SHA-256 is `fa04a042e05e17a5ad5fa404ad82f9f45eb1f328e40bf01f19ad65b76a708b16`.
+The extracted files passed every entry in `qualification.sha256`.
