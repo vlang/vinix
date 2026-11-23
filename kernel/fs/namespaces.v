@@ -222,6 +222,8 @@ fn replace_namespace(process &proc.Process, mut old proc.Namespace) &proc.Namesp
 		}
 		proc.clone_newipc {
 			ns.ipc_user_ns = if process.ns.user == unsafe { nil } { u64(4026531837) } else { process.ns.user.id }
+			ns.ipc_fsuid = process.fsuid
+			ns.ipc_fsgid = process.fsgid
 		}
 		proc.clone_newns {
 			// A mount namespace owned by an unprivileged user namespace may

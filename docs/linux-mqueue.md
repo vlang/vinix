@@ -156,16 +156,53 @@ Hashes are SHA-256 prefixes. The archive is
 `~/.cache/vinix-r15/mq-waiters/qualification.tar.gz`, with SHA-256
 `65f1eabe78299adae2e3874aa344cb7667f1f46f963a63bb0a5b20924bb0f80e`.
 
+### Mounted queue directory
+
+Use `mount -t mqueue none /dev/mqueue` with an existing mount point. The
+sticky directory exposes the IPC namespace selected at mount time. Listing
+and pathname opens use the same queue inodes and messages as `mq_open`.
+Regular files created with `O_CREAT` use the default queue attributes.
+Either pathname `unlink` or `mq_unlink` removes the shared name. An open
+descriptor continues to work after removal. A directory description and
+an `O_PATH` description return `EBADF` from the queue syscalls.
+
+The mount reports `MQUEUE_MAGIC` through `statfs` and carries `nodev` and
+`noexec` restrictions. Mount aliases share inodes and directory permissions.
+Each attachment applies its own read-only policy. [Linux mqueue filesystem](https://github.com/gregkh/linux/blob/v6.12.51/ipc/mqueue.c)
+
+The probe adds 36 checks for pathname creation, listing and unlink, shared
+queue metadata and message traffic, sticky directory and access rules,
+read-only remounts, covered entries, and mounts across IPC namespace changes.
+Optimized kernels from `7404d9eb8` plus this change and Linux 6.12.51 each
+passed all 257 + 16 checks with the same probe ELF on both architectures.
+The old x86-64 kernel failed the sticky-directory check because its mqueue
+mount had tmpfs semantics. The `open` and `namespace` regressions passed on
+both Vinix kernels. The allocation checker reported the same unlisted sites
+as the baseline after accounting for the boot-time filesystem object and the
+directory snapshot buffer freed by readdir.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `ce8eb695b272475b` | `78cc123e95fc66e5` | `769484120ffa2c3b` | `619f9b10db30e6cb` |
+| x86-64 | `4012d67e17818c39` | `ddb074672114f4e3` | `6b16b2414a0a58b9` | `4122b16d0b94e875` |
+
+Hashes are SHA-256 prefixes. The archive is
+`~/.cache/vinix-r15/mq-filesystem/qualification.tar.zst`, with SHA-256
+`5f715cde39d8ddc6d61ac79d7d4e1d70d96f686d53f1b1a5c7bf6a07684d424c`.
+
 ## Limits
 
-- No mqueue filesystem: `/dev/mqueue` cannot be mounted, so queues cannot be
-  listed, inspected or removed through files.
+- Vinix removes queue names when their IPC namespace ends. Linux can keep
+  those names accessible through a mount that remains attached.
+- Retired queue nodes keep their references through the VFS grace period.
+  Nodes used by bind mounts can retain their queue charges after detach
+  under the existing VFS mount lifetime model.
+- The mqueue device number is shared across IPC namespaces. Nested bind
+  redirects use the VFS's shared-node behavior across mount aliases.
 - Ordinary priority inheritance follows Vinix's scheduler. The probe covers
   nice values, FIFO and arrival ties.
 - RLIMIT_MSGQUEUE is charged per real uid across all user namespaces; Linux
-  charges per user namespace up its hierarchy. The queues' root directory
-  counts as owned by uid 0 in every IPC namespace (Linux: by the namespace
-  creator).
+  charges per user namespace up its hierarchy.
 - A notification goes to the registered process even after it has executed a
   new program while keeping a descriptor without close-on-exec; Linux skips it.
 - A SIGEV_THREAD cookie that does not fit the socket's receive limit when the

@@ -53,6 +53,8 @@ pub mut:
 	// Immutable user-namespace identity that governs IPC capabilities. A user
 	// namespace alone must not transfer ownership of an inherited IPC one.
 	ipc_user_ns u64 = 4026531837
+	ipc_fsuid u32
+	ipc_fsgid u32
 	// UTS namespaces.
 	hostname   string
 	domainname string

@@ -376,10 +376,10 @@ fn free_node(node &VFSNode) {
 			for _, dot in node.children { unsafe { free(dot) } }
 			unsafe { node.children.free(); free(node.children) }
 		}
-		if node.directory_resource {
-			mut res := node.resource
-			resource.release_resource(mut res)
-		}
+	}
+	if node.directory_resource || node.retained_resource {
+		mut res := node.resource
+		resource.release_resource(mut res)
 	}
 	kbudget.release(node.kernel_charge)
 	inotify_forget(node)

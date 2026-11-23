@@ -2668,6 +2668,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   on Vinix and Linux 6.12 on both architectures. See
   [the message queue receipts](docs/linux-mqueue.md).
 
+- [x] Mount the POSIX queue registry as mqueuefs, scoped to the IPC namespace
+  at mount time. Share queue identity, permissions, and unlink behavior
+  between pathname access and queue syscalls. See
+  [the mounted queue directory](docs/linux-mqueue.md#mounted-queue-directory).
+
 - [x] Implement native futex2 vector waits, masked waits and wakes, and
   compare-requeue. Qualify 128-entry waits, shared and private keys, absolute
   deadlines, signal restart, and legacy futex interoperability on AArch64 and

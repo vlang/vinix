@@ -362,6 +362,9 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	require_access(parent_of_tgt_node, access_write | access_exec) or {
 		return errno.err, errno.get()
 	}
+	if is_mqueue_directory(parent_of_tgt_node) && kind != 0 && kind != stat.ifreg {
+		return errno.err, errno.eperm
+	}
 
 	mut dir := unsafe { parent_of_tgt_node }
 	umask := proc.current_thread().process.umask

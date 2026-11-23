@@ -15,6 +15,7 @@ import errno
 import event
 import event.eventstruct
 import file
+import fs as vfs
 import katomic
 import kbudget
 import klock
@@ -122,6 +123,7 @@ mut:
 	all_next      &Queue = unsafe { nil }
 	all_prev      &Queue = unsafe { nil }
 	dead_next     &Queue = unsafe { nil }
+	node          &vfs.VFSNode = unsafe { nil }
 	name          [256]u8
 	name_len      int
 	ipc_ns        u64
@@ -217,13 +219,14 @@ fn permitted(process &proc.Process, queue &Queue, requested u32) bool {
 	if allowed & requested == requested || has_capability(process, proc.cap_dac_override) {
 		return true
 	}
-	return requested & ~u32(4) == 0 && has_capability(process, proc.cap_dac_read_search)
+	read_search := if stat.isdir(mode) { u32(5) } else { u32(4) }
+	return requested & ~read_search == 0 && has_capability(process, proc.cap_dac_read_search)
 }
 
 // The sticky root directory's rule: the queue's owner, the directory's
 // (root) or CAP_FOWNER may remove a queue.
-fn may_remove(process &proc.Process, queue &Queue) bool {
-	return process.fsuid == queue.stat.uid || process.fsuid == 0
+fn may_remove(process &proc.Process, queue &Queue, dir_uid u32) bool {
+	return process.fsuid == queue.stat.uid || process.fsuid == dir_uid
 		|| has_capability(process, proc.cap_fowner)
 }
 
@@ -315,7 +318,9 @@ fn namespace_queues_locked(ns u64) int {
 // ── queue lifetime ───────────────────────────────────────────────────────────
 
 fn allocate_queue() ?&Queue {
-	charge := proc.reserve_kernel(.ipc, sizeof(Queue) + 512)?
+	// Allow for the resource box and a pathname node if the namespace mounts
+	// mqueuefs later. No new charge or resource reference is needed on lookup.
+	charge := proc.reserve_kernel(.ipc, sizeof(Queue) + sizeof(vfs.VFSNode) + name_max + 512)?
 	mut queue := unsafe { &Queue(memory.malloc_packed_fallible(sizeof(Queue))) }
 	if queue == unsafe { nil } {
 		kbudget.release(charge)
@@ -377,6 +382,13 @@ fn unname_locked(mut queue Queue) bool {
 	queue.linked = false
 	queue.stat.nlink = 0
 	queue.stat.ctim = now()
+	if queue.node != unsafe { nil } {
+		mut node := queue.node
+		queue.node = unsafe { nil }
+		mut dir := unsafe { &Queue(node.parent.resource) }
+		dir_entry_changed(mut dir, -directory_entry_size, queue.stat.ctim)
+		vfs.retire_mqueue_child(mut node)
+	}
 	if katomic.dec(mut &queue.refcount) {
 		return false
 	}
@@ -399,6 +411,11 @@ fn (mut this Queue) release() {
 pub fn destroy_namespace(ns u64) {
 	mut dead := &Queue(unsafe { nil })
 	mq_lock.acquire()
+	if ns in mq_roots {
+		mut root := unsafe { mq_roots[ns] }
+		root.linked = false
+		mq_roots.delete(ns)
+	}
 	mut queue := mq_queues
 	for queue != unsafe { nil } {
 		next := queue.all_next
@@ -775,6 +792,7 @@ fn (mut this Queue) status_text(text &u8) int {
 }
 
 fn (mut this Queue) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
+	if stat.isdir(this.stat.mode) { errno.set(errno.eisdir); return none }
 	text := unsafe { &u8(C.vinix_stack_alloc(128)) }
 	length := u64(this.status_text(text))
 	if loc >= length {
@@ -821,8 +839,9 @@ fn (mut this Queue) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 // ── syscalls ─────────────────────────────────────────────────────────────────
 
 fn queue_of(fd &file.FD) &Queue {
+	if fd.handle.flags & resource.o_path != 0 { return unsafe { nil } }
 	mut res := fd.handle.resource
-	if mut res is Queue {
+	if mut res is Queue && stat.isreg(res.stat.mode) {
 		return unsafe { res }
 	}
 	return unsafe { nil }
@@ -871,7 +890,7 @@ fn create_locked(mut spare Queue, process &proc.Process, ns u64, name string, mo
 	spare.stat.dev = mq_device
 	spare.stat.ino = mq_inodes
 	spare.stat.nlink = 1
-	spare.stat.mode = stat.ifreg | (mode & ~process.umask & 0o7777)
+	spare.stat.mode = stat.ifreg | (mode & 0o7777)
 	spare.stat.uid = process.fsuid
 	spare.stat.gid = process.fsgid
 	spare.stat.size = queue_file_size
@@ -891,6 +910,9 @@ fn create_locked(mut spare Queue, process &proc.Process, ns u64, name string, mo
 	// The registry's reference.
 	spare.refcount = 1
 	link_all_locked(mut spare)
+	if ns in mq_roots {
+		publish_queue_locked(mut spare, unsafe { mq_roots[ns] })
+	}
 	return 0
 }
 
@@ -933,8 +955,11 @@ pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, a
 	mut result := u64(0)
 	mut created := false
 	mq_lock.acquire()
+	root := if ns_id in mq_roots { unsafe { mq_roots[ns_id] } } else { unsafe { &Queue(nil) } }
 	mut queue := find_locked(ns_id, name)
-	if queue != unsafe { nil } {
+	if root != unsafe { nil } && !permitted(process, root, 1) {
+		result = errno.eacces
+	} else if queue != unsafe { nil } {
 		requested := match oflag & 3 {
 			resource.o_rdonly { u32(4) }
 			resource.o_wronly { u32(2) }
@@ -949,8 +974,10 @@ pub fn syscall_mq_open(_ voidptr, name_ptr u64, oflag_word u64, mode_word u64, a
 		}
 	} else if oflag & resource.o_creat == 0 {
 		result = errno.enoent
+	} else if root != unsafe { nil } && !permitted(process, root, 3) {
+		result = errno.eacces
 	} else {
-		result = create_locked(mut spare, process, ns_id, name, mode, attr)
+		result = create_locked(mut spare, process, ns_id, name, mode & ~process.umask, attr)
 		if result == 0 {
 			queue = spare
 			spare = unsafe { nil }
@@ -1028,11 +1055,20 @@ pub fn syscall_mq_unlink(_ voidptr, name_ptr u64) (u64, u64) {
 	mut result := u64(0)
 	mut last := false
 	mq_lock.acquire()
+	root := if ns_id in mq_roots { unsafe { mq_roots[ns_id] } } else { unsafe { &Queue(nil) } }
+	dir_uid := if root != unsafe { nil } { root.stat.uid } else if ns != unsafe { nil } { ns.ipc_fsuid } else { u32(0) }
+	sticky := root == unsafe { nil } || root.stat.mode & 0o1000 != 0
 	mut queue := find_locked(ns_id, name)
-	if queue == unsafe { nil } {
+	if root != unsafe { nil } && !permitted(process, root, 1) {
+		result = errno.eacces
+	} else if queue == unsafe { nil } {
 		result = errno.enoent
-	} else if !may_remove(process, queue) {
+	} else if root != unsafe { nil } && !permitted(process, root, 3) {
+		result = errno.eacces
+	} else if sticky && !may_remove(process, queue, dir_uid) {
 		result = errno.eperm
+	} else if vfs.mqueue_child_mounted_on(queue.node) {
+		result = errno.ebusy
 	} else {
 		last = unname_locked(mut queue)
 	}

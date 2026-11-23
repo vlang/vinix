@@ -33,6 +33,9 @@ main_amd64.v array initialization	2
 main_amd64.v string interpolation	4
 main_arm64.v array initialization	2
 memory/virtual_arm64.v string interpolation	2
+mqueue/filesystem.v array initialization	1
+mqueue/filesystem.v cast to interface	1
+mqueue/filesystem.v struct on the heap	1
 proc/proc.v array initialization	2
 sched/sched_amd64.v array initialization	1
 sched/sched_arm64.v array initialization	1

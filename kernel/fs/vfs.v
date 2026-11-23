@@ -90,6 +90,8 @@ pub mut:
 	parent_held u32
 	// A removed directory keeps its namespace resource reference until reap.
 	directory_resource bool
+	// Mounted queue aliases keep the resource as long as the retired node.
+	retained_resource bool
 	directory_released u64
 	overlay_refs  int
 	mount_covered bool
@@ -107,6 +109,9 @@ __global (
 // Only copy pointers or change map storage here; callbacks and node retirement
 // run after unlocking. The removed-node grace period protects copied pointers.
 fn lookup_child_synced(node &VFSNode, name string) &VFSNode {
+	if is_mqueue_directory(node) && name != '.' && name != '..' {
+		return mqueue_lookup(node, name)
+	}
 	if is_procfs_resource(node.resource) || is_sysfs_resource(node.resource) {
 		return lookup_child(node, name)
 	}
@@ -117,6 +122,7 @@ fn lookup_child_synced(node &VFSNode, name string) &VFSNode {
 }
 
 fn directory_snapshot_synced(node &VFSNode) ([]string, []&VFSNode) {
+	if is_mqueue_directory(node) { return []string{}, mqueue_snapshot(node) }
 	if is_procfs_resource(node.resource) || is_sysfs_resource(node.resource) {
 		return directory_snapshot(node)
 	}
@@ -676,7 +682,12 @@ fn unlink_on_mount(parent &VFSNode, name string, remove_dir bool, identity &lib.
 	may_remove(parent_of_tgt, node)?
 	if basename == '.' || basename == '..' || basename == '' { errno.set(errno.einval); return none }
 	// Something mounted here, in this or any other namespace, keeps the name.
-	if basename in parent_of_tgt.children {
+	if is_mqueue_directory(parent_of_tgt) {
+		if mqueue_child_mounted_on(mqueue_lookup(parent_of_tgt, basename)) {
+			errno.set(errno.ebusy)
+			return none
+		}
+	} else if basename in parent_of_tgt.children {
 		covered := unsafe { parent_of_tgt.children[basename] }
 		if covered.mountpoint != unsafe { nil } || covered.ns_mounts > 0 {
 			errno.set(errno.ebusy)
@@ -704,6 +715,7 @@ fn unlink_on_mount(parent &VFSNode, name string, remove_dir bool, identity &lib.
 		inotify_forget(node)
 		return
 	}
+	if is_mqueue_directory(parent_of_tgt) { return mqueue_unlink(parent_of_tgt, node) }
 	// A read-only or failing backend must leave the namespace intact.
 	node.resource.unlink(voidptr(node))?
 	// Establish the orphan's parent pin before the map can appear empty to
@@ -873,6 +885,9 @@ fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, acces
 	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
+	if is_mqueue_directory(parent_of_tgt_node) {
+		return mqueue_create(parent_of_tgt_node, basename, mode, apply_umask)
+	}
 	charge := proc.reserve_kernel(.file, 8192 + u64(basename.len) * 2)?
 	mut charge_transferred := false
 	defer { if !charge_transferred { kbudget.release(charge) } }

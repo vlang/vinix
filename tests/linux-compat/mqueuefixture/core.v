@@ -9,6 +9,7 @@
 module mqueuefixture
 
 #include <errno.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <sched.h>
@@ -20,6 +21,7 @@ module mqueuefixture
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statfs.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -43,12 +45,24 @@ mut:
 
 struct C.stat {
 mut:
+	st_dev   u64
 	st_ino   u64
 	st_mode  u32
 	st_nlink u64
 	st_uid   u32
 	st_gid   u32
 	st_size  i64
+}
+
+struct C.statfs {
+	f_type u64
+	f_namelen i64
+}
+
+struct C.dirent {
+	d_ino u64
+	d_type u8
+	d_name [256]char
 }
 
 struct C.sched_param {
@@ -86,6 +100,14 @@ fn C.socketpair(i32, i32, i32, &i32) i32
 fn C.recv(i32, voidptr, usize, i32) isize
 fn C.pipe(&i32) i32
 fn C.mount(&char, &char, &char, u64, voidptr) i32
+fn C.umount(&char) i32
+fn C.mkdir(&char, u32) i32
+fn C.chmod(&char, u32) i32
+fn C.unlink(&char) i32
+fn C.statfs(&char, &C.statfs) i32
+fn C.opendir(&char) voidptr
+fn C.readdir(voidptr) &C.dirent
+fn C.closedir(voidptr) i32
 fn C.umask(u32) u32
 fn C.getpid() i32
 fn C.getppid() i32
@@ -969,6 +991,139 @@ fn namespaces(mut s State) {
 	}
 }
 
+fn listed(directory &char, name &char, inode u64) bool {
+	stream := C.opendir(directory)
+	if stream == unsafe { nil } { return false }
+	defer { C.closedir(stream) }
+	for {
+		entry := C.readdir(stream)
+		if entry == unsafe { nil } { return false }
+		if unsafe { C.strcmp(&entry.d_name[0], name) == 0 } {
+			return entry.d_ino == inode && entry.d_type == C.DT_REG
+		}
+	}
+	return false
+}
+
+fn mounted_namespace_child(mut s State) i32 {
+	unsafe {
+		if C.syscall(isize(C.SYS_unshare), clone_newipc) != 0 { return 1 }
+		if mq_open(c'mounted-existing', o_rdonly, 0, nil) != -C.ENOENT { return 2 }
+		inherited := C.open(c'/tmp/mq-view/mounted-existing', C.O_RDONLY)
+		if inherited < 0 || curmsgs(mut s, inherited) != 0 { return 3 }
+		C.close(inherited)
+		if C.mount(c'none', c'/tmp/mq-child', c'mqueue', 0, nil) != 0 { return 4 }
+		if C.open(c'/tmp/mq-child/mounted-existing', C.O_RDONLY) != -1 || *C.__errno_location() != C.ENOENT { return 5 }
+		q := mq_open(c'mounted-existing', o_creat | o_rdwr, 0o600, set_attr(s.attr, 0, 2, 8, 0))
+		view := C.open(c'/tmp/mq-child/mounted-existing', C.O_RDONLY)
+		if q < 0 || view < 0 || current(mut s, view) != 0 || s.old[2] != 8 { return 6 }
+		C.close(view)
+		C.close(i32(q))
+		if mq_unlink(c'mounted-existing') != 0 || C.umount(c'/tmp/mq-child') != 0 { return 7 }
+		return 0
+	}
+}
+
+fn mount_view(mut s State) {
+	unsafe {
+		s.label = c'mqueuefs'
+		check(mut s, c'mount directories', C.mkdir(c'/tmp/mq-view', 0o755) == 0
+			&& C.mkdir(c'/tmp/mq-child', 0o755) == 0, 0)
+		q := mq_open(c'mounted-existing', o_creat | o_rdwr, 0o666, set_attr(s.attr, 0, 2, 16, 0))
+		check(mut s, c'create before mounting', q >= 0, q)
+		mounted := result(C.mount(c'none', c'/tmp/mq-view', c'mqueue', 0, nil))
+		check(mut s, c'mount mqueue', mounted == 0, mounted)
+		if mounted != 0 { return }
+		view := &char(c'/tmp/mq-view/mounted-existing')
+		root := C.open(c'/tmp/mq-view', C.O_RDONLY | C.O_DIRECTORY)
+		check(mut s, c'sticky directory', root >= 0 && C.fstat(root, s.st) == 0
+			&& s.st.st_mode == 0o41777 && s.st.st_nlink == 2, s.st.st_mode)
+		check(mut s, c'directory rejects mq operations', current(mut s, root) == -C.EBADF, 0)
+		check(mut s, c'directory read fails', C.read(root, s.buf, 1) == -1 && *C.__errno_location() == C.EISDIR, 0)
+		C.close(root)
+		mut filesystem := C.statfs{}
+		check(mut s, c'filesystem identity', C.statfs(c'/tmp/mq-view', &filesystem) == 0
+			&& filesystem.f_type == 0x19800202 && filesystem.f_namelen == 255, i64(filesystem.f_type))
+		fd := C.open(view, C.O_RDWR)
+		check(mut s, c'open pre-existing queue by path', fd >= 0, fd)
+		if fd < 0 { return }
+		check(mut s, c'queue inode', C.fstat(i32(q), s.st) == 0, 0)
+		ino := s.st.st_ino
+		dev := s.st.st_dev
+		check(mut s, c'path shares queue identity', C.fstat(fd, s.st) == 0
+			&& s.st.st_ino == ino && s.st.st_dev == dev, i64(s.st.st_ino))
+		check(mut s, c'readdir includes queue inode', listed(c'/tmp/mq-view', c'mounted-existing', ino), 0)
+		status_is(mut s, c'path fd exposes status', fd, 0, 0, 0, 0)
+		check(mut s, c'path fd sends to mq descriptor', mq_send(fd, c'k', 1, 0, nil) == 0
+			&& mq_receive(q, s.buf, 16, nil, nil) == 1 && s.buf[0] == `k`, 0)
+		opath := C.open(view, C.O_PATH)
+		check(mut s, c'path-only fd refuses mq operations', opath >= 0 && current(mut s, opath) == -C.EBADF, opath)
+		C.close(opath)
+		created := C.open(c'/tmp/mq-view/mounted-new', C.O_CREAT | C.O_EXCL | C.O_RDWR, 0o600)
+		check(mut s, c'create queue by path with default attributes', created >= 0 && current(mut s, created) == 0
+			&& s.old[1] == 10 && s.old[2] == 8192, created)
+		other := mq_open(c'mounted-new', o_rdonly, 0, nil)
+		check(mut s, c'mq_open sees path-created queue', other >= 0, other)
+		check(mut s, c'mq_unlink removes pathname', mq_unlink(c'mounted-new') == 0
+			&& C.open(c'/tmp/mq-view/mounted-new', C.O_RDONLY) == -1 && *C.__errno_location() == C.ENOENT, 0)
+		C.close(i32(other))
+		C.close(created)
+		check(mut s, c'refuse subdirectories', C.mkdir(c'/tmp/mq-view/sub', 0o755) == -1
+			&& *C.__errno_location() == C.EPERM, *C.__errno_location())
+		fifo := result(C.syscall(isize(C.SYS_mknodat), C.AT_FDCWD, c'/tmp/mq-view/fifo', C.S_IFIFO | 0o600, 0))
+		check(mut s, c'refuse FIFOs', fifo == -C.EPERM, fifo)
+		mount_view_lifetime(mut s, q, fd, view)
+	}
+}
+
+fn mount_view_lifetime(mut s State, q i64, fd i32, view &char) {
+	unsafe {
+		check(mut s, c'restrict queue directory', C.chmod(c'/tmp/mq-view', 0o1700) == 0, 0)
+		mut child := C.fork()
+		if child == 0 {
+			if C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(1) }
+			if mq_open(c'mounted-existing', o_rdonly, 0, nil) != -C.EACCES { C._exit(2) }
+			if mq_unlink(c'mounted-existing') != -C.EACCES { C._exit(3) }
+			if C.open(view, C.O_RDONLY) != -1 || *C.__errno_location() != C.EACCES { C._exit(4) }
+			C._exit(0)
+		}
+		mut status := i32(-1)
+		check(mut s, c'queue syscalls and pathname search honor directory mode', child > 0
+			&& C.waitpid(child, &status, 0) == child && status == 0, status)
+		check(mut s, c'restore queue directory', C.chmod(c'/tmp/mq-view', 0o1777) == 0, 0)
+		child = C.fork()
+		if child == 0 { C._exit(mounted_namespace_child(mut s)) }
+		status = -1
+		check(mut s, c'mount stays with its original IPC namespace', child > 0
+			&& C.waitpid(child, &status, 0) == child && status == 0, status)
+		check(mut s, c'mount a second view', C.mount(c'none', c'/tmp/mq-child', c'mqueue', 0, nil) == 0, 0)
+		alias := C.open(c'/tmp/mq-child/mounted-existing', C.O_RDONLY)
+		check(mut s, c'second view sees the same queue', alias >= 0 && current(mut s, alias) == 0 && s.old[2] == 16, alias)
+		C.close(alias)
+		check(mut s, c'remount only the second view read-only', C.mount(nil, c'/tmp/mq-child', nil,
+			C.MS_BIND | C.MS_REMOUNT | C.MS_RDONLY | C.MS_NOEXEC | C.MS_NODEV, nil) == 0, 0)
+		check(mut s, c'read-only view refuses writers', C.open(c'/tmp/mq-child/mounted-existing', C.O_RDWR) == -1
+			&& *C.__errno_location() == C.EROFS, *C.__errno_location())
+		check(mut s, c'unmount the second view', C.umount(c'/tmp/mq-child') == 0, 0)
+		mask := C.open(c'/tmp/mq-mask', C.O_CREAT | C.O_RDWR, 0o600)
+		check(mut s, c'file bind mount covers queue', mask >= 0
+			&& C.mount(c'/tmp/mq-mask', view, nil, C.MS_BIND, nil) == 0, 0)
+		check(mut s, c'covered pathname refuses unlink', C.unlink(view) == -1 && *C.__errno_location() == C.EBUSY, *C.__errno_location())
+		check(mut s, c'covered queue refuses mq_unlink', mq_unlink(c'mounted-existing') == -C.EBUSY, 0)
+		check(mut s, c'covered queue still has messages interface', current(mut s, q) == 0, 0)
+		check(mut s, c'unmount covered queue', C.umount(view) == 0, 0)
+		C.close(mask)
+		C.unlink(c'/tmp/mq-mask')
+		check(mut s, c'pathname unlink removes queue name', C.unlink(view) == 0
+			&& mq_open(c'mounted-existing', o_rdonly, 0, nil) == -C.ENOENT, 0)
+		check(mut s, c'open descriptor survives pathname unlink', C.fstat(fd, s.st) == 0 && s.st.st_nlink == 0
+			&& mq_send(q, c'r', 1, 0, nil) == 0 && mq_receive(fd, s.buf, 16, nil, nil) == 1 && s.buf[0] == `r`, 0)
+		C.close(fd)
+		C.close(i32(q))
+		check(mut s, c'unmount filesystem', C.umount(c'/tmp/mq-view') == 0, 0)
+	}
+}
+
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
@@ -997,6 +1152,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		notifications(mut s)
 		unprivileged(mut s)
 		namespaces(mut s)
+		mount_view(mut s)
 		C.printf(c'LINUX MQUEUE SUMMARY: checks=%d failures=%d\n', s.checks, s.failures)
 		if s.failures == 0 {
 			C.puts(if reference { c'LINUX MQUEUE REFERENCE: PASS' } else { c'LINUX MQUEUE: PASS' })

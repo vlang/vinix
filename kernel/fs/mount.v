@@ -236,6 +236,7 @@ fn record_mount(mut table MountTable, covered &VFSNode, root &VFSNode, source st
 		source:  source.clone()
 		fstype:  fstype.clone()
 		flags:   flags & ms_per_mount
+		locked_flags: if fstype == 'mqueue' { ms_noexec | ms_nodev } else { u64(0) }
 		options: public_mount_options(root, options).clone()
 	}
 	lib.copy_mount_context(&entry.parent, parent_mount)
@@ -533,7 +534,7 @@ pub fn mount(parent &VFSNode, source string, target string, filesystem string) ?
 fn filesystem_kind(fstype string) string {
 	return match fstype {
 		'proc' { 'procfs' }
-		'mqueue', 'shm', 'ramfs' { 'tmpfs' }
+		'shm', 'ramfs' { 'tmpfs' }
 		else { fstype }
 	}
 }
@@ -546,7 +547,7 @@ fn display_fstype(fstype string) string {
 	}
 }
 
-const pseudo_filesystems = ['tmpfs', 'procfs', 'sysfs', 'devtmpfs', 'cgroup2', 'overlay']
+const pseudo_filesystems = ['tmpfs', 'procfs', 'sysfs', 'devtmpfs', 'cgroup2', 'overlay', 'mqueue']
 
 fn new_mount(parent &VFSNode, source string, target string, fstype string, flags u64, options string) ? {
 	kind := filesystem_kind(fstype)
@@ -556,7 +557,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	mut block_token := -1
 	mut block_committed := false
 	defer { security.finish_block_mount(block_token, block_committed) }
-	if kind !in filesystems && kind !in ['overlay', 'ext2', 'ext4'] {
+	if kind !in filesystems && kind !in ['overlay', 'ext2', 'ext4', 'mqueue'] {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -623,7 +624,18 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	basename := final_component.clone()
 	mut mount_node := &VFSNode(unsafe { nil })
 	mut mount_flags := flags
-	if kind == 'cgroup2' {
+	if kind == 'mqueue' {
+		if mqueue_mount == unsafe { nil } {
+			unsafe { basename.free() }
+			errno.set(errno.enodev)
+			return none
+		}
+		mount_node = mqueue_mount() or {
+			unsafe { basename.free() }
+			return none
+		}
+		mount_flags |= ms_noexec | ms_nodev
+	} else if kind == 'cgroup2' {
 		mount_node = cgroup_mount_root(parent_of_tgt_node, basename) or {
 			unsafe { basename.free() }
 			return none
@@ -1705,14 +1717,14 @@ fn user_namespace_mount_allowed(fstype string, flags u64, options string) ? {
 		'proc' {
 			return user_namespace_proc_allowed(flags)
 		}
-		'tmpfs', 'mqueue', 'ramfs' {
+		'tmpfs', 'ramfs' {
 			// Its root may be given only an owner the namespace maps.
 			if !owner_options_mapped(options) {
 				errno.set(errno.einval)
 				return none
 			}
 		}
-		'devpts' {}
+		'mqueue', 'devpts' {}
 		else {
 			errno.set(errno.eperm)
 			return none
