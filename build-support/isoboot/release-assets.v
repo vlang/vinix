@@ -67,17 +67,34 @@ fn check_assets(directory string, manifest string) ! {
 	}
 }
 
+fn copy_asset(directory string, destination string, name string) !string {
+	path := os.join_path(destination, name)
+	pkgcore.copy_file(os.join_path(directory, name), path, 0, ~u64(0))!
+	os.chmod(path, 0o400)!
+	return path
+}
+
+fn capture_assets(directory string, destination string, names []string) ! {
+	os.mkdir(destination, mode: 0o700)!
+	mut seen := map[string]bool{}
+	for name in names {
+		if !valid_asset_name(name) || name in seen {
+			return error('invalid or repeated release asset name: ' + name)
+		}
+		seen[name] = true
+		copy_asset(directory, destination, name)!
+	}
+}
+
 fn stage_assets(directory string, manifest string, destination string) ! {
 	entries := read_manifest(manifest)!
 	if entries.len == 0 { return error('release checksum manifest is empty') }
 	os.mkdir(destination, mode: 0o700)!
 	for name, digest in entries {
-		path := os.join_path(destination, name)
-		pkgcore.copy_file(os.join_path(directory, name), path, 0, ~u64(0))!
+		path := copy_asset(directory, destination, name)!
 		if pkgcore.hash_file(path)! != digest {
 			return error('release asset changed after verification: ' + name)
 		}
-		os.chmod(path, 0o400)!
 	}
 }
 
@@ -85,13 +102,16 @@ fn run() ! {
 	if os.args.len >= 5 && os.args[1] == 'record' {
 		return record_assets(os.args[2], os.args[3], os.args[4..])
 	}
+	if os.args.len >= 5 && os.args[1] == 'capture' {
+		return capture_assets(os.args[2], os.args[3], os.args[4..])
+	}
 	if os.args.len == 4 && os.args[1] == 'check' {
 		return check_assets(os.args[2], os.args[3])
 	}
 	if os.args.len == 5 && os.args[1] == 'stage' {
 		return stage_assets(os.args[2], os.args[3], os.args[4])
 	}
-	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NEW_DESTINATION')
+	return error('usage: release-assets record DIRECTORY PACKAGE-PINS ASSET... | capture DIRECTORY NEW_DESTINATION ASSET... | check DIRECTORY MANIFEST | stage DIRECTORY MANIFEST NEW_DESTINATION')
 }
 
 fn main() {

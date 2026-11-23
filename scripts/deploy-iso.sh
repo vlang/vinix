@@ -360,10 +360,26 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
 fi
 
 [ "${#IMAGES[@]}" -gt 0 ] || die "nothing was built"
+ASSET_STAGE="$ASSET_WORK/upload"
+ASSET_DIRECTORY="$OUT"
+"$V" -backend c -prod -cc cc \
+    -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/tools/accounts" \
+    -o "$ASSET_WORK/release-assets" "$SCRIPT_DIR/build-support/isoboot/release-assets.v"
+if [ "$RUN_TESTS" -eq 1 ] || [ -n "$PACKAGE_WORK" ]; then
+    step "Capturing release assets"
+    "$ASSET_WORK/release-assets" capture "$OUT" "$ASSET_STAGE" \
+        "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}"
+    ASSET_DIRECTORY="$ASSET_STAGE"
+fi
+
+staged_images=()
 for image in "${IMAGES[@]}"; do
+    name="${image##*/}"
+    staged_images+=("$ASSET_STAGE/$name")
     # GitHub refuses release assets of 2 GiB or more.
-    if [ "$(file_size "$image")" -ge 2147483648 ]; then
-        die "$(basename "$image") is $(human_size "$(file_size "$image")"), over GitHub's 2 GiB asset limit"
+    size="$(file_size "$ASSET_DIRECTORY/$name")"
+    if [ "$size" -ge 2147483648 ]; then
+        die "$name is $(human_size "$size"), over GitHub's 2 GiB asset limit"
     fi
 done
 
@@ -373,8 +389,8 @@ if [ -n "$PACKAGE_WORK" ]; then
         plan="$PACKAGE_WORK/$arch.plan"
         if [ ! -s "$plan" ]; then continue; fi
         name="vinix-packages-$arch.json"
-        "$PACKAGE_WORK/receipt" verify "$OUT/vinix-$arch.iso" "$plan" > "$PACKAGE_WORK/$name"
-        cp "$PACKAGE_WORK/$name" "$PACKAGE_WORK/public-receipt"
+        "$PACKAGE_WORK/receipt" verify-staged "$ASSET_STAGE/vinix-$arch.iso" "$plan" > "$ASSET_STAGE/$name"
+        cp "$ASSET_STAGE/$name" "$PACKAGE_WORK/public-receipt"
         mv -f "$PACKAGE_WORK/public-receipt" "$OUT/$name"
         PACKAGE_RECEIPTS+=("$OUT/$name")
         BUNDLES+=("$OUT/$name")
@@ -383,32 +399,17 @@ fi
 
 # Capture the complete upload list before boot tests can change an output.
 step "Recording checksums for release assets"
-"$V" -backend c -prod -cc cc \
-    -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/tools/accounts" \
-    -o "$ASSET_WORK/release-assets" "$SCRIPT_DIR/build-support/isoboot/release-assets.v"
 : > "$ASSET_WORK/package-pins"
 for receipt in ${PACKAGE_RECEIPTS[@]+"${PACKAGE_RECEIPTS[@]}"}; do
-    "$PACKAGE_WORK/receipt" checksums "$PACKAGE_WORK/${receipt##*/}" >> "$ASSET_WORK/package-pins"
+    "$PACKAGE_WORK/receipt" checksums "$ASSET_STAGE/${receipt##*/}" >> "$ASSET_WORK/package-pins"
 done
-"$ASSET_WORK/release-assets" record "$OUT" "$ASSET_WORK/package-pins" \
+"$ASSET_WORK/release-assets" record "$ASSET_DIRECTORY" "$ASSET_WORK/package-pins" \
     "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}" > "$ASSET_WORK/SHA256SUMS"
-
-ASSET_STAGE="$ASSET_WORK/upload"
-staged_images=()
-for image in "${IMAGES[@]}"; do
-    staged_images+=("$ASSET_STAGE/${image##*/}")
-done
-
-stage_release_assets() {
-    step "Preparing verified release copies"
-    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
-}
 
 # ── Boot tests ─────────────────────────────────────────────────────────────
 
 TEST_SUMMARY=''
 if [ "$RUN_TESTS" -eq 1 ]; then
-    stage_release_assets
     step "Boot-testing the images"
     rm -rf "$OUT/test"
     if ! "$SRC/scripts/test-iso.sh" --out="$OUT/test" "${staged_images[@]}" | tee "$OUT/test.log"; then
@@ -568,10 +569,11 @@ fi
 
 cmp -s "$ASSET_WORK/SHA256SUMS" "$OUT/SHA256SUMS" ||
     die "SHA256SUMS changed after verification"
-if [ "$RUN_TESTS" -eq 1 ]; then
+if [ "$ASSET_DIRECTORY" = "$ASSET_STAGE" ]; then
     "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
 else
-    stage_release_assets
+    step "Preparing verified release copies"
+    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
 fi
 mv "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
 staged_bundles=()

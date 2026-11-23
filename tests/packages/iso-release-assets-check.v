@@ -103,10 +103,32 @@ fn capture_boot(out string, scenario string) ! {
 	}
 }
 
+fn extract_iso(out string, scenario string) !int {
+	args := os.args[1..]
+	device := args.index('-indev')
+	if device < 0 || device + 1 >= args.len { return error('unexpected fixture xorriso invocation') }
+	images := out + '/fixture-receipt-isos'
+	change_public := scenario == 'public-iso-during-receipt' && !os.exists(images)
+	public_image := out + '/vinix-amd64.iso'
+	mut original := ''
+	if change_public {
+		original = os.read_file(public_image)!
+		os.write_file(public_image, 'temporary public ISO\n')!
+	}
+	code, output := command(os.getenv('VINIX_ASSET_TEST_XORRISO'), args, os.getwd(), os.environ())
+	if change_public { os.write_file(public_image, original)! }
+	mut file := os.open_file(images, 'a')!
+	defer { file.close() }
+	file.writeln(args[device + 1])!
+	print(output)
+	return code
+}
+
 fn run_stub(name string) !int {
 	out := os.getenv('VINIX_ASSET_TEST_OUT')
 	scenario := os.getenv('VINIX_ASSET_TEST_CASE')
 	match name {
+		'xorriso' { return extract_iso(out, scenario) }
 		'get-deps', 'build-aarch64.sh' {}
 		'build-desktop-amd64.sh' {
 			os.cp(os.getenv('VINIX_ASSET_TEST_AMD64_ISO'), os.getenv('VINIX_AMD64_DESKTOP_ISO'))!
@@ -169,7 +191,7 @@ fn prepare_driver(repository string, root string) ! {
 	for path in ['tools', 'build-support/tarstream', 'build-support/tarcore']! {
 		os.symlink(repository + '/' + path, root + '/' + path)!
 	}
-	for path in ['kernel/get-deps', 'build-support/human-size', 'fake-bin/gh', 'scripts/build-desktop-amd64.sh',
+	for path in ['kernel/get-deps', 'build-support/human-size', 'fake-bin/gh', 'fake-bin/xorriso', 'scripts/build-desktop-amd64.sh',
 		'scripts/build-desktop-aarch64.sh', 'scripts/build-aarch64.sh', 'scripts/build-ios-aarch64.sh',
 		'build-support/build-aarch64-iso.sh', 'scripts/test-iso.sh']! {
 		os.symlink(os.executable(), root + '/' + path)!
@@ -212,7 +234,11 @@ fn verify_handoff(out string, with_packages bool, scenario string) ! {
 	listed.sort()
 	uploaded.sort()
 	if uploaded != listed { return error('release handoff bytes differ from the verified assets') }
-	if scenario == 'publish-no-test' {
+	upload_images := os.read_lines(out + '/fixture-upload')!.filter(it.starts_with('/') && it.ends_with('.iso'))
+	if with_packages && os.read_lines(out + '/fixture-receipt-isos')! != upload_images {
+		return error('package verifier and uploader used different ISO copies')
+	}
+	if scenario in ['publish-no-test', 'packages-no-test']! {
 		if os.exists(out + '/fixture-boot') || notes.contains('### Tested before release') {
 			return error('release booted images with --no-test')
 		}
@@ -223,7 +249,6 @@ fn verify_handoff(out string, with_packages bool, scenario string) ! {
 	if boot_digests != uploaded.filter(it.ends_with('.iso')) {
 		return error('boot test read different ISO bytes from the uploader')
 	}
-	upload_images := os.read_lines(out + '/fixture-upload')!.filter(it.starts_with('/') && it.ends_with('.iso'))
 	if os.read_lines(out + '/fixture-boot')! != upload_images {
 		return error('boot test and uploader used different ISO copies')
 	}
@@ -246,15 +271,16 @@ fn run() ! {
 		}
 	}
 	base['PATH'] = root + '/fake-bin:' + os.getenv('PATH')
+	base['VINIX_ASSET_TEST_XORRISO'] = os.find_abs_path_of_executable('xorriso')!
 	base['VINIX_UI2_SOURCE'] = root + '/ui2'
 	base['VINIX_ASSET_TEST_AMD64_ISO'] = am + '/image.iso'
 	base['VINIX_ASSET_TEST_ARM64_ISO'] = arm + '/image.iso'
-	for scenario in ['public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
+	for scenario in ['public-iso-during-receipt', 'public-iso-during-boot', 'legacy', 'packages', 'output-change-during-upload',
 		'bad-build-sidecar', 'boot-copy-changed', 'x11-after-boot', 'ios-pair-after-boot',
 		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff', 'build-only',
-		'publish-no-test']! {
+		'publish-no-test', 'packages-no-test']! {
 		with_packages := scenario in ['packages', 'receipt-after-boot', 'output-change-during-upload',
-			'public-iso-during-boot']!
+			'public-iso-during-boot', 'public-iso-during-receipt', 'packages-no-test']!
 		mut environment := base.clone()
 		if with_packages {
 			for arch, dir in {'X86_64': am, 'AARCH64': arm} {
@@ -269,14 +295,14 @@ fn run() ! {
 		mut args := [root + '/scripts/deploy-iso.sh', '--tag=fixture-' + scenario, '--yes',
 			'--repo=local/fixture']
 		if scenario == 'build-only' { args << ['--arch=amd64', '--no-publish'] }
-		if scenario == 'publish-no-test' { args << ['--no-test'] }
+		if scenario in ['publish-no-test', 'packages-no-test']! { args << ['--no-test'] }
 		code, log := command('/bin/bash', args, root, environment)
 		os.write_file(work + '/' + scenario + '.log', log)!
 		if os.ls(root + '/build-release/work')!.any(it.starts_with('release-assets.')) {
 			return error('release left a private staging directory: ' + scenario)
 		}
 		if scenario in ['legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
-			'publish-no-test']! {
+			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
 			verify_handoff(out, with_packages, scenario)!
 		} else if scenario == 'build-only' {
@@ -306,7 +332,7 @@ fn run() ! {
 
 fn main() {
 	name := os.file_name(os.args[0])
-	if name in ['get-deps', 'human-size', 'gh', 'test-iso.sh', 'build-desktop-amd64.sh',
+	if name in ['get-deps', 'human-size', 'gh', 'xorriso', 'test-iso.sh', 'build-desktop-amd64.sh',
 		'build-desktop-aarch64.sh', 'build-aarch64.sh', 'build-ios-aarch64.sh', 'build-aarch64-iso.sh']! {
 		exit(run_stub(name) or { eprintln(err); 2 })
 	}

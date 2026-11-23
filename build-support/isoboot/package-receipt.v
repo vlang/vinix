@@ -251,6 +251,25 @@ fn workspace() !string {
 	return work
 }
 
+// Only the release driver lends an existing capture. Other readers get an
+// isolated copy whose pathname stays under the verifier's control.
+fn receipt_image(source string, work string, staged bool) !string {
+	if staged {
+		parent := os.lstat(os.dir(source))!
+		image := os.lstat(source)!
+		uid := u32(os.geteuid())
+		if parent.mode & 0o177777 != 0o040700 || parent.uid != uid
+			|| image.mode & 0o177777 != 0o100400 || image.uid != uid || image.nlink != 1 {
+			return error('expected a private read-only release ISO')
+		}
+		return source
+	}
+	image := work + '/image.iso'
+	pkgcore.copy_file(source, image, 0, ~u64(0))!
+	os.chmod(image, 0o400)!
+	return image
+}
+
 fn run() ! {
 	if os.args.len == 3 && os.args[1] == 'checksums' {
 		return print_checksums(os.args[2])
@@ -268,11 +287,14 @@ fn run() ! {
 		println(json2.encode(preflight(work, arch, config, bundle, declaration)!))
 		return
 	}
-	if os.args.len != 4 || os.args[1] != 'verify' { return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | checksums RECEIPT.json') }
+	if os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged']! {
+		return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | checksums RECEIPT.json')
+	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }
 	expected := json2.decode[Selection](os.read_file(os.args[3])!)!
-	println(json2.encode(check_iso(os.args[2], work, expected)!))
+	iso := receipt_image(os.args[2], work, os.args[1] == 'verify-staged')!
+	println(json2.encode(check_iso(iso, work, expected)!))
 }
 
 fn main() {

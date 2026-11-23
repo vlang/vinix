@@ -569,7 +569,8 @@ preserved, and the retained trust and policy govern the check.
 
 `scripts/deploy-iso.sh` preflights the selected inputs before building and
 compares them with the package configuration, signed bundles and declaration
-inside each finished ISO. The check reauthenticates the complete embedded
+inside private copies of the finished ISOs. The receipt hashes the same copy
+the verifier extracts. The check reauthenticates the complete embedded
 bundles and verifies their payloads. It streams the POSIX USTAR initramfs from
 one gzip member, checks the CRC and uncompressed size, and requires EOF after
 the trailer. Package directories must be readable and searchable by ordinary
@@ -606,15 +607,16 @@ Before boot testing, the driver records `SHA256SUMS` for the complete asset
 list, including X11 and iOS payloads and their checksum sidecars. It checks
 each sidecar against its payload and carries the verified ISO and package
 receipt digests into the list. The driver rechecks the assets after boot
-testing. When boot tests run, the driver verifies private, read-only copies and
-passes the staged ISOs to the boot runner. Publication uses the same copies
-and rechecks the public assets and checksum list. With `--no-test`, the driver
-prepares the verified copies at publication. GitHub reads the verified assets,
-the recorded checksum list, and the generated release notes from the private
-directory. Allow space under `build-release/work` for a second copy of the
-assets while boot testing or publishing.
+testing. Package verification, boot testing, and publication use the same
+private ISO copies. The driver rechecks the public assets and checksum list
+before publication. When both package verification and boot testing are
+skipped, the driver prepares verified copies at publication. GitHub reads the
+verified assets, the recorded checksum list, and the generated release notes
+from the private directory. Allow space under `build-release/work` for a second
+copy of the assets while verifying, boot testing, or publishing.
 Set `TMPDIR` to a filesystem with room for ISO extraction and signed bundle
-verification when the system temporary filesystem is small.
+verification when the system temporary filesystem is small. Standalone
+`package-receipt verify` also keeps its private ISO copy in that filesystem.
 
 The staged format-2 declaration is available for ordinary Software review
 after boot. Installation still requires confirmation and administrator approval.
