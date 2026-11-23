@@ -7,9 +7,27 @@ import json2
 import os
 import tools.packages.pkgcore
 
+const launch_logs = '/run/vinix-audio-fixture'
+const launch_log_limit = 64 * 1024
+
 fn launch(package string, mode string, run string, frequency int) !int {
 	return child_start(['/usr/sbin/vinix-session', 'run', '--seat', 'alex', '/sbin/init', 'login',
-		package, mode, run, frequency.str()], '', '')
+		package, mode, run, frequency.str()], '', launch_logs + '/' + run)
+}
+
+fn wait_launch(pid int, run string) !int {
+	status := wait(pid)!
+	// The isolated payload cannot write to AArch64's seat console. Its usual
+	// inherited stdout and stderr arrive here without giving it a device fd.
+	path := launch_logs + '/' + run
+	mut log := os.open(path)!
+	defer { log.close() }
+	output := log.read_bytes(launch_log_limit + 1)
+	if output.len == 0 || output.len > launch_log_limit || output.last() != `\n` {
+		return error('missing, oversized or incomplete package launch output: ' + run)
+	}
+	print(output.bytestr())
+	return status
 }
 
 fn ready(run string) !Ready {
@@ -22,7 +40,7 @@ fn ready(run string) !Ready {
 }
 
 fn finish(pid int, run string, package string) ! {
-	require(wait(pid)! == 0, 'ordinary package session failed: ${run}')!
+	require(wait_launch(pid, run)! == 0, 'ordinary package session failed: ${run}')!
 	path := '/home/alex/.local/share/vinix-apps/' + package + '/' + run + '.done'
 	require(text(path) == 'PASS\n', 'payload completion missing: ${run}')!
 	for _ in 0 .. 100 {
@@ -45,6 +63,7 @@ fn gone(value Ready) ! {
 }
 
 fn setup() ! {
+	os.mkdir(launch_logs, mode: 0o700)!
 	command(['/usr/sbin/vinix-account', 'init'], '')!
 	command(['/usr/sbin/vinix-account', 'add', 'alex', 'Alex Example', 'admin'], 'alex has a password\n')!
 	command(['/usr/sbin/vinix-account', 'add', 'sam', 'Sam Example'], 'sam has another\n')!
@@ -81,7 +100,7 @@ fn basic() ! {
 		'display',
 	] } }))!
 	blocked := launch('tone', 'tone', 'policy', 440)!
-	require(wait(blocked)! != 0 && !os.exists(data + '/policy.done'), 'organization audio policy did not refuse launch')!
+	require(wait_launch(blocked, 'policy')! != 0 && !os.exists(data + '/policy.done'), 'organization audio policy did not refuse launch')!
 	os.write_file('/etc/vinix-packages/config.json', config_text)!
 	println('AUDIO CONTROL organization-policy refused PASS')
 	forged := launch('tone', 'forged', 'forged', 0)!
@@ -97,7 +116,7 @@ fn basic() ! {
 			os.write_file(value.socket, 'foreign replacement\n')!
 		}
 		os.write_file(data + '/' + mode + '.go', 'go\n')!
-		require(wait(pid)! == 0 && text(data + '/' + mode + '.done') == 'PASS\n', '${mode} control failed')!
+		require(wait_launch(pid, mode)! == 0 && text(data + '/' + mode + '.done') == 'PASS\n', '${mode} control failed')!
 		if mode == 'changed' {
 			require(text(value.socket) == 'foreign replacement\n', 'portal removed a replacement endpoint')!
 			os.rm(value.socket)!
@@ -125,7 +144,7 @@ fn lifecycle() ! {
 			require(os.exists('/proc/${value.pid}'), 'held client exited before launcher-death cleanup was observed')!
 			require(C.kill(value.pid, C.SIGKILL) == 0, 'cannot clean held client')!
 		}
-		require(wait(pid)! != 0, 'killed ${target} reported successful session')!
+		require(wait_launch(pid, run)! != 0, 'killed ${target} reported successful session')!
 		C.usleep(1_500_000)
 		next := if index == 0 { 'afterclient' } else { 'afterlauncher' }
 		fresh := launch('tone', 'tone', next, if index == 0 { 660 } else { 440 })!

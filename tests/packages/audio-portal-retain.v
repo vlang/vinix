@@ -540,6 +540,15 @@ fn retain(run string, out string, arch string, synthetic bool) ! {
 }
 
 fn main() {
+	if os.args.len > 1 && os.args[1] == '--diagnostic-serial' {
+		if os.args.len != 4 || os.args[2] !in ['basic', 'lifecycle', 'seat']! {
+			eprintln('use --diagnostic-serial basic|lifecycle|seat SERIAL_LOG')
+			exit(1)
+		}
+		serial(os.args[3], os.args[2]) or { eprintln(err); exit(1) }
+		println('AUDIO SERIAL DIAGNOSTIC PASS qualification=false scenario=' + os.args[2])
+		return
+	}
 	if os.args.len == 5 && os.args[1] == '--diagnostic-basic' {
 		basic_diagnostic(os.args[2], os.args[3], os.args[4]) or { eprintln(err); exit(1) }
 		return

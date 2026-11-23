@@ -7,6 +7,8 @@ import json2
 import math
 import os
 
+const serial_mutations = ['missing-refusal', 'duplicate-marker', 'reordered-marker', 'wrong-identity', 'panic']
+
 struct Control {
 	name string
 	code int
@@ -141,7 +143,7 @@ fn mutate(run string, name string) !string {
 		replace(path, json2.encode(value).bytes())!
 		return 'raw hardware outcome did not pass'
 	}
-	if name in ['missing-refusal', 'duplicate-marker', 'reordered-marker', 'wrong-identity', 'panic'] {
+	if name in serial_mutations {
 		path := state + '/serial.log'
 		text := os.read_file(path)!
 		changed := match name {
@@ -218,6 +220,12 @@ fn run(program string, out string) ! {
 		return error('basic positive did not remain diagnostic-only')
 	}
 	controls << positive
+	serial_path := original + '/run/packages-audio-basic/serial.log'
+	serial_positive := call(program, ['--diagnostic-serial', 'basic', serial_path], 'serial-positive', out)!
+	if serial_positive.code != 0 || serial_positive.output.trim_space() != 'AUDIO SERIAL DIAGNOSTIC PASS qualification=false scenario=basic' {
+		return error('serial diagnostic did not admit the complete basic log: ' + serial_positive.output)
+	}
+	controls << serial_positive
 	for name in ['missing-outcome.json', 'missing-serial.log', 'missing-sound.wav', 'missing-qemu.log', 'missing-qmp.log',
 		'failed-outcome', 'interrupted-outcome', 'reason-outcome', 'wrong-scenario', 'wrong-state', 'zero-seconds', 'long-seconds',
 		'missing-refusal', 'duplicate-marker', 'reordered-marker', 'wrong-identity', 'panic', 'wrong-shutdown', 'duplicate-shutdown',
@@ -231,6 +239,14 @@ fn run(program string, out string) ! {
 			return error('basic control did not refuse before output: ' + name + ': ' + result.output)
 		}
 		controls << result
+		if name in serial_mutations {
+			altered_serial := work + '/run/packages-audio-basic/serial.log'
+			serial_result := call(program, ['--diagnostic-serial', 'basic', altered_serial], 'serial-' + name, out)!
+			if serial_result.code == 0 || !serial_result.output.contains(reason) {
+				return error('serial diagnostic admitted altered evidence: ' + name)
+			}
+			controls << serial_result
+		}
 	}
 	for name, args in {
 		'wrong-architecture': ['--diagnostic-basic', original, out + '/wrong-arch-result', 'x86_64']

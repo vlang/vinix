@@ -44,7 +44,8 @@ pub fn build_program_with_flags(host Host, source string, directory string, name
 		compile << ['-path', lookup.join('|')]
 	}
 	compile << ['-o', c_file, source]
-	run_tool(compile, map[string]string{}, log, tool_seconds)!
+	// Link trace consumers read build.log as C compiler output.
+	run_tool(compile, map[string]string{}, os.join_path(directory, 'generate.log'), tool_seconds)!
 	add_process_runtime(c_file)!
 	if host.arch == 'aarch64' {
 		sysroot := environment_or('VINIX_AARCH64_SYSROOT', shared_path(host.root, os.join_path('build-aarch64-userland',
