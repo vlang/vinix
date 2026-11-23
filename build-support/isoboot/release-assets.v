@@ -116,12 +116,14 @@ fn capture_assets(directory string, destination string, names []string) ! {
 	}
 }
 
-fn stage_assets(directory string, manifest string, destination string) ! {
+fn stage_assets(directory string, manifest string, destination string, uploaded []string) ! {
 	entries := read_manifest(manifest)!
 	if entries.len == 0 { return error('release checksum manifest is empty') }
 	os.mkdir(destination, mode: 0o700)!
 	for name, digest in entries {
-		path := copy_asset(directory, destination, name)!
+		path := if name in uploaded { os.join_path(directory, name) } else {
+			copy_asset(directory, destination, name)!
+		}
 		if pkgcore.hash_file(path)! != digest {
 			return error('release asset changed after verification: ' + name)
 		}
@@ -240,13 +242,20 @@ fn missing_assets(directory string, assets []UploadedAsset) ![]string {
 	return expected.keys()
 }
 
-fn upload_draft(stage string, directory string, response string, repo string, id string, tag string, prerelease bool) ! {
+fn upload_draft(stage string, directory string, response string, repo string, id string, tag string, prerelease bool, original string) ! {
 	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
 	draft := read_release(response, id, tag, notes, prerelease)!
 	if !draft.draft { return error('GitHub release is already published') }
 	endpoint := upload_endpoint(draft, repo)!
 	names := missing_assets(directory, draft.assets)!
+	if original != '' {
+		manifest := os.join_path(directory, 'SHA256SUMS')
+		if names.len == 0 { return check_assets(original, manifest) }
+		stage_assets(original, manifest, stage, draft.assets.map(it.name))!
+	}
 	if names.len == 0 { return }
+	if 'SHA256SUMS' in names { copy_asset(directory, stage, 'SHA256SUMS')! }
+	copy_asset(directory, stage, 'RELEASE_NOTES.md')!
 	gh := os.find_abs_path_of_executable('gh')!
 	eprintln('Uploading assets to GitHub draft ${draft.id}')
 	for start := 0; start < names.len; start += 5 {
@@ -293,7 +302,7 @@ fn run() ! {
 		return check_assets(os.args[2], os.args[3])
 	}
 	if os.args.len == 5 && os.args[1] == 'stage' {
-		return stage_assets(os.args[2], os.args[3], os.args[4])
+		return stage_assets(os.args[2], os.args[3], os.args[4], [])
 	}
 	if os.args.len == 8 && os.args[1] == 'prepare-creation' {
 		return prepare_creation(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
@@ -308,9 +317,9 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'restore-draft' {
 		return restore_draft(os.args[2], os.args[3], os.args[4])
 	}
-	if os.args.len == 9 && os.args[1] == 'upload-draft' {
+	if os.args.len == 10 && os.args[1] == 'upload-draft' {
 		upload_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
-			os.args[8] == 'true')!
+			os.args[8] == 'true', os.args[9])!
 		return
 	}
 	if os.args.len == 3 && os.args[1] == 'release-state' {

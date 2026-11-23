@@ -637,9 +637,11 @@ first upload the driver saves the repository, tag, commit, checksum manifest,
 and notes in `build-release/work/draft-ID.json`. Keep that record and the
 original asset files under `build-release/TAG`. Resume verifies those files
 against the saved manifest and checks the draft and tag again. It skips
-already uploaded assets with matching digests and uploads the missing files
-to the same draft ID. An unexpected asset, an incomplete upload, or a digest
-mismatch stops the run for inspection. Use `--draft` to finish the uploads
+already uploaded assets with matching digests when making private upload
+copies and stages the missing files for the same draft ID. A complete draft
+requires only checksum reads of the original files. An unexpected asset, an
+incomplete upload, or a digest mismatch stops the run for inspection.
+Use `--draft` to finish the uploads
 while keeping the release unpublished. A complete draft can also be published
 with the same resume command.
 

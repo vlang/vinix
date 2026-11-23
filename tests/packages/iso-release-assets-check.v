@@ -274,6 +274,12 @@ fn github_release_api(args []string, remote string, path string, scenario string
 	if path != 'releases/' + draft_id { return error('unexpected draft release ID') }
 	mut draft := json2.decode[FixtureRelease](os.read_file(local)!)!
 	if args.len == 3 {
+		if scenario == 'resume-publish' {
+			work := os.getenv('VINIX_ASSET_TEST_ROOT') + '/build-release/work'
+			if os.ls(work)!.any(it.starts_with('release-assets.') && os.is_dir(work + '/' + it + '/upload')) {
+				return error('complete draft recovery created an upload staging directory')
+			}
+		}
 		if !draft.draft && scenario == 'publish-readback-lost' {
 			eprintln('fixture could not read published release')
 			return 1
@@ -340,6 +346,17 @@ fn upload_fixture(args []string, out string, remote string, scenario string) !in
 	}
 	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if !draft.draft || draft.tag_name != tag { return error('upload does not target the draft') }
+	if scenario == 'resume-complete-draft' && name == 'vinix-amd64.iso' {
+		stage := os.dir(file)
+		mut names := os.ls(stage)!
+		names.sort()
+		for asset in draft.assets {
+			if asset.name in names {
+				return error('resume copied an already uploaded asset: ' + asset.name)
+			}
+		}
+		os.write_file(remote + '/resume-stage', names.join('\n') + '\n')!
+	}
 	if name == 'vinix-amd64.iso' && !scenario.starts_with('resume-') {
 		capture_public_output(out, scenario)!
 		match scenario {
@@ -646,14 +663,18 @@ fn check_resume(root string, work string, out string, remote string, environment
 	created := os.read_file(remote + '/release-attempt')!
 	mut before := os.ls(remote + '/uploads')!
 	before.sort()
-	iso := out + '/vinix-amd64.iso'
-	original := os.read_file(iso)!
-	os.write_file(iso, 'changed release ISO')!
-	resume_attempt(root, work, environment, 'resume-stale-local', [], 'release asset changed after verification') or {
-		os.write_file(iso, original)!
-		return err
+	uploaded := before.filter(it != 'SHA256SUMS')
+	if uploaded.len == 0 { return error('interrupted draft has no retained payload') }
+	for scenario, name in {'resume-stale-local': 'vinix-amd64.iso', 'resume-stale-uploaded': uploaded[0]} {
+		file := out + '/' + name
+		original := os.read_file(file)!
+		os.write_file(file, 'changed release asset')!
+		resume_attempt(root, work, environment, scenario, [], 'release asset changed after verification') or {
+			os.write_file(file, original)!
+			return err
+		}
+		os.write_file(file, original)!
 	}
-	os.write_file(iso, original)!
 	resume_attempt(root, work, environment, 'resume-bad-remote', [], 'GitHub draft asset differs from the verified upload')!
 	resume_attempt(root, work, environment, 'resume-wrong-repo', ['--repo=local/other'], 'belongs to local/fixture')!
 	mut after_refusals := os.ls(remote + '/uploads')!
@@ -666,7 +687,8 @@ fn check_resume(root string, work string, out string, remote string, environment
 	os.write_file(out + '/SHA256SUMS', 'changed public checksum list')!
 	resume_attempt(root, work, environment, 'resume-complete-draft', ['--draft'], '')!
 	finished := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
-	if !finished.draft || finished.assets.len != expected || os.exists(remote + '/publish-attempt') {
+	if !finished.draft || finished.assets.len != expected || os.exists(remote + '/publish-attempt')
+		|| !os.exists(remote + '/resume-stage') {
 		return error('recovery did not complete the retained draft')
 	}
 	resume_attempt(root, work, environment, 'resume-publish', [], '')!

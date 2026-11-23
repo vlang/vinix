@@ -242,10 +242,9 @@ verify_release() {
 }
 
 finish_draft() {
-    local release_id="$1" response="$2" release_url
-    cp "$ASSET_WORK/SHA256SUMS" "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_STAGE/"
+    local release_id="$1" response="$2" original="${3:-}" release_url
     "$ASSET_WORK/release-assets" upload-draft "$ASSET_STAGE" "$ASSET_WORK" \
-        "$response" "$REPO" "$release_id" "$TAG" "$prerelease"
+        "$response" "$REPO" "$release_id" "$TAG" "$prerelease" "$original"
     github_api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
     release_url="$(verify_release "$release_id" "$ASSET_WORK/draft.json" draft)"
     if [ "$DRAFT" -eq 1 ]; then
@@ -314,8 +313,7 @@ if [ -n "$RESUME_DRAFT" ]; then
         exit 0
     fi
     confirm_publish
-    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
-    finish_draft "$RESUME_DRAFT" "$ASSET_WORK/resume-draft.json"
+    finish_draft "$RESUME_DRAFT" "$ASSET_WORK/resume-draft.json" "$OUT"
     exit 0
 fi
 
