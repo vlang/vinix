@@ -159,24 +159,27 @@ fn check() ! {
 	os.write_file(work + '/inputs-before-build.json', json2.encode(inputs))!
 	verify(inputs)!
 	verify_sources(root, sources)!
-	extras := work + '/extras'
-	for directory in ['/usr/bin', '/usr/sbin', '/etc/vinix', '/etc/vinix-packages', '/var/lib/vinix-packages'] { os.mkdir_all(extras + directory)! }
-	os.write_file(extras + '/etc/vinix/auth.conf', 'scrypt_ln = 10\nscrypt_p = 1\n')!
-	os.cp(sandbox, extras + '/usr/bin/vinix-sandbox')!
-	os.mkdir_all(extras + '/usr/share/neovim-update')!
-	for name in ['index.json', 'index.sig'] { os.cp(update_repository + '/' + name, extras + '/usr/share/neovim-update/' + name)! }
-	os.write_file(extras + '/usr/share/neovim-update/public-key', key)!
+	boot := work + '/boot'
+	// Populate the fresh boot root in place. The full package store would
+	// otherwise occupy disk space in both extras and the initramfs staging tree.
+	rootfs := boot + '/rootfs'
+	for directory in ['/usr/bin', '/usr/sbin', '/etc/vinix', '/etc/vinix-packages', '/var/lib/vinix-packages'] { os.mkdir_all(rootfs + directory)! }
+	os.write_file(rootfs + '/etc/vinix/auth.conf', 'scrypt_ln = 10\nscrypt_p = 1\n')!
+	os.cp(sandbox, rootfs + '/usr/bin/vinix-sandbox')!
+	os.mkdir_all(rootfs + '/usr/share/neovim-update')!
+	for name in ['index.json', 'index.sig'] { os.cp(update_repository + '/' + name, rootfs + '/usr/share/neovim-update/' + name)! }
+	os.write_file(rootfs + '/usr/share/neovim-update/public-key', key)!
 	account := build_program(host.v, clang, sysroot, gcc, process_runtime, source, source + '/tools/accounts/account.v', 'vinix-account', arch, work, false)!
-	os.cp(account, extras + '/usr/sbin/vinix-account')!
+	os.cp(account, rootfs + '/usr/sbin/vinix-account')!
 	session := build_program(host.v, clang, sysroot, gcc, process_runtime, source, source + '/tools/accounts/session.v', 'vinix-session', arch, work, false)!
-	os.cp(session, extras + '/usr/sbin/vinix-session')!
+	os.cp(session, rootfs + '/usr/sbin/vinix-session')!
 	package := build_program(host.v, clang, sysroot, gcc, process_runtime, source, source + '/tools/packages/main.v', 'vinix-package', arch, work, false)!
-	os.cp(package, extras + '/usr/bin/vinix-package')!
+	os.cp(package, rootfs + '/usr/bin/vinix-package')!
 	guest := build_program(host.v, clang, sysroot, gcc, process_runtime, source, source + '/tests/packages/neovim-native/main.v', 'guest', arch, work, false)!
 	config := pkgcore.Config{architecture: arch, launch_user: 'alex', policy: pkgcore.Policy{offline: true, reserve_bytes: 0},
 		repositories: [pkgcore.Repository{id: 'neovim-fixture', url: 'file://' + repository, public_key: key}]}
-	os.write_file(extras + '/etc/vinix-packages/config.json', json2.encode(config))!
-	service := pkgcore.Service{root: extras}
+	os.write_file(rootfs + '/etc/vinix-packages/config.json', json2.encode(config))!
+	service := pkgcore.Service{root: rootfs}
 	mut catalog := service.refresh()!; catalog.close()
 	mut state := service.transact('install', ['org.neovim.editor'], pkgcore.TransactionOptions{})!; state.close()
 	// The publisher secret is never an input or a member of the guest image.
@@ -195,15 +198,15 @@ fn check() ! {
 	runtime_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
 	verify(inputs)!
 	verify_sources(root, sources)!
-	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{kernel: kernel, guest: guest, extras: extras,
-		state: work + '/boot', timeout: 1200, keep: true})
+	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{kernel: kernel, guest: guest,
+		state: boot, timeout: 1200, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	verify(inputs)!
 	verify_sources(root, sources)!
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!
 	mut outputs := map[string]string{}
 	for path in os.walk_ext(work, '') {
-		if os.is_file(path) && !path.contains('/rootfs/') && (!path.contains('/iso-root/') || path.ends_with('/boot/limine.conf')) && !path.starts_with(extras + '/') {
+		if os.is_file(path) && !path.starts_with(rootfs + '/') && (!path.contains('/iso-root/') || path.ends_with('/boot/limine.conf')) {
 			outputs[path[work.len + 1..]] = digest(path)!
 		}
 	}
