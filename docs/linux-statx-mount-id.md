@@ -19,8 +19,9 @@ original attachments. The mount table keeps an internal identity to map saved
 directory routes into the namespace copy. IDs identify mounts within one boot.
 
 Anonymous descriptions without mount records still omit mount fields. DMA-BUF
-continues to report the ID of its internal filesystem. `statmount` and
-`listmount` remain separate, unimplemented interfaces.
+continues to report the ID of its internal filesystem. The reported unique IDs
+can select a subtree in [`listmount`](linux-listmount.md). `statmount` remains
+unimplemented.
 
 ## Qualification
 

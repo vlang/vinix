@@ -265,10 +265,7 @@ fn publish_mount_attachment(mut table MountTable, mut covered VFSNode, root &VFS
 
 fn new_mount_record(covered &VFSNode, root &VFSNode, source string,
 	fstype string, flags u64, options string, parent_mount &lib.MountContext) &Mount {
-	id := allocate_mount_id()
 	mut entry := &Mount{
-		id:      id
-		public_id: id
 		covered: unsafe { covered }
 		root:    unsafe { root }
 		source:  source.clone()
@@ -282,6 +279,10 @@ fn new_mount_record(covered &VFSNode, root &VFSNode, source string,
 }
 
 fn append_mount_record_locked(mut table MountTable, mut entry Mount) {
+	// Allocate the public ID at publication so each table stays ordered even
+	// when two filesystems finish preparing their mount at the same time.
+	entry.id = allocate_mount_id()
+	entry.public_id = entry.id
 	root := entry.root
 	covered := entry.covered
 	if is_mqueue_inode(root) {
@@ -997,6 +998,13 @@ fn is_beneath(node &VFSNode, ancestor &VFSNode) bool {
 // current namespace parents rather than a descriptor's saved cursor prefix.
 fn mount_path_beneath(mut table MountTable, node &VFSNode, entry &Mount,
 	root &VFSNode, root_entry &Mount) bool {
+	table.lock.acquire()
+	defer { table.lock.release() }
+	return mount_path_beneath_locked(table, node, entry, root, root_entry)
+}
+
+fn mount_path_beneath_locked(table &MountTable, node &VFSNode, entry &Mount,
+	root &VFSNode, root_entry &Mount) bool {
 	mut current_node := unsafe { node }
 	mut current_entry := unsafe { entry }
 	for _ in 0 .. 64 {
@@ -1004,10 +1012,9 @@ fn mount_path_beneath(mut table MountTable, node &VFSNode, entry &Mount,
 		if current_entry.id == root_entry.id { return is_beneath(current_node, root) }
 		current_entry.lock.acquire()
 		current_node = current_entry.covered
+		identity := lib.mount_context_top(&current_entry.parent)
 		current_entry.lock.release()
-		next, valid := mount_parent_in_namespace(mut table, current_entry)
-		if !valid { return false }
-		current_entry = next
+		current_entry = mount_by_route_locked(table, identity, false)
 	}
 	return false
 }
@@ -1144,14 +1151,26 @@ fn mount_descends_locked(table &MountTable, _entry &Mount, ancestor &Mount) bool
 		entry.lock.acquire()
 		identity := lib.mount_context_top(&entry.parent)
 		entry.lock.release()
-		if identity == unsafe { nil } { return false }
-		parent_id := unsafe { &Mount(identity) }.id
-		mut parent := &Mount(unsafe { nil })
-		for candidate in table.mounts { if candidate.id == parent_id { parent = candidate; break } }
-		if parent == unsafe { nil } { return false }
-		entry = parent
+		entry = mount_by_route_locked(table, identity, true)
+		if entry == unsafe { nil } { return false }
 	}
 	return false
+}
+
+fn mount_by_route_locked(table &MountTable, identity voidptr, include_detached bool) &Mount {
+	if identity == unsafe { nil } { return unsafe { nil } }
+	id := unsafe { &Mount(identity) }.id
+	mut low := 0
+	mut high := table.mounts.len
+	for low < high {
+		mid := low + (high - low) / 2
+		candidate := table.mounts[mid]
+		if candidate.id == id {
+			return if include_detached || !candidate.detached { candidate } else { unsafe { nil } }
+		}
+		if candidate.id < id { low = mid + 1 } else { high = mid }
+	}
+	return unsafe { nil }
 }
 
 // Called under vfs_lock before changing either attachment. Saved cwd/fd routes

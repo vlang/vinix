@@ -2787,6 +2787,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   aliases, inherited descriptors, mount namespace copies, and lazy detach on
   both architectures. See [the mount identity receipts](docs/linux-statx-mount-id.md).
 
+- [x] Implement native `listmount` for the caller's mount namespace. Qualify
+  subtree enumeration, pagination in both directions, and mount moves and
+  detach on both architectures. See [the listmount receipts](docs/linux-listmount.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both
