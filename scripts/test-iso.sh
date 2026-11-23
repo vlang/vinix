@@ -8,6 +8,7 @@
 #                      VBoxManage is installed and can run the image's
 #                      architecture on this host)
 #   --no-virtualbox    skip VirtualBox
+#   --keep-qemu-disks  retain the raw QEMU installation disks under --out
 #   --timeout=SECONDS  per boot (default: 240, or 900 without acceleration)
 #   --out=DIR          serial logs and screenshots (default: a temporary dir)
 #
@@ -34,6 +35,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RUN_QEMU=1
 RUN_VBOX=auto
+KEEP_QEMU_DISKS=0
 TIMEOUT=''
 OUT=''
 ISOS=()
@@ -47,6 +49,7 @@ for arg in "$@"; do
         --no-qemu) RUN_QEMU=0 ;;
         --virtualbox) RUN_VBOX=1 ;;
         --no-virtualbox) RUN_VBOX=0 ;;
+        --keep-qemu-disks) KEEP_QEMU_DISKS=1 ;;
         --timeout=*) TIMEOUT="${arg#*=}" ;;
         --out=*) OUT="${arg#*=}" ;;
         --help|-h) usage; exit 0 ;;
@@ -131,6 +134,10 @@ vm_shoot() {
 
 # A blank disk for a boot to install onto, as a new VM's is.
 blank_disk() {
+    if [ "$KEEP_QEMU_DISKS" -eq 1 ] && { [ -e "$1" ] || [ -L "$1" ]; }; then
+        echo "ERROR: retained disk already exists: $1; use a fresh --out directory" >&2
+        return 1
+    fi
     rm -f "$1"
     truncate -s 4G "$1" 2>/dev/null || mkfile -n 4g "$1"
 }
@@ -372,7 +379,9 @@ qemu_amd64() {
                 -machine pc,hpet=off -m 4096 -smp 1 -vga std \
                 -drive "file=$disk,format=raw" -nic user,model=e1000
         fi
-        rm -f "$disk"
+        if [ "$KEEP_QEMU_DISKS" -eq 0 ]; then
+            rm -f "$disk"
+        fi
     else
         FAILED+=("qemu-amd64-uefi (no x86_64 UEFI firmware found)")
     fi
@@ -452,7 +461,9 @@ qemu_arm64() {
                 ;;
         esac
     done
-    rm -f "$disk"
+    if [ "$KEEP_QEMU_DISKS" -eq 0 ]; then
+        rm -f "$disk"
+    fi
 }
 
 find_vboxmanage() {
