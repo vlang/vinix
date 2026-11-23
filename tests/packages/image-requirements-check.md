@@ -349,6 +349,26 @@ The fixtures, diagnostics and build logs are in
 Its SHA-256 is `3d0bb1dc4a3060393740829425e925d69a2c5be7b327757ed4806b6b39f54ed2`.
 All 383 entries in the extracted `qualification.sha256` passed.
 
+### Archive link verification
+
+At `0eeb1ed6f`, the verifier checks link targets in initramfs order. Hard links
+must name a previously listed regular file outside the protected package paths.
+An earlier admitted hard link may serve as the target of another link. The
+verifier also refuses archive entries that traverse a symbolic-link parent.
+
+Both target plans passed 33 host controls with the production verifier and
+under ASan/UBSan. The six new cases cover a valid hard-link chain and ordinary
+symlink, a hard link to package configuration, a directory target, a forward
+target, a symbolic-link target, and a member under a symbolic-link parent. The
+mixed-catalog and configuration-only fixtures reproduced byte-identical receipts.
+The retained bootable desktop ISOs passed the archive checks and reached the
+repository authentication check for their expired fixture indexes.
+
+The fixtures, verification logs and retained ISO input checksums are in
+`~/.local/state/vinix/r14-iso-archive-links-kVzVtp/qualification.tar.gz`.
+Its SHA-256 is `b9540411300a7a5edcaa741c0c1bc21c8fa30a7e9e6679f637cde00913aa8e8b`.
+All 304 entries in the extracted `qualification.sha256` passed.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the

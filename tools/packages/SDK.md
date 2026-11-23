@@ -583,6 +583,8 @@ libarchive and zlib.
 The verifier checks the exact repository member names in the archive before
 creating the host scratch tree. Publisher IDs, index and signature filenames,
 and lowercase object digests follow the existing signed repository layout.
+Initramfs hard links must name earlier regular files outside the protected
+package paths. The verifier refuses archive entries under symbolic-link parents.
 
 To require an independently reviewed selection, build the host helper and
 generate one plan per target with the candidate package input environment.
