@@ -1896,7 +1896,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 				return errno.err, errno.eacces
 			}
 			// Nor may mprotect() make it writable later.
-			map_flags |= mmap.map_no_write
+			map_flags |= mmap.map_no_write | mmap.map_read_only_handle
 		}
 	}
 

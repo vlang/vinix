@@ -9,7 +9,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 
 ## aarch64
 
-261/310 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
+262/310 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
 
 | Number | Linux name | Handler | Dispatch status | Registered by |
 | --- | --- | --- | --- | --- |
@@ -247,7 +247,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | 231 | munlockall | `mmap.syscall_munlockall` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
 | 232 | mincore | `mmap.syscall_mincore` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
 | 233 | madvise | `mmap.syscall_madvise` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
-| 234 | remap_file_pages | `vacant` | unavailable |  |
+| 234 | remap_file_pages | `mmap.syscall_remap_file_pages` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
 | 235 | mbind | `numa.syscall_mbind` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
 | 236 | get_mempolicy | `numa.syscall_get_mempolicy` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
 | 237 | set_mempolicy | `numa.syscall_set_mempolicy` | wired; unqualified | `kernel/syscall/table/syscall_table_arm64.v:init_syscall_table` |
@@ -333,7 +333,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 
 ## x86_64
 
-300/367 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
+301/367 baseline calls have a non-vacant dispatch (excluding known unavailable BPF/rseq).
 
 | Number | Linux name | Handler | Dispatch status | Registered by |
 | --- | --- | --- | --- | --- |
@@ -553,7 +553,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | 213 | epoll_create | `syscall_linux_epoll_create` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
 | 214 | epoll_ctl_old | `vacant` | unavailable |  |
 | 215 | epoll_wait_old | `vacant` | unavailable |  |
-| 216 | remap_file_pages | `vacant` | unavailable |  |
+| 216 | remap_file_pages | `mmap.syscall_remap_file_pages` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
 | 217 | getdents64 | `syscall_linux_getdents64` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
 | 218 | set_tid_address | `userland.syscall_set_tid_address` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
 | 219 | restart_syscall | `syscall_restart_syscall` | wired; unqualified | `kernel/syscall/table/linux_table_amd64.v:init_syscall_table` |
@@ -716,7 +716,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | --- | --- |
 | `kernel/c/pthread.h` | `349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2` |
 | `kernel/event/event.v` | `1f95b365a5abcfe7fdf93b8b57bcbcee11e6d6327d0f20fef358bfde5fbffcf0` |
-| `kernel/file/file.v` | `a96f1155616b89e6a3d0d381140283d4456f91868a202300695ff4e94b8d0400` |
+| `kernel/file/file.v` | `7dccedd0d8fbd08b7303f27a0c5c29789b0256f2a885a85e56ea0eeb9e2341b5` |
 | `kernel/fs/cachestat.v` | `a91f13d49f8fddfd26f3acf44014ccafec290ccfdae0865ec17e5fdfe424ab11` |
 | `kernel/fs/memfd_policy.v` | `33534ea5547c7d52ce3fbb2d0d195955d60351b065ec992549496b6b9b7cc1f2` |
 | `kernel/fs/mount.v` | `eacc84513600846fe2b29f374f412317a6483a1de5dee673588f24b55aa35d7b` |
@@ -740,8 +740,9 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/memory/mmap/inherit.v` | `04744a1e13ad5537b99f32d6a1ad6339079f5ce2c8ed22e8d15010e97b77f803` |
 | `kernel/memory/mmap/linux.v` | `5f0618d9a9ec35f98e548e9f27726917bb59cf549baff6c70f1e5bd8fd005afb` |
 | `kernel/memory/mmap/lock.v` | `ed62d24aad9c905dc291995dde114ef0ecb943746f034e66df09b5883b7711d8` |
-| `kernel/memory/mmap/mmap.v` | `9430fa93a3d01e6d259cb22aab56604287d386168e42ea55dc10a9982c4cf4db` |
+| `kernel/memory/mmap/mmap.v` | `1e409d4c20c414c034ff8ee49d2757ceffea9f9820f7666b60124e5367746d0a` |
 | `kernel/memory/mmap/paging.v` | `ed0ed6ca202812222ed89db6286c980437b2b96bb5626707d7a0634ed7c3b43c` |
+| `kernel/memory/mmap/remap_file.v` | `bbaf9dd7a1c9622318b20ec474e99092712378681ce735c632dd775736bb614f` |
 | `kernel/memory/mmap/seal.v` | `7dd0065b193f5c36814cae9c2b91f3ff52078fe3ebb2c6f23f45aae5b960fc10` |
 | `kernel/memory/physical.v` | `bd28de5502a609afea9c71dc547a771fc14b6b3e3ac0a093a8f0d57bd9f7e5c5` |
 | `kernel/memory/slab.v` | `10fb53c07ba105ff216027c7e0d9d9bc9b419a500e5b8963537d7a4ac4fa8367` |
@@ -775,13 +776,13 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/syscall/table/container_arm64.v` | `13b4623072c1c966af706d8f8954c7273f5827ee912247496e80154ad4a6dc36` |
 | `kernel/syscall/table/linux_common.v` | `7ab393a68132f4664d7d5279a5f51398566b718380711eb62c843ef096983dd2` |
 | `kernel/syscall/table/linux_compat.v` | `f7bd11f5ad30281c2ffa06b9833fde39a0b30c2ae895d3aca1e2577e4f94e5a8` |
-| `kernel/syscall/table/linux_table_amd64.v` | `f3fad4a16c97e2a852d74276112b9d184dc449048285388b795cf37cf4c1acf4` |
+| `kernel/syscall/table/linux_table_amd64.v` | `f9f7723b0e830bb04e630da992ec5281f26ec8e1cf304794c96e263dbbcf206d` |
 | `kernel/syscall/table/mmap_aslr_amd64.v` | `8670ac6d0f56c37f91402b0a6311b746c9bc7471fdda97e6aa2d96939cfe45ce` |
 | `kernel/syscall/table/pipe_usercopy_amd64.v` | `48c1bdd554d3dfc05a544f3d18df0d284fe3e1a074621abcf8c1688cb416e8d0` |
 | `kernel/syscall/table/security_amd64.v` | `5b6929162ebb0682c2c98cf9aab4cf12aa62021576b898ec60ab804b2a63749a` |
 | `kernel/syscall/table/storage_amd64.v` | `ad3b72a321de8a00e39b1584e1ef2cdcff73157cbe1a99f4b9350ffd342bfb63` |
 | `kernel/syscall/table/storage_arm64.v` | `e4e8be0aa3679c61a824290f2741e91d8172b8cad4d291448602d5468e983da6` |
-| `kernel/syscall/table/syscall_table_arm64.v` | `c2f5a6769d73e07882657a0c867a5b5cb6877e1e4002033fab2fdd2b03d432f7` |
+| `kernel/syscall/table/syscall_table_arm64.v` | `9d393acbacb619a8d30f2dba8bb294edd5d02744e871a060d6770446af89b79b` |
 | `kernel/syscall/table/sysv_message.v` | `0c7c2f8912ab1903a717699975d954352d0ab8350d74915fde581a957ca7323d` |
 | `kernel/syscall/table/trace_amd64.v` | `886f920865046fc589e5e923fd2ae9c1bf1ed0a6731b5344026b480470b3cd18` |
 | `kernel/time/time.v` | `e68d5b75abe21d155335517daa52c64cd551559350cf66bd6e0716ddfdadfc52` |
@@ -798,7 +799,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/userland.v` | `2f0a2f5ec802ef73db0bb442366458c4074d61de0d14688a84fec4b89fa66893` |
 | `kernel/userland/userland_arm64.v` | `0f79600e49706d5e54a9ca8eb11bd1ebcc20b5d69af3c1f4f0455310bcde9098` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
-| `tools/linux-compat/coverage.v` | `e08636422e394667091e15d7d743b1e3aa0fa2cc323a36ff88b79fbf80b97a8c` |
+| `tools/linux-compat/coverage.v` | `562a6bf4e5fafac524bd399f72708c6cbda9b9c38ff91abb20415d953b1746fd` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/linux-6.12-syscalls.h` | `c8b6a93593c1422fd31155f9ce06288bc3971fbe0375a25bfd173f7e9253c120` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

@@ -591,6 +591,7 @@ pub fn init_syscall_table() {
 	syscall_table[214] = voidptr(mmap.syscall_brk) // __NR_brk
 	syscall_table[215] = voidptr(mmap.syscall_munmap) // __NR_munmap
 	syscall_table[216] = voidptr(mmap.syscall_mremap) // __NR_mremap
+	syscall_table[234] = voidptr(mmap.syscall_remap_file_pages) // __NR_remap_file_pages
 	syscall_table[220] = voidptr(userland.syscall_clone) // __NR_clone
 	syscall_table[221] = voidptr(userland.syscall_execve) // __NR_execve
 	syscall_table[222] = voidptr(syscall_linux_mmap) // __NR_mmap

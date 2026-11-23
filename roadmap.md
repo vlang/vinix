@@ -2771,6 +2771,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   files. Qualify sparse ranges, shared faults, permission checks and the
   fixed-width result on both architectures. See [the cachestat receipts](docs/linux-cachestat.md).
 
+- [x] Implement native `remap_file_pages` for shared regular-file mappings.
+  Qualify offset replacement, adjacent mappings, protection checks and
+  concurrent unmap on both architectures. See [the remap receipts](docs/linux-remap-file-pages.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

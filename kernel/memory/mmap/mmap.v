@@ -58,8 +58,10 @@ const map_brk_reservation = 0x20000000
 pub const map_no_write = 0x40000000
 // Internal permission ceiling for files mapped through a noexec mount.
 pub const map_no_exec = 0x10000000
+// Linux clears VM_SHARED for MAP_SHARED on a read-only description.
+pub const map_read_only_handle = 0x08000000
 // Userspace cannot supply any of the kernel's mapping bookkeeping bits.
-pub const map_internal_mask = map_brk_reservation | map_no_write | map_no_exec
+pub const map_internal_mask = map_brk_reservation | map_no_write | map_no_exec | map_read_only_handle
 
 // Runtimes such as JavaScriptCore reserve multi-gigabyte anonymous arenas but
 // commit only a small fraction of them. Keep large reservations sparse and let
@@ -184,6 +186,7 @@ mut:
 	credit_base      u64
 	credit_serial    u64
 	created_serial   &u64 = unsafe { nil }
+	file_remap FileRemapSource
 }
 
 pub fn list_ranges(pagemap &memory.Pagemap) {
@@ -1402,6 +1405,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// private to the loader until it replaces the old page map.
 	own_update := voidptr(pagemap) == voidptr(process.pagemap)
 		&& flags & map_brk_reservation == 0 && options.created_serial == unsafe { nil }
+		&& options.file_remap.serial == 0
 	if own_update { begin_mapping_update(mut pagemap)? }
 	defer { if own_update { end_mapping_update(mut pagemap) } }
 
@@ -1465,6 +1469,13 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		}
 		if !mapping_retained {
 			unsafe { free_local_range(range_local) }
+			return none
+		}
+		// A remap may move a view from beyond EOF to live file data. Admit
+		// any needed backing storage before removing the old mapping.
+		if options.file_remap.serial != 0 && !reserve_shared_file_span(mut resource_, u64(offset), length) {
+			free_local_range(range_local)
+			errno.set(errno.enomem)
 			return none
 		}
 		if flags & map_shared == 0 {
@@ -1544,11 +1555,19 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		}
 	} else if fixed {
 		base = u64(addr)
-		if first_protected_range_unlocked(pagemap, base, length, .sealed) != unsafe { nil } {
+		failure := if options.file_remap.serial != 0
+			&& !file_remap_matches_unlocked(pagemap, base, base + length, prot, options) {
+			errno.einval
+		} else if first_protected_range_unlocked(pagemap, base, length, .sealed) != unsafe { nil } {
+			errno.eperm
+		} else {
+			u64(0)
+		}
+		if failure != 0 {
 			pagemap.l.release()
 			free_global_range(range_global)
 			free_local_range(range_local)
-			errno.set(errno.eperm)
+			errno.set(u64(failure))
 			return none
 		}
 		if voidptr(pagemap) == voidptr(process.pagemap)
@@ -1634,18 +1653,11 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// Convert movable shared-file storage before any page can be handed out,
 	// including when the mapping itself will be populated on demand.
 	if flags & map_anonymous == 0 && flags & map_shared != 0
-		&& voidptr(resource_) != unsafe { nil } {
-		reserve_length := if u64(offset) < u64(resource_.stat.size) {
-			min_u64(length, u64(resource_.stat.size) - u64(offset))
-		} else {
-			u64(0)
-		}
-		if reserve_length > 0
-			&& !resource.reserve_shared_mapping(mut resource_, u64(offset), reserve_length) {
-			unmap_created_range(mut pagemap, base, length, mapping_serial)
-			errno.set(errno.enomem)
-			return none
-		}
+		&& voidptr(resource_) != unsafe { nil } && options.file_remap.serial == 0
+		&& !reserve_shared_file_span(mut resource_, u64(offset), length) {
+		unmap_created_range(mut pagemap, base, length, mapping_serial)
+		errno.set(errno.enomem)
+		return none
 	}
 	if prot != prot_none && !lazy_anonymous && !lazy_private_file && !lazy_file {
 		for i := u64(0); i < length; i += page_size {
@@ -1688,7 +1700,12 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		}
 	}
 
-	if flags & map_locked != 0 {
+	if options.file_remap.serial != 0 {
+		// Linux treats prefault as best effort after a successful remap.
+		if prot != prot_none && (options.file_remap.populate || flags & map_locked != 0) {
+			populate_missing_pages(mut pagemap, base, length, prot, false) or {}
+		}
+	} else if flags & map_locked != 0 {
 		populate_missing_pages(mut pagemap, base, length, prot, false) or {
 			failure := errno.get()
 			unmap_created_range(mut pagemap, base, length, mapping_serial)
@@ -1697,6 +1714,11 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		}
 	}
 	return voidptr(base)
+}
+
+fn reserve_shared_file_span(mut res resource.Resource, offset u64, length u64) bool {
+	size := u64(res.stat.size)
+	return offset >= size || resource.reserve_shared_mapping(mut res, offset, min_u64(length, size - offset))
 }
 
 // A failed prefill may race MAP_FIXED replacement of the same span. Remove

@@ -485,6 +485,7 @@ pub fn init_syscall_table() {
 	syscall_table[11] = voidptr(mmap.syscall_munmap) // munmap
 	syscall_table[12] = voidptr(mmap.syscall_brk) // brk
 	syscall_table[25] = voidptr(mmap.syscall_mremap) // mremap
+	syscall_table[216] = voidptr(mmap.syscall_remap_file_pages) // remap_file_pages
 	syscall_table[26] = voidptr(mmap.syscall_msync) // msync
 	syscall_table[27] = voidptr(mmap.syscall_mincore) // mincore
 	syscall_table[28] = voidptr(mmap.syscall_madvise) // madvise

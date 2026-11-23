@@ -245,6 +245,7 @@ fn coverage(root string) !Coverage {
 		'kernel/userland/seccomp_signal.v', 'kernel/memory/mmap/linux.v',
 		'kernel/memory/mmap/lock.v', 'kernel/memory/mmap/inherit.v',
 		'kernel/memory/mmap/immutable.v', 'kernel/memory/mmap/paging.v',
+		'kernel/memory/mmap/remap_file.v',
 		'kernel/memory/mmap/seal.v', 'kernel/memory/virtual.v',
 		'kernel/memory/mmap/mmap.v', 'kernel/memory/table_budget.v',
 		'kernel/memory/physical.v', 'kernel/memory/slab.v',
