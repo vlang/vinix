@@ -261,6 +261,48 @@ The paired fixture ISOs, plans, receipts and logs are in
 `qualification.sha256` is
 `2df1f66944c0dcd98b18350059c514b480b47fe72435a1d39ec384f4a220e293`.
 
+### Initramfs layout verification
+
+At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
+octal mode and size fields used by the release packer. It requires one gzip
+compression layer. Package parent directories must appear before their members,
+allow ordinary accounts to read and traverse them, and exclude shared writes.
+The scratch tree is created from explicit directory entries before checking the
+signed selection.
+
+Both target plans passed 19 host controls with the production verifier and again
+under ASan/UBSan. The baseline issued receipts for all eleven new negative cases
+on both targets. They cover inaccessible and search-only directories, missing or
+late parents, legacy and contiguous file types, PAX path replacement, non-USTAR
+headers, leading spaces in a size field, bzip2 and nested gzip. The shared tar
+reader tests and the configuration-only receipt replay also passed.
+
+The retained x86-64 mixed-catalog fixture produced an identical receipt. The
+previous AArch64 handoff fixture lacked an explicit `/etc` entry and refused.
+Repacking the same signed tree with its parents produced a matching package
+selection and a new ISO digest. Both retained bootable desktop ISOs passed the
+archive checks and reached repository verification, which refused their expired
+fixture indexes.
+
+Build the two host tools as described above. The test runner can generate fresh
+signed fixtures without relying on an older fixture index's lifetime:
+
+```sh
+fixture=/path/to/new-fixture
+iso-package-receipt-check fixture aarch64 "$fixture"
+VINIX_PACKAGE_IMAGE_CONFIG_AARCH64="$fixture/config.json" \
+VINIX_PACKAGE_IMAGE_REPOSITORIES_AARCH64="$fixture/bundle" \
+VINIX_PACKAGE_IMAGE_APPLICATIONS_AARCH64="$fixture/staged/usr/share/vinix-packages/applications.json" \
+  package-receipt plan aarch64 > "$fixture/plan.json"
+iso-package-receipt-check /path/to/package-receipt "$fixture/staged" \
+  "$fixture/plan.json" /path/to/new-check-output
+```
+
+The fixtures, baseline and fixed outcomes, and mixed-catalog evidence are in
+`~/.local/state/vinix/r14-iso-boot-layout-luLPhK/qualification.tar.gz`.
+Its SHA-256 is `4ec9818f3a349e9468d707d28dbce344014915c50ada177cb7ecf8e356d769ec`.
+All 179 entries in the extracted `qualification.sha256` passed.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
