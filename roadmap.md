@@ -929,10 +929,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     bind output-only 48 kHz stereo streams to the signed generation lease,
     package identity, exact private endpoint and immutable active-seat login
     labels before account isolation. Applications receive no raw sound-device
-    path. All 52 host checks pass, including allocation ownership, refusal and
-    production C generation for both targets. The
+    path. The retained host run passed 52 checks, including allocation ownership,
+    refusal and production C generation for both targets. The
     [paired QEMU checks](tests/packages/audio-portal-native-check.md#finalized-qemu-waveform-capture)
     pass exact stereo waveforms, seat switching and cleanup on both targets.
+    The [interrupted-wait checks](tests/packages/audio-portal-native-check.md#pcm-portal-signal-interruption)
+    verify that handled signals preserve acknowledgements, deadlines and lease
+    closure.
     The [HD Audio stall check](tests/packages/audio-portal-native-check.md#hd-audio-stall-and-close-recovery)
     verifies bounded write and drain failures and successful reuse after close.
     The [VirtIO stall check](tests/packages/audio-portal-native-check.md#virtio-sound-stall-recovery)

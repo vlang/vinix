@@ -423,3 +423,35 @@ source patches are in
 `~/.local/state/vinix/r14-apple-pcm-r5NmNW/qualification.tar.gz`.
 Its SHA-256 is `04d53a637ea46ec2d62b676d0f0104054b05af421cdfa4e793b8abf926174d81`.
 The extracted files passed all 48 entries in `qualification.sha256`.
+
+## PCM portal signal interruption
+
+At `bdaae41cf`, `EINTR` from `poll()` retries against the original
+monotonic deadline. This covers nonblocking connect, frame reads and
+writes, listener readiness and caller-lease checks. A real socket or lease
+event still ends the wait according to its existing handling.
+
+The focused portal tests passed in normal, production and ASan/UBSan
+builds with allocation tracking. Real `SIGUSR1` interruptions preserved
+a delayed PCM acknowledgement and the original 150 ms idle deadline.
+The same test exercised a timed lease check and indefinite readiness
+ending on lease closure. The immediate-refusal control lost the
+acknowledgement. The deadline-renewal control waited past the finite
+deadline and encountered the later lease closure.
+
+The maintained host suite stopped on two existing launch-transport
+ownership assertions. With the same compiler, both assertions reported
+208,000 retained bytes on the unchanged `6c01b60c6` baseline and the
+updated source. The remaining suites and target C generation ran
+independently.
+
+With the change applied to `6c01b60c6`, the signed basic, lifecycle and
+seat scenarios passed on both unsealed QEMU kernels. All six recordings
+passed the strict serial, waveform and guest shutdown checks. Independently
+reviewed audio kernel seals remain open.
+
+The source patch, control results, host logs, guest artifacts and input
+inventories are in
+`~/.local/state/vinix/r14-pcm-poll-THa9SR/qualification.tar.gz`.
+Its SHA-256 is `7b92127337d6b812481c04e1bcb940d81bab81edf2016a4c79999edf16203a4a`.
+The extracted files passed all 104 entries in `qualification.sha256`.
