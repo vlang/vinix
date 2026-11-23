@@ -770,12 +770,36 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	}
 }
 
+struct TmpFSMountOptions {
+	recorded bool
+	mode u32
+	uid u32
+	gid u32
+}
+
 struct TmpFS {
 pub mut:
 	dev_id        u64
 	inode_counter u64
+	// The root's initial configuration, independent of chmod and chown.
+	mount_options TmpFSMountOptions
 	// See as_filesystem().
 	box &FileSystem = unsafe { nil }
+}
+
+// The caller is preparing a filesystem root for its first publication.
+fn capture_tmpfs_mount_options(root &VFSNode) {
+	if root.resource == unsafe { nil } { return }
+	mut backend := root.filesystem
+	if mut backend is TmpFS {
+		if backend.mount_options.recorded { return }
+		backend.mount_options = TmpFSMountOptions{
+			recorded: true
+			mode: root.resource.stat.mode & 0o7777
+			uid: root.resource.stat.uid
+			gid: root.resource.stat.gid
+		}
+	}
 }
 
 // as_filesystem is the filesystem as the VFS holds it, boxed once. Passing

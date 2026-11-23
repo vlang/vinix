@@ -2798,6 +2798,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   attachment metadata, bind roots and mountpoints, and the effects of moves,
   detach, and chroot on both architectures. See [the statmount receipts](docs/linux-statmount.md).
 
+- [x] Report tmpfs superblock options through `statmount`. Qualify option
+  formatting, output boundaries, and shared configuration across bind mounts
+  on both architectures. See [the tmpfs option receipts](docs/linux-statmount.md#tmpfs-options-qualification).
+
 - [x] Implement native `open_tree` path references. Qualify mount identity,
   descriptor reservation, and metadata-only pipe and terminal references on
   both architectures. See [the open_tree receipts](docs/linux-open-tree.md).

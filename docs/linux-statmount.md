@@ -20,10 +20,18 @@ string buffer returns `EOVERFLOW` before copyout. The kernel releases both
 mount locks before copying the result to userspace.
 [Linux 6.12.51 implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/namespace.c)
 
+For tmpfs, `STATMOUNT_MNT_OPTS` reports the root mode, owner and group captured
+at mount creation, followed by `inode64`. It uses the same configuration
+through bind aliases and after changes to the root inode's attributes. Mode
+`1777` and zero owner or group IDs are omitted from the string. The mode
+reported for a stock Vinix tmpfs reflects its initial `0755` root mode.
+[Linux 6.12.51 tmpfs option formatting](https://github.com/gregkh/linux/blob/v6.12.51/mm/shmem.c)
+
 Foreign namespace queries return `ENOENT`. Propagation fields describe the
-private mount model, with no peer or master groups. The mount-options string
-is omitted. Combined strings use a bounded 12 KiB scratch buffer plus the
-leading NUL, so sufficiently deep paths can return `EOVERFLOW`.
+private mount model, with no peer or master groups. Other filesystems omit
+the options field. Tmpfs capacity and inode-count limits remain outside this
+implementation. Combined strings use a bounded 12 KiB scratch buffer plus
+the leading NUL, so sufficiently deep paths can return `EOVERFLOW`.
 
 ## Qualification
 
@@ -49,4 +57,31 @@ the baseline. The `listmount`, `statmntid`, `namespace`, `clonefsns` and
 Hashes are SHA-256 prefixes. The restored and verified archive is
 `~/.cache/vinix-r15/statmount/qualification.tar.zst`, with SHA-256
 `4773dc65c771e926ec975a9289f8b1230d770041bf8532c1657c795c5298f173`.
+Decode it with `zstd --long=28 -dc` before extracting the tar stream.
+
+## Tmpfs options qualification
+
+The same `statopts` probe executable passed on Vinix and Linux 6.12.51 for
+each architecture. It checks exact-fit and short buffers, string offsets
+when the filesystem type is also requested, default omission, and stable
+options through bind aliases and root inode changes. The probe checks owner
+and group IDs above `INT_MAX`. Vinix now parses those mount options as
+unsigned 32-bit values. The baseline omitted the options field.
+
+Production builds used `2a074181d` plus the archived source patch. Review
+covered the capture paths, including boot-created scratch mounts, and checked
+that the formatter's stack data is copied before return. The allocation
+checker reported the same existing findings and the same 306 AArch64 and
+254 x86-64 sites as the baseline.
+The `statmount`, `listmount`, `movemount`, and namespace regressions passed
+on both architectures.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `cd919f8bbdf0d177` | `e8b47f317573a8e3` | `c10dcda286791671` | `71eebc7268bb437f` |
+| x86-64 | `8e58602d9ea72610` | `7106811244ef56f7` | `e9f0fa09f64697bf` | `e4eaaf91c5f0d361` |
+
+Hashes are SHA-256 prefixes. The restored and verified archive is
+`~/.cache/vinix-r15/statopts/qualification.tar.zst`, with SHA-256
+`7e16e4699ff8588c1403e4bdf185d741c5ad47e5281f3846f835e32b959f688c`.
 Decode it with `zstd --long=28 -dc` before extracting the tar stream.

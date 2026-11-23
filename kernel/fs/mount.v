@@ -820,6 +820,8 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 			mount_node.resource.stat.uid = mounter.fsuid
 			mount_node.resource.stat.gid = mounter.fsgid
 		}
+		// Snapshot after translating ownership, before publishing the mount.
+		capture_tmpfs_mount_options(mount_node)
 	}
 
 	shown := if fstype == kind { display_fstype(kind) } else { fstype }
@@ -877,10 +879,10 @@ fn apply_tmpfs_options(mut root VFSNode, options string) {
 			res.stat.mode = (res.stat.mode & stat.ifmt) | (mode & 0o7777)
 		} else if option.starts_with('uid=') {
 			value := unsafe { tos(option.str + 4, option.len - 4) }
-			res.stat.uid = u32(value.int())
+			res.stat.uid = value.u32()
 		} else if option.starts_with('gid=') {
 			value := unsafe { tos(option.str + 4, option.len - 4) }
-			res.stat.gid = u32(value.int())
+			res.stat.gid = value.u32()
 		}
 	}
 }
@@ -1802,6 +1804,7 @@ pub fn record_root_switch(root &VFSNode, fstype string) {
 			}
 		}
 		if !starting_mount(child, identity) { continue }
+		if shown == 'tmpfs' { capture_tmpfs_mount_options(child.mountpoint) }
 		record_mount(mut table, child, child.mountpoint, shown, shown, 0, '', identity)
 	}
 	for mut entry in old { retire_mqueue_view(mut entry, false) }

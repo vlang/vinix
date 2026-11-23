@@ -17,7 +17,7 @@ const statmount_mnt_point = u64(0x10)
 const statmount_fs_type = u64(0x20)
 const statmount_mnt_ns_id = u64(0x40)
 const statmount_mnt_opts = u64(0x80)
-const statmount_paths = statmount_mnt_root | statmount_mnt_point | statmount_fs_type
+const statmount_string_fields = statmount_mnt_root | statmount_mnt_point | statmount_fs_type | statmount_mnt_opts
 const statmount_string_capacity = u64(3 * 4096 + 1)
 
 // The Linux 6.12 fixed header. String offsets are relative to its end.
@@ -58,10 +58,10 @@ pub fn syscall_statmount(_ voidptr, address u64, output u64, size u64, flags u32
 	ns := query_mount_namespace(request.namespace_id) or { return errno.err, errno.get() }
 	limit := memory.user_address_limit()
 	if output > limit || size > limit - output { return errno.err, errno.efault }
-	if size == sizeof(StatmountResult) && request.parameter & (statmount_paths | statmount_mnt_opts) != 0 {
+	if size == sizeof(StatmountResult) && request.parameter & statmount_string_fields != 0 {
 		return errno.err, errno.eoverflow
 	}
-	if request.parameter & statmount_paths == 0 {
+	if request.parameter & statmount_string_fields == 0 {
 		return statmount_to_user(ns, request, output, size, unsafe { nil })
 	}
 	reservation := vmstorage.allocation_bytes(statmount_string_capacity) or { return errno.err, errno.enomem }
@@ -154,7 +154,54 @@ fn snapshot_statmount_fields(view MountQueryView, root_entry &Mount, entry &Moun
 		}
 		header.mask |= statmount_mnt_point
 	}
+	if mask & statmount_mnt_opts != 0 && entry.fstype == 'tmpfs' {
+		mut backend := entry.filesystem_root.filesystem
+		if mut backend is TmpFS {
+			if backend.mount_options.recorded {
+				header.mnt_opts = append_statmount_tmpfs_options(mut strings, backend.mount_options) or { return false }
+				header.mask |= statmount_mnt_opts
+			}
+		}
+	}
 	return true
+}
+
+fn append_statmount_tmpfs_options(mut strings StatmountStrings, options TmpFSMountOptions) ?u32 {
+	// Four octal mode digits, two decimal u32 values, and the inode mode.
+	mut buffer := [48]u8{}
+	base := unsafe { &buffer[0] }
+	mut length := 0
+	if options.mode != 0o1777 {
+		length += format_statmount_option(base, 'mode=', options.mode, 8, 3)
+	}
+	if options.uid != 0 {
+		length += format_statmount_option(unsafe { base + length }, 'uid=', options.uid, 10, 1)
+	}
+	if options.gid != 0 {
+		length += format_statmount_option(unsafe { base + length }, 'gid=', options.gid, 10, 1)
+	}
+	// The tmpfs inode counter is u64.
+	unsafe { C.memcpy(base + length, c'inode64', 7) }
+	return append_statmount_string(mut strings, unsafe { tos(base, length + 7) })
+}
+
+fn format_statmount_option(out &u8, name string, value u32, radix u32, width int) int {
+	mut digits := [10]u8{}
+	mut start := digits.len
+	mut remaining := value
+	for {
+		start--
+		digits[start] = u8(`0` + remaining % radix)
+		remaining /= radix
+		if remaining == 0 && digits.len - start >= width { break }
+	}
+	count := digits.len - start
+	unsafe {
+		C.memcpy(out, name.str, name.len)
+		C.memcpy(out + name.len, &digits[start], count)
+		*(&u8(out + name.len + count)) = `,`
+	}
+	return name.len + count + 1
 }
 
 fn statmount_superblock(entry &Mount, mut header StatmountResult) {
