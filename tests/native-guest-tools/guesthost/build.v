@@ -202,13 +202,33 @@ fn launch_at(_init string, archive string, state string, kernel_dir string, arch
 	return Launch{command, env}
 }
 
+@[params]
+pub struct GuestOptions {
+pub:
+	numa bool
+}
+
+pub fn two_node_command(base []string) []string {
+	mut command := base.clone()
+	command[command.index('-m') + 1] = '2048'
+	command[command.index('-smp') + 1] = '4'
+	command << ['-object', 'memory-backend-ram,id=vinix-numa0,size=1024M', '-object',
+		'memory-backend-ram,id=vinix-numa1,size=1024M', '-numa',
+		'node,nodeid=0,cpus=0-1,memdev=vinix-numa0', '-numa',
+		'node,nodeid=1,cpus=2-3,memdev=vinix-numa1', '-numa', 'dist,src=0,dst=1,val=20']
+	return command
+}
+
 pub fn guest(source string, prebuilt string, state_arg string, kernel_arg string, arch string,
-	expected []string, failures []string, panic_mode bool, no_network bool, timeout int) !int {
-	return guest_with_cancel(source, prebuilt, state_arg, kernel_arg, arch, expected, failures, panic_mode, no_network, timeout, unsafe { nil })!
+	expected []string, failures []string, panic_mode bool, no_network bool, timeout int,
+	options GuestOptions) !int {
+	return guest_with_cancel(source, prebuilt, state_arg, kernel_arg, arch, expected, failures,
+		panic_mode, no_network, timeout, unsafe { nil }, options)!
 }
 
 pub fn guest_with_cancel(source string, prebuilt string, state_arg string, kernel_arg string, arch string,
-	expected []string, failures []string, panic_mode bool, no_network bool, timeout int, cancelled fn () bool) !int {
+	expected []string, failures []string, panic_mode bool, no_network bool, timeout int,
+	cancelled fn () bool, options GuestOptions) !int {
 	if cancelled != unsafe { nil } && cancelled() { return error('Guest run interrupted') }
 	if timeout <= 0 || expected.len == 0 || expected.any(it == '') {
 		return error('timeout and expected verdicts must be nonempty/positive')
@@ -242,6 +262,7 @@ pub fn guest_with_cancel(source string, prebuilt string, state_arg string, kerne
 	configured := launch(init, archive, state, kernel_dir, arch, no_network)!
 	if cancelled != unsafe { nil } && cancelled() { return error('Guest run interrupted') }
 	positive, negative := verdict_policy(expected, failures, panic_mode)
+	command := if options.numa { two_node_command(configured.command) } else { configured.command }
 	println('Guest artifacts: ' + state)
-	return boot_from_cancelled(configured.command, configured.env, state, positive, negative, timeout, true, '', cancelled)!
+	return boot_from_cancelled(command, configured.env, state, positive, negative, timeout, true, '', cancelled)!
 }

@@ -2804,6 +2804,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   under pressure on both architectures.
   See [the preferred-many receipts](docs/linux-preferred-many.md).
 
+- [x] Implement native `set_mempolicy_home_node` for private anonymous bind
+  and preferred-many ranges. Qualify ordered updates, range splitting, fork
+  inheritance, and fault placement on both architectures.
+  See [the home-node receipts](docs/linux-mempolicy-home-node.md).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).

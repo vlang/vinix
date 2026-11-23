@@ -44,6 +44,61 @@ pub fn syscall_mbind(_ voidptr, address u64, length u64, mode i32, nodes u64, ma
 	return 0, 0
 }
 
+pub fn syscall_set_mempolicy_home_node(_ voidptr, address u64, length u64, node u64,
+	flags u64) (u64, u64) {
+	mut base := address
+	$if arm64 {
+		base &= u64(0x00ffffffffffffff)
+	}
+	if base % page_size != 0 || flags != 0 || node >= u64(numa.node_count()) {
+		return errno.err, errno.einval
+	}
+	end := base + lib.align_up(length, page_size)
+	if end < base { return errno.err, errno.einval }
+	if end == base { return 0, 0 }
+
+	mut pagemap := proc.current_thread().process.pagemap
+	begin_mapping_update(mut pagemap) or { return errno.err, errno.get() }
+	defer { end_mapping_update(mut pagemap) }
+	pagemap.l.acquire()
+	result := set_home_node_unlocked(mut pagemap, base, end, i32(node))
+	pagemap.l.release()
+	if result != 0 { return errno.err, result }
+	return 0, 0
+}
+
+fn set_home_node_unlocked(mut pagemap memory.Pagemap, base u64, end u64, node i32) u64 {
+	mut cursor := base
+	mut result := errno.enoent
+	for cursor < end {
+		local, _, _ := addr2range(pagemap, cursor) or {
+			cursor = next_mapped_start(pagemap, cursor, end)
+			continue
+		}
+		next := min_u64(end, local.base + local.length)
+		old := local.policy
+		if old.mode == numa.mpol_default {
+			cursor = next
+			continue
+		}
+		if old.mode != numa.mpol_bind && old.mode != numa.mpol_preferred_many {
+			return errno.eopnotsupp
+		}
+		if old.home_node != node {
+			policy := proc.NumaPolicy{mode: old.mode, home_node: node, mask: old.mask}
+			// Commit each piece before visiting a later mapping. Its failure
+			// leaves the policies of earlier pieces in place.
+			split_policy_boundary_unlocked(mut pagemap, next, policy) or { return errno.get() }
+			split_policy_boundary_unlocked(mut pagemap, cursor, policy) or { return errno.get() }
+			mut changed, _, _ := addr2range(pagemap, cursor) or { return errno.efault }
+			changed.policy = policy
+		}
+		result = 0
+		cursor = next
+	}
+	return result
+}
+
 fn bind_range_unlocked(mut pagemap memory.Pagemap, base u64, end u64, policy proc.NumaPolicy,
 	strict_mask ?u64) u64 {
 	// Validate the whole interval before changing policies. Default can

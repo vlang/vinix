@@ -553,6 +553,7 @@ pub fn init_syscall_table() {
 	syscall_table[223] = voidptr(file.syscall_fadvise64) // __NR_fadvise64
 	syscall_table[213] = voidptr(file.syscall_readahead) // __NR_readahead
 	syscall_table[449] = voidptr(futex.syscall_waitv) // __NR_futex_waitv
+	syscall_table[450] = voidptr(mmap.syscall_set_mempolicy_home_node) // __NR_set_mempolicy_home_node
 	syscall_table[451] = voidptr(fs.syscall_cachestat) // __NR_cachestat
 	syscall_table[452] = voidptr(fs.syscall_fchmodat2) // __NR_fchmodat2
 	syscall_table[454] = voidptr(futex.syscall_futex2_wake) // __NR_futex_wake

@@ -212,7 +212,8 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 
 pub struct NumaPolicy {
 pub:
-	mode int
+	mode i32
+	home_node i32 = -1
 	mask u64
 }
 

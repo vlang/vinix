@@ -43,16 +43,16 @@ pub fn normalize_policy(mode i32, mask u64) ?proc.NumaPolicy {
 	match mode {
 		mpol_default, mpol_local {
 			if mask != 0 { return none }
-			return proc.NumaPolicy{mode: int(mode)}
+			return proc.NumaPolicy{mode: mode}
 		}
 		mpol_preferred {
 			if mask == 0 { return proc.NumaPolicy{mode: mpol_local} }
 			if allowed == 0 { return none }
-			return proc.NumaPolicy{mode: int(mode), mask: allowed & (~allowed + 1)}
+			return proc.NumaPolicy{mode: mode, mask: allowed & (~allowed + 1)}
 		}
 		else {
 			if allowed == 0 { return none }
-			return proc.NumaPolicy{mode: int(mode), mask: allowed}
+			return proc.NumaPolicy{mode: mode, mask: allowed}
 		}
 	}
 }
@@ -67,12 +67,13 @@ pub fn alloc_range_page(range_policy proc.NumaPolicy, index u64, zero bool) void
 		if caller != unsafe { nil } { policy = caller.numa_policy }
 	}
 	if !memory.user_room(1) { return unsafe { nil } }
-	home := current_node()
 	match policy.mode {
 		mpol_bind, mpol_preferred_many {
+			home := if policy.home_node >= 0 { int(policy.home_node) } else { current_node() }
 			strict := policy.mode == mpol_bind
 			page := alloc_from_policy_mask(home, policy.mask, strict, zero)
 			if strict || page != unsafe { nil } { return page }
+			return alloc_policy_node(home, false, zero)
 		}
 		mpol_interleave {
 			mut count := u64(0)
@@ -91,7 +92,7 @@ pub fn alloc_range_page(range_policy proc.NumaPolicy, index u64, zero bool) void
 		}
 		else {}
 	}
-	return alloc_policy_node(home, false, zero)
+	return alloc_policy_node(current_node(), false, zero)
 }
 
 fn alloc_from_policy_mask(home int, mask u64, strict bool, zero bool) voidptr {

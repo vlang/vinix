@@ -11,8 +11,10 @@ It skips direct reclaim on this pass. If all preferred candidates fail, it
 tries the normal local-first allocation path. The preferred mask stays
 intact when an allocation falls back.
 
-`MPOL_WEIGHTED_INTERLEAVE`, optional mode flags, home-node overrides,
-and translated or 32-bit policy calls remain open.
+An explicit range can override the node used to order those attempts.
+See [home-node qualification](linux-mempolicy-home-node.md).
+`MPOL_WEIGHTED_INTERLEAVE`, optional mode flags, and translated or
+32-bit policy calls remain open.
 
 ## Qualification
 

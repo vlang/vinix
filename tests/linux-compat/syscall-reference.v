@@ -46,7 +46,8 @@ fn run() ! {
 		hosttest.Option{ name: '--init', value: true },
 		hosttest.Option{ name: '--source', value: true },
 		hosttest.Option{ name: '--state-dir', value: true },
-	], [], 'Usage: syscall-reference.v --arch aarch64|x86_64 --case NAME --kernel LINUX (--init NATIVE-PROBE-ELF | --source PROBE.v) --state-dir FRESH-DIR')!
+		hosttest.Option{ name: '--numa' },
+	], [], 'Usage: syscall-reference.v --arch aarch64|x86_64 --case NAME --kernel LINUX (--init NATIVE-PROBE-ELF | --source PROBE.v) --state-dir FRESH-DIR [--numa]')!
 	for key in ['--arch', '--case', '--kernel', '--state-dir'] {
 		if !options.has(key) { return error('missing ' + key) }
 	}
@@ -95,6 +96,10 @@ fn run() ! {
 	command << ['-m', '512', '-smp', '2', '-kernel', work + '/linux', '-initrd', work + '/initramfs.cpio',
 		'-append', if arch == 'aarch64' { 'console=ttyAMA0 rdinit=/init panic=-1' } else { 'console=ttyS0 rdinit=/init panic=-1' },
 		'-display', 'none', '-serial', 'mon:stdio', '-no-reboot']
+	if options.has('--numa') {
+		command = guesthost.two_node_command(command)
+		command[command.index('-append') + 1] += ' numa_balancing=disable'
+	}
 	pass := 'LINUX ' + name + ' REFERENCE: PASS'
 	result := guesthost.boot_session(command, os.environ(), work, guesthost.SessionPolicy{
 		pass: pass

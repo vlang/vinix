@@ -83,6 +83,10 @@ controls future anonymous allocations and copy-on-write faults, is inherited
 across fork, and is visible to address queries through `get_mempolicy(2)`.
 Resident pages keep their placement. See the [mbind contract and receipts](linux-mbind.md).
 
+`set_mempolicy_home_node(2)` selects the node used to order future allocations
+for an explicit `MPOL_BIND` or `MPOL_PREFERRED_MANY` range. See
+[home-node qualification](linux-mempolicy-home-node.md).
+
 `getcpu(2)` reports the node of the CPU the caller is on.
 
 ## What userspace sees
