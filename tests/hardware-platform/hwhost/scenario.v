@@ -1165,6 +1165,21 @@ pub const scenarios = [
 		timeout:  60
 	},
 	Scenario{
+		name:     'virtio-sound-stall'
+		about:    'VirtIO sound recovers its DMA queues after an unacknowledged STOP'
+		arches:   ['aarch64']
+		define:   'virtio_snd_stall'
+		qemu:     ['-audiodev', 'none,id=hwsnd', '-device',
+			'virtio-sound-device,audiodev=hwsnd,streams=1']
+		required: ['HWTEST START virtio-sound-stall', 'HWTEST STEP stalled write timed out',
+			'HWTEST STEP stalled drain timed out', 'virtio-snd: control request timed out',
+			'virtio-snd: device reset timed out',
+			'virtio-snd: reset recovered playback transport', 'HWTEST STEP fresh stream drained',
+			'HWTEST PASS virtio-sound-stall']
+		ending:   .poweroff
+		timeout:  70
+	},
+	Scenario{
 		name:     'drivers-sleep'
 		about:    'HD Audio and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM'
 		arches:   ['x86_64']

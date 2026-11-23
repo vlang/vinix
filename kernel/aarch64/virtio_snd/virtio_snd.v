@@ -99,6 +99,7 @@ mut:
 	desc      u64
 	avail     u64
 	used      u64
+	pages     u64
 	avail_idx u16
 	last_used u16
 }
@@ -138,6 +139,7 @@ __global (
 	snd_ctl_phys  = u64(0)
 	snd_meta_phys = u64(0)
 	snd_data_phys = u64(0)
+	snd_needs_reset = false
 	snd_card      SoundCard
 	snd_stream    SoundStream
 )
@@ -149,6 +151,12 @@ fn mmio_r32(address u64) u32 {
 }
 
 fn mmio_w32(address u64, value u32) {
+	$if virtio_snd_stall ? {
+		if stall_test_stream && stall_test_delay_reset && address == snd_base + reg_status && value == 0 {
+			stall_test_delay_reset = false
+			return
+		}
+	}
 	cpu.dmb_ish()
 	unsafe { *&u32(address) = value }
 }
@@ -175,16 +183,28 @@ fn set_desc(table u64, index u16, address u64, length u32, flags u16, next u16) 
 	}
 }
 
-fn setup_queue(index u16, wanted u16) ?Queue {
+fn queue_capacity(index u16) u32 {
 	mmio_w32(snd_base + reg_queue_sel, index)
-	maximum := mmio_r32(snd_base + reg_queue_num_max)
+	return mmio_r32(snd_base + reg_queue_num_max)
+}
+
+fn enable_queue(mut queue Queue, index u16) {
+	mmio_w32(snd_base + reg_queue_sel, index)
+	mmio_w32(snd_base + reg_queue_num, queue.size)
+	mmio_w32(snd_base + reg_queue_align, u32(queue_align))
+	queue.avail_idx = 0
+	queue.last_used = 0
+	unsafe { C.memset(voidptr(queue.desc), 0, queue.pages * memory.page_size) }
+	cpu.dmb_ish()
+	mmio_w32(snd_base + reg_queue_pfn, u32((queue.desc - snd_hhdm) / memory.page_size))
+}
+
+fn setup_queue(index u16, wanted u16) ?Queue {
+	maximum := queue_capacity(index)
 	if maximum == 0 {
 		return none
 	}
 	size := if maximum < wanted { u16(maximum) } else { wanted }
-	mmio_w32(snd_base + reg_queue_num, size)
-	mmio_w32(snd_base + reg_queue_align, u32(queue_align))
-
 	avail_offset := u64(size) * 16
 	used_offset := align_up(avail_offset + 4 + 2 * u64(size) + 2, queue_align)
 	pages := (used_offset + 4 + 8 * u64(size) + 2 + memory.page_size - 1) / memory.page_size
@@ -193,15 +213,15 @@ fn setup_queue(index u16, wanted u16) ?Queue {
 		return none
 	}
 	virt := phys + snd_hhdm
-	unsafe { C.memset(voidptr(virt), 0, pages * memory.page_size) }
-	cpu.dmb_ish()
-	mmio_w32(snd_base + reg_queue_pfn, u32(phys / memory.page_size))
-	return Queue{
+	mut queue := Queue{
 		size:  size
 		desc:  virt
 		avail: virt + avail_offset
 		used:  virt + used_offset
+		pages: pages
 	}
+	enable_queue(mut queue, index)
+	return queue
 }
 
 fn push(mut q Queue, head u16, queue u16) {
@@ -209,6 +229,11 @@ fn push(mut q Queue, head u16, queue u16) {
 	q.avail_idx++
 	cpu.dmb_ish()
 	unsafe { *&u16(q.avail + 2) = q.avail_idx }
+	$if virtio_snd_stall ? {
+		if stall_test_stream && queue == control_queue_index && rd32(request_page()) == r_pcm_stop {
+			return
+		}
+	}
 	mmio_w32(snd_base + reg_queue_notify, queue)
 }
 
@@ -243,6 +268,7 @@ fn control(request_len u32, response_len u32) u32 {
 		}
 		if time.monotonic_ns() - start > control_timeout_ns {
 			print('virtio-snd: control request timed out\n')
+			snd_needs_reset = true
 			return 0
 		}
 		sys.nsleep(poll_ns)
@@ -253,6 +279,9 @@ fn control(request_len u32, response_len u32) u32 {
 }
 
 fn stream_request(code u32, stream_id u32) u32 {
+	if snd_needs_reset {
+		return 0
+	}
 	page := request_page()
 	wr32(page, code)
 	wr32(page + 4, stream_id)
@@ -441,7 +470,9 @@ fn (mut s SoundStream) setup_params(fmt u32, rate u32, channels u8) {
 	defer {
 		s.unlock()
 	}
-	s.release_locked()
+	if !s.release_locked() {
+		return
+	}
 
 	format := virtio_format(fmt)
 	bytes := sample_bytes(format)
@@ -503,6 +534,9 @@ fn (mut s SoundStream) setup_params(fmt u32, rate u32, channels u8) {
 	s.period_bytes = period_bytes
 	s.wait_ns = wait_ns
 	s.prepared = true
+	$if virtio_snd_stall ? {
+		stall_test_stream = rate == 44100
+	}
 }
 
 fn (mut s SoundStream) change_volume(percentage int) {
@@ -526,9 +560,8 @@ fn (mut s SoundStream) play(play bool) {
 	}
 	if play {
 		s.start_locked()
-	} else if s.started {
-		stream_request(r_pcm_stop, s.id)
-		s.started = false
+	} else {
+		s.stop_locked()
 	}
 }
 
@@ -549,8 +582,8 @@ fn (mut s SoundStream) writable() u64 {
 	defer {
 		s.unlock()
 	}
-	if !s.prepared {
-		// The first write configures the stream and always has room.
+	if !s.prepared || snd_needs_reset {
+		// Let the write configure a fresh stream or report a pending fault.
 		return page_bytes
 	}
 	s.reap()
@@ -568,7 +601,7 @@ fn (mut s SoundStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 	defer {
 		s.unlock()
 	}
-	if !s.prepared {
+	if !s.prepared || snd_needs_reset {
 		errno.set(errno.eio)
 		return none
 	}
@@ -581,7 +614,7 @@ fn (mut s SoundStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 				if done > 0 {
 					return i64(done)
 				}
-				errno.set(if period == interrupted { errno.eintr } else { errno.eio })
+				errno.set(if period == interrupted { errno.eintr } else { errno.etimedout })
 				return none
 			}
 			s.filling = period
@@ -599,6 +632,9 @@ fn (mut s SoundStream) sync_write(buf voidptr, _loc u64, count u64) ?i64 {
 
 		if s.fill_len == s.period_bytes {
 			s.submit()
+			if snd_needs_reset {
+				break
+			}
 		}
 	}
 	return i64(done)
@@ -609,6 +645,10 @@ fn (mut s SoundStream) wait_until_empty() ? {
 	defer {
 		s.unlock()
 	}
+	if snd_needs_reset {
+		errno.set(errno.eio)
+		return none
+	}
 	if !s.prepared {
 		return
 	}
@@ -616,6 +656,10 @@ fn (mut s SoundStream) wait_until_empty() ? {
 		s.fill_len -= s.fill_len % s.frame_bytes
 		if s.fill_len > 0 {
 			s.submit()
+			if snd_needs_reset {
+				errno.set(errno.eio)
+				return none
+			}
 		} else {
 			s.filling = -1
 		}
@@ -653,36 +697,60 @@ fn (mut s SoundStream) wait_until_empty() ? {
 // ---- stream internals, called with the lock held ----
 
 fn (mut s SoundStream) start_locked() {
-	if s.prepared && !s.started {
+	if s.prepared && !s.started && !snd_needs_reset {
 		code := stream_request(r_pcm_start, s.id)
 		if code != s_ok {
 			C.kprintf(c'virtio-snd: START failed (%llx)\n', u64(code))
+			snd_needs_reset = true
 			return
 		}
 		s.started = true
 	}
 }
 
-fn (mut s SoundStream) release_locked() {
-	if s.started {
-		stream_request(r_pcm_stop, s.id)
-		s.started = false
+fn (mut s SoundStream) stop_locked() {
+	if s.started && !snd_needs_reset {
+		if stream_request(r_pcm_stop, s.id) != s_ok {
+			snd_needs_reset = true
+		} else {
+			s.started = false
+		}
 	}
-	if s.prepared {
-		// The device completes every period still queued before it answers.
-		stream_request(r_pcm_release, s.id)
-		s.prepared = false
+}
+
+fn (mut s SoundStream) release_locked() bool {
+	s.stop_locked()
+	if s.prepared && !snd_needs_reset {
+		// RELEASE returns every descriptor before replying. A rejected
+		// request or outstanding period requires a transport reset.
+		if stream_request(r_pcm_release, s.id) == s_ok {
+			s.prepared = false
+			s.reap()
+			snd_needs_reset = s.in_flight != 0
+		} else {
+			snd_needs_reset = true
+		}
 	}
-	s.reap()
+	s.started = false
+	s.prepared = false
+	if snd_needs_reset && !reset_transport() {
+		return false
+	}
 	for i in 0 .. max_periods {
 		s.busy[i] = false
 	}
 	s.in_flight = 0
 	s.filling = -1
 	s.fill_len = 0
+	return true
 }
 
 fn (mut s SoundStream) reap() {
+	$if virtio_snd_stall ? {
+		if stall_test_stream && s.prepared {
+			return
+		}
+	}
 	cpu.dmb_ish()
 	used := unsafe { *&u16(snd_tx.used + 2) }
 	for snd_tx.last_used != used {
@@ -805,6 +873,58 @@ fn (mut s SoundStream) submit() {
 	s.start_locked()
 }
 
+fn reset_device() bool {
+	mmio_w32(snd_base + reg_status, 0)
+	start := time.monotonic_ns()
+	for mmio_r32(snd_base + reg_status) != 0 {
+		if time.monotonic_ns() - start > control_timeout_ns {
+			print('virtio-snd: device reset timed out\n')
+			return false
+		}
+		sys.nsleep(poll_ns)
+	}
+	mmio_w32(snd_base + reg_status, status_acknowledge)
+	mmio_w32(snd_base + reg_status, status_acknowledge | status_driver)
+	mmio_w32(snd_base + reg_guest_features, 0)
+	mmio_w32(snd_base + reg_guest_page_size, u32(memory.page_size))
+	return true
+}
+
+fn setup_period_descriptors() {
+	// Each period's chain has a stream header, samples, and a status.
+	// Only the sample length changes when the period is queued.
+	meta := snd_meta_phys + snd_hhdm
+	for p := 0; p < snd_stream.periods; p++ {
+		head := u16(p) * descriptors_per_period
+		header := snd_meta_phys + u64(p) * 16
+		wr32(meta + u64(p) * 16, snd_stream.id)
+		set_desc(snd_tx.desc, head, header, 4, desc_next, head + 1)
+		set_desc(snd_tx.desc, head + 1, snd_data_phys + u64(p) * page_bytes, 0, desc_next,
+			head + 2)
+		set_desc(snd_tx.desc, head + 2, header + 8, 8, desc_write, 0)
+	}
+}
+
+// Keep DMA storage intact until the device confirms that it released both
+// queues. An unacknowledged reset leaves the stream unavailable for retry.
+fn reset_transport() bool {
+	if !reset_device() {
+		return false
+	}
+	if queue_capacity(control_queue_index) < snd_control.size
+		|| queue_capacity(transmit_queue_index) < snd_tx.size {
+		fail('queues unavailable after reset')
+		return false
+	}
+	enable_queue(mut snd_control, control_queue_index)
+	enable_queue(mut snd_tx, transmit_queue_index)
+	setup_period_descriptors()
+	mmio_w32(snd_base + reg_status, status_acknowledge | status_driver | status_driver_ok)
+	snd_needs_reset = false
+	print('virtio-snd: reset recovered playback transport\n')
+	return true
+}
+
 // ---- discovery ----
 
 fn find_output_stream(streams u32) bool {
@@ -869,11 +989,9 @@ pub fn initialise(hhdm u64) {
 		return
 	}
 
-	mmio_w32(snd_base + reg_status, 0)
-	mmio_w32(snd_base + reg_status, status_acknowledge)
-	mmio_w32(snd_base + reg_status, status_acknowledge | status_driver)
-	mmio_w32(snd_base + reg_guest_features, 0)
-	mmio_w32(snd_base + reg_guest_page_size, u32(memory.page_size))
+	if !reset_device() {
+		return
+	}
 
 	snd_control = setup_queue(control_queue_index, 16) or {
 		fail('control queue unavailable')
@@ -906,20 +1024,7 @@ pub fn initialise(hhdm u64) {
 		return
 	}
 
-	// Each period's chain never changes shape: the stream header, the
-	// samples, and the status the device writes back. Only the sample
-	// length is filled in when a period is queued.
-	meta := snd_meta_phys + snd_hhdm
-	for p := 0; p < snd_stream.periods; p++ {
-		head := u16(p) * descriptors_per_period
-		header := snd_meta_phys + u64(p) * 16
-		wr32(meta + u64(p) * 16, snd_stream.id)
-		set_desc(snd_tx.desc, head, header, 4, desc_next, head + 1)
-		set_desc(snd_tx.desc, head + 1, snd_data_phys + u64(p) * page_bytes, 0, desc_next,
-			head + 2)
-		set_desc(snd_tx.desc, head + 2, header + 8, 8, desc_write, 0)
-	}
-
+	setup_period_descriptors()
 	snd_stream.level = 100
 	snd_stream.filling = -1
 	print('virtio-snd: stream ${snd_stream.id}, ${snd_stream.channels_min}-${snd_stream.channels_max} channels, formats ${snd_stream.formats:x}, rates ${snd_stream.rates:x}, ${snd_stream.periods} periods\n')

@@ -41,6 +41,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'net-carrier' { scenario_net_carrier(mut t) }
 		'drivers-sleep' { scenario_drivers_sleep(mut t) }
 		'hda-stall' { scenario_hda_stall(mut t) }
+		'virtio-sound-stall' { scenario_virtio_sound_stall(mut t) }
 		'nvme-sleep' { scenario_nvme_sleep(mut t) }
 		'firmware' { scenario_firmware(mut t) }
 		'hibernate' { scenario_hibernate(mut t) }
