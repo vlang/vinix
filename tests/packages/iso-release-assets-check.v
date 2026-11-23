@@ -19,6 +19,7 @@ const draft_refusals = ['draft-tag-rebound', 'draft-wrong-upload-url',
 const publish_refusals = ['publish-readback-lost', 'publish-still-draft',
 	'publish-changed-asset', 'publish-tag-moved']
 const repo_refusals = ['repo-foreign', 'repo-invalid', 'repo-dotdot']
+const creation_refusals = ['create-delayed', 'create-no-draft']
 
 struct FixtureAsset {
 	name string
@@ -29,6 +30,16 @@ struct FixtureAsset {
 struct FixtureUpload {
 	path string
 	asset FixtureAsset
+}
+
+struct FixtureCreation {
+	id u64
+	repo string
+	tag string
+	commit string
+	prerelease bool
+	notes string
+	manifest string
 }
 
 struct FixtureRelease {
@@ -136,8 +147,7 @@ fn read_uploaded_assets(out string, directory string, resumed bool) ![]FixtureAs
 	for name in names {
 		uploads << json2.decode[FixtureUpload](os.read_file(directory + '/' + name)!)!
 	}
-	if resumed { return uploads.map(it.asset) }
-	if uploads.len == 0 { return error('draft has no recorded uploads') }
+	if resumed || uploads.len == 0 { return uploads.map(it.asset) }
 	files := uploads.map(it.path)
 	stage := os.dir(files[0])
 	if stage == out || files.any(os.dir(it) != stage) {
@@ -198,9 +208,22 @@ fn github_release_api(args []string, remote string, path string, scenario string
 	tag := os.getenv('VINIX_ASSET_TEST_TAG')
 	commit := os.getenv('VINIX_ASSET_TEST_COMMIT')
 	draft_id := os.getenv('VINIX_ASSET_TEST_DRAFT_ID')
+	out := os.getenv('VINIX_ASSET_TEST_OUT')
 	upload_endpoint := fixture_upload_endpoint(draft_id)
 	local := remote + '/draft.json'
+	if path == 'releases?per_page=100' {
+		if args[3..] != ['--paginate', '--jq', '.[] | select(.draft == true) | [.id, .tag_name] | @tsv'] {
+			return error('expected paginated draft lookup')
+		}
+		println('99900\t${tag}-other')
+		if os.exists(local) && scenario != 'create-delayed' {
+			println('${draft_id}\t${tag}')
+			if scenario == 'resume-create-ambiguous' { println('99901\t${tag}') }
+		}
+		return 0
+	}
 	if path == 'releases' {
+		if os.exists(remote + '/release-attempt') { return error('fixture second creation request') }
 		os.write_file(remote + '/release-attempt', args[1..].join('\n') + '\n')!
 		legacy := args.len == 19 && args[17..] == ['--jq', '.id']
 		if (!legacy && args.len != 17) || !args[12].starts_with('body=@') {
@@ -214,11 +237,26 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			|| os.read_file(tag_file(remote, tag))! != commit {
 			return error('draft created before checking the exact remote tag commit')
 		}
+		notes := os.read_file(body[6..])!
+		manifest := os.read_file(out + '/SHA256SUMS')!
+		intent_path := out + '/.draft-creation.json'
+		intent := json2.decode[FixtureCreation](os.read_file(intent_path)!)!
+		if intent.id != 0 || intent.repo != 'local/fixture' || intent.tag != tag || intent.commit != commit
+			|| intent.prerelease != prerelease || intent.notes != notes || intent.manifest != manifest
+			|| !notes.contains('<!-- Vinix release attempt: ')
+			|| !notes.ends_with(' ${sha256.hexhash(manifest)} -->\n') {
+			return error('creation request did not use saved release metadata')
+		}
+		os.cp(intent_path, remote + '/creation-record')!
+		if scenario == 'create-no-draft' {
+			eprintln('fixture refused creation before saving the draft')
+			return 1
+		}
 		draft := FixtureRelease{
 			id: draft_id.u64()
 			tag_name: tag
 			name: 'Vinix ' + tag
-			body: os.read_file(body[6..])!
+			body: notes
 			prerelease: prerelease
 			upload_url: if scenario == 'draft-wrong-upload-url' {
 				fixture_upload_endpoint((draft_id.u64() + 1).str()) + '{?name,label}'
@@ -226,6 +264,10 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		}
 		os.mkdir(remote + '/uploads')!
 		os.write_file(local, json2.encode(draft))!
+		if scenario in ['create-response-lost', 'create-delayed']! {
+			eprintln('fixture lost the creation response')
+			return 1
+		}
 		println(if legacy { draft_id } else { json2.encode(draft) })
 		return 0
 	}
@@ -250,6 +292,10 @@ fn github_release_api(args []string, remote string, path string, scenario string
 			draft.assets[0] = FixtureAsset{...first, digest: 'sha256:' + '0'.repeat(64)}
 		}
 		if scenario == 'draft-changed' { draft = FixtureRelease{...draft, tag_name: tag + '-changed'} }
+		if scenario == 'resume-create-unrelated' {
+			println(json2.encode(FixtureRelease{...draft, body: 'unrelated draft notes'}))
+			return 0
+		}
 		os.write_file(local, json2.encode(draft))!
 		println(json2.encode(draft))
 		return 0
@@ -529,11 +575,10 @@ fn verify_handoff(out string, with_packages bool, scenario string) ! {
 	}
 }
 
-fn resume_attempt(root string, work string, environment map[string]string, scenario string, options []string, expected_error string) ! {
+fn recovery_attempt(root string, work string, environment map[string]string, scenario string, options []string, expected_error string) ! {
 	mut env := environment.clone()
 	env['VINIX_ASSET_TEST_CASE'] = scenario
-	mut args := [root + '/scripts/deploy-iso.sh', '--yes',
-		'--resume-draft=' + env['VINIX_ASSET_TEST_DRAFT_ID']]
+	mut args := [root + '/scripts/deploy-iso.sh', '--yes']
 	args << options
 	code, log := command('/bin/bash', args, root, env)
 	os.write_file(work + '/' + scenario + '.log', log)!
@@ -542,6 +587,56 @@ fn resume_attempt(root string, work string, environment map[string]string, scena
 		return error('unexpected recovery outcome for ${scenario}\n${log}')
 	}
 	println('ISO release assets ${scenario} PASS')
+}
+
+fn resume_attempt(root string, work string, environment map[string]string, scenario string, options []string, expected_error string) ! {
+	args := ['--resume-draft=' + environment['VINIX_ASSET_TEST_DRAFT_ID'], ...options]
+	recovery_attempt(root, work, environment, scenario, args, expected_error)!
+}
+
+fn check_creation_recovery(root string, work string, out string, remote string, environment map[string]string, scenario string) ! {
+	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
+	tag := environment['VINIX_ASSET_TEST_TAG']
+	intent_path := out + '/.draft-creation.json'
+	recovery_path := root + '/build-release/work/draft-' + id + '.json'
+	intent := os.read_file(intent_path)!
+	attempt := os.read_file(remote + '/release-attempt')!
+	if intent != os.read_file(remote + '/creation-record')! || os.exists(recovery_path)
+		|| os.exists(remote + '/publish-attempt') {
+		return error('interrupted creation did not retain exactly one creation record')
+	}
+	options := ['--resume-create=' + tag]
+	if scenario == 'create-no-draft' {
+		recovery_attempt(root, work, environment, 'resume-create-missing', options, 'no GitHub draft found')!
+		if os.exists(remote + '/draft.json') || os.exists(recovery_path) || os.read_file(intent_path)! != intent {
+			return error('recovery changed state for a missing draft')
+		}
+		return
+	}
+	recovery_attempt(root, work, environment, 'resume-create-protect-output', ['--tag=' + tag,
+		'--repo=local/fixture'], 'draft creation record already exists')!
+	recovery_attempt(root, work, environment, 'resume-create-ambiguous', options, 'multiple GitHub drafts use')!
+	recovery_attempt(root, work, environment, 'resume-create-unrelated', options, 'GitHub draft metadata changed after creation')!
+	iso := out + '/vinix-amd64.iso'
+	original := os.read_file(iso)!
+	os.write_file(iso, 'changed release ISO')!
+	recovery_attempt(root, work, environment, 'resume-create-stale-local', options, 'release asset changed after verification') or {
+		os.write_file(iso, original)!
+		return err
+	}
+	os.write_file(iso, original)!
+	if os.ls(remote + '/uploads')!.len != 0 || os.exists(recovery_path)
+		|| os.read_file(intent_path)! != intent || os.exists(remote + '/publish-attempt') {
+		return error('refused recovery changed the interrupted creation')
+	}
+	recovery_attempt(root, work, environment, 'resume-create-complete', [...options, '--draft'], '')!
+	finished := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
+	recovery := json2.decode[FixtureCreation](os.read_file(recovery_path)!)!
+	if !finished.draft || finished.assets.len != os.read_lines(out + '/SHA256SUMS')!.len + 1
+		|| os.exists(intent_path) || recovery.id.str() != id || recovery.notes != finished.body
+		|| os.exists(remote + '/publish-attempt') || os.read_file(remote + '/release-attempt')! != attempt {
+		return error('recovery did not complete the original draft')
+	}
 }
 
 fn check_resume(root string, work string, out string, remote string, environment map[string]string) ! {
@@ -617,6 +712,8 @@ fn run() ! {
 	if date_code != 0 { return error('cannot resolve fixture date: ' + date_output) }
 	default_tag := 'iso-' + date_output.trim_space()
 	mut scenarios := repo_refusals.clone()
+	scenarios << creation_refusals
+	scenarios << 'create-response-lost'
 	scenarios << draft_refusals
 	scenarios << publish_refusals
 	scenarios << ['publish-response-lost', 'repo-inferred']
@@ -639,6 +736,7 @@ fn run() ! {
 		}
 		tag := match scenario {
 			'tag-existing' { 'release/fixture-tag+existing' }
+			'create-delayed' { 'release/fixture-create-delayed' }
 			'tag-auto' { default_tag + '-3' }
 			else { 'fixture-' + scenario }
 		}
@@ -676,7 +774,8 @@ fn run() ! {
 			return error('release left a private staging directory: ' + scenario)
 		}
 		draft_refusal := scenario in draft_refusals
-		expect_create := draft_refusal || scenario in publish_refusals || scenario in ['publish-response-lost', 'repo-inferred', 'draft-only', 'tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
+		expect_create := draft_refusal || scenario in publish_refusals || scenario in creation_refusals
+			|| scenario in ['create-response-lost', 'publish-response-lost', 'repo-inferred', 'draft-only', 'tag-auto', 'tag-raced', 'tag-raced-match', 'tag-create-failed',
 			'workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test']!
 		if os.exists(remote + '/create-tag') != expect_create {
@@ -684,12 +783,13 @@ fn run() ! {
 		}
 		if scenario in ['workspace-lock', 'legacy', 'packages', 'output-change-during-upload', 'public-iso-during-boot',
 			'public-iso-during-receipt', 'publish-no-test', 'packages-no-test', 'tag-existing', 'tag-auto',
-			'tag-raced-match', 'draft-only', 'publish-response-lost', 'repo-inferred']! {
+			'tag-raced-match', 'draft-only', 'publish-response-lost', 'create-response-lost', 'repo-inferred']! {
 			if code != 0 { return error('release fixture failed: ' + scenario + '\n' + log) }
 			verify_handoff(out, with_packages, scenario)!
 			draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 			if draft.draft != (scenario == 'draft-only')
-				|| os.exists(remote + '/publish-attempt') != (scenario != 'draft-only') {
+				|| os.exists(remote + '/publish-attempt') != (scenario != 'draft-only')
+				|| os.exists(out + '/.draft-creation.json') {
 				return error('unexpected final draft state: ' + scenario)
 			}
 			if scenario == 'workspace-lock' {
@@ -699,6 +799,11 @@ fn run() ! {
 					return error('release workspace retry failed\n' + retry_log)
 				}
 			}
+		} else if scenario in creation_refusals {
+			if code == 0 || !log.contains('no GitHub draft found') {
+				return error('unexpected creation recovery outcome: ' + scenario + '\n' + log)
+			}
+			check_creation_recovery(root, work, out, remote, environment, scenario)!
 		} else if scenario in repo_refusals {
 			diagnostic := if scenario == 'repo-foreign' {
 				"the checkout's repository is on a different host"

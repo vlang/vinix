@@ -12,6 +12,7 @@
 #   --no-test          do not boot-test the images first
 #   --no-publish       build (and test) only
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
+#   --resume-create=TAG  recover a draft whose creation response was lost
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
 #   --repo=OWNER/NAME  GitHub.com repository (default: the repository gh discovers)
@@ -56,6 +57,7 @@ ASSUME_YES=0
 REPO=''
 PACKAGE_REVIEW=''
 RESUME_DRAFT=''
+RESUME_CREATE=''
 BUILD_OPTIONS=0
 
 usage() {
@@ -76,6 +78,10 @@ for arg in "$@"; do
             case "$RESUME_DRAFT" in
                 ''|0*|*[!0-9]*) echo "ERROR: --resume-draft requires a numeric draft ID" >&2; exit 1 ;;
             esac
+            ;;
+        --resume-create=*)
+            RESUME_CREATE="${arg#*=}"
+            [ -n "$RESUME_CREATE" ] || { echo "ERROR: --resume-create requires a tag" >&2; exit 1; }
             ;;
         --package-review=*)
             BUILD_OPTIONS=1
@@ -133,8 +139,10 @@ file_size() {
 
 need git cc
 cd "$SCRIPT_DIR"
-if [ -n "$RESUME_DRAFT" ]; then
-    [ "$BUILD_OPTIONS" -eq 0 ] || die "--resume-draft accepts --repo, --draft and --yes"
+if [ -n "$RESUME_DRAFT$RESUME_CREATE" ]; then
+    [ -z "$RESUME_DRAFT" ] || [ -z "$RESUME_CREATE" ] ||
+        die "choose one of --resume-draft and --resume-create"
+    [ "$BUILD_OPTIONS" -eq 0 ] || die "release recovery accepts --repo, --draft and --yes"
 else
     need curl clang ld.lld xorriso rsync mformat mmd mcopy
     COMMIT="$(git rev-parse --verify "$REF^{commit}")" || die "no such commit: $REF"
@@ -169,11 +177,17 @@ build_release_assets() {
         -o "$ASSET_WORK/release-assets" "$SCRIPT_DIR/build-support/isoboot/release-assets.v"
 }
 
-if [ -n "$RESUME_DRAFT" ]; then
+if [ -n "$RESUME_DRAFT$RESUME_CREATE" ]; then
     build_release_assets
-    recovery="$("$ASSET_WORK/release-assets" restore-draft "$WORK" "$RESUME_DRAFT" "$ASSET_WORK")"
+    if [ -n "$RESUME_CREATE" ]; then
+        git check-ref-format "refs/tags/$RESUME_CREATE" || die "invalid recovery tag: $RESUME_CREATE"
+        OUT="$SCRIPT_DIR/build-release/$RESUME_CREATE"
+        recovery="$("$ASSET_WORK/release-assets" restore-creation "$OUT" "$RESUME_CREATE" "$ASSET_WORK")"
+    else
+        recovery="$("$ASSET_WORK/release-assets" restore-draft "$WORK" "$RESUME_DRAFT" "$ASSET_WORK")"
+    fi
     IFS=$'\t' read -r recovery_repo TAG COMMIT prerelease <<< "$recovery"
-    [ -z "$REPO" ] || [ "$REPO" = "$recovery_repo" ] || die "draft $RESUME_DRAFT belongs to $recovery_repo"
+    [ -z "$REPO" ] || [ "$REPO" = "$recovery_repo" ] || die "release $TAG belongs to $recovery_repo"
     REPO="$recovery_repo"
     SHORT="${COMMIT:0:10}"
 fi
@@ -248,6 +262,42 @@ finish_draft() {
     echo "$release_url"
 }
 
+find_created_draft() {
+    local candidate_id candidate_tag release_id=''
+    github_api "$release_api?per_page=100" --paginate \
+        --jq '.[] | select(.draft == true) | [.id, .tag_name] | @tsv' > "$ASSET_WORK/release-list" ||
+        die "cannot list GitHub drafts for $TAG. Retry with --resume-create=$TAG"
+    while IFS=$'\t' read -r candidate_id candidate_tag; do
+        [ "$candidate_tag" = "$TAG" ] || continue
+        case "$candidate_id" in
+            ''|0*|*[!0-9]*) die "GitHub returned an invalid draft ID for $TAG" ;;
+        esac
+        [ -z "$release_id" ] || die "multiple GitHub drafts use $TAG"
+        release_id="$candidate_id"
+    done < "$ASSET_WORK/release-list"
+    [ -n "$release_id" ] || die "no GitHub draft found for $TAG. Retry with --resume-create=$TAG"
+    echo "$release_id"
+}
+
+finish_creation() {
+    local response="$1" candidate_id="$2" release_id
+    release_id="$("$ASSET_WORK/release-assets" record-draft "$WORK" "$OUT" "$response" \
+        "$TAG" "$candidate_id")"
+    echo "  Recovery record: $WORK/draft-$release_id.json"
+    finish_draft "$release_id" "$response"
+}
+
+if [ -n "$RESUME_CREATE" ]; then
+    step "Recovering GitHub draft creation for $TAG at $SHORT"
+    "$ASSET_WORK/release-tag" verify "$REPO" "$TAG" "$COMMIT"
+    candidate_id="$(find_created_draft)"
+    github_api "$release_api/$candidate_id" > "$ASSET_WORK/created-draft.json"
+    confirm_publish
+    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
+    finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"
+    exit 0
+fi
+
 if [ -n "$RESUME_DRAFT" ]; then
     git check-ref-format "refs/tags/$TAG" || die "invalid Git tag in recovery record: $TAG"
     OUT="$SCRIPT_DIR/build-release/$TAG"
@@ -296,6 +346,9 @@ elif [ "$PUBLISH" -eq 1 ]; then
 fi
 
 OUT="$SCRIPT_DIR/build-release/$TAG"
+if [ -e "$OUT/.draft-creation.json" ] || [ -L "$OUT/.draft-creation.json" ]; then
+    die "draft creation record already exists. Recover it with --resume-create=$TAG"
+fi
 mkdir -p "$OUT" "$CACHE"
 
 if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
@@ -700,10 +753,17 @@ fi
 "$ASSET_WORK/release-tag" prepare "$REPO" "$TAG" "$COMMIT"
 prerelease=false
 [ "$PRERELEASE" -eq 1 ] && prerelease=true
-github_api "$release_api" --method POST -f "tag_name=$TAG" \
+"$ASSET_WORK/release-assets" prepare-creation "$OUT" "$ASSET_WORK" "$REPO" \
+    "$TAG" "$COMMIT" "$prerelease"
+cp "$ASSET_WORK/RELEASE_NOTES.md" "$ASSET_WORK/public-notes"
+mv -f "$ASSET_WORK/public-notes" "$OUT/RELEASE_NOTES.md"
+echo "  If draft creation is interrupted, retry with --resume-create=$TAG"
+candidate_id=''
+if ! github_api "$release_api" --method POST -f "tag_name=$TAG" \
     -f "target_commitish=$COMMIT" -f "name=Vinix $TAG" -F "body=@$ASSET_WORK/RELEASE_NOTES.md" \
-    -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"
-release_id="$("$ASSET_WORK/release-assets" record-draft "$WORK" "$ASSET_WORK" \
-    "$ASSET_WORK/created-draft.json" "$REPO" "$TAG" "$COMMIT" "$prerelease")"
-echo "  Recovery record: $WORK/draft-$release_id.json"
-finish_draft "$release_id" "$ASSET_WORK/created-draft.json"
+    -F draft=true -F "prerelease=$prerelease" > "$ASSET_WORK/created-draft.json"; then
+    echo "Draft creation request failed. Looking for the draft on GitHub." >&2
+    candidate_id="$(find_created_draft)"
+    github_api "$release_api/$candidate_id" > "$ASSET_WORK/created-draft.json"
+fi
+finish_creation "$ASSET_WORK/created-draft.json" "$candidate_id"

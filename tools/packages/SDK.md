@@ -649,6 +649,18 @@ the confirmation is interrupted, run `--resume-draft=ID` again with the same
 recovery record and original assets. The driver verifies an already published
 release without uploading files or sending another publish request.
 
+Before creating a GitHub draft, the driver saves
+`build-release/TAG/.draft-creation.json` with the verified manifest and
+notes. An HTML comment in the notes ties the draft to that creation attempt
+and manifest. If the creation response is lost, the driver looks for the
+draft by exact tag and reads it by ID. If the lookup is interrupted or the
+draft is temporarily missing, use `--resume-create=TAG` from the same
+checkout. Keep the creation record and original assets. This command adopts
+only a single empty draft with matching metadata and a verified tag commit.
+It revalidates the local assets, writes the ordinary ID-based recovery
+record and continues the upload to that draft. The creation record protects
+the original assets by blocking a fresh build for the same tag.
+
 Release publication targets GitHub.com. The driver checks the host of the
 repository inferred by `gh`. In a checkout that defaults to another host,
 pass `--repo=OWNER/NAME` to select the GitHub.com repository explicitly.

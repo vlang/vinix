@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import crypto.rand
 import crypto.sha256
 import json2
 import os
@@ -145,16 +146,18 @@ fn read_release(response string, id string, tag string, notes string, prerelease
 	return release
 }
 
-fn record_draft(work string, directory string, response string, repo string, tag string, commit string, prerelease bool) !u64 {
+fn creation_path(output string) string {
+	return os.join_path(output, '.draft-creation.json')
+}
+
+fn prepare_creation(output string, directory string, repo string, tag string, commit string, prerelease bool) ! {
 	manifest := pkgcore.read_metadata(os.join_path(directory, 'SHA256SUMS'))!
-	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
-	draft := read_release(response, '', tag, notes, prerelease)!
-	if !draft.draft { return error('GitHub did not create a draft release') }
-	upload_endpoint(draft, repo)!
-	if draft.assets.len != 0 { return error('new GitHub draft already contains assets') }
-	path := os.join_path(work, 'draft-${draft.id}.json')
-	pkgcore.atomic_write_new(path, json2.encode(DraftRecovery{
-		id: draft.id
+	notes_path := os.join_path(directory, 'RELEASE_NOTES.md')
+	original_notes := pkgcore.read_metadata(notes_path)!
+	marker := rand.bytes(16)!.hex()
+	notes := original_notes + '\n<!-- Vinix release attempt: ${marker} ${sha256.hexhash(manifest)} -->\n'
+	os.write_file(notes_path, notes)!
+	pkgcore.atomic_write_new(creation_path(output), json2.encode(DraftRecovery{
 		repo: repo
 		tag: tag
 		commit: commit
@@ -162,23 +165,64 @@ fn record_draft(work string, directory string, response string, repo string, tag
 		manifest: manifest
 		notes: notes
 	}) + '\n')!
+}
+
+fn read_recovery(path string) !DraftRecovery {
+	recovery := json2.decode[DraftRecovery](pkgcore.read_metadata(path) or {
+		return error('cannot read release draft recovery record: ${err}')
+	})!
+	if recovery.repo == '' || recovery.tag == ''
+		|| recovery.commit.len != 40 || recovery.commit.bytes().any(it !in '0123456789abcdef'.bytes())
+		|| [recovery.repo, recovery.tag].any(it.contains_any('\t\r\n')) {
+		return error('invalid release draft recovery record: ' + path)
+	}
+	return recovery
+}
+
+fn read_creation(output string, tag string) !DraftRecovery {
+	path := creation_path(output)
+	creation := read_recovery(path)!
+	if creation.id != 0 || creation.tag != tag
+		|| !creation.notes.ends_with(' ${sha256.hexhash(creation.manifest)} -->\n') {
+		return error('invalid release draft creation record: ' + path)
+	}
+	return creation
+}
+
+fn record_draft(work string, output string, response string, tag string, id string) !u64 {
+	creation := read_creation(output, tag)!
+	draft := read_release(response, id, tag, creation.notes, creation.prerelease)!
+	if !draft.draft { return error('GitHub did not create a draft release') }
+	upload_endpoint(draft, creation.repo)!
+	if draft.assets.len != 0 { return error('new GitHub draft already contains assets') }
+	path := os.join_path(work, 'draft-${draft.id}.json')
+	record := json2.encode(DraftRecovery{...creation, id: draft.id}) + '\n'
+	if os.exists(path) {
+		// The earlier conversion may have stopped after writing the record.
+		if pkgcore.read_metadata(path)! != record {
+			return error('conflicting recovery record for GitHub draft ${draft.id}')
+		}
+	} else {
+		pkgcore.atomic_write_new(path, record)!
+	}
+	os.rm(creation_path(output)) or {
+		return error('draft ${draft.id} recorded. Resume with --resume-draft=${draft.id}: ${err}')
+	}
 	return draft.id
+}
+
+fn restore_metadata(recovery DraftRecovery, directory string) ! {
+	os.write_file(os.join_path(directory, 'SHA256SUMS'), recovery.manifest)!
+	os.write_file(os.join_path(directory, 'RELEASE_NOTES.md'), recovery.notes)!
+	println('${recovery.repo}\t${recovery.tag}\t${recovery.commit}\t${recovery.prerelease}')
 }
 
 fn restore_draft(work string, id string, directory string) ! {
 	if id == '' || id.bytes().any(!it.is_digit()) { return error('invalid draft recovery ID') }
 	path := os.join_path(work, 'draft-${id}.json')
-	recovery := json2.decode[DraftRecovery](pkgcore.read_metadata(path) or {
-		return error('cannot read release draft recovery record: ${err}')
-	})!
-	if recovery.id.str() != id || recovery.repo == '' || recovery.tag == ''
-		|| recovery.commit.len != 40 || recovery.commit.bytes().any(it !in '0123456789abcdef'.bytes())
-		|| [recovery.repo, recovery.tag].any(it.contains_any('\t\r\n')) {
-		return error('invalid release draft recovery record: ' + path)
-	}
-	os.write_file(os.join_path(directory, 'SHA256SUMS'), recovery.manifest)!
-	os.write_file(os.join_path(directory, 'RELEASE_NOTES.md'), recovery.notes)!
-	println('${recovery.repo}\t${recovery.tag}\t${recovery.commit}\t${recovery.prerelease}')
+	recovery := read_recovery(path)!
+	if recovery.id.str() != id { return error('invalid release draft recovery record: ' + path) }
+	restore_metadata(recovery, directory)!
 }
 
 fn missing_assets(directory string, assets []UploadedAsset) ![]string {
@@ -251,9 +295,14 @@ fn run() ! {
 	if os.args.len == 5 && os.args[1] == 'stage' {
 		return stage_assets(os.args[2], os.args[3], os.args[4])
 	}
-	if os.args.len == 9 && os.args[1] == 'record-draft' {
-		println(record_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
-			os.args[8] == 'true')!)
+	if os.args.len == 8 && os.args[1] == 'prepare-creation' {
+		return prepare_creation(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
+	}
+	if os.args.len == 5 && os.args[1] == 'restore-creation' {
+		return restore_metadata(read_creation(os.args[2], os.args[3])!, os.args[4])
+	}
+	if os.args.len == 7 && os.args[1] == 'record-draft' {
+		println(record_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])!)
 		return
 	}
 	if os.args.len == 5 && os.args[1] == 'restore-draft' {
@@ -275,7 +324,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | check | stage | record-draft | restore-draft | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | check | stage | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
 }
 
 fn main() {
