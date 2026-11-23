@@ -117,3 +117,21 @@ does not boot a graphical ordinary-user desktop or qualify application-launch
 group isolation, physical presentation, foreign graphical/audio brokers, public
 publisher enrollment or the remaining catalog migration. Those roadmap acceptance
 items remain open.
+
+## Current compiler rerun
+
+At `c39228822`, the controller passes `-enable-globals` to the guest init and
+the staged programs that import the session signal state. The guest uses an
+explicit error return in `load_db` and passes the collector probe's argument
+vector through the C pointer interface. This addresses the V 0.5.2 `4478fc4`
+code generation and strict AArch64 C compilation failures in the fixture.
+
+The unchanged authenticated scenario passed from the checked-in fixture in
+46.1 seconds on AArch64 and 60.9 seconds on x86-64 under QEMU TCG. Both guests
+used pinned kernels and freshly built native userspace. All required markers
+passed, including audited reviewed administration and completion after a client
+disconnect. Both shut down cleanly and all eight artifact hashes in each
+receipt verified.
+
+The build logs, source patches, receipts, QMP and serial evidence are archived
+with the [isolated launch rerun](launch-client-check.md#current-compiler-rerun).

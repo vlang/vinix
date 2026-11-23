@@ -107,3 +107,28 @@ skip this branch. The distribution driver includes the tracked native fixture.
 - [AArch64 receipt](results/2026-10-16/launch-client-aarch64.json), [serial](results/2026-10-16/launch-client-aarch64.serial.txt), [real package serial](results/2026-10-16/launch-client-aarch64.packages.serial.txt)
 - [x86-64 receipt](results/2026-10-16/launch-client-x86_64.json), [serial](results/2026-10-16/launch-client-x86_64.serial.txt), [real package serial](results/2026-10-16/launch-client-x86_64.packages.serial.txt)
 - [AArch64 real-isolation receipt](results/2026-10-16/launch-client-aarch64.isolated.json), [serial](results/2026-10-16/launch-client-aarch64.isolated.serial.txt), [x86-64 real-isolation receipt](results/2026-10-16/launch-client-x86_64.isolated.json), [serial](results/2026-10-16/launch-client-x86_64.isolated.serial.txt)
+
+## Current compiler rerun
+
+The fixture in `40dbb3462` uses `execl` to start the actor and an explicit C
+pointer for its socket address. Its controller passes `-enable-globals` to
+the staged account and package programs that need it, and honors a nonempty
+`TMPDIR` when staging the pinned kernel. The final controller's temporary
+staging and cleanup also passed the host check with an explicit and an empty
+`TMPDIR`.
+
+With the package userspace from `87bf07ae1`, both QEMU TCG targets passed all
+17 allocation windows. Thirteen complete ordinary-client outcomes each ran
+1,000 calls with zero retained bytes, stable descriptors and no leftover
+invitation sockets. The local checks ran as root and UID 1000, and the
+protocol, stream and administrator socket companions passed. Both guests
+shut down cleanly and each receipt's ten artifact hashes verified. The
+AArch64 run used the default temporary location and passed in 448.8 seconds.
+The x86-64 run used a RAM-backed temporary directory and passed in 439.1
+seconds. The tracked host fixture and its ASan/UBSan build passed both local
+zero-retention windows.
+
+Evidence for the paired launch and [authenticated administrator reruns](admin-check.md#current-compiler-rerun)
+is in `~/.local/state/vinix/r14-admin-launch-rerun-TcNT19/qualification.tar.gz`.
+Its SHA-256 is `dbfb5f9f7fb33fafa2d8548525b3b80e11478c4ea9b26d3196ab9b0c51e35cc1`.
+All 141 entries in the extracted `qualification.sha256` passed.
