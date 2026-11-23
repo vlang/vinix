@@ -1512,6 +1512,7 @@ fn load_native_program_image(execve bool, mut image ExecImage, prog_mount &lib.M
 		proc.carry_io_context(mut new_thread, t)
 		new_thread.personality = proc.exec_personality(t)
 		new_thread.numa_policy = t.numa_policy
+		new_thread.numa_interleave = t.numa_interleave
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
 		// exec keeps blocked and ignored signals, as the x86 handoff does.
 		new_thread.masked_signals = t.masked_signals

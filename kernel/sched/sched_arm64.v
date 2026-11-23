@@ -1200,6 +1200,7 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 
 	mut new_thread := new_user_thread(process, false, pc, unsafe { nil }, stack, empty_string_array, empty_string_array, unsafe { nil }, false) or { return errno.err, errno.get() }
 	new_thread.numa_policy = current_thread.numa_policy
+	new_thread.numa_interleave = current_thread.numa_interleave
 
 	enqueue_thread(new_thread, false)
 
@@ -1404,6 +1405,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		ioprio_context: proc.inherited_io_context(source)
 		personality: source.personality
 		numa_policy: source.numa_policy
+		numa_interleave: source.numa_interleave
 	} }
 	charge_transferred = true
 

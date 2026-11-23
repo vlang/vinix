@@ -681,6 +681,7 @@ fn load_native_program_image(execve bool, mut image ExecImage, prog_mount &lib.M
 		proc.carry_io_context(mut new_thread, t)
 		new_thread.personality = proc.exec_personality(t)
 		new_thread.numa_policy = t.numa_policy
+		new_thread.numa_interleave = t.numa_interleave
 
 		// execve keeps the signal mask and what was ignored; only handlers,
 		// which pointed into the old program, go back to the default.

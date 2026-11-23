@@ -26,15 +26,17 @@ fn main() {
   hosttest.Option{name: '--kernel-dir', value: true},
   hosttest.Option{name: '--state-dir', value: true},
   hosttest.Option{name: '--timeout', value: true},
-  hosttest.Option{name: '--case', value: true, choices: ['mount', 'setid', 'textbusy']},
+  hosttest.Option{name: '--case', value: true, choices: ['mount', 'setid', 'textbusy', 'weightedcache']},
   hosttest.Option{name: '--journal'},
- ], [], 'Usage: run-mount.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case mount|setid|textbusy] [--journal] [--timeout SECONDS]')!
+  hosttest.Option{name: '--numa'},
+ ], [], 'Usage: run-mount.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case mount|setid|textbusy|weightedcache] [--journal] [--numa] [--timeout SECONDS]')!
  for key in ['--arch', '--kernel-dir', '--state-dir'] {
   if !options.has(key) { eprintln('missing ' + key); exit(2) }
  }
  arch := options.value('--arch', '')
  name := options.value('--case', 'mount')
  journal := options.has('--journal')
+ numa := options.has('--numa')
  state := os.abs_path(options.value('--state-dir', ''))
  timeout := options.integer('--timeout', 180)!
  if os.exists(state) || timeout <= 0 { eprintln('state must be fresh and timeout positive'); exit(2) }
@@ -73,21 +75,22 @@ fn main() {
   child.close()
  }
  mut inputs := {'kernel': sha256.sum(kernel).hex(), 'fixture_source': sha256.sum(source.bytes()).hex(), 'disk_before': digest(disk)!}
- code := run_guest(state, arch, name, frozen + '/core.v', disk, timeout) or { eprintln(err.msg()); 1 }
+ code := run_guest(state, arch, name, frozen + '/core.v', disk, timeout, numa) or { eprintln(err.msg()); 1 }
  for artifact, path in {'init': state + '/init', 'iso': state + '/test.iso', 'disk_after': disk} {
   inputs[artifact] = digest(path) or { '' }
  }
  context := 'native Vinix QEMU guest; private ' + (if journal { 'VJFS' } else { 'ext2' }) + ' volume'
+  + if numa { '; two NUMA nodes' } else { '' }
  os.write_file(state + '/receipt.json', json2.encode(MountReceipt{arch, context, inputs, code}, prettify: true) + '\n')!
  exit(code)
 }
 
-fn run_guest(state string, arch string, name string, source string, disk string, timeout int) !int {
+fn run_guest(state string, arch string, name string, source string, disk string, timeout int, numa bool) !int {
  init := guesthost.compile_init(source, state, arch, false)!
  archive := guesthost.image(init, state)!
  if arch == 'x86_64' { os.setenv('VINIX_CMDLINE', os.getenv('VINIX_CMDLINE') + ' vinix.disk=auto', true) }
  configured := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
- mut command := configured.command.clone()
+ mut command := if numa { guesthost.two_node_command(configured.command) } else { configured.command.clone() }
  if arch == 'aarch64' {
   command << ['-drive', 'if=none,format=raw,file=' + disk + ',id=compat-data', '-device', 'virtio-blk-device,drive=compat-data']
  } else { command << ['-drive', 'if=ide,format=raw,file=' + disk] }
@@ -101,6 +104,7 @@ fn run_guest(state string, arch string, name string, source string, disk string,
   markers << ['LINUX TEXTBUSY DISK: cross-mount write exclusion passed',
    'LINUX TEXTBUSY DISK: persisted hardlink checks passed']
  }
+ if name == 'weightedcache' && numa { markers << 'LINUX WEIGHTEDCACHE NUMA: PASS' }
  positive, negative := guesthost.verdict_policy(markers, [label + ' FAIL'], false)
  return guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 }

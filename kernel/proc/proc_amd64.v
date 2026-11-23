@@ -100,6 +100,7 @@ pub mut:
 	personality u32
 	// Default NUMA placement belongs to the thread making the allocation.
 	numa_policy NumaPolicy
+	numa_interleave NumaInterleaveCursor
 	// A filesystem change this thread made during its syscall that is not on
 	// the device yet. It is flushed on the way back to userspace, or once an
 	// exiting process' descriptors are closed, where no lock is held; see

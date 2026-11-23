@@ -445,6 +445,7 @@ pub fn syscall_set_mempolicy(_ voidptr, mode i32, nodemask u64, maxnode u64) (u6
 	policy := normalize_policy(mode, mask) or { return errno.err, errno.einval }
 	mut caller := proc.current_thread()
 	caller.numa_policy = policy
+	caller.numa_interleave = proc.NumaInterleaveCursor{}
 	return 0, 0
 }
 

@@ -17,10 +17,9 @@ weight set. [Linux sysfs attribute implementation](https://github.com/gregkh/lin
 
 An oversized write consumes at most one native page. The I/O layer bounds
 the payload copy for scalar, positioned, and vectored writes. The no-address
-`MPOL_F_NODE` query returns the first node in the weighted mask for the
-indexed subset. The allocation-order cursor for kernel and page-cache
-allocations, explicit shared range policies, optional mode flags, and
-translated or 32-bit policy calls remain open.
+`MPOL_F_NODE` query returns the next allocation-order node. General kernel
+allocation and the block cache, explicit shared range policies, optional
+mode flags, and translated or 32-bit policy calls remain open.
 
 ## Qualification
 
@@ -157,3 +156,49 @@ baseline failures and the same 307 AArch64 and 255 x86-64 allocation sites.
 The restored and verified archive is
 `~/.cache/vinix-r15/weighted-anon/qualification.tar.zst`, with SHA-256
 `dbc4ab275322f20788436cdd5fdf50af43a19c243112729b4bd8074408cb90e0`.
+
+## Allocation order for mapped file pages
+
+Cold pages brought into the ext2/VJFS inode mapping cache use a per-thread
+cursor under a weighted task policy. A successful `set_mempolicy` starts
+the cursor at the first selected node. Starting a turn samples that node's
+current weight and successive allocations there spend the saved count.
+The next turn reads its own live weight. A no-address `MPOL_F_NODE` query
+reports the next node and leaves the cursor available for the next
+allocation. Fork and thread creation copy its current state and exec
+carries it forward. Indexed anonymous and shmem allocation use their
+existing backing indexes. [Linux 6.12.51 memory policy implementation](https://github.com/gregkh/linux/blob/v6.12.51/mm/mempolicy.c)
+
+The probe maps a sparse file through two aliases, visits cold pages out of
+offset order, and checks that an alias to a cached page preserves its node
+and the cursor. Vinix runs it on a private ext2 image and checks the exact
+sequence with a mid-turn weight change. The diskless Linux reference uses
+ramfs and checks each cold page against the immediately preceding next-node
+query. Linux can spend additional turns on kernel allocations during the
+same fault.
+
+Both production kernels were built from `9ad9e3400` plus the archived
+source patch. The same fixture ELF per architecture passed on Vinix with
+ext2 and on Linux 6.12.51 with ramfs in single- and two-node guests. The
+two-node VJFS runs passed on both architectures. The prior Vinix kernels
+failed when the next allocation was due on node one.
+
+| Architecture | Probe ELF SHA-256 prefix | Vinix kernel SHA-256 prefix |
+| --- | --- | --- |
+| AArch64 | `e67d3a166b6783de` | `2946456c6bf31b61` |
+| x86-64 | `1278f6a0da3baaf9` | `4ace234930d70f46` |
+
+The `weighted`, `taskpolicy`, and `cachestat` regressions passed on both
+architectures. Independent review checked page ownership, reclaim locking,
+reserve accounting, and cursor copies. The allocation checker reproduced
+the baseline failures and the same 307 AArch64 and 255 x86-64 allocation
+sites.
+
+Run `build-support/run-v-tool.sh tests/linux-compat/run-mount.v --case
+weightedcache --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR --numa`.
+Add `--journal` for VJFS. Pass `FRESH-DIR/init` to the Linux reference
+runner with `--case weightedcache`. Omit `--numa` for single-node runs.
+
+The restored and verified archive is
+`~/.cache/vinix-r15/weighted-cache/qualification.tar.zst`, with SHA-256
+`2b35428e734a8a6b3462465d18102a47a64720b38907eb0255456458124046c8`.

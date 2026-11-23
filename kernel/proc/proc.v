@@ -217,6 +217,12 @@ pub:
 	mask u64
 }
 
+pub struct NumaInterleaveCursor {
+pub mut:
+	node i32 = -1
+	remaining u8
+}
+
 pub struct Process {
 pub mut:
 	constructing bool

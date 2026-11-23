@@ -59,6 +59,33 @@ pub fn weighted_task_node(index u64) int {
 	return weighted_interleave_node(caller.numa_policy.mask, index)
 }
 
+// The next allocation without a mapping index. Queries leave the turn intact.
+pub fn weighted_next_node(caller &proc.Thread) int {
+	cursor := caller.numa_interleave
+	if cursor.remaining != 0 { return int(cursor.node) }
+	mask := caller.numa_policy.mask
+	for node := int(cursor.node) + 1; node < node_count(); node++ {
+		if mask & (u64(1) << node) != 0 { return node }
+	}
+	return first_node_in(mask)
+}
+
+pub fn alloc_mapped_file_page() voidptr {
+	if !numa_multinode { return memory.pmm_alloc_user(1) }
+	mut caller := proc.current_thread()
+	if caller == unsafe { nil } || caller.numa_policy.mode != mpol_weighted_interleave {
+		return memory.pmm_alloc_user(1)
+	}
+	if !memory.user_room(1) { return unsafe { nil } }
+	node := weighted_next_node(caller)
+	if caller.numa_interleave.remaining == 0 {
+		caller.numa_interleave.node = i32(node)
+		caller.numa_interleave.remaining = interleave_weight(node)
+	}
+	caller.numa_interleave.remaining--
+	return alloc_policy_node(node, false, true)
+}
+
 // The native Linux memory policy syscalls read maxnode-1 bits.
 pub fn import_nodemask(address u64, maxnode u64) ?u64 {
 	if address == 0 || maxnode == 1 { return u64(0) }

@@ -157,6 +157,7 @@ pub mut:
 	personality u32
 	// Default NUMA placement belongs to the thread making the allocation.
 	numa_policy NumaPolicy
+	numa_interleave NumaInterleaveCursor
 	// Scheduling policy, priority and, under SCHED_DEADLINE, the budget left
 	// in this period. Inherited by fork and by every thread a process clones,
 	// and kept across exec, so `chrt -f 50 ./program` gives the program the

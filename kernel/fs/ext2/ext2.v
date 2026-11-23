@@ -7,6 +7,7 @@ import lib
 import event
 import event.eventstruct
 import memory
+import numa
 import fs as vfs
 import fs.journal
 import pagecache
@@ -232,7 +233,7 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	// A page that stays for as long as it is mapped, so the mapping process'
 	// to answer for, as an anonymous one is: not from the memory the kernel
 	// keeps for itself, and counted when there is none (memory/reserve.v).
-	physical := memory.pmm_alloc_user(1)
+	physical := if offset < file_size { numa.alloc_mapped_file_page() } else { memory.pmm_alloc_user(1) }
 	if physical == unsafe { nil } {
 		errno.set(errno.enomem)
 		return unsafe { nil }

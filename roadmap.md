@@ -2829,6 +2829,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   identities and offsets in proc maps on both architectures.
   See [the shared anonymous receipts](docs/linux-weighted-interleave.md#shared-anonymous-placement).
 
+- [x] Use a per-thread weighted cursor for cold mapped ext2 pages. Qualify
+  next-node queries, cache hits, and weight updates on both architectures.
+  See [the file allocation receipts](docs/linux-weighted-interleave.md#allocation-order-for-mapped-file-pages).
+
 - [x] Match native `fadvise64` descriptor and range validation. Qualify
   error ordering, signed ranges, argument widths, and libc return values
   on both architectures. See [the file advice receipts](docs/linux-fadvise.md).
