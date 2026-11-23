@@ -159,6 +159,31 @@ fn run() ! {
 	}))!
 	check(helper, state, 'resume-complete', args, 'error', '')!
 	require_absent(stage)!
+
+	bundle := os.join_path(original, 'bundle.tar.gz')
+	os.write_file(bundle, '')!
+	defer { os.rm(bundle) or {} }
+	os.truncate(bundle, u64(2147483647))!
+	check(helper, state, 'asset-limit-minus-one', ['check-upload-sizes', original, 'bundle.tar.gz'],
+		'error', '')!
+	os.truncate(bundle, u64(2147483648))!
+	size_error := 'GitHub release asset bundle.tar.gz is 2147483648 bytes'
+	check(helper, state, 'capture-asset-limit', ['capture-upload', original, stage, 'a.iso', 'bundle.tar.gz'],
+		'4096', size_error)!
+	require_absent(stage)!
+	os.write_file(manifest, '${sha256.hexhash('')}  bundle.tar.gz\n')!
+	os.write_file(response, json2.encode(FixtureDraft{}))!
+	check(helper, state, 'resume-asset-limit', args, '4096', size_error)!
+	require_absent(stage)!
+
+	staged_bundle := os.join_path(capture, 'bundle.tar.gz')
+	os.write_file(staged_bundle, '')!
+	defer { os.rm(staged_bundle) or {} }
+	os.truncate(staged_bundle, u64(2147483648))!
+	check(helper, state, 'staged-asset-limit', ['upload-draft', capture, state, response, 'local/fixture',
+		'42', 'fixture', 'false', ''], '4096', size_error)!
+	require_absent(os.join_path(capture, 'SHA256SUMS'))!
+	require_absent(os.join_path(capture, 'RELEASE_NOTES.md'))!
 }
 
 fn main() {

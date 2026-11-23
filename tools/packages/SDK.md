@@ -617,6 +617,10 @@ compares the bytes it needs to copy with the space available under
 `build-release/work`. Keep additional free space for filesystem overhead,
 package receipt verification and boot testing. Copy and flush errors still
 stop the release if available space changes during staging.
+Each GitHub release asset must be smaller than 2 GiB. The driver checks
+initial asset sizes before capture or checksum generation and checks
+the staged payloads before creating the tag and draft. Draft recovery
+applies the same limit to assets that still need to be sent.
 The driver holds an exclusive lock on `build-release/work` through publication
 or build-only completion. A second invocation in the same workspace exits
 before creating its tag output directory. Use a workspace filesystem that

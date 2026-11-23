@@ -545,22 +545,24 @@ fi
 [ "${#IMAGES[@]}" -gt 0 ] || die "nothing was built"
 ASSET_DIRECTORY="$OUT"
 build_release_assets
+capture=capture-upload
+if [ "$PUBLISH" -eq 0 ]; then
+    capture=capture
+    "$ASSET_WORK/release-assets" check-upload-sizes "$OUT" "${IMAGES[@]##*/}"
+fi
 if [ "$RUN_TESTS" -eq 1 ] || [ -n "$PACKAGE_WORK" ]; then
     step "Capturing release assets"
-    "$ASSET_WORK/release-assets" capture "$OUT" "$ASSET_STAGE" \
+    "$ASSET_WORK/release-assets" "$capture" "$OUT" "$ASSET_STAGE" \
         "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}"
     ASSET_DIRECTORY="$ASSET_STAGE"
+elif [ "$PUBLISH" -eq 1 ]; then
+    "$ASSET_WORK/release-assets" check-upload-sizes "$OUT" "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}"
 fi
 
 staged_images=()
 for image in "${IMAGES[@]}"; do
     name="${image##*/}"
     staged_images+=("$ASSET_STAGE/$name")
-    # GitHub refuses release assets of 2 GiB or more.
-    size="$(file_size "$ASSET_DIRECTORY/$name")"
-    if [ "$size" -ge 2147483648 ]; then
-        die "$name is $(human_size "$size"), over GitHub's 2 GiB asset limit"
-    fi
 done
 
 if [ -n "$PACKAGE_WORK" ]; then
@@ -743,6 +745,7 @@ confirm_publish
 cmp -s "$ASSET_WORK/SHA256SUMS" "$OUT/SHA256SUMS" ||
     die "SHA256SUMS changed after verification"
 if [ "$ASSET_DIRECTORY" = "$ASSET_STAGE" ]; then
+    "$ASSET_WORK/release-assets" check-upload-sizes "$ASSET_STAGE" "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}"
     "$ASSET_WORK/release-assets" check "$OUT" "$ASSET_WORK/SHA256SUMS"
 else
     step "Preparing verified release copies"

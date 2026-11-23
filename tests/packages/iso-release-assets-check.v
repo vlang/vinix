@@ -20,6 +20,7 @@ const publish_refusals = ['publish-readback-lost', 'publish-still-draft',
 	'publish-changed-asset', 'publish-tag-moved']
 const repo_refusals = ['repo-foreign', 'repo-invalid', 'repo-dotdot']
 const creation_refusals = ['create-delayed', 'create-no-draft']
+const size_refusals = ['oversize-capture', 'oversize-no-test']
 
 struct FixtureAsset {
 	name string
@@ -438,7 +439,9 @@ fn run_stub(name string) !int {
 		'build-aarch64.sh' {}
 		'build-desktop-amd64.sh' {
 			os.cp(os.getenv('VINIX_ASSET_TEST_AMD64_ISO'), os.getenv('VINIX_AMD64_DESKTOP_ISO'))!
-			fixture_bundle(os.getenv('VINIX_AMD64_X11_BUNDLE'))!
+			bundle := os.getenv('VINIX_AMD64_X11_BUNDLE')
+			fixture_bundle(bundle)!
+			if scenario in size_refusals { os.truncate(bundle, u64(2147483648))! }
 		}
 		'build-desktop-aarch64.sh' { fixture_bundle(os.getenv('VINIX_X11_BUNDLE'))! }
 		'build-ios-aarch64.sh' { fixture_runtime()! }
@@ -734,6 +737,7 @@ fn run() ! {
 	if date_code != 0 { return error('cannot resolve fixture date: ' + date_output) }
 	default_tag := 'iso-' + date_output.trim_space()
 	mut scenarios := repo_refusals.clone()
+	scenarios << size_refusals
 	scenarios << creation_refusals
 	scenarios << 'create-response-lost'
 	scenarios << draft_refusals
@@ -789,7 +793,7 @@ fn run() ! {
 		if scenario != 'tag-auto' { args << '--tag=' + tag }
 		if scenario == 'draft-only' { args << ['--draft', '--prerelease'] }
 		if scenario == 'build-only' { args << ['--arch=amd64', '--no-publish'] }
-		if scenario in ['publish-no-test', 'packages-no-test']! { args << ['--no-test'] }
+		if scenario in ['publish-no-test', 'packages-no-test', 'oversize-no-test']! { args << ['--no-test'] }
 		code, log := command('/bin/bash', args, root, environment)
 		os.write_file(work + '/' + scenario + '.log', log)!
 		if os.ls(root + '/build-release/work')!.any(it.starts_with('release-assets.')) {
@@ -820,6 +824,17 @@ fn run() ! {
 				if retry_code != 0 || !os.is_file(root + '/build-release/fixture-lock-build/SHA256SUMS') {
 					return error('release workspace retry failed\n' + retry_log)
 				}
+			}
+		} else if scenario in size_refusals {
+			bundle := out + '/' + x11
+			length := os.file_size(bundle)
+			// Keep the test evidence small even though the checked file is sparse.
+			os.write_file(bundle, 'fixture bundle\n')!
+			if code == 0 || length != u64(2147483648)
+				|| !log.contains('GitHub release asset ${x11} is 2147483648 bytes')
+				|| log.contains('Recording checksums for release assets') || os.exists(out + '/fixture-boot')
+				|| os.ls(remote)!.len != 0 {
+				return error('oversized release bundle reached verification or publication\n' + log)
 			}
 		} else if scenario in creation_refusals {
 			if code == 0 || !log.contains('no GitHub draft found') {

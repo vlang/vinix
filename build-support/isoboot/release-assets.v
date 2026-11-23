@@ -7,6 +7,8 @@ import json2
 import os
 import tools.packages.pkgcore
 
+const github_asset_limit = u64(2) * 1024 * 1024 * 1024
+
 struct UploadedAsset {
 	name   string
 	state  string
@@ -112,9 +114,8 @@ fn require_staging_space(directory string, needed u64) ! {
 	}
 }
 
-fn prepare_staging(directory string, destination string, names []string, metadata_bytes u64) !map[string]u64 {
+fn asset_sizes(directory string, names []string, github bool) !map[string]u64 {
 	mut sizes := map[string]u64{}
-	mut needed := metadata_bytes
 	for name in names {
 		if !valid_asset_name(name) || name in sizes {
 			return error('invalid or repeated release asset name: ' + name)
@@ -122,17 +123,28 @@ fn prepare_staging(directory string, destination string, names []string, metadat
 		path := os.join_path(directory, name)
 		info := os.lstat(path) or { return error('cannot inspect release asset ${path}: ${err}') }
 		if info.get_filetype() != .regular { return error('release asset must be a regular file: ' + path) }
-		if info.size > ~u64(0) - needed { return error('release staging size overflows') }
+		if github && info.size >= github_asset_limit {
+			return error('GitHub release asset ${name} is ${info.size} bytes. It must be smaller than 2 GiB.')
+		}
 		sizes[name] = info.size
-		needed += info.size
+	}
+	return sizes
+}
+
+fn prepare_staging(directory string, destination string, names []string, metadata_bytes u64, github bool) !map[string]u64 {
+	sizes := asset_sizes(directory, names, github)!
+	mut needed := metadata_bytes
+	for _, size in sizes {
+		if size > ~u64(0) - needed { return error('release staging size overflows') }
+		needed += size
 	}
 	require_staging_space(os.dir(destination), needed)!
 	os.mkdir(destination, mode: 0o700)!
 	return sizes
 }
 
-fn capture_assets(directory string, destination string, names []string) ! {
-	sizes := prepare_staging(directory, destination, names, 0)!
+fn capture_assets(directory string, destination string, names []string, github bool) ! {
+	sizes := prepare_staging(directory, destination, names, 0, github)!
 	for name in names {
 		copy_asset(directory, destination, name, sizes[name])!
 	}
@@ -141,7 +153,8 @@ fn capture_assets(directory string, destination string, names []string) ! {
 fn stage_assets(directory string, manifest string, destination string, uploaded []string, metadata_bytes u64) ! {
 	entries := read_manifest(manifest)!
 	if entries.len == 0 { return error('release checksum manifest is empty') }
-	sizes := prepare_staging(directory, destination, entries.keys().filter(it !in uploaded), metadata_bytes)!
+	sizes := prepare_staging(directory, destination, entries.keys().filter(it !in uploaded),
+		metadata_bytes, true)!
 	for name, digest in entries {
 		path := if size := sizes[name] {
 			copy_asset(directory, destination, name, size)!
@@ -283,6 +296,7 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 	if original != '' {
 		stage_assets(original, manifest, stage, draft.assets.map(it.name), metadata_bytes)!
 	} else {
+		asset_sizes(stage, names.filter(it != 'SHA256SUMS'), true)!
 		require_staging_space(stage, metadata_bytes)!
 	}
 	if upload_manifest { copy_asset(directory, stage, 'SHA256SUMS', checksum_bytes)! }
@@ -326,8 +340,12 @@ fn run() ! {
 	if os.args.len >= 5 && os.args[1] == 'record' {
 		return record_assets(os.args[2], os.args[3], os.args[4..])
 	}
-	if os.args.len >= 5 && os.args[1] == 'capture' {
-		return capture_assets(os.args[2], os.args[3], os.args[4..])
+	if os.args.len >= 5 && os.args[1] in ['capture', 'capture-upload']! {
+		return capture_assets(os.args[2], os.args[3], os.args[4..], os.args[1] == 'capture-upload')
+	}
+	if os.args.len >= 4 && os.args[1] == 'check-upload-sizes' {
+		asset_sizes(os.args[2], os.args[3..], true)!
+		return
 	}
 	if os.args.len == 4 && os.args[1] == 'check' {
 		return check_assets(os.args[2], os.args[3])
@@ -364,7 +382,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | check | stage | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
 }
 
 fn main() {
