@@ -510,6 +510,14 @@ fn (mut this TmpFSResource) append_data(handle voidptr, buf voidptr, count u64, 
 	return written
 }
 
+fn (mut this TmpFSResource) clear_write_setid_locked() {
+	mode := mode_after_write(this.stat.mode, this.stat.gid)
+	if mode != this.stat.mode {
+		this.stat.mode = mode
+		this.stat.ctim = realtime_clock
+	}
+}
+
 // Caller holds the resource lock through policy checks and data publication.
 fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	append := _handle != unsafe { nil }
@@ -540,6 +548,7 @@ fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, 
 		errno.set(errno.enospc)
 		return none
 	}
+	this.clear_write_setid_locked()
 	if this.paged {
 		// A hole from a seek past EOF reads back as zero: freshly allocated
 		// pages already are, and pages kept from before a truncation are
@@ -667,6 +676,7 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 		// may still reach them, and a regrow must show the same page, not a
 		// fresh one. An ordinary file's borrowed storage can stay borrowed and
 		// re-materialise its still-visible prefix on the next grow.
+		this.clear_write_setid_locked()
 		this.stat.size = new_size
 		if !this.paged {
 			this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
@@ -697,6 +707,7 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 		}
 	}
 
+	this.clear_write_setid_locked()
 	this.stat.size = new_size
 	if !this.paged {
 		this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))

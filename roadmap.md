@@ -2671,6 +2671,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Qualify concurrent fixed remap and seal-and-exit storage on both
   architectures. See [the memory sealing receipts](docs/linux-mseal.md).
 
+- [x] Clear set-ID mode bits on unprivileged writes and truncation on tmpfs,
+  ext2 and VJFS. Qualify capability and group exceptions, `fallocate` growth
+  and persistence after remount on both native architectures. See
+  [the set-ID write receipts](docs/linux-setid-write.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

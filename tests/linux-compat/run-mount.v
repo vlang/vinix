@@ -2,13 +2,11 @@
 module main
 
 import crypto.sha256
+import diskhost
 import guesthost
 import hosttest
 import json2
 import os
-
-#include <unistd.h>
-fn C.truncate(&char, i64) int
 
 struct MountReceipt {
  architecture string
@@ -28,11 +26,15 @@ fn main() {
   hosttest.Option{name: '--kernel-dir', value: true},
   hosttest.Option{name: '--state-dir', value: true},
   hosttest.Option{name: '--timeout', value: true},
- ], [], 'Usage: run-mount.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--timeout SECONDS]')!
+  hosttest.Option{name: '--case', value: true, choices: ['mount', 'setid']},
+  hosttest.Option{name: '--journal'},
+ ], [], 'Usage: run-mount.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case mount|setid] [--journal] [--timeout SECONDS]')!
  for key in ['--arch', '--kernel-dir', '--state-dir'] {
   if !options.has(key) { eprintln('missing ' + key); exit(2) }
  }
  arch := options.value('--arch', '')
+ name := options.value('--case', 'mount')
+ journal := options.has('--journal')
  state := os.abs_path(options.value('--state-dir', ''))
  timeout := options.integer('--timeout', 180)!
  if os.exists(state) || timeout <= 0 { eprintln('state must be fresh and timeout positive'); exit(2) }
@@ -42,13 +44,12 @@ fn main() {
   eprintln('kernel must be matching little-endian ELF64'); exit(2)
  }
  os.mkdir_all(state + '/kernel/bin')!
- os.mkdir_all(state + '/sources/mountfixture')!
+ frozen := state + '/sources/' + name + 'fixture'
+ os.mkdir_all(frozen)!
  os.write_file_array(state + '/kernel/bin/vinix', kernel)!
- source := os.read_file(os.real_path(os.dir(@FILE) + '/mountfixture/core.v'))!
- os.write_file(state + '/sources/mountfixture/core.v', source)!
- disk := state + '/store.ext2'
- os.write_file(disk, '')!
- if unsafe { C.truncate(disk.str, 128 * 1024 * 1024) } != 0 { eprintln('cannot size private volume'); exit(1) }
+ source := os.read_file(os.real_path(os.dir(@FILE) + '/' + name + 'fixture/core.v'))!
+ os.write_file(frozen + '/core.v', source)!
+ disk := state + if journal { '/store.vjfs' } else { '/store.ext2' }
  mut formatter := os.getenv('VINIX_MKE2FS')
  if formatter == '' {
   for candidate in ['mke2fs', 'mkfs.ext2', '/opt/homebrew/opt/e2fsprogs/sbin/mke2fs'] {
@@ -57,24 +58,32 @@ fn main() {
   }
  }
  if formatter == '' { eprintln('mke2fs is required'); exit(2) }
- mut child := os.new_process(formatter)
- child.set_args(['-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-O',
-  'filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum', disk])
- child.run()
- child.wait()
- if child.code != 0 { eprintln('formatting private volume failed'); exit(1) }
- child.close()
- mut inputs := {'kernel': sha256.sum(kernel).hex(), 'fixture_source': sha256.sum(source.bytes()).hex(), 'disk_before': digest(disk)!}
- code := run_guest(state, arch, disk, timeout) or { eprintln(err.msg()); 1 }
- for name, path in {'init': state + '/init', 'iso': state + '/test.iso', 'disk_after': disk} {
-  inputs[name] = digest(path) or { '' }
+ if journal {
+  seed := state + '/empty'
+  os.mkdir(seed)!
+  diskhost.journal_fixture(disk, seed, formatter, 64)!
+ } else {
+  diskhost.sparse_file(disk, 128 * 1024 * 1024)!
+  mut child := os.new_process(formatter)
+  child.set_args(['-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-O',
+   'filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum', disk])
+  child.run()
+  child.wait()
+  if child.code != 0 { eprintln('formatting private volume failed'); exit(1) }
+  child.close()
  }
- os.write_file(state + '/receipt.json', json2.encode(MountReceipt{arch, 'native Vinix QEMU guest; private ext2 volume', inputs, code}, prettify: true) + '\n')!
+ mut inputs := {'kernel': sha256.sum(kernel).hex(), 'fixture_source': sha256.sum(source.bytes()).hex(), 'disk_before': digest(disk)!}
+ code := run_guest(state, arch, name, frozen + '/core.v', disk, timeout) or { eprintln(err.msg()); 1 }
+ for artifact, path in {'init': state + '/init', 'iso': state + '/test.iso', 'disk_after': disk} {
+  inputs[artifact] = digest(path) or { '' }
+ }
+ context := 'native Vinix QEMU guest; private ' + (if journal { 'VJFS' } else { 'ext2' }) + ' volume'
+ os.write_file(state + '/receipt.json', json2.encode(MountReceipt{arch, context, inputs, code}, prettify: true) + '\n')!
  exit(code)
 }
 
-fn run_guest(state string, arch string, disk string, timeout int) !int {
- init := guesthost.compile_init(state + '/sources/mountfixture/core.v', state, arch, false)!
+fn run_guest(state string, arch string, name string, source string, disk string, timeout int) !int {
+ init := guesthost.compile_init(source, state, arch, false)!
  archive := guesthost.image(init, state)!
  if arch == 'x86_64' { os.setenv('VINIX_CMDLINE', os.getenv('VINIX_CMDLINE') + ' vinix.disk=auto', true) }
  configured := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
@@ -82,6 +91,12 @@ fn run_guest(state string, arch string, disk string, timeout int) !int {
  if arch == 'aarch64' {
   command << ['-drive', 'if=none,format=raw,file=' + disk + ',id=compat-data', '-device', 'virtio-blk-device,drive=compat-data']
  } else { command << ['-drive', 'if=ide,format=raw,file=' + disk] }
- positive, negative := guesthost.verdict_policy(['LINUX MOUNT: PASS'], ['LINUX MOUNT FAIL'], false)
+ label := 'LINUX ' + name.to_upper()
+ mut markers := [label + ': PASS']
+ if name == 'setid' {
+  markers << ['LINUX SETID TMPFS: 30 privileged and 30 unprivileged operations passed',
+   'LINUX SETID DISK: 30 privileged and 30 unprivileged operations and remount passed']
+ }
+ positive, negative := guesthost.verdict_policy(markers, [label + ' FAIL'], false)
  return guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 }

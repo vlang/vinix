@@ -136,6 +136,22 @@ fn chmod_permissions(mode u32, gid u32) u32 {
 	return if may_keep_setgid(gid) { mode } else { mode & ~u32(0o2000) }
 }
 
+// A regular file modified without CAP_FSETID loses setuid. Setgid also
+// drops if group execute is set or the caller is outside the file's group.
+pub fn mode_after_write(mode u32, gid u32) u32 {
+	if mode & 0o6000 == 0 || !stat.isreg(mode) { return mode }
+	task := proc.current_thread()
+	if task == unsafe { nil } || task.process == unsafe { nil }
+		|| holds_capability(task.process, proc.cap_fsetid, true) {
+		return mode
+	}
+	mut clear := u32(0o4000)
+	if mode & 0o2000 != 0 && (mode & 0o010 != 0 || !credential_in_group(task.process, gid, true)) {
+		clear |= 0o2000
+	}
+	return mode & ~clear
+}
+
 fn may_chown(uid u32, new_uid u32, new_gid u32) bool {
 	process := proc.current_thread().process
 	if holds_capability(process, proc.cap_chown, true) {

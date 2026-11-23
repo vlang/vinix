@@ -329,6 +329,22 @@ fn (mut this EXT2Resource) append_data(handle voidptr, buf voidptr, count u64, l
 	return written
 }
 
+// Remove privileged mode bits before touching data. The journal commits the
+// mode with the mutation. On legacy ext2, publish the cleared mode as soon
+// as it reaches the block cache, even if a later step fails.
+fn (mut this EXT2Resource) clear_write_setid_locked(mut inode EXT2Inode) ? {
+	mode := vfs.mode_after_write(u32(inode.permissions), u32(inode.group_id))
+	if mode == u32(inode.permissions) { return }
+	inode.permissions = u16(mode)
+	inode.creation_time = ext2_now()
+	inode.write_entry(mut this.filesystem, u32(this.stat.ino))?
+	if this.filesystem.journal == unsafe { nil } {
+		this.stat.mode &= mode | ~u32(0o6000)
+		this.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
+		flush_on_return()
+	}
+}
+
 // Caller holds the resource lock through policy checks and data publication.
 fn (mut this EXT2Resource) write_locked(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
 	append := _handle != unsafe { nil }
@@ -351,6 +367,7 @@ fn (mut this EXT2Resource) write_locked(_handle voidptr, buf voidptr, loc u64, c
 	if this.filesystem.journal != unsafe { nil } && current_inode.oss1 == truncate_pending {
 		this.filesystem.cleanup_inode(mut current_inode, u32(this.stat.ino))?
 	}
+	this.clear_write_setid_locked(mut current_inode)?
 	written := current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), write_at, if this.filesystem.journal != unsafe { nil } && count > 1024 * 1024 { u64(1024 * 1024) } else { count })?
 	this.filesystem.commit_transaction()?
 	// A writer far enough ahead of the device catches up before its call
@@ -377,6 +394,7 @@ fn (mut this EXT2Resource) write_locked(_handle voidptr, buf voidptr, loc u64, c
 	}
 	this.stat.size = i64(current_inode.size())
 	this.stat.blocks = current_inode.sector_cnt
+	this.stat.mode &= u32(current_inode.permissions) | ~u32(0o6000)
 	this.stat.mtim = time.TimeSpec{i64(current_inode.mod_time), 0}
 	this.stat.ctim = time.TimeSpec{i64(current_inode.creation_time), 0}
 	return written
@@ -475,6 +493,7 @@ fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 	this.filesystem.begin_transaction()?
 	defer { this.filesystem.abort_transaction() }
 	old_size := current_inode.size()
+	this.clear_write_setid_locked(mut current_inode)?
 	if this.filesystem.journal != unsafe { nil } {
 		this.resize_journaled_locked(mut current_inode, new_size)?
 	} else { current_inode.resize(mut this.filesystem, u32(this.stat.ino), 0, new_size)? }
@@ -522,6 +541,7 @@ fn (mut this EXT2Resource) publish_size_locked(inode &EXT2Inode, old_size u64) {
 
 	this.stat.size = i64(new_size)
 	this.stat.blocks = inode.sector_cnt
+	this.stat.mode &= u32(inode.permissions) | ~u32(0o6000)
 	this.stat.mtim = time.TimeSpec{i64(inode.mod_time), 0}
 	this.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
 }
