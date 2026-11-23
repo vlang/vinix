@@ -19,7 +19,7 @@ this catalog does not establish full application lifecycle or sandbox support.
 
 The [generated native syscall inventory](linux-syscall-coverage.md) and
 [machine-readable inventory](linux-syscall-coverage.json) cover every number in
-the pinned musl 1.2.5 namespace and Linux 6.12 futex2 additions on AArch64 and
+the pinned musl 1.2.5 namespace and selected Linux 6.12 additions on AArch64 and
 x86-64. Regenerate the inventory with the following commands.
 
 ```sh
@@ -248,6 +248,7 @@ they are not automatically rerun or upgraded to current qualification here.
 | openat2 and constrained path traversal | partial | partial | Raw regression in `tests/linux-compat/openfixture`: ordinary opens, NO_SYMLINKS, NO_MAGICLINKS and NO_XDEV during lookup/creation, final O_PATH link handles. Mount checks retain bind alias identities. BENEATH, IN_ROOT and CACHED remain EOPNOTSUPP, including combinations with supported flags. |
 | rename/unlink, sparse files, links, directory iteration and xattrs | partial | partial | [Sparse ext2](../tests/ext2-sparse/README.md), [xattrs](../tests/ext2-xattr/README.md), [journal](../tests/fs-journal/README.md). The [mount controller](../tests/linux-compat/run-mount.v) qualifies source selection, source symlinks, readonly alias errors and remounted data for boot-detected ext2 volumes on both architectures. tmpfs and disk-backed behavior must be tested independently. |
 | mmap, W^X, mprotect, shared/private mappings and page sizes | partial | partial | [TLB](../tests/tlb/README.md), [paging](../tests/paging/README.md), [mapped writeback](../tests/mapped-writeback/README.md). [Sparse-fork qualification](linux-posix-qualification.md#sparse-fork-page-table-reservations) covers deferred roots, COW, first-touch zero pages and WIPEONFORK on both architectures. [Mapping-storage qualification](linux-posix-qualification.md#mapping-metadata-storage-reservations) covers retained capacity, refused growth and native split/fork/unmap recovery. AArch64 uses 16 KiB native pages; x86-64 uses 4 KiB. Runtime assumptions must be checked, not hard-coded. |
+| Native mapping sealing | qualified subset | qualified subset | mseal qualifies range validation, split boundaries, protection and replacement errors, advice, fork and exec, and concurrent fixed remap. [Semantics and receipts](linux-mseal.md). |
 | `/proc` processes, threads, maps, mounts and memory/accounting | partial | partial | [Process inspection](../tests/process-inspection/README.md), [proc mounts](../tests/procfs-mount/README.md), [proc allocations](../tests/procfs-allocs/README.md). [Production task diagnostics](linux-posix-qualification.md#production-task-diagnostics) qualify root-only repeated serial dumps on both architectures. Linux tools may require fields or files that are not present. |
 | `/sys` device discovery and cgroup behavior | partial | partial | `kernel/fs/sysfs*.v`, [resource groups](../tests/resource-groups/README.md). Linux sysfs is not fully reproduced; device cgroup BPF filtering is absent. |
 | musl ELF loader, auxv, shared libraries and runtime fallback | partial | partial | Alpine userland and native fixture boots. [Dumpability/auxv](../tests/dumpability/README.md), [developer tools](../tests/developer-tools/README.md). Pin userland and kernel versions in qualification receipts. |

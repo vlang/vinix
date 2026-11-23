@@ -42,6 +42,8 @@ fn test_real_tables_keep_architecture_numbers_and_private_extension() {
 			assert futex.len == 1 && futex[0].number == number
 			assert futex[0].status == 'wired; unqualified'
 		}
+		mseal := report.syscalls.filter(it.arch == arch && it.name == 'mseal')
+		assert mseal.len == 1 && mseal[0].number == 462 && mseal[0].handler == 'mmap.syscall_mseal'
 	}
 }
 

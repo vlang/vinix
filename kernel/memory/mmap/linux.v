@@ -25,7 +25,9 @@ pub const mremap_fixed = 2
 const madv_dontneed = 4
 
 const madv_free = 8
+const madv_remove = 9
 const madv_pageout = 21
+const madv_dontneed_locked = 24
 
 // The program break lives in its own arena, well clear of the thread stacks at
 // 0x70000000000 and the anonymous mmap region at 0x80000000000.
@@ -90,10 +92,16 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		return errno.err, errno.einval
 	}
 
+	begin_mapping_update(mut pagemap) or { return errno.err, errno.get() }
+	defer { end_mapping_update(mut pagemap) }
 	pagemap.l.acquire()
 	source, _, source_file_page := addr2range(pagemap, old_address) or {
 		pagemap.l.release()
 		return errno.err, errno.efault
+	}
+	if source.metadata_protected() {
+		pagemap.l.release()
+		return errno.err, errno.eperm
 	}
 	// Restored lock/protection splits can still describe one original mapping.
 	// Incompatible pieces or independently created globals cannot be moved as
@@ -101,10 +109,6 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	if !compatible_remap_span_unlocked(pagemap, old_address, old_length, source, source_file_page) {
 		pagemap.l.release()
 		return errno.err, errno.get()
-	}
-	if source.immutable {
-		pagemap.l.release()
-		return errno.err, errno.eperm
 	}
 	prot := source.prot
 	map_flags := source.flags
@@ -264,7 +268,7 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 
 	pagemap.l.acquire()
 	if !remap_span_unlocked(pagemap, old_address, old_length, source_options.credit_serial, true)
-		|| !remap_span_unlocked(pagemap, u64(destination), new_length, *destination_slot, false) {
+		|| !remap_span_unlocked(pagemap, u64(destination), new_length, *destination_slot, true) {
 		failure := errno.get()
 		pagemap.l.release()
 		unmap_created_range(mut pagemap, u64(destination), new_length, *destination_slot)
@@ -286,7 +290,7 @@ fn compatible_remap_span_unlocked(pagemap &memory.Pagemap, base u64, length u64,
 	mut cursor := base
 	for cursor < base + length {
 		local, _, file_page := addr2range(pagemap, cursor) or { errno.set(errno.efault); return false }
-		if local.immutable { errno.set(errno.eperm); return false }
+		if local.metadata_protected() { errno.set(errno.eperm); return false }
 		if local.global != reference.global || local.prot != reference.prot
 			|| local.flags != reference.flags || local.cow != reference.cow
 			|| local.dont_fork != reference.dont_fork || local.wipe_on_fork != reference.wipe_on_fork
@@ -304,7 +308,7 @@ fn remap_span_unlocked(pagemap &memory.Pagemap, base u64, length u64, serial u64
 	for cursor < base + length {
 		local, _, _ := addr2range(pagemap, cursor) or { errno.set(errno.efault); return false }
 		if local.global.serial != serial { errno.set(errno.efault); return false }
-		if mutable && local.immutable { errno.set(errno.eperm); return false }
+		if mutable && local.metadata_protected() { errno.set(errno.eperm); return false }
 		cursor = min_u64(base + length, local.base + local.length)
 	}
 	return true
@@ -496,7 +500,7 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 		pageout(pagemap, address, span)
 		return 0, 0
 	}
-	if advice != madv_dontneed && advice != madv_free {
+	if advice !in [madv_dontneed, madv_free, madv_remove, madv_dontneed_locked]! {
 		return 0, 0
 	}
 	if length > u64(-1) - (guest_page_size - 1) {
@@ -513,27 +517,40 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 	defer {
 		pagemap.l.release()
 	}
+	sealed := first_protected_range_unlocked(pagemap, address, aligned_length, .sealed_discard)
+	if advice == madv_remove {
+		// The existing implementation has no hole punching for this advice.
+		// Still enforce the seal before offering it to a backing resource.
+		if sealed != unsafe { nil } { return errno.err, errno.eperm }
+		return 0, 0
+	}
 	if immutable_overlap_unlocked(pagemap, address, aligned_length) {
 		return errno.err, errno.eperm
 	}
-	if locked_overlap_unlocked(pagemap, lib.align_down(address, page_size),
-		lib.align_up(address % page_size + aligned_length, page_size)) > 0 {
+	limit := if sealed == unsafe { nil } { end } else { max_u64(address, sealed.base) }
+	allow_locked := advice == madv_dontneed_locked
+	if !allow_locked && limit > address && locked_overlap_unlocked(pagemap,
+		lib.align_down(address, page_size), lib.align_up(limit - address + address % page_size,
+		page_size)) > 0 {
 		return errno.err, errno.einval
 	}
 
 	mut virt := address
-	for virt < end {
+	for virt < limit {
 		in_page := virt % page_size
 		available := page_size - in_page
-		chunk := if end - virt < available { end - virt } else { available }
+		chunk := min_u64(limit - virt, available)
 		local_range, _, file_page := addr2range(pagemap, virt) or {
 			virt += chunk
 			continue
 		}
-		// File-page release callbacks temporarily drop pagemap.l. A lock
-		// installed while they run must protect each following page too.
-		if local_range.flags & map_locked != 0 { return errno.err, errno.einval }
-		if advice == madv_dontneed && local_range.flags & map_shared == 0
+		// File-page release callbacks temporarily drop pagemap.l. Recheck
+		// protection and locking after reacquiring it.
+		if local_range.immutable || local_range.sealed_from_discard() {
+			return errno.err, errno.eperm
+		}
+		if !allow_locked && local_range.flags & map_locked != 0 { return errno.err, errno.einval }
+		if (advice == madv_dontneed || allow_locked) && local_range.flags & map_shared == 0
 			&& local_range.global.private_cow && in_page == 0 && chunk == page_size {
 			mut owner := local_range.global
 			owner.shadow_pagemap.l.acquire()
@@ -623,6 +640,7 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 		virt += chunk
 	}
 
+	if limit != end { return errno.err, errno.eperm }
 	return 0, 0
 }
 
@@ -633,8 +651,8 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 	mut process := proc.current_thread().process
 	mut heap_map := process.pagemap
-	begin_brk(mut heap_map) or { return heap_map.brk_current, 0 }
-	defer { end_brk(mut heap_map) }
+	begin_mapping_update(mut heap_map) or { return heap_map.brk_current, 0 }
+	defer { end_mapping_update(mut heap_map) }
 
 	if process.pagemap.brk_base == 0 {
 		// Reserve the arena once and commit pages with mprotect as the break
@@ -676,7 +694,7 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 		}
 		mut pagemap := process.pagemap
 		pagemap.l.acquire()
-		if immutable_overlap_unlocked(pagemap, current_page, growth) {
+		if first_protected_range_unlocked(pagemap, current_page, growth, .metadata) != unsafe { nil } {
 			pagemap.l.release()
 			return process.pagemap.brk_current, 0
 		}

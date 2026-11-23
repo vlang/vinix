@@ -87,6 +87,10 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 	current = base
 	for current < end {
 		mut local_range, _, _ := addr2range(pagemap, current) or { return }
+		if (change.dont_fork || change.wipe_on_fork) && local_range.sealed_from_discard() {
+			errno.set(errno.eperm)
+			return none
+		}
 		local_end := local_range.base + local_range.length
 		snip_begin := current
 		snip_end := if local_end < end { local_end } else { end }
@@ -112,6 +116,7 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				sealed: local_range.sealed
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
@@ -137,6 +142,7 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 			flags: local_range.flags
 			cow: local_range.cow
 			immutable: local_range.immutable
+			sealed: local_range.sealed
 			dont_fork: dont_fork
 			wipe_on_fork: wipe_on_fork
 			global: local_range.global

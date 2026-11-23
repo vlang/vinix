@@ -122,6 +122,7 @@ pub mut:
 	flags     int
 	cow       bool
 	immutable bool
+	sealed    bool
 	// What fork(2) does with the range, set by madvise(2) and minherit(2):
 	// leaves it out of the child, or gives the child an empty one.
 	dont_fork    bool
@@ -557,27 +558,29 @@ pub fn share_pagemap(_pagemap &memory.Pagemap) &memory.Pagemap {
 
 // A brk transaction can populate a swapped page or reclaim memory. Keep the
 // map spinlock only around its busy flag, never across those sleeping paths.
-fn begin_brk(mut pagemap memory.Pagemap) ? {
+// Serialize mapping changes that release pagemap.l before completing.
+// A seal or fork must see their completed state.
+fn begin_mapping_update(mut pagemap memory.Pagemap) ? {
 	for {
 		pagemap.l.acquire()
-		if !pagemap.brk_busy {
-			pagemap.brk_busy = true
+		if !pagemap.mapping_busy {
+			pagemap.mapping_busy = true
 			pagemap.l.release()
 			return
 		}
-		generation := event.generation(mut pagemap.brk_changed)
+		generation := event.generation(mut pagemap.mapping_changed)
 		pagemap.l.release()
-		event.await_one_from_generation_masked(mut pagemap.brk_changed, generation) or {
+		event.await_one_from_generation_killable(mut pagemap.mapping_changed, generation) or {
 			errno.set(errno.eintr)
 			return none
 		}
 	}
 }
 
-fn end_brk(mut pagemap memory.Pagemap) {
+fn end_mapping_update(mut pagemap memory.Pagemap) {
 	pagemap.l.acquire()
-	pagemap.brk_busy = false
-	event.trigger(mut pagemap.brk_changed, true)
+	pagemap.mapping_busy = false
+	event.trigger(mut pagemap.mapping_changed, true)
 	pagemap.l.release()
 }
 
@@ -678,8 +681,8 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 	mut new_pagemap := memory.new_user_pagemap(owner)?
 	mut completed := false
 	defer { if !completed { delete_pagemap(mut new_pagemap) or {} } }
-	begin_brk(mut old_pagemap)?
-	defer { end_brk(mut old_pagemap) }
+	begin_mapping_update(mut old_pagemap)?
+	defer { end_mapping_update(mut old_pagemap) }
 	old_pagemap.l.acquire()
 	new_pagemap.l.acquire()
 	new_pagemap.brk_base = old_pagemap.brk_base
@@ -1383,6 +1386,14 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		return none
 	}
 
+	// brk owns the update while it installs its reservation, and mremap owns
+	// it through construction and copying of a destination. An exec map is
+	// private to the loader until it replaces the old page map.
+	own_update := voidptr(pagemap) == voidptr(process.pagemap)
+		&& flags & map_brk_reservation == 0 && options.created_serial == unsafe { nil }
+	if own_update { begin_mapping_update(mut pagemap)? }
+	defer { if own_update { end_mapping_update(mut pagemap) } }
+
 	mut range_local := new_local_range(MmapRangeLocal{
 		pagemap: pagemap
 		base: base
@@ -1517,6 +1528,13 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		}
 	} else if fixed {
 		base = u64(addr)
+		if first_protected_range_unlocked(pagemap, base, length, .sealed) != unsafe { nil } {
+			pagemap.l.release()
+			free_global_range(range_global)
+			free_local_range(range_local)
+			errno.set(errno.eperm)
+			return none
+		}
 		if voidptr(pagemap) == voidptr(process.pagemap)
 			&& !mapping_fits_address_limit(pagemap, process, base, length, true, charged_length, limit_credit) {
 			pagemap.l.release()
@@ -1726,7 +1744,9 @@ pub fn syscall_mprotect(_ voidptr, addr voidptr, length u64, prot int) (u64, u64
 		process.pagemap.l.release()
 		if !blocked { effective |= prot_exec }
 	}
-	mprotect(mut process.pagemap, addr, length, effective) or { return errno.err, errno.get() }
+	mprotect_range(mut process.pagemap, addr, length, effective, true) or {
+		return errno.err, errno.get()
+	}
 
 	return 0, 0
 }
@@ -1774,6 +1794,26 @@ pub fn syscall_msync(_ voidptr, addr u64, _length u64, flags int) (u64, u64) {
 }
 
 pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
+	mprotect_range(mut pagemap, addr, len, prot, false)?
+}
+
+fn protectable_length_unlocked(pagemap &memory.Pagemap, base u64, length u64,
+	allow_sealed_prefix bool) ?u64 {
+	if immutable_overlap_unlocked(pagemap, base, length) {
+		errno.set(errno.eperm)
+		return none
+	}
+	sealed := first_protected_range_unlocked(pagemap, base, length, .sealed)
+	if sealed == unsafe { nil } { return length }
+	if !allow_sealed_prefix || sealed.base <= base {
+		errno.set(errno.eperm)
+		return none
+	}
+	return sealed.base - base
+}
+
+fn mprotect_range(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int,
+	allow_sealed_prefix bool) ? {
 	validate_protection(prot)?
 	if len == 0 {
 		errno.set(errno.einval)
@@ -1785,20 +1825,19 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 		return none
 	}
 
-	// Preflight before populating sparse pages. Otherwise a denied protection
-	// change could still allocate physical memory inside an immutable range.
+	// Linux mprotect can update the prefix before a sealed mapping. Internal
+	// callers such as brk need a refusal before changing any page.
 	pagemap.l.acquire()
-	if immutable_overlap_unlocked(pagemap, u64(addr), length) {
+	prefix := protectable_length_unlocked(pagemap, u64(addr), length, allow_sealed_prefix) or {
 		pagemap.l.release()
-		errno.set(errno.eperm)
 		return none
 	}
-	if prot & prot_exec != 0 && no_exec_overlap_unlocked(pagemap, u64(addr), length) {
+	if prot & prot_exec != 0 && no_exec_overlap_unlocked(pagemap, u64(addr), prefix) {
 		pagemap.l.release()
 		errno.set(errno.eacces)
 		return none
 	}
-	if prot & prot_write != 0 && no_write_overlap_unlocked(pagemap, u64(addr), length) {
+	if prot & prot_write != 0 && no_write_overlap_unlocked(pagemap, u64(addr), prefix) {
 		pagemap.l.release()
 		errno.set(errno.eacces)
 		return none
@@ -1811,7 +1850,7 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 	// part of the reservation. A process in a cgroup is left to fault them in
 	// instead, as mmap() leaves it to (see there).
 	if prot != prot_none && !memory_accounted(proc.current_thread().process, &pagemap) {
-		populate_missing_pages(mut pagemap, u64(addr), len, prot, true)?
+		populate_missing_pages(mut pagemap, u64(addr), prefix, prot, true)?
 	}
 
 	pagemap.l.acquire()
@@ -1819,7 +1858,13 @@ pub fn mprotect(mut pagemap memory.Pagemap, addr voidptr, len u64, prot int) ? {
 		pagemap.l.release()
 	}
 
-	mprotect_unlocked(mut pagemap, addr, len, prot)?
+	// A seal installed during population can shorten the allowed prefix.
+	current_prefix := protectable_length_unlocked(pagemap, u64(addr), length, allow_sealed_prefix)?
+	mprotect_unlocked(mut pagemap, addr, current_prefix, prot)?
+	if current_prefix != length {
+		errno.set(errno.eperm)
+		return none
+	}
 }
 
 // Fill in the pages of [address, address + length) a range has no page for
@@ -1916,6 +1961,7 @@ fn extend_brk_range_unlocked(mut pagemap memory.Pagemap, base u64, length u64, p
 		|| reserve.length == length
 		|| committed.global != reserve.global || committed.flags != reserve.flags
 		|| committed.cow != reserve.cow || committed.immutable != reserve.immutable
+		|| committed.sealed != reserve.sealed
 		|| committed.dont_fork != reserve.dont_fork
 		|| committed.wipe_on_fork != reserve.wipe_on_fork || committed.offset + i64(committed.length) != reserve.offset {
 		return false
@@ -1980,7 +2026,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 		errno.set(errno.einval)
 		return none
 	}
-	if immutable_overlap_unlocked(pagemap, u64(addr), length) {
+	if first_protected_range_unlocked(pagemap, u64(addr), length, .metadata) != unsafe { nil } {
 		errno.set(errno.eperm)
 		return none
 	}
@@ -2027,6 +2073,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				sealed: local_range.sealed
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
@@ -2049,6 +2096,7 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				sealed: local_range.sealed
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
@@ -2155,7 +2203,8 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 		errno.set(errno.einval)
 		return none
 	}
-	if enforce_immutable && immutable_overlap_unlocked(pagemap, u64(addr), length) {
+	if enforce_immutable
+		&& first_protected_range_unlocked(pagemap, u64(addr), length, .metadata) != unsafe { nil } {
 		errno.set(errno.eperm)
 		return none
 	}
@@ -2187,6 +2236,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				sealed: local_range.sealed
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global

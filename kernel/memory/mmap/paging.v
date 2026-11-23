@@ -435,9 +435,11 @@ fn remap_shared_anonymous(mut pagemap memory.Pagemap, old_address u64, old_lengt
 		errno.set(errno.efault)
 		return none
 	}
-	if local.global.serial != serial || !compatible_remap_span_unlocked(&pagemap,
-		old_address, old_length, local, first_page) {
+	if local.global.serial != serial {
 		errno.set(errno.efault)
+		return none
+	}
+	if !compatible_remap_span_unlocked(&pagemap, old_address, old_length, local, first_page) {
 		return none
 	}
 	mut global := local.global
@@ -450,7 +452,7 @@ fn remap_shared_anonymous(mut pagemap memory.Pagemap, old_address u64, old_lengt
 		errno.set(errno.enomem)
 		return none
 	}
-	if immutable_overlap_unlocked(&pagemap, base, new_length) {
+	if first_protected_range_unlocked(&pagemap, base, new_length, .metadata) != unsafe { nil } {
 		errno.set(errno.eperm)
 		return none
 	}

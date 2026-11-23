@@ -9,12 +9,26 @@ import lib
 import memory
 import proc
 
-// OpenBSD's mimmutable(2) makes mapping metadata one-way: once a mapped span is
-// immutable its protection or mapping cannot be changed. Unmapped holes are
-// deliberately ignored and do not acquire any latent state.
-fn immutable_overlap_unlocked(pagemap &memory.Pagemap, base u64, length u64) bool {
+enum RangeProtection {
+	immutable
+	sealed
+	metadata
+	sealed_discard
+}
+
+fn (local &MmapRangeLocal) metadata_protected() bool {
+	return local.immutable || local.sealed
+}
+
+fn (local &MmapRangeLocal) sealed_from_discard() bool {
+	return local.sealed && local.flags & map_anonymous != 0 && local.flags & map_shared == 0
+		&& local.prot & prot_write == 0
+}
+
+fn first_protected_range_unlocked(pagemap &memory.Pagemap, base u64, length u64,
+	protection RangeProtection) &MmapRangeLocal {
 	if length == 0 || base > u64(-1) - length {
-		return false
+		return unsafe { nil }
 	}
 	end := base + length
 	mut range_local := range_floor(pagemap, base)
@@ -25,16 +39,25 @@ fn immutable_overlap_unlocked(pagemap &memory.Pagemap, base u64, length u64) boo
 		if range_local.base >= end {
 			break
 		}
-		range_end := range_local.base + range_local.length
-		if range_local.immutable && base < range_end && end > range_local.base {
-			return true
+		protected := match protection {
+			.immutable { range_local.immutable }
+			.sealed { range_local.sealed }
+			.metadata { range_local.metadata_protected() }
+			.sealed_discard { range_local.sealed_from_discard() }
+		}
+		if protected && base < range_local.base + range_local.length {
+			return range_local
 		}
 		if range_local.base == u64(-1) {
 			break
 		}
 		range_local = range_lower_bound(pagemap, range_local.base + 1)
 	}
-	return false
+	return unsafe { nil }
+}
+
+fn immutable_overlap_unlocked(pagemap &memory.Pagemap, base u64, length u64) bool {
+	return first_protected_range_unlocked(pagemap, base, length, .immutable) != unsafe { nil }
 }
 
 fn next_mapped_base_unlocked(pagemap &memory.Pagemap, address u64, end u64) u64 {
@@ -48,6 +71,7 @@ fn next_mapped_base_unlocked(pagemap &memory.Pagemap, address u64, end u64) u64 
 	return end
 }
 
+// OpenBSD mimmutable deliberately skips holes and leaves them available.
 pub fn mimmutable(mut pagemap memory.Pagemap, address u64, _length u64) ? {
 	if _length == 0 {
 		return
@@ -101,6 +125,7 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: local_range.immutable
+				sealed: local_range.sealed
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
@@ -123,6 +148,7 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				flags: local_range.flags
 				cow: local_range.cow
 				immutable: true
+				sealed: local_range.sealed
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global

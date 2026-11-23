@@ -6,10 +6,10 @@ The accompanying COPYRIGHT applies. The coverage generator records their hashes
 and rejects duplicate, malformed and out-of-range numbers. Updating the baseline
 is an explicit reviewable change; report generation does not fetch the network.
 
-`linux-futex2-syscalls.h` adds the three numbers absent from that musl release.
-Linux 6.12 assigns the same numbers on both native architectures.
-[Linux x86-64 syscall table](https://github.com/torvalds/linux/blob/v6.12/arch/x86/entry/syscalls/syscall_64.tbl#L379-L381),
-[Linux generic UAPI syscall numbers](https://github.com/torvalds/linux/blob/v6.12/include/uapi/asm-generic/unistd.h#L779-L784).
+`linux-6.12-syscalls.h` adds futex2 and mseal numbers absent from that musl
+release. Linux 6.12 assigns the same numbers on both native architectures.
+[Linux x86-64 syscall table](https://github.com/torvalds/linux/blob/v6.12/arch/x86/entry/syscalls/syscall_64.tbl#L379-L387),
+[Linux generic UAPI syscall numbers](https://github.com/torvalds/linux/blob/v6.12/include/uapi/asm-generic/unistd.h#L779-L798).
 
 This is the native ELF64 namespace. Linux i386 and x32 are separate ABIs;
 instruction translation does not establish support for their syscall layouts.

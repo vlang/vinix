@@ -2666,6 +2666,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   deadlines, signal restart, and legacy futex interoperability on AArch64 and
   x86-64. See [the futex2 receipts](docs/linux-futex2.md).
 
+- [x] Implement native `mseal` with range validation, permanent mapping
+  metadata protection, discard rules, fork inheritance and exec teardown.
+  Qualify concurrent fixed remap and seal-and-exit storage on both
+  architectures. See [the memory sealing receipts](docs/linux-mseal.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

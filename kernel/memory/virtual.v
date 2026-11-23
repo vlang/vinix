@@ -139,8 +139,8 @@ pub mut:
 	// are separate: only the final process release may destroy this map.
 	owners      u64 = 1
 	// The program break belongs to the address space, not a process sharing it.
-	brk_busy    bool
-	brk_changed eventstruct.Event
+	mapping_busy    bool
+	mapping_changed eventstruct.Event
 	brk_base    u64
 	brk_current u64
 	// MCL_FUTURE belongs to the address space shared by CLONE_VM threads.
