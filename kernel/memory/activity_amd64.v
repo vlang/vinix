@@ -5,6 +5,18 @@ import katomic
 const page_accessed = u64(1) << 5
 const page_dirty = u64(1) << 6
 
+pub fn (mut map_ Pagemap) age_page_unlocked(address u64) {
+	mut entry := map_.virt2pte(address, false) or { return }
+	mut old := katomic.load(entry)
+	for old & page_accessed != 0 {
+		if katomic.cas(mut entry, old, old & ~page_accessed) {
+			map_.invalidate(address)
+			return
+		}
+		old = katomic.load(entry)
+	}
+}
+
 // Caller holds l. Revoke writes on every alias before collecting dirty bits.
 pub fn (mut map_ Pagemap) protect_file_page_unlocked(address u64) {
 	mut entry := map_.virt2pte(address, false) or { return }

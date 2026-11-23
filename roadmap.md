@@ -2775,6 +2775,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Qualify offset replacement, adjacent mappings, protection checks and
   concurrent unmap on both architectures. See [the remap receipts](docs/linux-remap-file-pages.md).
 
+- [x] Implement the native `process_madvise` paging subset. Qualify pidfd
+  lifetime, filesystem credentials, partial vector returns, and anonymous
+  paging on both architectures. See [the advice receipts](docs/linux-process-madvise.md).
+
 - [x] Implement native `mseal` with range validation, permanent mapping
   metadata protection, discard rules, fork inheritance and exec teardown.
   Qualify concurrent fixed remap and seal-and-exit storage on both

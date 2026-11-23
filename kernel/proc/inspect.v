@@ -17,7 +17,13 @@ fn inspection_capable(caller &Process, target &Process) bool {
 	return caller.caps.effective & (u64(1) << cap_sys_ptrace) != 0
 }
 
-fn inspection_allowed(caller &Process, target &Process, real_creds bool) bool {
+enum InspectionCredentials {
+	real
+	effective
+	filesystem
+}
+
+fn inspection_allowed(caller &Process, target &Process, credentials InspectionCredentials) bool {
 	if !mac_peer_allowed(caller, target) { return false }
 	if voidptr(caller) == voidptr(target) || inspection_capable(caller, target) {
 		return true
@@ -25,9 +31,17 @@ fn inspection_allowed(caller &Process, target &Process, real_creds bool) bool {
 	if dumpability(target) != 1 || voidptr(caller.ns.user) != voidptr(target.ns.user) {
 		return false
 	}
-	uid := if real_creds { caller.uid } else { caller.euid }
-	gid := if real_creds { caller.gid } else { caller.egid }
-	caps := if real_creds { caller.caps.permitted } else { caller.caps.effective }
+	uid := match credentials {
+		.real { caller.uid }
+		.effective { caller.euid }
+		.filesystem { caller.fsuid }
+	}
+	gid := match credentials {
+		.real { caller.gid }
+		.effective { caller.egid }
+		.filesystem { caller.fsgid }
+	}
+	caps := if credentials == .real { caller.caps.permitted } else { caller.caps.effective }
 	return target.uid == uid && target.euid == uid && target.suid == uid
 		&& target.gid == gid && target.egid == gid && target.sgid == gid
 		&& target.caps.permitted & ~caps == 0
@@ -57,7 +71,7 @@ pub fn may_inspect_locked(target &Process) bool {
 		return false
 	}
 	current := current_thread().process
-	return inspection_allowed(current, target, false)
+	return inspection_allowed(current, target, .effective)
 }
 
 // get_robust_list uses READ_REALCREDS, as process_vm_* does. The caller holds
@@ -67,7 +81,7 @@ pub fn may_inspect_realcreds_locked(target &Process) bool {
 		return false
 	}
 	current := current_thread().process
-	return inspection_allowed(current, target, true)
+	return inspection_allowed(current, target, .real)
 }
 
 pub struct ProcessInspection {
@@ -103,18 +117,55 @@ pub fn inspect_pagemap(local_pid int) ?ProcessInspection {
 		errno.set(errno.esrch)
 		return none
 	}
-	if !inspection_allowed(caller, target, true) {
+	if !inspection_allowed(caller, target, .real) {
 		errno.set(errno.eperm)
 		return none
 	}
-	mut pagemap := target.pagemap
+	return ProcessInspection{
+		pagemap:       retain_inspection_locked(target.pagemap)
+		fault_missing: voidptr(target) == voidptr(caller)
+	}
+}
+
+// The table protects the target identity, credentials and current pagemap
+// until its destruction can see this reference.
+fn retain_inspection_locked(map_ &memory.Pagemap) &memory.Pagemap {
+	mut pagemap := unsafe { map_ }
 	pagemap.l.acquire()
 	pagemap.inspection_refs++
 	pagemap.l.release()
-	return ProcessInspection{
-		pagemap:       pagemap
-		fault_missing: voidptr(target) == voidptr(caller)
+	return pagemap
+}
+
+pub fn pin_advice_pagemap(record &PidFile, valid_advice bool) ?&memory.Pagemap {
+	lock_table()
+	defer { unlock_table() }
+	target := pidfd_target_locked(record)
+	if target == unsafe { nil } {
+		errno.set(errno.esrch)
+		return none
 	}
+	if !valid_advice {
+		errno.set(errno.einval)
+		return none
+	}
+	pagemap := target.pagemap
+	if target.exiting || pagemap == unsafe { nil } {
+		errno.set(errno.esrch)
+		return none
+	}
+	caller := current_thread().process
+	if voidptr(pagemap) != voidptr(caller.pagemap) {
+		if !inspection_allowed(caller, target, .filesystem) {
+			errno.set(errno.eacces)
+			return none
+		}
+		if !has_capability(caller, cap_sys_nice) {
+			errno.set(errno.eperm)
+			return none
+		}
+	}
+	return retain_inspection_locked(pagemap)
 }
 
 // Allocation call chains expose kernel addresses and the global tracker can

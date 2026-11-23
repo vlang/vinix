@@ -166,7 +166,7 @@ fn fork_paged_span(global &MmapRangeGlobal, mut child MmapRangeGlobal, begin u64
 // locks are tried, never waited for, under range_locals_lock. This respects
 // the existing pagemap -> locals lock order even when two sharers page out.
 // All translations are synchronously revoked before the frame is read.
-fn detach_page_unlocked(mut pagemap memory.Pagemap, virt u64) &pager.Backing {
+fn detach_page_unlocked(mut pagemap memory.Pagemap, virt u64, exclusive bool) &pager.Backing {
 	defer { pagemap.l.release() }
 	local, _, _ := addr2range(&pagemap, virt) or { return unsafe { nil } }
 	if (local.flags & map_anonymous == 0 && (!local.global.tracked_file || local.flags & map_shared != 0)) || local.flags & map_locked != 0
@@ -181,6 +181,7 @@ fn detach_page_unlocked(mut pagemap memory.Pagemap, virt u64) &pager.Backing {
 	defer { global.shadow_pagemap.l.release() }
 	if global.shadow_pagemap.top_level == unsafe { nil } { return unsafe { nil } }
 	physical := global.shadow_pagemap.virt2phys(page) or { return unsafe { nil } }
+	if exclusive && memory.pmm_refcount(voidptr(physical)) != 1 { return unsafe { nil } }
 	if local.flags & map_anonymous == 0 {
 		mut res := global.resource
 		file_page := u64(local.offset) / page_size + (virt - local.base) / page_size
@@ -214,7 +215,9 @@ fn detach_page_unlocked(mut pagemap memory.Pagemap, virt u64) &pager.Backing {
 		if !shadow_covered(alias, page) { continue }
 		address := alias.base + page - shadow_begin(alias)
 		if phys := alias.pagemap.virt2phys(address) {
-			if phys != physical { return unsafe { nil } }
+			if phys != physical || (exclusive && (voidptr(alias.pagemap) != voidptr(&pagemap) || address != virt)) {
+				return unsafe { nil }
+			}
 		}
 	}
 	node := unsafe { &PagedPage(memory.malloc_packed_fallible(sizeof(PagedPage))) }
@@ -239,17 +242,17 @@ fn detach_page_unlocked(mut pagemap memory.Pagemap, virt u64) &pager.Backing {
 	return backing
 }
 
-fn store_detached_page(pagemap &memory.Pagemap, virt u64, backing &pager.Backing) u64 {
+fn store_detached_page(pagemap &memory.Pagemap, virt u64, backing &pager.Backing, exclusive bool) u64 {
 	// The mapping may disappear while store runs; the completion/rollback
 	// must own its own pin rather than rely on the tree entry surviving.
 	pager.retain(backing)
 	reclaimed := pager.store(backing)
-	restore_failed_pageout(pagemap, virt, backing)
+	restore_failed_pageout(pagemap, virt, backing, exclusive)
 	pager.release(backing)
 	return reclaimed
 }
 
-fn restore_failed_pageout(_pagemap &memory.Pagemap, virt u64, backing &pager.Backing) {
+fn restore_failed_pageout(_pagemap &memory.Pagemap, virt u64, backing &pager.Backing, exclusive bool) {
 	physical := pager.fallback_frame(backing)
 	if physical == unsafe { nil } { return }
 	mut transferred := false
@@ -272,6 +275,7 @@ fn restore_failed_pageout(_pagemap &memory.Pagemap, virt u64, backing &pager.Bac
 	 }
 	for alias in global.locals {
 		if !shadow_covered(alias, page) { continue }
+		if exclusive && (voidptr(alias.pagemap) != voidptr(pagemap) || alias.base + page - shadow_begin(alias) != virt) { continue }
 		mut other := alias.pagemap
 		if voidptr(other) == voidptr(pagemap) { continue }
 		mut already := false
@@ -291,10 +295,11 @@ fn restore_failed_pageout(_pagemap &memory.Pagemap, virt u64, backing &pager.Bac
 	transferred = true
 	for alias in global.locals {
 		if !shadow_covered(alias, page) { continue }
+		address := alias.base + page - shadow_begin(alias)
+		if exclusive && (voidptr(alias.pagemap) != voidptr(pagemap) || address != virt) { continue }
 		mut mutable_alias := unsafe { alias }
 		if alias.flags & map_shared == 0 { mutable_alias.cow = true }
 		if alias.prot & prot_exec != 0 { sync_new_code_page(physical) }
-		address := alias.base + page - shadow_begin(alias)
 		alias.pagemap.map_page_unlocked(address, u64(physical),
 			page_table_flags(alias.prot, global.pte_extra, alias.flags & map_shared != 0)) or {}
 	}
@@ -302,6 +307,11 @@ fn restore_failed_pageout(_pagemap &memory.Pagemap, virt u64, backing &pager.Bac
 }
 
 pub fn pageout(pagemap &memory.Pagemap, address u64, length u64) u64 {
+	reclaimed := pageout_pager(pagemap, address, length, false)
+	return reclaimed + pageout_file_span(pagemap, address, address + length)
+}
+
+fn pageout_pager(pagemap &memory.Pagemap, address u64, length u64, exclusive bool) u64 {
 	mut map_ := unsafe { pagemap }
 	mut reclaimed := u64(0)
 	end := address + length
@@ -314,10 +324,10 @@ pub fn pageout(pagemap &memory.Pagemap, address u64, length u64) u64 {
 			break
 		}
 		cursor = page + page_size
-		backing := detach_page_unlocked(mut map_, page)
-		if backing != unsafe { nil } { reclaimed += store_detached_page(map_, page, backing) }
+		backing := detach_page_unlocked(mut map_, page, exclusive)
+		if backing != unsafe { nil } { reclaimed += store_detached_page(map_, page, backing, exclusive) }
 	}
-	return reclaimed + pageout_file_span(pagemap, address, end)
+	return reclaimed
 }
 
 __global (
@@ -412,9 +422,9 @@ pub fn reclaim_anonymous(wanted u64, foreground bool) u64 {
 			pagemap.pageout_cursor = if page == end { end } else { page + page_size }
 			scanned++
 			if page == end { continue }
-			backing := detach_page_unlocked(mut pagemap, page)
+			backing := detach_page_unlocked(mut pagemap, page, false)
 			if backing != unsafe { nil } {
-				reclaimed += store_detached_page(pagemap, page, backing)
+				reclaimed += store_detached_page(pagemap, page, backing, false)
 			}
 			pagemap.l.acquire()
 		}

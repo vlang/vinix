@@ -5,6 +5,14 @@ import katomic
 const arm64_file_tracked = u64(1) << 56
 const arm64_file_dirty = u64(1) << 55
 
+pub fn (mut map_ Pagemap) age_page_unlocked(address u64) {
+	mut entry := map_.virt2pte(address, false) or { return }
+	old := katomic.load(entry)
+	if old & arm64_pte_af != 0 {
+		install_arm64_pte(mut entry, address, old & ~arm64_pte_af, true)
+	}
+}
+
 pub fn (mut map_ Pagemap) protect_file_page_unlocked(address u64) {
 	mut entry := map_.virt2pte(address, false) or { return }
 	old := katomic.load(entry)
