@@ -584,6 +584,31 @@ The paired inputs, creation records, run logs and transport checks are in
 Its SHA-256 is `dc84951da78014774343651c8bc7c52f5f9a2fb4f1ed022223795df42d708d73`.
 All 1,233 entries in the extracted `qualification.sha256` passed.
 
+### Draft recovery staging
+
+At `e4fa5e600`, draft recovery verifies every original asset against the
+saved manifest and checks the remote SHA-256 digests. It makes private
+upload copies for missing payloads only. Recovery of a complete draft
+verifies the originals in place and uses no temporary upload directory.
+
+All 63 fixture checks passed with local GitHub stubs, compiled host helpers
+and signed inputs for both architectures. The previous driver at
+`556125776` failed the new staging check by copying the uploaded arm64
+ISO. The updated driver omitted four previously uploaded payloads totaling
+376,951 bytes in the fixture. It refused changed original files whether
+their remote assets were present or missing. The complete draft proceeded
+to publication without an upload directory.
+
+ASan/UBSan controls confirmed complete-draft verification and refusal of
+changed bytes, a symbolic link in place of an original file, and a bad
+remote digest.
+
+The paired inputs, baseline and updated runs, stage inventories and
+sanitizer checks are in
+`~/.local/state/vinix/r14-release-resume-staging-5qvnY3/qualification.tar.gz`.
+Its SHA-256 is `fdb0303c494928f8df68e8b06e24bfd61eaf75af6fa2bf44e57025fddcdbba6d`.
+All 1,646 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
