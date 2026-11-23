@@ -106,7 +106,8 @@ mut:
 	signal int
 	value  u64
 	socket &resource.Resource = unsafe { nil }
-	cookie [32]u8
+	datagram netlink.ReservedDatagram
+	cookie_result u8
 }
 
 pub struct Queue {
@@ -149,7 +150,7 @@ mut:
 	notify_signal int
 	notify_value  u64
 	notify_socket &resource.Resource = unsafe { nil }
-	notify_cookie [32]u8
+	notify_datagram netlink.ReservedDatagram
 }
 
 __global (
@@ -347,7 +348,7 @@ fn free_queue(mut queue Queue) {
 	if queue.notify_socket != unsafe { nil } {
 		mut socket := queue.notify_socket
 		queue.notify_socket = unsafe { nil }
-		socket.unref(unsafe { nil }) or {}
+		discard_notification_socket(mut socket, mut queue.notify_datagram)
 	}
 	kbudget.release(queue.kernel_charge)
 	unsafe {
@@ -676,6 +677,7 @@ fn (mut this Queue) clear_notification_locked() {
 	this.notify_signal = 0
 	this.notify_value = 0
 	this.notify_socket = unsafe { nil }
+	this.notify_datagram = netlink.ReservedDatagram{}
 }
 
 // __do_notify(): the queue went from empty to one message with no receiver
@@ -694,8 +696,8 @@ fn (mut this Queue) fire_notification_locked(mut delivery Delivery) {
 		}
 		sigev_thread {
 			delivery.socket = this.notify_socket
-			unsafe { C.memcpy(&delivery.cookie[0], &this.notify_cookie[0], notify_cookie_len) }
-			delivery.cookie[notify_cookie_len - 1] = notify_wokenup
+			delivery.datagram = unsafe { this.notify_datagram }
+			delivery.cookie_result = notify_wokenup
 		}
 		else {}
 	}
@@ -706,8 +708,8 @@ fn (mut this Queue) fire_notification_locked(mut delivery Delivery) {
 fn (mut this Queue) remove_notification_locked(mut delivery Delivery) {
 	if this.notify_kind == sigev_thread && this.notify_socket != unsafe { nil } {
 		delivery.socket = this.notify_socket
-		unsafe { C.memcpy(&delivery.cookie[0], &this.notify_cookie[0], notify_cookie_len) }
-		delivery.cookie[notify_cookie_len - 1] = notify_removed
+		delivery.datagram = unsafe { this.notify_datagram }
+		delivery.cookie_result = notify_removed
 	}
 	this.clear_notification_locked()
 }
@@ -721,7 +723,8 @@ fn deliver(delivery &Delivery) {
 	if delivery.socket != unsafe { nil } {
 		mut socket := delivery.socket
 		if mut socket is netlink.NetlinkSocket {
-			socket.queue_kernel_datagram(unsafe { &delivery.cookie[0] }, notify_cookie_len)
+			mut datagram := unsafe { delivery.datagram }
+			socket.queue_reserved_datagram(mut datagram, delivery.cookie_result)
 		}
 		socket.unref(unsafe { nil }) or {}
 	}
@@ -1101,12 +1104,47 @@ pub fn syscall_mq_unlink(_ voidptr, name_ptr u64) (u64, u64) {
 	return 0, 0
 }
 
-// netlink_getsockbyfilp(): only a netlink socket takes a SIGEV_THREAD cookie.
-fn is_netlink(mut res resource.Resource) bool {
-	if mut res is netlink.NetlinkSocket {
-		return true
+// Resolve the socket and reserve the cookie before consulting the mqd. A
+// wait pins the socket itself and retries through the descriptor number.
+fn reserve_notification_socket(number i32, cookie &u8) ?(&resource.Resource, netlink.ReservedDatagram) {
+	mut datagram := netlink.prepare_kernel_datagram(cookie, notify_cookie_len)
+	mut transferred := false
+	defer { if !transferred { datagram.free() } }
+	for {
+		mut fd := file.fd_from_fdnum(unsafe { nil }, int(number))?
+		mut res := fd.handle.resource
+		if !stat.issock(res.stat.mode) {
+			fd.unref()
+			errno.set(errno.enotsock)
+			return none
+		}
+		if mut res is netlink.NetlinkSocket {
+			reserved, generation := res.try_reserve_datagram(unsafe { &datagram })
+			mut socket := fd.handle.resource
+			katomic.inc(mut &socket.refcount)
+			fd.unref()
+			if reserved {
+				transferred = true
+				return socket, datagram
+			}
+			res.wait_receive_space(generation) or {
+				socket.unref(unsafe { nil }) or {}
+				return none
+			}
+			socket.unref(unsafe { nil }) or {}
+		} else {
+			fd.unref()
+			errno.set(errno.einval)
+			return none
+		}
 	}
-	return false
+}
+
+fn discard_notification_socket(mut socket resource.Resource, mut datagram netlink.ReservedDatagram) {
+	if mut socket is netlink.NetlinkSocket {
+		socket.discard_reserved_datagram(mut datagram)
+	}
+	socket.unref(unsafe { nil }) or {}
 }
 
 // The descriptor and its queue, or nil with the descriptor given back.
@@ -1276,6 +1314,10 @@ pub fn syscall_mq_notify(_ voidptr, mqdes u64, sev_ptr u64) (u64, u64) {
 	unsafe { C.memset(sev, 0, sizeof(SigEvent)) }
 	cookie := unsafe { &u8(C.vinix_stack_alloc(notify_cookie_len)) }
 	mut socket := &resource.Resource(unsafe { nil })
+	mut datagram := netlink.ReservedDatagram{}
+	defer {
+		if socket != unsafe { nil } { discard_notification_socket(mut socket, mut datagram) }
+	}
 	if registering {
 		if !usercopy.copy_from_user(sev, sev_ptr, sizeof(SigEvent)) {
 			return errno.err, errno.efault
@@ -1290,28 +1332,11 @@ pub fn syscall_mq_notify(_ voidptr, mqdes u64, sev_ptr u64) (u64, u64) {
 			if !usercopy.copy_from_user(cookie, sev.value, notify_cookie_len) {
 				return errno.err, errno.efault
 			}
-			mut socket_fd := file.fd_from_fdnum(unsafe { nil }, int(sev.signo)) or {
-				return errno.err, errno.ebadf
-			}
-			mut res := socket_fd.handle.resource
-			if !stat.issock(res.stat.mode) {
-				socket_fd.unref()
-				return errno.err, errno.enotsock
-			}
-			if !is_netlink(mut res) {
-				socket_fd.unref()
-				return errno.err, errno.einval
-			}
-			katomic.inc(mut &res.refcount)
-			socket = res
-			socket_fd.unref()
+			socket, datagram = reserve_notification_socket(sev.signo, cookie) or { return errno.err, errno.get() }
 		}
 	}
 	mut fd, mut queue := queue_fd(mqdes)
 	if fd == unsafe { nil } {
-		if socket != unsafe { nil } {
-			socket.unref(unsafe { nil }) or {}
-		}
 		return errno.err, errno.ebadf
 	}
 	process := proc.current_thread().process
@@ -1336,17 +1361,14 @@ pub fn syscall_mq_notify(_ voidptr, mqdes u64, sev_ptr u64) (u64, u64) {
 		}
 		if sev.notify == sigev_thread {
 			queue.notify_socket = socket
+			queue.notify_datagram = unsafe { datagram }
 			socket = unsafe { nil }
-			unsafe { C.memcpy(&queue.notify_cookie[0], cookie, notify_cookie_len) }
 		}
 		queue.stat.atim = now()
 		queue.stat.ctim = queue.stat.atim
 	}
 	mq_lock.release()
 	fd.unref()
-	if socket != unsafe { nil } {
-		socket.unref(unsafe { nil }) or {}
-	}
 	deliver(delivery)
 	if result != 0 {
 		return errno.err, result

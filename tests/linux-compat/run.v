@@ -34,6 +34,8 @@ fn fixture_files(name string) []string {
 	// five qualified semwait sources together so every compiled input is pinned.
 	return if name == 'semwait' {
 		['core.v', 'snapshot.v', 'storage.v', 'queued.v', 'lifetime.v']
+	} else if name == 'mqueue' {
+		['core.v', 'notifybuf.v']
 	} else if name in ['selecttimeout','ppolltime','ppollsignal'] {
 		['core.v', 'storage.v', 'bounds.v']
 	} else if name in ['selectempty', 'execown', 'selectfds', 'selectword', 'selectorder', 'selecttimeout', 'selecttimeval', 'ppollargs', 'pollcount', 'ppolltime', 'ppollsignal', 'pollcopy', 'selectwake', 'pipeready', 'epollkey', 'epollchurn'] {
@@ -301,7 +303,7 @@ fn added_markers(name string, arch string, marker string) ?[]string {
 		'syslog' { [marker, 'LINUX SYSLOG SUMMARY: checks=35 failures=0', 'LINUX SYSLOG CHILD: checks=10 failures=0'] }
 		'sigqueue' { [marker, 'LINUX SIGQUEUE SUMMARY: checks=44 failures=0'] }
 		'fsuid' { [marker, 'LINUX FSUID SUMMARY: checks=20 failures=0', 'LINUX FSUID CHILD: checks=22 failures=0'] }
-		'mqueue' { [marker, 'LINUX MQUEUE SUMMARY: checks=290 failures=0', 'LINUX MQUEUE CHILD: checks=16 failures=0'] }
+		'mqueue' { [marker, 'LINUX MQUEUE SUMMARY: checks=299 failures=0', 'LINUX MQUEUE CHILD: checks=16 failures=0'] }
 		'futex2' { [marker, 'LINUX FUTEX2 SUMMARY: checks=86 failures=0'] }
 		'mseal' { [marker, 'LINUX MSEAL SUMMARY: checks=' + (if arch == 'aarch64' { '168' } else { '167' }) + ' failures=0'] }
 		'textbusy' { [marker, 'LINUX TEXTBUSY SUMMARY: writer and image lifetime controls passed'] }

@@ -2697,6 +2697,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   successful `execve` calls with a retained queue descriptor. See
   [the exec notification receipts](docs/linux-mqueue.md#signal-notifications-across-exec).
 
+- [x] Reserve netlink receive space for `SIGEV_THREAD` cookies. Qualify
+  delivery after receive-buffer reduction, waiting for room, and release on
+  failed registration. See
+  [the cookie reservation receipts](docs/linux-mqueue.md#receive-space-for-thread-notification-cookies).
+
 - [x] Implement native futex2 vector waits, masked waits and wakes, and
   compare-requeue. Qualify 128-entry waits, shared and private keys, absolute
   deadlines, signal restart, and legacy futex interoperability on AArch64 and

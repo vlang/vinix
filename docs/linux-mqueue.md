@@ -292,6 +292,35 @@ Hashes are SHA-256 prefixes. The archives are under
 - `groupabi-replay.tar.zst` has SHA-256
   `b00c78ec2871bf3f6a0543648f5ff94abf0cf067e24aca8e41bf0901a6c54a51`.
 
+### Receive space for thread notification cookies
+
+`SIGEV_THREAD` registration copies the cookie and reserves netlink receive
+space before looking up the queue descriptor. A full socket makes the
+registration wait for space. Wakeups retry the socket descriptor lookup.
+Failed registrations release the reservation. Delivery and cancellation
+publish the reserved datagram, even if `SO_RCVBUF` has since been reduced.
+[Linux netlink receive reservation](https://github.com/gregkh/linux/blob/v6.12.51/net/netlink/af_netlink.c#L1123)
+
+The probe adds nine checks. It delivers all 64 registered cookies after a
+receive-buffer reduction, waits for space before rejecting an invalid queue
+descriptor, and repeats failed registrations to check that they release
+their reservations. The previous x86-64 kernel delivered 42 of the cookies.
+
+Optimized kernels from `1e8d2c20a` plus the exec and receive-space changes
+passed all 299 + 16 checks. The same probe ELFs passed on Linux 6.12.51 on
+AArch64 and x86-64. `userns` passed on both Vinix kernels, including the
+100-cycle storage checks. Allocation site counts and existing checker
+failures matched the baseline.
+
+| Architecture | Probe ELF | Vinix kernel | Vinix serial log | Linux serial log |
+| --- | --- | --- | --- | --- |
+| AArch64 | `e14a311e5c87587a` | `6a8708b52ed7acf0` | `8988e4102df437ed` | `b895587f171accf0` |
+| x86-64 | `535635b1fe69ec95` | `28dc42dbaf99f484` | `a43040ad3c781724` | `3d409ec58fe44e4d` |
+
+Hashes are SHA-256 prefixes. The archive is
+`~/.cache/vinix-r15/mq-notification-receive-space/qualification.tar.zst`, with
+SHA-256 `ecff5ca603fa2782806e04b1efd1fbd06b013b320a8584dee4c30ed9580edd93`.
+
 ## Limits
 
 - Retired queue nodes keep their references through the VFS grace period.
@@ -306,8 +335,6 @@ Hashes are SHA-256 prefixes. The archives are under
   nice values, FIFO and arrival ties.
 - RLIMIT_MSGQUEUE is charged per real uid across all user namespaces; Linux
   charges per user namespace up its hierarchy.
-- A SIGEV_THREAD cookie that does not fit the socket's receive limit when the
-  notification fires is dropped; Linux reserves room at registration.
 - mq_open can still fail after making a queue if the open file's kernel budget
   runs out; the queue is then removed again.
 - Creating a queue walks every live queue to count the namespace's queues and

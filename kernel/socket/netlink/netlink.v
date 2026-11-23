@@ -102,7 +102,8 @@ pub mut:
 	rx            [][]u8
 	receive_limit int = 262144
 	send_limit    int = 262144
-	queued_bytes  int
+	queued_bytes  int // Readable datagrams and active reservations.
+	receive_space eventstruct.Event
 	// The interface box its descriptor is made with, freed with the socket.
 	box &resource.Resource = unsafe { nil }
 }
@@ -488,12 +489,10 @@ fn (mut this NetlinkSocket) write(_handle voidptr, buf voidptr, _loc u64, count 
 
 fn (mut this NetlinkSocket) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
 	this.l.acquire()
-	defer {
-		this.l.release()
-	}
 	handle := unsafe { &file.Handle(_handle) }
 	for this.rx.len == 0 {
 		if _handle != unsafe { nil } && handle.flags & resource.o_nonblock != 0 {
+			this.l.release()
 			errno.set(errno.ewouldblock)
 			return none
 		}
@@ -504,8 +503,9 @@ fn (mut this NetlinkSocket) read(_handle voidptr, buf voidptr, _loc u64, count u
 		}
 		this.l.acquire()
 	}
+	defer { this.l.release() }
 	mut datagram := this.rx[0]
-	this.queued_bytes -= datagram.cap + 64
+	this.release_receive_charge_locked(datagram.cap + 64)
 	this.rx.delete(0)
 	if this.rx.len == 0 {
 		this.status &= ~file.pollin
@@ -566,7 +566,7 @@ pub fn (mut this NetlinkSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, f
 		this.l.acquire()
 	}
 	mut datagram := this.rx[0]
-	this.queued_bytes -= datagram.cap + 64
+	this.release_receive_charge_locked(datagram.cap + 64)
 	this.rx.delete(0)
 	if this.rx.len == 0 {
 		this.status &= ~file.pollin
@@ -666,7 +666,9 @@ pub fn (mut this NetlinkSocket) setsockopt(_handle voidptr, level int, optname i
 			if !proc.grow_kernel(mut this.kernel_charge, u64(limit - this.receive_reservation) * 2) { return none }
 			this.receive_reservation = limit
 		}
+		previous := this.receive_limit
 		this.receive_limit = limit
+		if limit > previous { event.trigger(mut this.receive_space, true) }
 	}
 }
 
@@ -697,6 +699,9 @@ fn (mut this NetlinkSocket) ioctl(handle voidptr, request u64, argp voidptr) ?in
 }
 
 fn (mut this NetlinkSocket) unref(_handle voidptr) ? {
+	// A capacity waiter keeps the socket, but must look up the descriptor
+	// again when the last reference to its original file description closes.
+	if _handle != unsafe { nil } { event.trigger(mut this.receive_space, true) }
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
@@ -723,30 +728,64 @@ fn (mut this NetlinkSocket) mmap(_handle voidptr, _page u64, _flags int) voidptr
 	return 0
 }
 
-// A datagram from the kernel that no request asked for: the cookie a POSIX
-// message queue sends to the socket mq_notify(SIGEV_THREAD) named. musl's and
-// glibc's helper threads wait for it with recv(). False when it does not fit.
-pub fn (mut this NetlinkSocket) queue_kernel_datagram(data voidptr, length int) bool {
-	if length <= 0 {
-		return false
-	}
+// Receive space can be held by a registered notification before its datagram
+// becomes readable. The notification owns this buffer and its socket pin.
+pub struct ReservedDatagram {
+mut:
+	data []u8
+}
+
+pub fn prepare_kernel_datagram(data voidptr, length int) ReservedDatagram {
+	mut payload := []u8{len: length} @[freed]
+	unsafe { C.memcpy(payload.data, data, length) }
+	return ReservedDatagram{data: unsafe { payload }}
+}
+
+pub fn (mut datagram ReservedDatagram) free() {
+	unsafe { datagram.data.free() }
+}
+
+pub fn (mut this NetlinkSocket) try_reserve_datagram(datagram &ReservedDatagram) (bool, u64) {
+	charge := datagram.data.cap + 64
 	this.l.acquire()
-	defer {
-		this.l.release()
+	defer { this.l.release() }
+	if this.queued_bytes != 0 && this.queued_bytes > this.receive_limit - charge {
+		return false, event.generation(mut this.receive_space)
 	}
-	charge := length + 64
-	if charge > this.receive_limit || this.queued_bytes > this.receive_limit - charge {
-		return false
+	this.queued_bytes += charge
+	return true, 0
+}
+
+pub fn (mut this NetlinkSocket) wait_receive_space(generation u64) ? {
+	event.await_one_from_generation(mut this.receive_space, true, generation) or {
+		errno.set(u64(proc.interrupted_errno))
+		return none
 	}
-	mut datagram := []u8{len: length} @[freed]
-	unsafe { C.memcpy(datagram.data, data, length) }
-	this.queued_bytes += datagram.cap + 64
+}
+
+fn (mut this NetlinkSocket) release_receive_charge_locked(charge int) {
+	this.queued_bytes -= charge
+	event.trigger(mut this.receive_space, true)
+}
+
+pub fn (mut this NetlinkSocket) discard_reserved_datagram(mut datagram ReservedDatagram) {
+	this.l.acquire()
+	this.release_receive_charge_locked(datagram.data.cap + 64)
+	this.l.release()
+	datagram.free()
+}
+
+// Publish the existing reservation. Even a new, smaller receive limit does
+// not discard it. The final byte carries the kernel caller's result.
+pub fn (mut this NetlinkSocket) queue_reserved_datagram(mut datagram ReservedDatagram, result u8) {
+	datagram.data[datagram.data.len - 1] = result
+	this.l.acquire()
 	this.rx.flags |= .noslices
 	// Transfer the buffer header, as handle_request does.
-	this.rx.insert(this.rx.len, unsafe { &datagram })
+	this.rx.insert(this.rx.len, unsafe { &datagram.data })
 	this.status |= file.pollin
 	event.trigger(mut this.event, false)
-	return true
+	this.l.release()
 }
 
 // A change to interface 1 (ifaddrmsg and ifinfomsg both keep the index at

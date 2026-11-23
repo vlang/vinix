@@ -1430,6 +1430,7 @@ pub fn run(argc i32, argv &&char) i32 {
 		attr_calls(mut s)
 		notifications(mut s)
 		notification_exec(mut s)
+		notification_buffer(mut s)
 		unprivileged(mut s)
 		namespaces(mut s)
 		mount_view(mut s)
