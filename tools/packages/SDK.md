@@ -2999,9 +2999,10 @@ or refusal errors close that client. The portal serves one client stream at a
 time and retires its worker and recorded endpoint before releasing the launch
 lease. It supplies no mixing, recording, ALSA/Pulse compatibility or Wine audio
 translation. Socket waits and nonblocking DSP retries have five-second deadlines
-and observe the caller lease; hardware drain and final close retain the driver's
-interruption semantics. Stalled hardware is not qualified. A forced startup kill
-before endpoint identity capture can leave a private nonce socket.
+and observe the caller lease. Handled signals interrupting a socket wait consume
+time from its original deadline. Hardware drain and final close retain the
+driver's interruption semantics. Stalled hardware is not qualified. A forced
+startup kill before endpoint identity capture can leave a private nonce socket.
 
 The [52 host checks](../../tests/packages/audio-portal-host-check.md) cover
 authority, framing, refusal, allocation ownership and production C generation

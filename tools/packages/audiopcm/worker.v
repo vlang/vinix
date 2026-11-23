@@ -140,9 +140,9 @@ fn stream(fd int, guard int, id string, generation u64, manifest string) ! {
 		}
 		read_exact(fd, &bytes[0], int(length), guard)!
 		mut at := 0
-		deadline := time.sys_mono_now() + 5_000_000_000
+		deadline := time.sys_mono_now() + io_timeout_ns
 		for at < int(length) {
-			remaining_ms(deadline)!
+			if remaining_ms(deadline) == 0 { return error('audio operation timed out') }
 			lease_alive(guard, 0)!
 			n := C.write(dsp, unsafe { &bytes[0] + at }, uint(int(length) - at))
 			if n < 0 && C.errno == C.EINTR { continue }

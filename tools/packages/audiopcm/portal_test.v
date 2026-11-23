@@ -2,6 +2,11 @@
 module audiopcm
 
 import os
+import time
+
+fn C.signal(int, voidptr) voidptr
+fn C.siginterrupt(int, int) int
+fn C.usleep(u32) int
 
 $if track_heap ? {
 	#include "heap_tracker.h"
@@ -12,6 +17,22 @@ $if track_heap ? {
 // Explicit checks also execute in -prod, unlike V assertions.
 fn pcm_check(ok bool, message string) { if !ok { panic(message) } }
 fn pcm_error(err IError) { message := err.msg(); unsafe { message.free(); err.free() } }
+
+fn pcm_ignore_interrupt(_ int) {}
+
+fn pcm_install_interrupt_handler() voidptr {
+	previous := C.signal(C.SIGUSR1, voidptr(pcm_ignore_interrupt))
+	pcm_check(previous != voidptr(C.SIG_ERR) && C.siginterrupt(C.SIGUSR1, 1) == 0,
+		'cannot install non-restarting PCM signal handler')
+	return previous
+}
+
+fn pcm_interrupt_waiter(pid int, count int) {
+	for _ in 0 .. count {
+		C.usleep(20_000)
+		if C.kill(pid, C.SIGUSR1) != 0 { C._exit(23) }
+	}
+}
 
 fn test_audio_capability_shape_and_checked_unsigned_identity() {
 	path := '/run/user/1000/vinix-audio-0123456789abcdef0123456789abcdef.sock'
@@ -82,6 +103,9 @@ fn test_audio_socket_acknowledgements_frame_bounds_and_caller_lease() {
 	pcm_check(C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &pair[0]) == 0, 'fixture socketpair')
 	nonblocking(pair[0])!
 	nonblocking(pair[1])!
+	previous := pcm_install_interrupt_handler()
+	defer { C.signal(C.SIGUSR1, previous) }
+	parent := C.getpid()
 	pid := C.fork()
 	pcm_check(pid >= 0, 'fixture fork')
 	if pid == 0 {
@@ -92,6 +116,7 @@ fn test_audio_socket_acknowledgements_frame_bounds_and_caller_lease() {
 		mut payload := [4]u8{}
 		read_exact(pair[1], &payload[0], 4, -1) or { C._exit(12) }
 		if payload != [u8(1), 2, 3, 4]! { C._exit(13) }
+		pcm_interrupt_waiter(parent, 4)
 		answer(pair[1], -1, true) or { C._exit(14) }
 		read_exact(pair[1], &header[0], 4, -1) or { C._exit(15) }
 		if header != [u8(0), 0, 0, 0]! { C._exit(16) }
@@ -116,6 +141,54 @@ fn test_audio_socket_acknowledgements_frame_bounds_and_caller_lease() {
 	lease_alive(lease[0], 0)!
 	C.close(lease[1])
 	if _ := lease_alive(lease[0], 0) { panic('accepted dead caller lease') } else { pcm_error(err) }
+}
+
+fn test_audio_interrupted_wait_keeps_deadline_and_observes_lease_closure() {
+	mut pair := [2]i32{}
+	mut lease := [2]i32{}
+	pcm_check(C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &pair[0]) == 0, 'PCM wait pair')
+	pcm_check(C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &lease[0]) == 0, 'PCM wait lease')
+	previous := pcm_install_interrupt_handler()
+	defer { C.signal(C.SIGUSR1, previous) }
+	parent := C.getpid()
+	pid := C.fork()
+	pcm_check(pid >= 0, 'PCM wait fork')
+	if pid == 0 {
+		C.close(pair[0])
+		C.close(lease[0])
+		mut kick := u8(0)
+		read_exact(pair[1], &kick, 1, -1) or { C._exit(24) }
+		pcm_interrupt_waiter(parent, 25)
+		C.close(lease[1])
+		C.close(pair[1])
+		C._exit(0)
+	}
+	C.close(pair[1])
+	C.close(lease[1])
+	defer { C.close(pair[0]); C.close(lease[0]) }
+	kick := u8(1)
+	start := time.sys_mono_now()
+	write_exact(pair[0], &kick, 1, -1)!
+	if _ := ready(pair[0], 1, lease[0], start + 150_000_000) {
+		panic('idle PCM endpoint unexpectedly readable')
+	} else {
+		pcm_check(err.msg() == 'audio operation timed out', 'expected PCM deadline expiry')
+		pcm_error(err)
+	}
+	elapsed := time.sys_mono_now() - start
+	pcm_check(elapsed >= 150_000_000 && elapsed < 400_000_000,
+		'periodic interruption changed the PCM deadline')
+	lease_start := time.sys_mono_now()
+	lease_alive(lease[0], 80)!
+	pcm_check(time.sys_mono_now() - lease_start >= 80_000_000, 'interruption skipped the lease wait')
+	if _ := ready(pair[0], 1, lease[0], -1) {
+		panic('infinite PCM wait ignored a closed lease')
+	} else {
+		pcm_check(err.msg() == 'audio launch lease ended', 'closed lease did not end the PCM wait')
+		pcm_error(err)
+	}
+	mut status := i32(0)
+	pcm_check(C.waitpid(pid, &status, 0) == pid && status == 0, 'PCM signal fixture did not retire')
 }
 
 fn test_audio_bootstrap_proof_binds_every_selection_field_and_ambient_refusal() {

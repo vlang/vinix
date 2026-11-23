@@ -26,6 +26,7 @@ struct C.vinix_pcm_address { mut: sun_family u16 sun_path [108]char }
 struct Poll { mut: fd i32 events i16 revents i16 }
 struct Credentials { mut: pid i32 uid u32 gid u32 }
 struct LoginIdentity { mut: uid u32 session u32 }
+const io_timeout_ns = i64(5_000_000_000)
 fn C.vinix_pcm_poll(voidptr, u64, int) int
 fn C.socket(int, int, int) int
 fn C.socketpair(int, int, int, &i32) int
@@ -125,27 +126,40 @@ fn worker_isolation(listener int, guard int, runtime int, path string) ! {
 	} $else { return error('audio output workers require Vinix') }
 }
 
+// A positive deadline is absolute. Zero is a nonblocking check and a
+// negative deadline waits until an event. Handled signals consume time
+// from the same deadline as every other attempt.
+fn poll_until(descriptors voidptr, count u64, deadline i64) int {
+	for {
+		timeout := if deadline <= 0 { int(deadline) } else { remaining_ms(deadline) }
+		if deadline > 0 && timeout == 0 { return 0 }
+		result := C.vinix_pcm_poll(descriptors, count, timeout)
+		if result >= 0 || C.errno != C.EINTR { return result }
+	}
+}
+
 fn lease_alive(guard int, timeout int) ! {
 	mut descriptor := Poll{ fd: i32(guard), events: 1 }
-	result := C.vinix_pcm_poll(&descriptor, 1, timeout)
-	if result < 0 || descriptor.revents != 0 { return error('audio launch lease ended') }
+	deadline := if timeout > 0 { time.sys_mono_now() + i64(timeout) * 1_000_000 } else { i64(timeout) }
+	result := poll_until(&descriptor, 1, deadline)
+	if result < 0 || (result > 0 && descriptor.revents != 0) { return error('audio launch lease ended') }
 }
 
 // Poll the caller lease with every potentially blocking socket operation.
 // A dead launcher cannot leave an orphaned worker accepting more audio.
-fn ready(fd int, event i16, guard int, timeout int) ! {
+fn ready(fd int, event i16, guard int, deadline i64) ! {
 	mut descriptors := [Poll{ fd: i32(fd), events: event }, Poll{ fd: i32(guard), events: 1 }]!
 	count := if guard >= 0 { u64(2) } else { u64(1) }
-	if C.vinix_pcm_poll(&descriptors[0], count, timeout) <= 0 { return error('audio operation timed out') }
+	if poll_until(&descriptors[0], count, deadline) <= 0 { return error('audio operation timed out') }
 	if guard >= 0 && descriptors[1].revents != 0 { return error('audio launch lease ended') }
 	if descriptors[0].revents & event == 0 { return error('audio connection closed') }
 }
 
 fn read_exact(fd int, bytes voidptr, length int, guard int) ! {
 	mut at := 0
-	deadline := time.sys_mono_now() + 5_000_000_000
+	deadline := time.sys_mono_now() + io_timeout_ns
 	for at < length {
-		ready(fd, 1, guard, remaining_ms(deadline)!)!
+		ready(fd, 1, guard, deadline)!
 		n := C.vinix_pcm_recv(i32(fd), unsafe { &u8(bytes) + at }, uint(length - at), 0)
 		if n < 0 && C.errno in [C.EINTR, C.EAGAIN] { continue }
 		if n <= 0 { return error('audio connection closed') }
@@ -155,9 +169,9 @@ fn read_exact(fd int, bytes voidptr, length int, guard int) ! {
 
 fn write_exact(fd int, bytes voidptr, length int, guard int) ! {
 	mut at := 0
-	deadline := time.sys_mono_now() + 5_000_000_000
+	deadline := time.sys_mono_now() + io_timeout_ns
 	for at < length {
-		ready(fd, 4, guard, remaining_ms(deadline)!)!
+		ready(fd, 4, guard, deadline)!
 		$if macos { mut one := i32(1); C.setsockopt(fd, C.SOL_SOCKET, C.SO_NOSIGPIPE, &one, u32(sizeof(i32))) }
 		flags := $if macos { 0 } $else { C.MSG_NOSIGNAL }
 		n := C.vinix_pcm_send(i32(fd), unsafe { &u8(bytes) + at }, uint(length - at), i32(flags))
@@ -167,8 +181,7 @@ fn write_exact(fd int, bytes voidptr, length int, guard int) ! {
 	}
 }
 
-fn remaining_ms(deadline i64) !int {
+fn remaining_ms(deadline i64) int {
 	remaining := deadline - time.sys_mono_now()
-	if remaining <= 0 { return error('audio operation timed out') }
-	return int((remaining + 999_999) / 1_000_000)
+	return if remaining <= 0 { 0 } else { int((remaining + 999_999) / 1_000_000) }
 }

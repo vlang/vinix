@@ -2,6 +2,7 @@
 module audiopcm
 
 import os
+import time
 
 pub struct Client {
 mut:
@@ -26,7 +27,7 @@ fn endpoint_connection(capability Capability, uid u32) !int {
 	nonblocking(fd)!
 	if C.vinix_pcm_connect(fd, &location, u32(sizeof(C.vinix_pcm_address))) != 0 {
 		if C.errno !in [C.EINPROGRESS, C.EAGAIN] { return error('audio worker unavailable') }
-		ready(fd, 4, -1, 5000)!
+		ready(fd, 4, -1, time.sys_mono_now() + io_timeout_ns)!
 		mut failure := i32(0)
 		mut length := u32(sizeof(i32))
 		if C.getsockopt(fd, C.SOL_SOCKET, C.SO_ERROR, &failure, &length) != 0 || failure != 0 { return error('audio worker unavailable') }
