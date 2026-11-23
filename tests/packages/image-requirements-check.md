@@ -791,6 +791,27 @@ sanitizer checks are in
 Its SHA-256 is `336abd40827a2f1865a2dfab7297467bd7b086a7b1ee37ba3c7d8d640fbad26f`.
 All 1,440 entries in the extracted `qualification.sha256` passed.
 
+### Draft creation record capture
+
+At `433c6d0c0`, draft adoption uses the exact creation record captured before
+the GitHub request or lookup. The driver compares the public copy before
+saving the ID-based record and rechecks it before removal. The old driver
+saved a replacement commit during recovery and published the fixture draft.
+
+All 108 fixture checks passed with signed inputs for both architectures and
+local GitHub stubs. Replacing the record after a creation response or during
+draft lookup preserved the changed file and stopped before adoption and upload.
+Restoring the original record let both attempts recover the same draft with
+the original commit. A native driver run recovered a verified draft, and
+ASan/UBSan checked raw capture, a byte-only change, a conflicting ID record
+and an exact retry.
+
+The paired inputs, before and after runs, recovery records and sanitizer
+checks are in
+`~/.local/state/vinix/r14-release-capture-creation-HNoJRj/qualification.tar.gz`.
+Its SHA-256 is `7ba1b7e6be0c292783c177d35b4c9c9598bb890f72cbe4f18b809fb8670c5fd6`.
+All 1,467 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
