@@ -719,6 +719,14 @@ If the creation record has already been removed, `--resume-create=TAG`
 looks for a single valid saved ID record for that exact tag and resumes by
 ID. Pass `--repo=OWNER/NAME` to narrow the lookup. If multiple records match,
 use `--resume-draft=ID`.
+Run `./scripts/deploy-iso.sh --inspect-recovery=TAG` to see the local choices
+without contacting GitHub or changing records and assets. Its JSON lists the
+pending creation record first, with an empty `draft_id` string, then saved
+records in numeric ID order. Each record has the repository, commit,
+prerelease setting, and the SHA-256 digests of the recorded checksum manifest
+and notes. An empty `records` array means there are no matching local records.
+`--repo=OWNER/NAME` filters the report. Recovery still verifies
+the original files and remote release.
 Draft adoption uses the exact creation record captured before the GitHub
 request or lookup. If that record changes during the attempt, the driver
 stops and preserves the changed file for inspection.

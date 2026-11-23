@@ -62,6 +62,20 @@ struct FixturePreparedVerification {
 	assets          []FixtureVerifiedAsset
 }
 
+struct FixtureRecoverySummary {
+	repo string
+	draft_id string
+	commit string
+	prerelease bool
+	manifest_sha256 string
+	notes_sha256 string
+}
+
+struct FixtureRecoveryInspection {
+	tag string
+	records []FixtureRecoverySummary
+}
+
 struct FixtureRelease {
 	id u64
 	tag_name string
@@ -536,7 +550,8 @@ fn run_stub(name string) !int {
 			println('fixture size')
 		}
 		'gh' {
-			if scenario in ['prepared', 'prepared-recovery']! || scenario.starts_with('verify-prepared') {
+			if scenario in ['prepared', 'prepared-recovery']! || scenario.starts_with('verify-prepared')
+				|| scenario.starts_with('inspect-recovery') {
 				remote := os.getenv('VINIX_ASSET_TEST_REMOTE')
 				os.write_file(remote + '/unexpected-gh', os.args[1..].join('\n'))!
 				return error('local prepared release operation invoked GitHub')
@@ -918,10 +933,27 @@ fn check_tag_publication_recovery(root string, work string, out string, remote s
 	check_tag_without_creation(root, work, out, remote, environment)!
 }
 
+fn check_recovery_report(work string, scenario string, tag string, records []FixtureCreation) ! {
+	report := json2.decode[FixtureRecoveryInspection](os.read_file(work + '/' + scenario + '.log')!)!
+	if report.tag != tag || report.records.len != records.len {
+		return error('recovery inspection reported the wrong tag or record count')
+	}
+	for index, record in records {
+		entry := report.records[index]
+		id := if record.id == 0 { '' } else { record.id.str() }
+		if entry.repo != record.repo || entry.draft_id != id || entry.commit != record.commit
+			|| entry.prerelease != record.prerelease || entry.manifest_sha256 != sha256.hexhash(record.manifest)
+			|| entry.notes_sha256 != sha256.hexhash(record.notes) {
+			return error('recovery report changed saved record metadata: ' + scenario)
+		}
+	}
+}
+
 fn check_tag_without_creation(root string, work string, out string, remote string, environment map[string]string) ! {
 	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
 	tag := environment['VINIX_ASSET_TEST_TAG']
 	options := ['--resume-create=' + tag]
+	inspect := ['--inspect-recovery=' + tag]
 	record := root + '/build-release/work/draft-' + id + '.json'
 	saved := os.read_file(record)!
 	metadata := json2.decode[FixtureCreation](saved)!
@@ -930,15 +962,33 @@ fn check_tag_without_creation(root string, work string, out string, remote strin
 	wrong_id := root + '/build-release/work/draft-99997.json'
 	os.write_file(wrong_id, saved)!
 	os.rm(record)!
+	recovery_attempt(root, work, environment, 'inspect-recovery-empty', inspect, '')!
+	check_recovery_report(work, 'inspect-recovery-empty', tag, [])!
 	recovery_attempt(root, work, environment, 'resume-tag-missing-record', options,
 		'no saved draft recovery record for ' + tag)!
 	if os.exists(record) || os.read_file(wrong_id)! != saved {
 		return error('missing tag recovery rewrote a draft record')
 	}
 	os.write_file(record, saved)!
-	other := root + '/build-release/work/draft-99998.json'
-	other_text := json2.encode(FixtureCreation{...metadata, id: 99998, repo: 'local/other'}) + '\n'
+	other := root + '/build-release/work/draft-9.json'
+	other_record := FixtureCreation{...metadata, id: 9, repo: 'local/other', commit: other_commit,
+		prerelease: !metadata.prerelease}
+	other_text := json2.encode(other_record) + '\n'
 	os.write_file(other, other_text)!
+	creation_text := os.read_file(remote + '/creation-record')!
+	creation := json2.decode[FixtureCreation](creation_text)!
+	os.write_file(intent_path, creation_text)!
+	recovery_attempt(root, work, environment, 'inspect-recovery-all', inspect, '')!
+	check_recovery_report(work, 'inspect-recovery-all', tag, [creation, other_record, metadata])!
+	recovery_attempt(root, work, environment, 'inspect-recovery-repo', [...inspect, '--repo=local/other'], '')!
+	check_recovery_report(work, 'inspect-recovery-repo', tag, [other_record])!
+	recovery_attempt(root, work, environment, 'inspect-recovery-exclusive', [...inspect, ...options],
+		'choose one verification, publication or recovery action')!
+	if os.read_file(intent_path)! != creation_text || os.read_file(record)! != saved
+		|| os.read_file(other)! != other_text || os.exists(remote + '/unexpected-gh') {
+		return error('inspection changed a recovery record or contacted GitHub')
+	}
+	os.rm(intent_path)!
 	recovery_attempt(root, work, environment, 'resume-tag-ambiguous-record', options,
 		'multiple saved draft recovery records for ' + tag)!
 	recovery_attempt(root, work, environment, 'resume-tag-wrong-repo', [...options, '--repo=local/absent'],
@@ -947,6 +997,8 @@ fn check_tag_without_creation(root string, work string, out string, remote strin
 	if os.read_file(other)! != other_text { return error('tag recovery rewrote another repository record') }
 	os.rm(other)!
 	os.symlink(remote + '/creation-record', intent_path)!
+	recovery_attempt(root, work, environment, 'inspect-recovery-linked-creation', inspect,
+		'metadata must be a bounded regular file')!
 	recovery_attempt(root, work, environment, 'resume-tag-linked-creation', options,
 		'metadata must be a bounded regular file')!
 	if !os.is_link(intent_path) { return error('tag recovery replaced a linked creation record') }

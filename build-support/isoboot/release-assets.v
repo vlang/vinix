@@ -55,6 +55,20 @@ struct PreparedVerification {
 	assets          []PreparedAsset
 }
 
+struct RecoverySummary {
+	repo            string
+	draft_id        string
+	commit          string
+	prerelease      bool
+	manifest_sha256 string
+	notes_sha256    string
+}
+
+struct RecoveryInspection {
+	tag     string
+	records []RecoverySummary
+}
+
 fn valid_asset_name(name string) bool {
 	if name == '' || name[0] in [u8(`.`), `-`]! { return false }
 	if name in ['SHA256SUMS', 'RELEASE_NOTES.md']! { return false }
@@ -426,8 +440,8 @@ fn restore_saved_draft(recovery DraftRecovery, directory string) ! {
 	restore_metadata(recovery, directory)!
 }
 
-fn find_saved_draft(work string, tag string, repo string) !DraftRecovery {
-	mut saved := DraftRecovery{}
+fn matching_saved_drafts(work string, tag string, repo string) ![]DraftRecovery {
+	mut records := []DraftRecovery{}
 	for name in os.ls(work)! {
 		if !name.starts_with('draft-') || !name.ends_with('.json') { continue }
 		id := name['draft-'.len..name.len - '.json'.len]
@@ -437,26 +451,62 @@ fn find_saved_draft(work string, tag string, repo string) !DraftRecovery {
 		if recovery.id != number || recovery.tag != tag || (repo != '' && recovery.repo != repo) {
 			continue
 		}
-		if saved.id != 0 {
-			return error('multiple saved draft recovery records for ${tag}; use --resume-draft=ID')
-		}
-		saved = recovery
+		records << recovery
 	}
-	if saved.id == 0 {
+	return records
+}
+
+fn find_saved_draft(work string, tag string, repo string) !DraftRecovery {
+	records := matching_saved_drafts(work, tag, repo)!
+	if records.len > 1 {
+		return error('multiple saved draft recovery records for ${tag}; use --resume-draft=ID')
+	}
+	if records.len == 0 {
 		destination := if repo == '' { tag } else { '${tag} on ${repo}' }
 		return error('no saved draft recovery record for ${destination}')
 	}
-	return saved
+	return records[0]
+}
+
+fn has_creation_record(path string) !bool {
+	os.lstat(path) or {
+		if err.code() == C.ENOENT { return false }
+		return err
+	}
+	return true
 }
 
 fn restore_recovery_tag(work string, output string, tag string, repo string, directory string) ! {
-	os.lstat(creation_path(output)) or {
-		if err.code() != C.ENOENT { return err }
+	if !has_creation_record(creation_path(output))! {
 		recovery := find_saved_draft(work, tag, repo)!
 		os.write_file(os.join_path(directory, 'saved-draft-id'), '${recovery.id}\n')!
 		return restore_saved_draft(recovery, directory)
 	}
 	restore_creation(output, tag, directory)!
+}
+
+fn summarize_recovery(record DraftRecovery) RecoverySummary {
+	return RecoverySummary{
+		repo: record.repo
+		draft_id: if record.id == 0 { '' } else { record.id.str() }
+		commit: record.commit
+		prerelease: record.prerelease
+		manifest_sha256: sha256.hexhash(record.manifest)
+		notes_sha256: sha256.hexhash(record.notes)
+	}
+}
+
+fn inspect_recovery(work string, output string, tag string, repo string) !RecoveryInspection {
+	mut summaries := []RecoverySummary{}
+	path := creation_path(output)
+	if has_creation_record(path)! {
+		creation := parse_creation(read_recovery_text(path)!, path, tag)!
+		if repo == '' || creation.repo == repo { summaries << summarize_recovery(creation) }
+	}
+	mut drafts := matching_saved_drafts(work, tag, repo)!
+	drafts.sort(a.id < b.id)
+	for draft in drafts { summaries << summarize_recovery(draft) }
+	return RecoveryInspection{tag: tag, records: summaries}
 }
 
 fn retire_resumed_creation(output string, directory string) ! {
@@ -597,6 +647,10 @@ fn run() ! {
 	if os.args.len == 7 && os.args[1] == 'restore-recovery-tag' {
 		return restore_recovery_tag(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])
 	}
+	if os.args.len == 6 && os.args[1] == 'inspect-recovery' {
+		println(json2.encode(inspect_recovery(os.args[2], os.args[3], os.args[4], os.args[5])!))
+		return
+	}
 	if os.args.len == 7 && os.args[1] == 'has-saved-creation-draft' {
 		println(has_saved_creation_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])!)
 		return
@@ -627,7 +681,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | stage-reviewed | prepare-creation | restore-creation | restore-recovery-tag | inspect-recovery | has-saved-creation-draft | record-draft | restore-draft | retire-resumed-creation | upload-draft | release-state | verify-release')
 }
 
 fn main() {

@@ -17,6 +17,7 @@
 #   --prepared-review=FILE  require the exact reviewed JSON for --publish-prepared
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
 #   --resume-create=TAG  recover a release by tag using local recovery records
+#   --inspect-recovery=TAG  show local recovery records for the tag as JSON
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
 #   --repo=OWNER/NAME  GitHub.com repository (default: the repository gh discovers)
@@ -66,6 +67,7 @@ REPO=''
 PACKAGE_REVIEW=''
 RESUME_DRAFT=''
 RESUME_CREATE=''
+INSPECT_RECOVERY=''
 BUILD_OPTIONS=0
 
 usage() {
@@ -103,6 +105,10 @@ for arg in "$@"; do
         --resume-create=*)
             RESUME_CREATE="${arg#*=}"
             [ -n "$RESUME_CREATE" ] || { echo "ERROR: --resume-create requires a tag" >&2; exit 1; }
+            ;;
+        --inspect-recovery=*)
+            INSPECT_RECOVERY="${arg#*=}"
+            [ -n "$INSPECT_RECOVERY" ] || { echo "ERROR: --inspect-recovery requires a tag" >&2; exit 1; }
             ;;
         --package-review=*)
             BUILD_OPTIONS=1
@@ -168,7 +174,7 @@ if [ -n "$PREPARED_REVIEW" ]; then
 fi
 cd "$SCRIPT_DIR"
 post_build=0
-for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED"; do
+for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED" "$INSPECT_RECOVERY"; do
     if [ -n "$action" ]; then
         [ "$post_build" -eq 0 ] || die "choose one verification, publication or recovery action"
         post_build=1
@@ -214,6 +220,14 @@ if [ -n "$VERIFY_PREPARED" ]; then
     git check-ref-format "refs/tags/$VERIFY_PREPARED" || die "invalid prepared release tag: $VERIFY_PREPARED"
     build_release_assets
     "$ASSET_WORK/release-assets" verify-prepared "$SCRIPT_DIR/build-release/$VERIFY_PREPARED" "$VERIFY_PREPARED" "$REPO"
+    exit 0
+fi
+
+if [ -n "$INSPECT_RECOVERY" ]; then
+    git check-ref-format "refs/tags/$INSPECT_RECOVERY" || die "invalid recovery tag: $INSPECT_RECOVERY"
+    build_release_assets
+    "$ASSET_WORK/release-assets" inspect-recovery \
+        "$WORK" "$SCRIPT_DIR/build-release/$INSPECT_RECOVERY" "$INSPECT_RECOVERY" "$REPO"
     exit 0
 fi
 
