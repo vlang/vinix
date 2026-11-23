@@ -832,6 +832,26 @@ checks are in
 Its SHA-256 is `17541f7e9e9dc57aa3d640acbe834d74dfb05ca7b48030e799e800efe7bf6e0a`.
 All 1,494 entries in the extracted `qualification.sha256` passed.
 
+### Recorded draft uploads resumed by tag
+
+At `6ae575025`, `--resume-create=TAG` resumes a partially uploaded draft
+when the saved record for the candidate ID matches the captured creation
+record. The old driver refused the same partial draft. A native run with
+the fix staged and uploaded only `vinix-amd64.iso`, then verified the
+same draft ID and removed the redundant creation record.
+
+All 115 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. The partial draft was refused without an ID record,
+with a conflicting record and with a changed digest reported by GitHub.
+The exact retry left the ID record and existing uploads intact.
+ASan/UBSan checked missing and matching records, reformatting, aliases,
+numeric overflow and changes to the captured creation record's public copy.
+
+The paired inputs, before and after runs, recovery records and sanitizer
+checks are in `~/.local/state/vinix/r14-release-tag-upload-MDglQy/qualification.tar.gz`.
+Its SHA-256 is `b76ab403a26a505c253b7cbbda8f6c67716cbee06b43d30b141c53f99f2cd79e`.
+All 1,496 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
