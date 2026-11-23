@@ -19,7 +19,7 @@ const draft_refusals = ['draft-tag-rebound', 'draft-wrong-upload-url',
 const publish_refusals = ['publish-readback-lost', 'publish-still-draft',
 	'publish-changed-asset', 'publish-tag-moved']
 const repo_refusals = ['repo-foreign', 'repo-invalid', 'repo-dotdot']
-const creation_refusals = ['create-delayed', 'create-no-draft']
+const creation_refusals = ['create-delayed', 'create-no-draft', 'create-record-changed']
 const size_refusals = ['oversize-capture', 'oversize-no-test']
 const release_list_refusals = ['release-list-failed', 'release-already-draft', 'release-already-published',
 	'release-appears-before-create', 'release-list-fails-before-create']
@@ -223,6 +223,12 @@ fn extract_iso(out string, scenario string) !int {
 	return code
 }
 
+fn replace_creation_commit(out string) ! {
+	path := out + '/.draft-creation.json'
+	creation := json2.decode[FixtureCreation](os.read_file(path)!)!
+	os.write_file(path, json2.encode(FixtureCreation{...creation, commit: other_commit}) + '\n')!
+}
+
 fn github_release_api(args []string, remote string, path string, scenario string) !int {
 	tag := os.getenv('VINIX_ASSET_TEST_TAG')
 	commit := os.getenv('VINIX_ASSET_TEST_COMMIT')
@@ -299,6 +305,7 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		}
 		os.mkdir(remote + '/uploads')!
 		os.write_file(local, json2.encode(draft))!
+		if scenario == 'create-record-changed' { replace_creation_commit(out)! }
 		if scenario in ['create-response-lost', 'create-delayed', 'publish-prepared-delayed']! {
 			eprintln('fixture lost the creation response')
 			return 1
@@ -336,6 +343,9 @@ fn github_release_api(args []string, remote string, path string, scenario string
 		if scenario == 'resume-create-unrelated' {
 			println(json2.encode(FixtureRelease{...draft, body: 'unrelated draft notes'}))
 			return 0
+		}
+		if scenario == 'resume-create-record-changed' && draft.assets.len == 0 {
+			replace_creation_commit(out)!
 		}
 		os.write_file(local, json2.encode(draft))!
 		println(json2.encode(draft))
@@ -663,14 +673,26 @@ fn resume_attempt(root string, work string, environment map[string]string, scena
 	recovery_attempt(root, work, environment, scenario, args, expected_error)!
 }
 
+fn check_changed_creation(out string, remote string, recovery_path string, original string) ! {
+	creation := json2.decode[FixtureCreation](original)!
+	replacement := json2.encode(FixtureCreation{...creation, commit: other_commit}) + '\n'
+	if os.read_file(out + '/.draft-creation.json')! != replacement || os.exists(recovery_path)
+		|| os.ls(remote + '/uploads')!.len != 0 || os.exists(remote + '/publish-attempt') {
+		return error('changed creation record was retired or reached draft adoption')
+	}
+}
+
 fn check_creation_recovery(root string, work string, out string, remote string, environment map[string]string, scenario string) ! {
 	id := environment['VINIX_ASSET_TEST_DRAFT_ID']
 	tag := environment['VINIX_ASSET_TEST_TAG']
 	intent_path := out + '/.draft-creation.json'
 	recovery_path := root + '/build-release/work/draft-' + id + '.json'
-	intent := os.read_file(intent_path)!
+	intent := os.read_file(remote + '/creation-record')!
 	attempt := os.read_file(remote + '/release-attempt')!
-	if intent != os.read_file(remote + '/creation-record')! || os.exists(recovery_path)
+	if scenario == 'create-record-changed' {
+		check_changed_creation(out, remote, recovery_path, intent)!
+		os.write_file(intent_path, intent)!
+	} else if os.read_file(intent_path)! != intent || os.exists(recovery_path)
 		|| os.exists(remote + '/publish-attempt') {
 		return error('interrupted creation did not retain exactly one creation record')
 	}
@@ -682,27 +704,35 @@ fn check_creation_recovery(root string, work string, out string, remote string, 
 		}
 		return
 	}
-	recovery_attempt(root, work, environment, 'resume-create-protect-output', ['--tag=' + tag,
-		'--repo=local/fixture'], 'draft creation record already exists')!
-	recovery_attempt(root, work, environment, 'resume-create-ambiguous', options, 'multiple GitHub drafts use')!
-	recovery_attempt(root, work, environment, 'resume-create-unrelated', options, 'GitHub draft metadata changed after creation')!
-	iso := out + '/vinix-amd64.iso'
-	original := os.read_file(iso)!
-	os.write_file(iso, 'changed release ISO')!
-	recovery_attempt(root, work, environment, 'resume-create-stale-local', options, 'release asset changed after verification') or {
+	if scenario == 'create-delayed' {
+		recovery_attempt(root, work, environment, 'resume-create-record-changed', options,
+			'draft creation record changed during publication')!
+		check_changed_creation(out, remote, recovery_path, intent)!
+		os.write_file(intent_path, intent)!
+		recovery_attempt(root, work, environment, 'resume-create-protect-output', ['--tag=' + tag,
+			'--repo=local/fixture'], 'draft creation record already exists')!
+		recovery_attempt(root, work, environment, 'resume-create-ambiguous', options, 'multiple GitHub drafts use')!
+		recovery_attempt(root, work, environment, 'resume-create-unrelated', options, 'GitHub draft metadata changed after creation')!
+		iso := out + '/vinix-amd64.iso'
+		original := os.read_file(iso)!
+		os.write_file(iso, 'changed release ISO')!
+		recovery_attempt(root, work, environment, 'resume-create-stale-local', options, 'release asset changed after verification') or {
+			os.write_file(iso, original)!
+			return err
+		}
 		os.write_file(iso, original)!
-		return err
 	}
-	os.write_file(iso, original)!
 	if os.ls(remote + '/uploads')!.len != 0 || os.exists(recovery_path)
 		|| os.read_file(intent_path)! != intent || os.exists(remote + '/publish-attempt') {
 		return error('refused recovery changed the interrupted creation')
 	}
-	recovery_attempt(root, work, environment, 'resume-create-complete', [...options, '--draft'], '')!
+	completed_case := if scenario == 'create-record-changed' { 'resume-create-restored-record' } else { 'resume-create-complete' }
+	recovery_attempt(root, work, environment, completed_case, [...options, '--draft'], '')!
 	finished := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	recovery := json2.decode[FixtureCreation](os.read_file(recovery_path)!)!
 	if !finished.draft || finished.assets.len != os.read_lines(out + '/SHA256SUMS')!.len + 1
 		|| os.exists(intent_path) || recovery.id.str() != id || recovery.notes != finished.body
+		|| recovery.commit != environment['VINIX_ASSET_TEST_COMMIT']
 		|| os.exists(remote + '/publish-attempt') || os.read_file(remote + '/release-attempt')! != attempt {
 		return error('recovery did not complete the original draft')
 	}
@@ -1123,7 +1153,10 @@ fn run() ! {
 				return error('oversized release bundle reached verification or publication\n' + log)
 			}
 		} else if scenario in creation_refusals {
-			if code == 0 || !log.contains('no GitHub draft found') {
+			diagnostic := if scenario == 'create-record-changed' {
+				'draft creation record changed during publication'
+			} else { 'no GitHub draft found' }
+			if code == 0 || !log.contains(diagnostic) {
 				return error('unexpected creation recovery outcome: ' + scenario + '\n' + log)
 			}
 			check_creation_recovery(root, work, out, remote, environment, scenario)!

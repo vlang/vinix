@@ -234,15 +234,20 @@ fn prepare_creation(output string, directory string, repo string, tag string, co
 	metadata := release_metadata(directory, repo, tag, commit, prerelease)!
 	marker := rand.bytes(attempt_marker_bytes)!.hex()
 	notes := metadata.notes + attempt_marker_prefix + marker + attempt_marker_suffix(metadata.manifest)
+	record := json2.encode(DraftRecovery{...metadata, notes: notes}) + '\n'
 	os.write_file(os.join_path(directory, 'RELEASE_NOTES.md'), notes)!
-	pkgcore.atomic_write_new(creation_path(output),
-		json2.encode(DraftRecovery{...metadata, notes: notes}) + '\n')!
+	os.write_file(creation_path(directory), record)!
+	pkgcore.atomic_write_new(creation_path(output), record)!
 }
 
-fn read_recovery(path string) !DraftRecovery {
-	recovery := json2.decode[DraftRecovery](pkgcore.read_metadata(path) or {
+fn read_recovery_text(path string) !string {
+	return pkgcore.read_metadata(path) or {
 		return error('cannot read release draft recovery record: ${err}')
-	})!
+	}
+}
+
+fn parse_recovery(text string, path string) !DraftRecovery {
+	recovery := json2.decode[DraftRecovery](text)!
 	if recovery.repo == '' || recovery.tag == ''
 		|| recovery.commit.len != 40 || recovery.commit.bytes().any(it !in '0123456789abcdef'.bytes())
 		|| [recovery.repo, recovery.tag].any(it.contains_any('\t\r\n')) {
@@ -251,9 +256,12 @@ fn read_recovery(path string) !DraftRecovery {
 	return recovery
 }
 
-fn read_creation(output string, tag string) !DraftRecovery {
-	path := creation_path(output)
-	creation := read_recovery(path)!
+fn read_recovery(path string) !DraftRecovery {
+	return parse_recovery(read_recovery_text(path)!, path)
+}
+
+fn parse_creation(text string, path string, tag string) !DraftRecovery {
+	creation := parse_recovery(text, path)!
 	if creation.id != 0 || creation.tag != tag
 		|| !creation.notes.ends_with(attempt_marker_suffix(creation.manifest)) {
 		return error('invalid release draft creation record: ' + path)
@@ -261,8 +269,20 @@ fn read_creation(output string, tag string) !DraftRecovery {
 	return creation
 }
 
-fn record_draft(work string, output string, response string, tag string, id string) !u64 {
-	creation := read_creation(output, tag)!
+fn restore_creation(output string, tag string, directory string) ! {
+	path := creation_path(output)
+	text := read_recovery_text(path)!
+	creation := parse_creation(text, path, tag)!
+	os.write_file(creation_path(directory), text)!
+	restore_metadata(creation, directory)!
+}
+
+fn record_draft(work string, output string, directory string, response string, tag string, id string) !u64 {
+	intent := creation_path(output)
+	captured := creation_path(directory)
+	text := read_recovery_text(captured)!
+	if read_recovery_text(intent)! != text { return error('draft creation record changed during publication') }
+	creation := parse_creation(text, captured, tag)!
 	draft := read_release(response, id, tag, creation.notes, creation.prerelease)!
 	if !draft.draft { return error('GitHub did not create a draft release') }
 	upload_endpoint(draft, creation.repo)!
@@ -277,7 +297,13 @@ fn record_draft(work string, output string, response string, tag string, id stri
 	} else {
 		pkgcore.atomic_write_new(path, record)!
 	}
-	os.rm(creation_path(output)) or {
+	current := read_recovery_text(intent) or {
+		return error('draft ${draft.id} recorded. Cannot recheck the creation record: ${err}')
+	}
+	if current != text {
+		return error('draft ${draft.id} recorded. The creation record changed before retirement')
+	}
+	os.rm(intent) or {
 		return error('draft ${draft.id} recorded. Resume with --resume-draft=${draft.id}: ${err}')
 	}
 	return draft.id
@@ -483,10 +509,10 @@ fn run() ! {
 		return prepare_creation(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
 	}
 	if os.args.len == 5 && os.args[1] == 'restore-creation' {
-		return restore_metadata(read_creation(os.args[2], os.args[3])!, os.args[4])
+		return restore_creation(os.args[2], os.args[3], os.args[4])
 	}
-	if os.args.len == 7 && os.args[1] == 'record-draft' {
-		println(record_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6])!)
+	if os.args.len == 8 && os.args[1] == 'record-draft' {
+		println(record_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7])!)
 		return
 	}
 	if os.args.len == 5 && os.args[1] == 'restore-draft' {

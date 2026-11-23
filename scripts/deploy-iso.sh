@@ -333,7 +333,7 @@ find_created_draft() {
 
 finish_creation() {
     local response="$1" candidate_id="$2" release_id
-    release_id="$("$ASSET_WORK/release-assets" record-draft "$WORK" "$OUT" "$response" \
+    release_id="$("$ASSET_WORK/release-assets" record-draft "$WORK" "$OUT" "$ASSET_WORK" "$response" \
         "$TAG" "$candidate_id")"
     echo "  Recovery record: $WORK/draft-$release_id.json"
     finish_draft "$release_id" "$response"

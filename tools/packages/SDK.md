@@ -707,6 +707,9 @@ only a single empty draft with matching metadata and a verified tag commit.
 It revalidates the local assets, writes the ordinary ID-based recovery
 record and continues the upload to that draft. The creation record protects
 the original assets by blocking a fresh build for the same tag.
+Draft adoption uses the exact creation record captured before the GitHub
+request or lookup. If that record changes during the attempt, the driver
+stops and preserves the changed file for inspection.
 
 Release publication targets GitHub.com. The driver checks the host of the
 repository inferred by `gh`. In a checkout that defaults to another host,
