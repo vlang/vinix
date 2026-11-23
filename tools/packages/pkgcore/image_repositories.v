@@ -34,6 +34,7 @@ struct ImageRepositoriesOptions {
 	available_space fn (string) !u64 = free_bytes
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 	temporary_directory fn () string = import_temporary_directory
+	scratch string
 	flush fn (int) int = atomic_flush
 }
 
@@ -134,6 +135,11 @@ pub fn (configuration &ImageConfiguration) prepare_repositories(source string) !
 	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{})
 }
 
+// Capture into a caller-selected scratch filesystem for temporary image checks.
+pub fn (configuration &ImageConfiguration) prepare_repositories_in(source string, scratch string) !ImageRepositories {
+	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{ scratch: scratch })
+}
+
 fn (configuration &ImageConfiguration) prepare_repositories_with(source string, options ImageRepositoriesOptions) !ImageRepositories {
 	if source == '' { return ImageRepositories{} }
 	if !image_configuration_root_matches(configuration.root, configuration.device, configuration.inode) { return error('package image root changed before repository preparation') }
@@ -199,7 +205,7 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 	// Check both filesystems before making a potentially large private capture.
 	ancestor := image_repositories_parents(plan.root)!
 	defer { unsafe { ancestor.free() } }
-	temporary_path := options.temporary_directory()
+	temporary_path := if options.scratch == '' { options.temporary_directory() } else { options.scratch.clone() }
 	defer { unsafe { temporary_path.free() } }
 	temporary := publisher_real_path(temporary_path)!
 	defer { unsafe { temporary.free() } }

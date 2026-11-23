@@ -11,6 +11,7 @@
 #   --prerelease       mark the release as a pre-release
 #   --no-test          do not boot-test the images first
 #   --no-publish       build (and test) only
+#   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
 #   --yes              publish without asking
 #   --repo=OWNER/NAME  GitHub repository (default: the one gh picks for this checkout)
 #
@@ -51,6 +52,7 @@ RUN_TESTS=1
 PUBLISH=1
 ASSUME_YES=0
 REPO=''
+PACKAGE_REVIEW=''
 
 usage() {
     sed -n '2,/^set -/s/^# \{0,1\}//p' "$0" | sed '$d'
@@ -65,6 +67,14 @@ for arg in "$@"; do
         --prerelease) PRERELEASE=1 ;;
         --no-test) RUN_TESTS=0 ;;
         --no-publish) PUBLISH=0 ;;
+        --package-review=*)
+            PACKAGE_REVIEW="${arg#*=}"
+            if [ ! -d "$PACKAGE_REVIEW" ]; then
+                echo "ERROR: --package-review requires an existing directory" >&2
+                exit 1
+            fi
+            PACKAGE_REVIEW="$(CDPATH= cd -- "$PACKAGE_REVIEW" && pwd)"
+            ;;
         --yes|-y) ASSUME_YES=1 ;;
         --repo=*) REPO="${arg#*=}" ;;
         --help|-h) usage; exit 0 ;;
@@ -179,9 +189,22 @@ package_inputs_selected() {
     return 1
 }
 
+plan_package_selection() {
+    local target="$1" architecture="$2" plan reviewed
+    plan="$PACKAGE_WORK/$target.plan"
+    "$PACKAGE_WORK/receipt" plan "$architecture" > "$plan"
+    if [ -n "$PACKAGE_REVIEW" ]; then
+        reviewed="$PACKAGE_REVIEW/$target.json"
+        [ -s "$plan" ] || die "$target has no package inputs to match its reviewed plan"
+        [ -f "$reviewed" ] || die "$target is missing its reviewed package plan at $reviewed"
+        cmp -s "$reviewed" "$plan" || die "$target package inputs differ from its reviewed plan at $reviewed"
+    fi
+}
+
 PACKAGE_WORK=''
 PACKAGE_RECEIPTS=()
-if { [ "$BUILD_AMD64" -eq 1 ] && package_inputs_selected X86_64; } ||
+if [ -n "$PACKAGE_REVIEW" ] ||
+   { [ "$BUILD_AMD64" -eq 1 ] && package_inputs_selected X86_64; } ||
    { [ "$BUILD_ARM64" -eq 1 ] && package_inputs_selected AARCH64; }; then
     step "Preflighting selected release package inputs"
     PACKAGE_WORK="$(mktemp -d "$WORK/package-release.XXXXXX")"
@@ -190,10 +213,10 @@ if { [ "$BUILD_AMD64" -eq 1 ] && package_inputs_selected X86_64; } ||
         -path "@vlib|@vmodules|$SCRIPT_DIR|$SCRIPT_DIR/build-support|$SCRIPT_DIR/tools/accounts" \
         -o "$PACKAGE_WORK/receipt" "$SCRIPT_DIR/build-support/isoboot/package-receipt.v"
     if [ "$BUILD_AMD64" -eq 1 ]; then
-        "$PACKAGE_WORK/receipt" plan x86_64 > "$PACKAGE_WORK/amd64.plan"
+        plan_package_selection amd64 x86_64
     fi
     if [ "$BUILD_ARM64" -eq 1 ]; then
-        "$PACKAGE_WORK/receipt" plan aarch64 > "$PACKAGE_WORK/arm64.plan"
+        plan_package_selection arm64 aarch64
     fi
 fi
 
@@ -350,7 +373,8 @@ if [ -n "$PACKAGE_WORK" ]; then
         if [ ! -s "$plan" ]; then continue; fi
         name="vinix-packages-$arch.json"
         "$PACKAGE_WORK/receipt" verify "$OUT/vinix-$arch.iso" "$plan" > "$PACKAGE_WORK/$name"
-        mv -f "$PACKAGE_WORK/$name" "$OUT/$name"
+        cp "$PACKAGE_WORK/$name" "$PACKAGE_WORK/public-receipt"
+        mv -f "$PACKAGE_WORK/public-receipt" "$OUT/$name"
         PACKAGE_RECEIPTS+=("$OUT/$name")
         BUNDLES+=("$OUT/$name")
     done
@@ -378,7 +402,34 @@ sha256() {
         shasum -a 256 "$@"
     fi
 }
-(cd "$OUT" && sha256 $(for asset in "${IMAGES[@]}" ${PACKAGE_RECEIPTS[@]+"${PACKAGE_RECEIPTS[@]}"}; do basename "$asset"; done) > SHA256SUMS)
+
+release_checksums() {
+    local image name arch receipt
+    for image in "${IMAGES[@]}"; do
+        name="${image##*/}"
+        arch="${name#vinix-}"
+        receipt="$PACKAGE_WORK/vinix-packages-${arch%.iso}.json"
+        if [ -n "$PACKAGE_WORK" ] && [ -f "$receipt" ]; then
+            "$PACKAGE_WORK/receipt" checksums "$receipt"
+        else
+            sha256 "$name"
+        fi
+    done
+}
+
+check_release_assets() {
+    (cd "$OUT" && sha256 -c "$PACKAGE_WORK/SHA256SUMS") ||
+        die "release ISO or package receipt changed after verification"
+}
+
+if [ -n "$PACKAGE_WORK" ]; then
+    (cd "$OUT" && release_checksums) > "$PACKAGE_WORK/SHA256SUMS"
+    check_release_assets
+    cp "$PACKAGE_WORK/SHA256SUMS" "$PACKAGE_WORK/public-checksums"
+    mv -f "$PACKAGE_WORK/public-checksums" "$OUT/SHA256SUMS"
+else
+    (cd "$OUT" && release_checksums > SHA256SUMS)
+fi
 cat "$OUT/SHA256SUMS"
 
 describe_boot() {
@@ -523,6 +574,11 @@ create_args=(release create "$TAG" --repo "$REPO" --target "$COMMIT"
     --title "Vinix $TAG" --notes-file "$OUT/RELEASE_NOTES.md")
 [ "$DRAFT" -eq 1 ] && create_args+=(--draft)
 [ "$PRERELEASE" -eq 1 ] && create_args+=(--prerelease)
+if [ -n "$PACKAGE_WORK" ]; then
+    check_release_assets
+    cmp -s "$PACKAGE_WORK/SHA256SUMS" "$OUT/SHA256SUMS" ||
+        die "SHA256SUMS changed after verification"
+fi
 gh "${create_args[@]}" "${IMAGES[@]}" "$OUT/SHA256SUMS" ${BUNDLES[@]+"${BUNDLES[@]}"}
 
 step "Published"

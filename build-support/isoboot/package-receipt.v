@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import crypto.sha256
 import json2
 import os
 import rand
@@ -57,7 +58,7 @@ struct Receipt {
 fn preflight(root string, arch string, config string, bundle string, declaration string) !Selection {
 	mut configuration := pkgcore.prepare_image_configuration(root, arch, config)!
 	defer { configuration.close() }
-	mut repositories := unsafe { &configuration }.prepare_repositories(bundle)!
+	mut repositories := unsafe { &configuration }.prepare_repositories_in(bundle, root)!
 	defer { repositories.close() }
 	report := if declaration == '' {
 		unsafe { &configuration }.check_repositories(unsafe { &repositories })!
@@ -162,7 +163,33 @@ fn check_iso(iso string, work string, expected Selection) !Receipt {
 		applications: actual.applications, publishers: actual.publishers}
 }
 
+fn print_checksums(path string) ! {
+	raw := os.read_file(path)!
+	receipt := json2.decode[Receipt](raw)!
+	arch := match receipt.architecture {
+		'x86_64' { 'amd64' }
+		'aarch64' { 'arm64' }
+		else { return error('unsupported receipt architecture: ' + receipt.architecture) }
+	}
+	if receipt.format != 1 || !pkgcore.digest_valid(receipt.iso_sha256) {
+		return error('invalid ISO package receipt')
+	}
+	println('${receipt.iso_sha256}  vinix-${arch}.iso')
+	println('${sha256.sum(raw.bytes()).hex()}  vinix-packages-${arch}.json')
+}
+
+fn workspace() !string {
+	selected := os.getenv('TMPDIR')
+	temp := if selected != '' { selected } else { os.temp_dir() }
+	work := os.join_path(temp, 'vinix-iso-packages-' + rand.ulid())
+	os.mkdir(work, mode: 0o700)!
+	return work
+}
+
 fn run() ! {
+	if os.args.len == 3 && os.args[1] == 'checksums' {
+		return print_checksums(os.args[2])
+	}
 	if os.args.len == 3 && os.args[1] == 'plan' {
 		arch := os.args[2]
 		if arch !in ['aarch64', 'x86_64']! { return error('unsupported package architecture: ' + arch) }
@@ -171,15 +198,13 @@ fn run() ! {
 		bundle := imageinputs.environment_path(env, imageinputs.repositories, arch)
 		declaration := imageinputs.environment_path(env, imageinputs.applications, arch)
 		if config == '' && bundle == '' && declaration == '' { return }
-		work := os.temp_dir() + '/vinix-iso-packages-' + rand.ulid()
-		os.mkdir(work, mode: 0o700)!
+		work := workspace()!
 		defer { os.rmdir_all(work) or {} }
 		println(json2.encode(preflight(work, arch, config, bundle, declaration)!))
 		return
 	}
-	if os.args.len != 4 || os.args[1] != 'verify' { return error('usage: package-receipt plan ARCH | verify ISO PLAN.json') }
-	work := os.temp_dir() + '/vinix-iso-packages-' + rand.ulid()
-	os.mkdir(work, mode: 0o700)!
+	if os.args.len != 4 || os.args[1] != 'verify' { return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | checksums RECEIPT.json') }
+	work := workspace()!
 	defer { os.rmdir_all(work) or {} }
 	expected := json2.decode[Selection](os.read_file(os.args[3])!)!
 	println(json2.encode(check_iso(os.args[2], work, expected)!))

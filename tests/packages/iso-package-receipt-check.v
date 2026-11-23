@@ -112,6 +112,15 @@ fn run() ! {
 				|| report['publishers']!.as_array().len != 1 {
 				return error('ISO receipt differs from the embedded inputs')
 			}
+			receipt := work + '/receipt.json'
+			os.write_file(receipt, output)!
+			arch := if document.architecture == 'aarch64' { 'arm64' } else { 'amd64' }
+			checksums := '${pkgcore.hash_file(iso)!}  vinix-${arch}.iso\n' +
+				'${pkgcore.hash_file(receipt)!}  vinix-packages-${arch}.json\n'
+			check_code, check_output := command([tool, 'checksums', receipt])
+			if check_code != 0 || check_output != checksums {
+				return error('release checksums differ from the verified ISO and receipt: ' + check_output)
+			}
 		} else if code == 0 || !output.contains(diagnostic) {
 			return error('unexpected ISO verification outcome for ${scenario}: ${output}')
 		}

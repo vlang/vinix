@@ -576,6 +576,28 @@ bundled publisher keys and sequences, and selected application IDs. The release
 notes and `SHA256SUMS` include the receipts. The check also runs with
 `--no-test` and `--no-publish` and uses `xorriso` and `libarchive`.
 
+To require an independently reviewed selection, build the host helper and
+generate one plan per target with the candidate package input environment.
+
+```sh
+v -backend c -prod -cc cc -path '@vlib|@vmodules|.|build-support|tools/accounts' \
+    -o /tmp/vinix-package-receipt build-support/isoboot/package-receipt.v
+mkdir reviewed-package-plans
+/tmp/vinix-package-receipt plan x86_64 > reviewed-package-plans/amd64.json
+/tmp/vinix-package-receipt plan aarch64 > reviewed-package-plans/arm64.json
+```
+
+Review the application IDs, configuration and deployment digests, and each
+publisher's public key, signed index digest and sequence. Keep the reviewed
+plan files as emitted. Pass the directory to the release driver with
+`--package-review=reviewed-package-plans`. It requires a populated, identical
+plan for every requested target before it checks out the release source.
+With or without that option, a release with package inputs builds
+`SHA256SUMS` from the verified ISO and receipt digests and checks the staged
+files against it after boot testing and again just before publication.
+Set `TMPDIR` to a filesystem with room for ISO extraction and signed bundle
+verification when the system temporary filesystem is small.
+
 The staged format-2 declaration is available for ordinary Software review
 after boot. Installation still requires confirmation and administrator approval.
 See [file/cache qualification](../../tests/packages/image-requirements-check.md).
