@@ -852,6 +852,26 @@ checks are in `~/.local/state/vinix/r14-release-tag-upload-MDglQy/qualification.
 Its SHA-256 is `b76ab403a26a505c253b7cbbda8f6c67716cbee06b43d30b141c53f99f2cd79e`.
 All 1,496 entries in the extracted `qualification.sha256` passed.
 
+### Published release confirmation by tag
+
+At `b8d4eabdd`, `--resume-create=TAG` can confirm an already published
+release when its local creation record matches the saved draft ID record.
+It checks the original files, the release metadata and digests, and the
+remote tag commit. It then retires the redundant creation record. The
+previous driver reported that it could not find a draft for the tag.
+
+All 121 fixture checks passed with signed inputs for both architectures
+and local GitHub stubs. After a successful publish with a lost readback,
+tag recovery refused `--draft`, a missing ID record, a bad remote digest,
+and changed local ISO bytes. The exact retry confirmed the same release.
+A native run also confirmed it from a noninteractive shell without
+`--yes`. The original upload and publish request records kept their digests.
+
+The paired inputs, before and after runs, and recovery records are in
+`~/.local/state/vinix/r14-release-tag-confirm-epbvfY/qualification.tar.gz`.
+Its SHA-256 is `59df1fd954178f36887d550aa67545ce9e7b8ccbe3c899c00a4a4602fba2c7ff`.
+All 1,494 entries in the extracted `qualification.sha256` passed.
+
 ### Initramfs layout verification
 
 At `deaccaa03`, the ISO verifier reads the same POSIX USTAR header types and
