@@ -169,8 +169,7 @@ fn capture_assets(directory string, destination string, names []string, github b
 	}
 }
 
-fn stage_assets(directory string, manifest string, destination string, uploaded []string, metadata_bytes u64) ! {
-	entries := read_manifest(manifest)!
+fn stage_assets(directory string, entries map[string]string, destination string, uploaded []string, metadata_bytes u64) ! {
 	if entries.len == 0 { return error('release checksum manifest is empty') }
 	sizes := prepare_staging(directory, destination, entries.keys().filter(it !in uploaded),
 		metadata_bytes, true)!
@@ -298,35 +297,56 @@ fn read_prepared(output string, tag string, repo string) !DraftRecovery {
 	return metadata
 }
 
-fn restore_prepared(output string, tag string, directory string) ! {
+fn restore_prepared(output string, tag string, directory string, review string) ! {
 	metadata := read_prepared(output, tag, '')!
+	if review != '' {
+		text := pkgcore.read_metadata(review)!
+		os.write_file(os.join_path(directory, 'prepared-review.json'), text)!
+	}
 	restore_metadata(metadata, directory)!
 }
 
-fn verify_prepared(output string, tag string, repo string) !PreparedVerification {
-	metadata := read_prepared(output, tag, repo)!
-	entries := parse_manifest(metadata.manifest, os.join_path(output, 'SHA256SUMS'))!
+fn prepared_report(directory string, metadata DraftRecovery, entries map[string]string) !PreparedVerification {
 	if entries.len == 0 { return error('release checksum manifest is empty') }
 	mut names := entries.keys()
 	names.sort()
-	sizes := asset_sizes(output, names, true)!
+	sizes := asset_sizes(directory, names, true)!
 	mut assets := []PreparedAsset{cap: names.len}
 	for name in names {
-		size := sizes[name]
-		digest := entries[name]
-		if !pkgcore.verified_file(os.join_path(output, name), pkgcore.Payload{bytes: size, sha256: digest}) {
-			return error('release asset changed after verification: ' + name)
-		}
-		assets << PreparedAsset{name: name, bytes: size, sha256: digest}
+		assets << PreparedAsset{name: name, bytes: sizes[name], sha256: entries[name]}
 	}
 	return PreparedVerification{
 		repo: metadata.repo
-		tag: tag
+		tag: metadata.tag
 		commit: metadata.commit
 		prerelease: metadata.prerelease
 		manifest_sha256: sha256.hexhash(metadata.manifest)
 		notes_sha256: sha256.hexhash(metadata.notes)
 		assets: assets
+	}
+}
+
+fn verify_prepared(output string, tag string, repo string) !PreparedVerification {
+	metadata := read_prepared(output, tag, repo)!
+	entries := parse_manifest(metadata.manifest, os.join_path(output, 'SHA256SUMS'))!
+	report := prepared_report(output, metadata, entries)!
+	for asset in report.assets {
+		if !pkgcore.verified_file(os.join_path(output, asset.name),
+			pkgcore.Payload{bytes: asset.bytes, sha256: asset.sha256}) {
+			return error('release asset changed after verification: ' + asset.name)
+		}
+	}
+	return report
+}
+
+fn stage_reviewed(output string, directory string, stage string, repo string, tag string, commit string, prerelease bool) ! {
+	metadata := release_metadata(directory, repo, tag, commit, prerelease)!
+	entries := parse_manifest(metadata.manifest, os.join_path(directory, 'SHA256SUMS'))!
+	stage_assets(output, entries, stage, [], 0)!
+	report := prepared_report(stage, metadata, entries)!
+	review := pkgcore.read_metadata(os.join_path(directory, 'prepared-review.json'))!
+	if review != json2.encode(report) + '\n' {
+		return error('prepared release differs from the reviewed verification report')
 	}
 }
 
@@ -368,7 +388,7 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 	checksum_bytes := if upload_manifest { os.lstat(manifest)!.size } else { u64(0) }
 	metadata_bytes := u64(notes.len) + checksum_bytes
 	if original != '' {
-		stage_assets(original, manifest, stage, draft.assets.map(it.name), metadata_bytes)!
+		stage_assets(original, read_manifest(manifest)!, stage, draft.assets.map(it.name), metadata_bytes)!
 	} else {
 		asset_sizes(stage, names.filter(it != 'SHA256SUMS'), true)!
 		require_staging_space(stage, metadata_bytes)!
@@ -425,17 +445,22 @@ fn run() ! {
 		return check_assets(os.args[2], os.args[3])
 	}
 	if os.args.len == 5 && os.args[1] == 'stage' {
-		return stage_assets(os.args[2], os.args[3], os.args[4], [], 0)
+		return stage_assets(os.args[2], read_manifest(os.args[3])!, os.args[4], [], 0)
 	}
 	if os.args.len == 8 && os.args[1] == 'save-prepared' {
 		return save_prepared(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
 	}
-	if os.args.len == 5 && os.args[1] == 'restore-prepared' {
-		return restore_prepared(os.args[2], os.args[3], os.args[4])
+	if os.args.len in [5, 6]! && os.args[1] == 'restore-prepared' {
+		review := if os.args.len == 6 { os.args[5] } else { '' }
+		return restore_prepared(os.args[2], os.args[3], os.args[4], review)
 	}
 	if os.args.len == 5 && os.args[1] == 'verify-prepared' {
 		println(json2.encode(verify_prepared(os.args[2], os.args[3], os.args[4])!))
 		return
+	}
+	if os.args.len == 9 && os.args[1] == 'stage-reviewed' {
+		return stage_reviewed(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
+			os.args[8] == 'true')
 	}
 	if os.args.len == 8 && os.args[1] == 'prepare-creation' {
 		return prepare_creation(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7] == 'true')
@@ -466,7 +491,7 @@ fn run() ! {
 			os.args[7] == 'true', os.args[8] == 'published')!)
 		return
 	}
-	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
+	return error('usage: release-assets record | capture | capture-upload | check-upload-sizes | check | stage | save-prepared | restore-prepared | verify-prepared | stage-reviewed | prepare-creation | restore-creation | record-draft | restore-draft | upload-draft | release-state | verify-release')
 }
 
 fn main() {

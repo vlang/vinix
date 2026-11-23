@@ -425,7 +425,13 @@ fn github_api(args []string, scenario string) !int {
 	if path.starts_with(prefix + 'releases') {
 		return github_release_api(args, remote, path[prefix.len..], scenario)
 	}
-	if path == prefix + 'commits/' + commit && '--silent' in args { return 0 }
+	if path == prefix + 'commits/' + commit && '--silent' in args {
+		review := os.getenv('VINIX_ASSET_TEST_REVIEW')
+		if scenario == 'publish-prepared' && review != '' {
+			os.write_file(review, 'review changed after the driver captured it\n')!
+		}
+		return 0
+	}
 	if path.starts_with(prefix + 'git/matching-refs/tags/') && args[3..] == ['--jq', '.[].ref'] {
 		if scenario == 'tag-read-failed' {
 			eprintln('fixture GitHub tag lookup failed')
@@ -792,6 +798,31 @@ fn check_prepared_release(root string, work string, out string, remote string, e
 	args := ['--publish-prepared=' + tag]
 	recovery_attempt(root, work, environment, 'prepared-wrong-repo', [...args, '--repo=local/other'],
 		'belongs to local/fixture')!
+	review_file := work + '/reviewed release.json'
+	review_text := os.read_file(work + '/verify-prepared.log')!
+	review_args := [...args, '--prepared-review=../reviewed release.json']
+	os.write_file(review_file, json2.encode(FixturePreparedVerification{...report, commit: other_commit}) + '\n')!
+	recovery_attempt(root, work, environment, 'prepared-review-wrong-commit', review_args,
+		'prepared release differs from the reviewed verification report')!
+	os.write_file(review_file, review_text)!
+	recovery_attempt(root, work, environment, 'prepared-review-requires-publish',
+		[...verification_args, '--prepared-review=../reviewed release.json'],
+		'--prepared-review requires --publish-prepared')!
+
+	iso := out + '/vinix-amd64.iso'
+	original_iso := os.read_file(iso)!
+	replacement := 'different prepared ISO'
+	replacement_manifest := prepared.manifest.replace(sha256.hexhash(original_iso) + '  vinix-amd64.iso',
+		sha256.hexhash(replacement) + '  vinix-amd64.iso')
+	os.write_file(iso, replacement)!
+	os.write_file(out + '/SHA256SUMS', replacement_manifest)!
+	os.write_file(record_path, json2.encode(FixtureCreation{...prepared, manifest: replacement_manifest}) + '\n')!
+	recovery_attempt(root, work, environment, 'prepared-review-replacement', review_args,
+		'prepared release differs from the reviewed verification report')!
+	os.write_file(iso, original_iso)!
+	os.write_file(out + '/SHA256SUMS', prepared.manifest)!
+	os.write_file(record_path, record)!
+
 	for note, name in {'prepared-checksums-changed': 'SHA256SUMS',
 		'prepared-notes-changed': 'RELEASE_NOTES.md', 'prepared-asset-changed': 'vinix-amd64.iso'} {
 		file := out + '/' + name
@@ -819,12 +850,15 @@ fn check_prepared_release(root string, work string, out string, remote string, e
 	git(root, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
 		'-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null',
 		'commit', '--allow-empty', '-qm', 'Advance HEAD after preparing the release'])!
-	recovery_attempt(root, work, environment, 'publish-prepared', args, '')!
+	mut publishing := environment.clone()
+	publishing['VINIX_ASSET_TEST_REVIEW'] = review_file
+	recovery_attempt(root, work, publishing, 'publish-prepared', review_args, '')!
 	verify_handoff(out, true, 'publish-prepared')!
 	published := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if !published.prerelease || published.draft || !published.body.starts_with(prepared.notes)
 		|| os.read_file(tag_file(remote, tag))! != commit || os.read_file(record_path)! != record
-		|| !os.exists(remote + '/publish-attempt') {
+		|| !os.exists(remote + '/publish-attempt')
+		|| os.read_file(review_file)! != 'review changed after the driver captured it\n' {
 		return error('publication did not use the prepared release metadata')
 	}
 }

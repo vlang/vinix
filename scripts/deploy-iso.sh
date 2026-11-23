@@ -14,6 +14,7 @@
 #   --prepare-only    build and save a handoff for later publication
 #   --verify-prepared=TAG  check a saved handoff and report its asset digests
 #   --publish-prepared=TAG  verify and publish a saved handoff
+#   --prepared-review=FILE  require the exact reviewed JSON for --publish-prepared
 #   --resume-draft=ID  continue an upload or confirm publication by release ID
 #   --resume-create=TAG  recover a draft whose creation response was lost
 #   --package-review=DIR  require a reviewed package plan (amd64.json or arm64.json) for each target
@@ -59,6 +60,7 @@ PUBLISH=1
 PREPARE_ONLY=0
 VERIFY_PREPARED=''
 PUBLISH_PREPARED=''
+PREPARED_REVIEW=''
 ASSUME_YES=0
 REPO=''
 PACKAGE_REVIEW=''
@@ -87,6 +89,10 @@ for arg in "$@"; do
         --publish-prepared=*)
             PUBLISH_PREPARED="${arg#*=}"
             [ -n "$PUBLISH_PREPARED" ] || { echo "ERROR: --publish-prepared requires a tag" >&2; exit 1; }
+            ;;
+        --prepared-review=*)
+            PREPARED_REVIEW="${arg#*=}"
+            [ -n "$PREPARED_REVIEW" ] || { echo "ERROR: --prepared-review requires a file" >&2; exit 1; }
             ;;
         --resume-draft=*)
             RESUME_DRAFT="${arg#*=}"
@@ -153,6 +159,13 @@ file_size() {
 # ── What to build ──────────────────────────────────────────────────────────
 
 need git cc
+if [ -n "$PREPARED_REVIEW" ]; then
+    [ -n "$PUBLISH_PREPARED" ] || die "--prepared-review requires --publish-prepared"
+    case "$PREPARED_REVIEW" in
+        /*) ;;
+        *) PREPARED_REVIEW="$PWD/$PREPARED_REVIEW" ;;
+    esac
+fi
 cd "$SCRIPT_DIR"
 post_build=0
 for action in "$RESUME_DRAFT" "$RESUME_CREATE" "$VERIFY_PREPARED" "$PUBLISH_PREPARED"; do
@@ -211,7 +224,8 @@ if [ -n "$RESUME_DRAFT$RESUME_CREATE$PUBLISH_PREPARED" ]; then
     if [ -n "$PUBLISH_PREPARED" ]; then
         git check-ref-format "refs/tags/$PUBLISH_PREPARED" || die "invalid prepared release tag: $PUBLISH_PREPARED"
         OUT="$SCRIPT_DIR/build-release/$PUBLISH_PREPARED"
-        recovery="$("$ASSET_WORK/release-assets" restore-prepared "$OUT" "$PUBLISH_PREPARED" "$ASSET_WORK")"
+        recovery="$("$ASSET_WORK/release-assets" restore-prepared "$OUT" "$PUBLISH_PREPARED" \
+            "$ASSET_WORK" "$PREPARED_REVIEW")"
     elif [ -n "$RESUME_CREATE" ]; then
         git check-ref-format "refs/tags/$RESUME_CREATE" || die "invalid recovery tag: $RESUME_CREATE"
         OUT="$SCRIPT_DIR/build-release/$RESUME_CREATE"
@@ -438,7 +452,12 @@ if [ -n "$PUBLISH_PREPARED" ]; then
     confirm_publish
     cmp -s "$ASSET_WORK/SHA256SUMS" "$OUT/SHA256SUMS" || die "prepared SHA256SUMS changed"
     cmp -s "$ASSET_WORK/RELEASE_NOTES.md" "$OUT/RELEASE_NOTES.md" || die "prepared release notes changed"
-    "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
+    if [ -n "$PREPARED_REVIEW" ]; then
+        "$ASSET_WORK/release-assets" stage-reviewed "$OUT" "$ASSET_WORK" "$ASSET_STAGE" \
+            "$REPO" "$TAG" "$COMMIT" "$prerelease"
+    else
+        "$ASSET_WORK/release-assets" stage "$OUT" "$ASSET_WORK/SHA256SUMS" "$ASSET_STAGE"
+    fi
     publish_staged_assets
     exit 0
 fi

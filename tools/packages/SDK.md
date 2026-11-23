@@ -662,6 +662,13 @@ verified assets and uses the original release notes. Pass `--draft` to
 keep the verified release as a draft. The saved record protects the
 output directory from a second build with that tag.
 
+To require a reviewed handoff, save the JSON from `--verify-prepared=TAG`
+and pass `--prepared-review=FILE` when publishing it. The driver captures
+the supplied file at startup and compares its exact bytes with a report
+for the verified upload staging files. Keep the original JSON, including
+its final newline. Any difference stops the run before tag or draft
+creation.
+
 To resume an interrupted upload, run
 `./scripts/deploy-iso.sh --resume-draft=ID` from the same checkout. Before the
 first upload the driver saves the repository, tag, commit, checksum manifest,
