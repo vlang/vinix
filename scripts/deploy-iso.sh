@@ -377,11 +377,18 @@ retire_resumed_creation() {
 }
 
 finish_draft() {
-    local release_id="$1" response="$2" original="${3:-}" release_url outcome
+    local release_id="$1" response="$2" original="${3:-}" release_url outcome upload_status=0
     "$ASSET_WORK/release-assets" upload-draft "$ASSET_STAGE" "$ASSET_WORK" \
-        "$response" "$REPO" "$release_id" "$TAG" "$prerelease" "$original"
-    github_api "$release_api/$release_id" > "$ASSET_WORK/draft.json"
-    release_url="$(verify_release "$release_id" "$ASSET_WORK/draft.json" draft)"
+        "$response" "$REPO" "$release_id" "$TAG" "$prerelease" "$original" || upload_status=$?
+    case "$upload_status" in
+        0) ;;
+        2) echo "Checking which assets GitHub saved for draft $release_id." >&2 ;;
+        *) return "$upload_status" ;;
+    esac
+    github_api "$release_api/$release_id" > "$ASSET_WORK/draft.json" ||
+        die "cannot read back draft $release_id; retry with --resume-draft=$release_id"
+    release_url="$(verify_release "$release_id" "$ASSET_WORK/draft.json" draft)" ||
+        die "cannot verify draft $release_id; retry with --resume-draft=$release_id"
     if [ "$DRAFT" -eq 1 ]; then
         outcome="Saved verified draft"
     else

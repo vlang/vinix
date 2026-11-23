@@ -627,7 +627,7 @@ fn inspect_saved_draft(directory string, response string, id string, recorded bo
 	}
 }
 
-fn upload_draft(stage string, directory string, response string, repo string, id string, tag string, prerelease bool, original string) ! {
+fn upload_draft(stage string, directory string, response string, repo string, id string, tag string, prerelease bool, original string) !bool {
 	notes := pkgcore.read_metadata(os.join_path(directory, 'RELEASE_NOTES.md'))!
 	draft := read_release(response, id, tag, notes, prerelease)!
 	if !draft.draft { return error('GitHub release is already published') }
@@ -636,7 +636,7 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 	manifest := os.join_path(directory, 'SHA256SUMS')
 	if names.len == 0 {
 		if original != '' { check_assets(original, manifest)! }
-		return
+		return true
 	}
 	upload_manifest := 'SHA256SUMS' in names
 	checksum_bytes := if upload_manifest { os.lstat(manifest)!.size } else { u64(0) }
@@ -669,8 +669,12 @@ fn upload_draft(stage string, directory string, response string, repo string, id
 			if child.code != 0 || child.pid <= 0 { failed << batch[index] }
 			child.close()
 		}
-		if failed.len > 0 { return error('upload failed for GitHub draft ${draft.id}: ' + failed.join(', ')) }
+		if failed.len > 0 {
+			eprintln('upload failed for GitHub draft ${draft.id}: ' + failed.join(', '))
+			return false
+		}
 	}
+	return true
 }
 
 fn verify_release(directory string, response string, repo string, id string, tag string, prerelease bool, published bool) !string {
@@ -763,8 +767,10 @@ fn run() ! {
 		return retire_resumed_creation(os.args[2], os.args[3])
 	}
 	if os.args.len == 10 && os.args[1] == 'upload-draft' {
-		upload_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
-			os.args[8] == 'true', os.args[9])!
+		if !upload_draft(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6], os.args[7],
+			os.args[8] == 'true', os.args[9])! {
+			exit(2) // Transfer failed after staging. Read back the draft before deciding the outcome.
+		}
 		return
 	}
 	if os.args.len == 3 && os.args[1] == 'release-state' {

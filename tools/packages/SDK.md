@@ -686,6 +686,9 @@ already uploaded assets with matching digests when making private upload
 copies and stages the missing files for the same draft ID. A complete draft
 requires only checksum reads of the original files. An unexpected asset, an
 incomplete upload, or a digest mismatch stops the run for inspection.
+If an upload command fails, the driver reads back the draft. It continues
+when the entire recorded asset set and the tag verify. Otherwise the
+saved draft remains available for recovery with `--resume-draft=ID`.
 Use `--draft` to finish the uploads
 while keeping the release unpublished. A complete draft can also be published
 with the same resume command.

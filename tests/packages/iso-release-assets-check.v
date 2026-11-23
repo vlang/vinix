@@ -451,7 +451,7 @@ fn upload_fixture(args []string, out string, remote string, scenario string) !in
 	}
 	draft := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if !draft.draft || draft.tag_name != tag { return error('upload does not target the draft') }
-	if scenario in ['resume-complete-draft', 'resume-create-saved-upload']! && name == 'vinix-amd64.iso' {
+	if scenario in ['resume-complete-draft-response-lost', 'resume-create-saved-upload']! && name == 'vinix-amd64.iso' {
 		stage := os.dir(file)
 		mut names := os.ls(stage)!
 		names.sort()
@@ -481,6 +481,10 @@ fn upload_fixture(args []string, out string, remote string, scenario string) !in
 		path: file
 		asset: FixtureAsset{name: name, state: 'uploaded', digest: 'sha256:' + digest}
 	}))!
+	if scenario == 'resume-complete-draft-response-lost' && name == 'vinix-amd64.iso' {
+		eprintln('fixture lost the response after saving the upload')
+		return 1
+	}
 	return 0
 }
 
@@ -1017,6 +1021,9 @@ fn check_resume(root string, work string, out string, remote string, environment
 			return err
 		}
 		os.write_file(file, original)!
+		if os.read_file(work + '/' + scenario + '.log')!.contains('Checking which assets GitHub saved') {
+			return error('local verification failure triggered upload readback')
+		}
 	}
 	resume_attempt(root, work, environment, 'resume-bad-remote', [], 'GitHub draft asset differs from the verified upload')!
 	resume_attempt(root, work, environment, 'resume-wrong-repo', ['--repo=local/other'], 'belongs to local/fixture')!
@@ -1031,14 +1038,17 @@ fn check_resume(root string, work string, out string, remote string, environment
 	os.write_file(out + '/SHA256SUMS', 'changed public checksum list')!
 	replace_creation_commit(out)!
 	conflict := os.read_file(intent_path)!
-	resume_attempt(root, work, environment, 'resume-complete-draft', ['--draft'], '')!
+	resume_case := 'resume-complete-draft-response-lost'
+	resume_attempt(root, work, environment, resume_case, ['--draft'], '')!
+	resume_log := os.read_file(work + '/' + resume_case + '.log')!
 	finished := json2.decode[FixtureRelease](os.read_file(remote + '/draft.json')!)!
 	if !finished.draft || finished.assets.len != expected || os.exists(remote + '/publish-attempt')
-		|| !os.exists(remote + '/resume-stage') {
+		|| !os.exists(remote + '/resume-stage') || !resume_log.contains('fixture lost the response after saving the upload')
+		|| !resume_log.contains('Checking which assets GitHub saved') {
 		return error('recovery did not complete the retained draft')
 	}
 	if os.read_file(intent_path)! != conflict
-		|| !os.read_file(work + '/resume-complete-draft.log')!.contains('it differs from the saved draft') {
+		|| !resume_log.contains('it differs from the saved draft') {
 		return error('draft recovery did not report and preserve the conflicting creation record')
 	}
 	os.write_file(intent_path, intent)!
@@ -1702,6 +1712,10 @@ fn run() ! {
 			if early && os.exists(out) { return error('GitHub tag preflight wrote release output') }
 			if os.exists(out + '/fixture-boot') != (!early && scenario != 'bad-build-sidecar') {
 				return error('unexpected boot test handoff: ' + scenario)
+			}
+			if scenario in ['upload-interrupted', 'upload-interrupted-create']!
+				&& (!log.contains('Checking which assets GitHub saved') || !log.contains('missing GitHub draft assets')) {
+				return error('interrupted upload did not verify the incomplete remote draft')
 			}
 			if scenario == 'upload-interrupted' { check_resume(root, work, out, remote, environment)! }
 			if scenario == 'upload-interrupted-create' {
