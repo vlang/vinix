@@ -19,6 +19,12 @@ pub fn (mut info ReleaseOriginInfo) close() {
 	info = ReleaseOriginInfo{}
 }
 
+// Verify the publisher's complete local export without contacting its origin.
+pub fn check_release_export(directory string, id string, public_key string) !ReleaseInfo {
+	if !identifier(id) { return error('invalid release repository ID') }
+	return check_signed_release(directory, id, public_key, '')
+}
+
 // Compare a hosted repository with a complete signed export using the caller's
 // independently verified publisher key. Only the private transfer stage is written.
 pub fn check_release_origin(directory string, id string, public_key string, url string) !ReleaseOriginInfo {
@@ -26,6 +32,11 @@ pub fn check_release_origin(directory string, id string, public_key string, url 
 	if !url.starts_with('https://') || !pkgprotocol.valid_repository_url(url) {
 		return error('release origin requires a valid HTTPS repository URL')
 	}
+	release := check_signed_release(directory, id, public_key, url)!
+	return ReleaseOriginInfo{ url: url.clone(), release: release }
+}
+
+fn check_signed_release(directory string, id string, public_key string, url string) !ReleaseInfo {
 	path := publisher_path(directory)!
 	defer { unsafe { path.free() } }
 	fd := capture_prepared_root(path, 'signed release export')!
@@ -57,27 +68,30 @@ pub fn check_release_origin(directory string, id string, public_key string, url 
 	defer { unsafe { objects.free() } }
 	release_closures(index, public_key)!
 	verify_release_stage(release, text, trimmed, objects, true)!
-	check_hosted_release(fd, url, text, signature, objects)!
+	if url != '' {
+		check_hosted_release(fd, url, text, signature, objects)!
+		if !atomic_parent_matches(release, u64(info.st_dev), u64(info.st_ino)) {
+			return error('signed release export changed during origin check')
+		}
+		check_export_parent(release, 'signed release export')!
+		verify_release_stage(release, text, trimmed, objects, true)!
+	}
 	if !atomic_parent_matches(release, u64(info.st_dev), u64(info.st_ino)) {
-		return error('signed release export changed during origin check')
+		return error('signed release export changed during verification')
 	}
 	check_export_parent(release, 'signed release export')!
-	verify_release_stage(release, text, trimmed, objects, true)!
 	if index.expires <= time.now().unix() {
-		return error('signed release expired during origin check')
+		return error('signed release expired during verification')
 	}
-	return ReleaseOriginInfo{
-		url:     url.clone()
-		release: ReleaseInfo{
-			repository:    id.clone()
-			public_key:    public_key.clone()
-			index_sha256:  index_digest(text)
-			directory:     release.clone()
-			sequence:      index.sequence
-			expires:       index.expires
-			package_count: index.packages.len
-			object_count:  objects.len
-		}
+	return ReleaseInfo{
+		repository:    id.clone()
+		public_key:    public_key.clone()
+		index_sha256:  index_digest(text)
+		directory:     release.clone()
+		sequence:      index.sequence
+		expires:       index.expires
+		package_count: index.packages.len
+		object_count:  objects.len
 	}
 }
 

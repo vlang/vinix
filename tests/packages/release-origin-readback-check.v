@@ -91,16 +91,67 @@ fn inventory(local string) !map[string]string {
 	return files
 }
 
+fn check_local_export(cli string, work string, local string, key string, original map[string]string) ! {
+	// The verifier must work without curl or other external tools.
+	path := os.getenv('PATH')
+	os.setenv('PATH', work + '/no-tools', true)
+	defer { os.setenv('PATH', path, true) }
+	command := [cli, 'check-release-export', local, 'fixture', key]
+	published := json2.decode[pkgcore.ReleaseInfo](os.read_file(work + '/publish-1.log')!)!
+	history := work + '/workspace/.publisher/history.json'
+	floor := pkgcore.hash_file(history)!
+	output := run(work + '/offline-export-check', [cli, '--offline', ...command[1..]], 0, '')!
+	if json2.decode[pkgcore.ReleaseInfo](output)! != published {
+		return error('local export receipt differs from publication')
+	}
+	run(work + '/local-export-wrong-id', [cli, 'check-release-export', local, 'other', key], 1, '')!
+	run(work + '/local-export-wrong-key', [cli, 'check-release-export', local, 'fixture',
+		'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'], 1, 'signature verification failed')!
+	run(work + '/local-export-extra-operand', [...command, 'extra'], 1, 'requires a signed release directory')!
+	root := work + '/untouched-local-root'
+	run(work + '/local-export-root-option', [cli, '--root', root, ...command[1..]], 1, 'without an installation root option')!
+	run(work + '/local-export-workspace', [cli, 'check-release-export', work + '/workspace', 'fixture', key], 1, '')!
+
+	alias := work + '/export-link'
+	os.symlink(local, alias)!
+	run(work + '/local-export-root-alias', [cli, 'check-release-export', alias, 'fixture', key], 1, 'must be an ordinary directory')!
+	os.rm(alias)!
+	object := local + '/objects/' + pkgcore.hash_file(work + '/payload/content')!
+	os.chmod(object, 0o600)!
+	run(work + '/local-export-object-mode', command, 1, 'ordinary single-link file with mode 0644')!
+	os.chmod(object, 0o644)!
+	os.write_file(object, 'x'.repeat(int(os.file_size(object))))!
+	run(work + '/local-export-changed-object', command, 1, 'export payload changed')!
+	os.rm(object)!
+	run(work + '/local-export-missing-object', command, 1, 'missing entries')!
+	os.cp(work + '/payload/content', object)!
+	os.chmod(object, 0o644)!
+	os.write_file(local + '/untracked', '')!
+	run(work + '/local-export-extra-file', command, 1, 'unexpected export entry')!
+	os.rm(local + '/untracked')!
+	retry := run(work + '/local-export-retry', command, 0, '')!
+	if json2.decode[pkgcore.ReleaseInfo](retry)! != published || os.exists(root)
+		|| inventory(local)! != original || pkgcore.hash_file(history)! != floor {
+		return error('local export check changed the signed export or publisher history')
+	}
+	println('RELEASE EXPORT offline receipt, ten refusals and exact retry PASS')
+}
+
 fn check() ! {
 	if os.args.len !in [4, 6] {
 		return error('usage: release-origin-readback-check VINIX_PACKAGE HTTPS_FIXTURE NEW_WORK [MIXED_RELEASE PUBLIC_KEY_HEX]')
 	}
 	work := os.abs_path(os.args[3])
 	os.mkdir(work)!
+	defer {
+		os.rm(work + '/key.pem') or {}
+		os.rm(work + '/seed') or {}
+	}
 	cli := os.abs_path(os.args[1])
 	key := publish(cli, work)!
 	local := work + '/release 1'
 	original := inventory(local)!
+	check_local_export(cli, work, local, key, original)!
 	local_mode := (os.lstat(local)!).mode
 	served := work + '/served'
 	os.cp_all(local, served, false)!
@@ -127,8 +178,6 @@ fn check() ! {
 		server.wait()
 		os.write_file(work + '/server.log', server.stdout_slurp()) or {}
 		server.close()
-		os.rm(work + '/key.pem') or {}
-		os.rm(work + '/seed') or {}
 	}
 	url := ready(work + '/ready', mut server)!
 	fixture := Fixture{ work: work, cli: cli, url: url, key: key, local: local }
@@ -184,6 +233,8 @@ fn check() ! {
 	if os.args.len == 6 {
 		mixed := os.abs_path(os.args[4])
 		index := json2.decode[pkgcore.Index](os.read_file(mixed + '/index.json')!)!
+		mixed_export := json2.decode[pkgcore.ReleaseInfo](run(work + '/mixed-local-export',
+			[cli, 'check-release-export', mixed, index.repository, os.args[5]], 0, '')!)!
 		os.cp_all(mixed, served + '/mixed', false)!
 		mixed_fixture := Fixture{ ...fixture, local: mixed, key: os.args[5], id: index.repository }
 		paths := os.ls(mixed + '/objects')!.sorted().map('objects/' + it)
@@ -193,7 +244,8 @@ fn check() ! {
 			...metadata,
 		])!
 		mixed_info := json2.decode[pkgcore.ReleaseOriginInfo](checked)!
-		if mixed_info.release.object_count != paths.len || mixed_info.release.package_count != index.packages.len
+		if mixed_info.release != mixed_export || mixed_info.release.object_count != paths.len
+			|| mixed_info.release.package_count != index.packages.len
 			|| mixed_info.release.index_sha256 != pkgcore.hash_file(mixed + '/index.json')! {
 			return error('mixed catalog receipt does not describe the reviewed export')
 		}

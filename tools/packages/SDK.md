@@ -1188,6 +1188,21 @@ failure reports that the complete directory exists but its durability is uncerta
 Upload this complete release to a new remote directory, then switch the server's
 release route. Serving a mutable workspace can expose a torn metadata pair.
 
+#### Check a local release export
+
+```sh
+vinix-package check-release-export RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX
+```
+
+Use the independently verified publisher key to verify a saved export before
+uploading it or including it in an image. The command checks the signed index,
+expiry, complete dependency closures and exact object inventory, including each
+payload's size and digest. It emits the same format-1 JSON fields as
+`publish-release`, so the index digest and publisher identity can be compared
+with the reviewed publication receipt. A copy reports its own absolute directory.
+The check runs locally without a signing seed, an installed package system or
+network access.
+
 #### Check the hosted release
 
 Run `check-release-origin` with the reviewed `publish-release` directory, the
