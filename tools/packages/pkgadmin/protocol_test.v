@@ -7,6 +7,7 @@ fn test_reviewed_admin_requests_and_bound_completion() {
 		['--progress', '--offline', 'update', 'field.local', fingerprint],
 		['--progress', 'update-media', 'field.local', '/media/with spaces/field.local'],
 		['--progress', '--offline', 'update-media', 'field.local', '/media/field', 'support', '/media/support'],
+		['update-media', '/media/release apps'],
 		['--progress', '--offline', 'apply', fingerprint, 'install', 'org.vinix.memo'],
 		['apply', fingerprint, 'upgrade'], ['apply', fingerprint, 'repair'], ['apply', fingerprint, 'rollback'], ['cleanup-apply', fingerprint], ['repo-apply', fingerprint, 'revoke', 'publisher'],
 		['repo-apply', fingerprint, 'enroll', 'publisher', 'file:///media/with spaces; $literal', fingerprint],
@@ -44,6 +45,7 @@ fn test_admin_transport_refuses_launches_alternate_roots_and_unreviewed_changes(
 		['update-media', 'field', '/media', 'extra'],
 		['update-media', 'field', '/media/field', 'field', '/other/field'],
 		['update-media', 'field', '/media/field', 'support', 'relative'],
+		['update-media', 'relative/release'],
 		['update', ''], ['--offline', '--progress', 'update']] {
 		mut refused := false
 		validate_arguments(arguments) or { refused = true; unsafe { err.free() } }

@@ -35,6 +35,7 @@ fn image_export_suite() hwhost.Suite {
 				'ISO OFFLINE MEDIA verification checks both signed publishers and rejects duplicate receipt pins PASS',
 				'REPOSITORY MEDIA keeps HTTPS identity, checks replay and objects, caches policy-allowed payloads and installs after disconnect PASS',
 				'REPOSITORY MEDIA batch authenticates both publishers before acquisition, retains verified objects after refusal and installs from the repaired offline cache PASS',
+				'REPOSITORY MEDIA bundle discovers enrolled publishers and rejects undeclared entries, aliases and late namespace changes PASS',
 				'IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS',
 				'IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS',
 				'IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS',

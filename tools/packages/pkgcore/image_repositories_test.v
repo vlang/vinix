@@ -4,6 +4,7 @@ module pkgcore
 import json2
 import os
 import time
+import tools.packages.pkgprotocol
 
 #include <sys/resource.h>
 fn C.getrlimit(int, voidptr) int
@@ -486,13 +487,47 @@ fn test_repository_media_batch_authenticates_and_acquires_before_catalog_publica
 	assert os.read_file(config_path)! == config && service.state()!.generation == 0
 
 	os.write_file(object, bytes)!
-	mut catalog := service.import_repository_media_batch(sources)!
+	bundle := work + '/bundle'
+	undeclared := bundle + '/unenrolled'
+	os.mkdir(undeclared)!
+	if _ := service.import_repository_media_bundle(bundle) { assert false }
+	else { assert err.msg().contains('unexpected export entry') }
+	assert os.ls(objects)! == [shared_hash] && !os.exists(catalog_path)
+	os.rmdir(undeclared)!
+	alias := work + '/bundle-link'
+	os.symlink(bundle, alias)!
+	if _ := service.import_repository_media_bundle(alias + '/') { assert false }
+	else { assert err.msg().contains('ordinary directory') }
+	deployment := bundle + '/' + pkgprotocol.deployment_mirror_filename
+	os.symlink(config_path, deployment)!
+	if _ := service.import_repository_media_bundle(bundle) { assert false }
+	else { assert err.msg().contains('ordinary single-link file') }
+	os.rm(deployment)!
+	os.write_file(deployment, '{"format":1,"architecture":"aarch64","packages":["app","extra"]}\n')!
+	os.chmod(deployment, 0o644)!
+
+	changing := Service{ root: root, progress: fn [undeclared] (event pkgprotocol.Progress) {
+		if event.phase == 'verify' && event.repository == 'organization' && event.path == 'index.json' {
+			os.mkdir(undeclared) or { panic(err) }
+		}
+	} }
+	if _ := changing.import_repository_media_bundle(bundle) { assert false }
+	else { assert err.msg().contains('unexpected export entry') }
+	assert !os.exists(catalog_path) && !os.exists(history_path)
+	os.rmdir(undeclared)!
+
+	mut catalog := service.import_repository_media_bundle(bundle)!
 	assert catalog.packages.len == 3
 	catalog.close()
 	assert os.ls(objects)!.sorted() == [shared_hash, unique_hash].sorted()
 	assert read_snapshots(directory)!.map(it.repository) == repositories
 	assert service.state()!.generation == 0
-	os.rename(work + '/bundle', work + '/disconnected')!
+	before_catalog := os.read_file(catalog_path)!
+	os.rm(deployment)!
+	mut retry := service.import_repository_media_bundle(bundle)!
+	retry.close()
+	assert os.read_file(catalog_path)! == before_catalog
+	os.rename(bundle, work + '/disconnected')!
 	offline := Service{ root: root, offline: true }
 	mut review := offline.review('install', ['app', 'extra'])!
 	defer { review.close() }
@@ -502,6 +537,7 @@ fn test_repository_media_batch_authenticates_and_acquires_before_catalog_publica
 	assert installed.packages.any(it.repository == 'organization' && it.public_key == second_key && it.sequence == 2)
 	assert os.read_file(config_path)! == config
 	println('REPOSITORY MEDIA batch authenticates both publishers before acquisition, retains verified objects after refusal and installs from the repaired offline cache PASS')
+	println('REPOSITORY MEDIA bundle discovers enrolled publishers and rejects undeclared entries, aliases and late namespace changes PASS')
 }
 
 fn test_online_install_reuses_payloads_from_the_authenticated_image_bundle() {

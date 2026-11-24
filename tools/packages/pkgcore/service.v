@@ -62,6 +62,18 @@ pub fn (service Service) import_repository_media_batch(sources []RepositoryMedia
 		if source.id in selected { return error('duplicate offline media repository: ${source.id}') }
 		selected[source.id] = true
 	}
+	return service.import_repository_media_sources(sources, '')
+}
+
+// Import enrolled repositories found directly inside an exported bundle.
+pub fn (service Service) import_repository_media_bundle(source string) !Catalog {
+	if !source.starts_with('/') || !printable(source, 4096) {
+		return error('offline media bundle requires an absolute directory')
+	}
+	return service.import_repository_media_sources([], source)
+}
+
+fn (service Service) import_repository_media_sources(sources []RepositoryMediaSource, bundle string) !Catalog {
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
@@ -73,7 +85,11 @@ pub fn (service Service) import_repository_media_batch(sources []RepositoryMedia
 	}
 	mut batch := RepositoryMediaBatch{}
 	defer { batch.close() }
-	for source in sources { batch.sources[source.id] = open_repository_media(source.directory)! }
+	if bundle != '' {
+		batch.open_bundle(bundle, config)!
+	} else {
+		for source in sources { batch.sources[source.id] = open_repository_media(source.directory)! }
+	}
 	return refresh_progress_from(config, directory, '', unsafe { &batch }, service.progress)
 }
 

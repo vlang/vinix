@@ -17,6 +17,8 @@ struct RepositoryMedia {
 struct RepositoryMediaBatch {
 mut:
 	sources map[string]RepositoryMedia
+	bundle ?RepositoryMedia
+	has_deployment bool
 }
 
 fn (mut batch RepositoryMediaBatch) close() {
@@ -25,6 +27,53 @@ fn (mut batch RepositoryMediaBatch) close() {
 		unsafe { id.free(); media.path.free() }
 	}
 	unsafe { batch.sources.free() }
+	if bundle := batch.bundle {
+		C.close(bundle.fd)
+		unsafe { bundle.path.free() }
+	}
+}
+
+fn (bundle RepositoryMedia) member_exists(name string) !bool {
+	mut info := C.stat{}
+	if C.fstatat(bundle.fd, name.str, unsafe { &info }, C.AT_SYMLINK_NOFOLLOW) == 0 { return true }
+	if C.errno == C.ENOENT { return false }
+	return error('cannot inspect offline media bundle entry: ${name}')
+}
+
+fn (mut batch RepositoryMediaBatch) open_bundle(directory string, config Config) ! {
+	bundle := open_repository_media(directory)!
+	batch.bundle = bundle
+	for repository in config.repositories {
+		if !bundle.member_exists(repository.id)! { continue }
+		bundle.check()!
+		path := bundle.path + '/' + repository.id
+		defer { unsafe { path.free() } }
+		batch.sources[repository.id] = open_repository_media(path)!
+	}
+	batch.has_deployment = bundle.member_exists(pkgprotocol.deployment_mirror_filename)!
+	batch.check_bundle()!
+	if batch.sources.len == 0 { return error('offline media bundle contains no enrolled repositories') }
+}
+
+fn (batch &RepositoryMediaBatch) check_bundle() ! {
+	if bundle := batch.bundle {
+		mut entries := map[string]u64{}
+		defer { unsafe { entries.free() } }
+		for id, _ in batch.sources {
+			defer { unsafe { id.free() } }
+			entries[id] = 0
+		}
+		bundle.check()!
+		if batch.has_deployment {
+			name := pkgprotocol.deployment_mirror_filename
+			entries[name] = 0
+			path := bundle.path + '/' + name
+			defer { unsafe { path.free() } }
+			export_stage_file(path)!
+		}
+		export_stage_directory(bundle.path, entries, 0)!
+		bundle.check()!
+	}
 }
 
 fn (batch &RepositoryMediaBatch) snapshot(repository Repository, previous []Snapshot) !Snapshot {
@@ -118,6 +167,7 @@ fn (batch &RepositoryMediaBatch) import_payloads(config Config, directory string
 		defer { unsafe { id.free() } }
 		source.check()!
 	}
+	batch.check_bundle()!
 }
 
 fn (media RepositoryMedia) import_group(config Config, directory string, missing []MediaPayload,

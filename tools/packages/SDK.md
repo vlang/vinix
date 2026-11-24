@@ -820,20 +820,21 @@ reports the ISO digest named by the receipt, architecture, deployment digest,
 application IDs and repository IDs. Enrollment and deployment still require
 their own reviews on the destination system.
 
-For already enrolled publishers, import one or more repository directories
-into the installed system's catalog and object cache. This uses the existing
-publisher keys and replay history and keeps the configured URLs. Include
-every publisher that lacks a current cached snapshot. A single pair works
-like targeted `update` for the other publishers.
+For already enrolled publishers, import an entire exported directory into the
+installed system's catalog and object cache. Its publisher subdirectories
+must match the enrolled IDs. A bundle may also contain `_deployment.json`.
+Import keeps the configured URLs and uses the existing keys and replay
+history. Any enrolled publisher absent from the directory needs a current
+cached snapshot.
 
 ```sh
-vinix-package admin update-media PUBLISHER /media/usb/release-apps/PUBLISHER
+vinix-package admin update-media /media/usb/release-apps
 vinix-package --offline deployment-add-review /media/usb/release-apps/_deployment.json
 vinix-package admin --offline deployment-add-apply DEPLOYMENT_FINGERPRINT /media/usb/release-apps/_deployment.json
 ```
 
-For a release with two enrolled publishers, refresh both from media in one
-operation:
+Use explicit repository and directory pairs to select individual publishers
+or import from several locations:
 
 ```sh
 vinix-package admin update-media PUBLISHER /media/usb/release-apps/PUBLISHER SUPPORT /media/usb/release-apps/SUPPORT
@@ -843,8 +844,10 @@ vinix-package admin update-media PUBLISHER /media/usb/release-apps/PUBLISHER SUP
 the verified payloads for this architecture and architecture-independent
 packages allowed by current organization policy. It checks space for the
 complete batch and publishes one refreshed catalog after acquisition. Use
-absolute paths to controlled ordinary directories. You can disconnect the
-media after importing and copying its lock to a local filename.
+absolute paths to controlled ordinary directories. The bundle directory must
+be owned by the importing administrator. Its `_deployment.json` is available
+for separate review. You can disconnect the media after importing and copying
+the lock to a local filename.
 If acquisition fails, verified cache objects remain available for retry.
 Enrollment and installed generations keep their existing state during import.
 
