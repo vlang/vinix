@@ -143,6 +143,64 @@ fn admit_serial(path string, installed bool, first_run bool, release_routing boo
 	}
 }
 
+fn admit_production_serial(path string, boot int) ! {
+	transcript := os.read_file(path)!
+	registration := 'SOFTWARE GRAPHICAL PRODUCTION root registration READY'
+	mut markers := ['SOFTWARE GRAPHICAL PRODUCTION PID1 installed inputs and observer parent PASS',
+		'SOFTWARE GRAPHICAL PRODUCTION direct-child graphical manager PASS']
+	if boot == 1 {
+		markers << registration
+	} else if transcript.contains(registration) {
+		return error('production registration repeated on boot 2')
+	}
+	markers << 'SOFTWARE GRAPHICAL PRODUCTION ordinary greeter uid=101 READY'
+	if boot == 1 { markers << 'SOFTWARE FIRST RUN pre-ready compositor uid=1000 home=/home/alex runtime=0700 PASS' }
+	markers << ['SOFTWARE GRAPHICAL ordinary-compositor uid=1000 home=/home/alex PASS',
+		'SOFTWARE GRAPHICAL PRODUCTION authenticated ordinary seat uid=1000 PASS']
+	mut previous := -1
+	for marker in markers {
+		exact_marker(transcript, marker)!
+		position := transcript.index(marker) or { return error('missing production graphical marker') }
+		if position <= previous { return error('production login markers are out of order') }
+		previous = position
+	}
+	if transcript.contains('SOFTWARE GRAPHICAL requesting guest poweroff') {
+		return error('production shutdown must use the desktop power action')
+	}
+}
+
+fn admit_production_inputs(run string, receipt Receipt, mut paths map[string]string) ! {
+	proof := json2.decode[map[string]string](os.read_file(paths['installed-declaration'])!)!
+	for path in ['/sbin/init', '/bin/busybox', '/lib/ld-musl-' + receipt.architecture + '.so.1',
+		'/usr/sbin/vinix-volume', '/usr/sbin/vinix-system', '/usr/share/vinix/actions/power-off'] {
+		image := receipt.artifacts['production-image' + path] or { return error('missing production image input: ' + path) }
+		if receipt.artifacts['production-stage' + path] != image || proof[path] != image {
+			return error('production stage and installed input do not match: ' + path)
+		}
+		paths['production-image' + path] = run + '/rootfs' + path
+	}
+	for applet in ['sh', 'mkdir', 'chmod', 'rm', 'ln', 'sleep', 'kill', 'mount', 'cat', 'sync', 'zsh'] {
+		path := '/bin/' + applet
+		if proof['@link:' + path] != 'busybox' || os.readlink(run + '/rootfs' + path)! != 'busybox' {
+			return error('production BusyBox alias differs: ' + path)
+		}
+	}
+	observer := '/usr/libexec/vinix-version-check'
+	guest := receipt.artifacts['guest'] or { return error('missing production observer build') }
+	if proof[observer] != guest || receipt.artifacts['production-observer'] != guest ||
+		proof['/sbin/init'] == guest {
+		return error('production init and read-only observer identities differ')
+	}
+	paths['production-observer'] = run + '/rootfs' + observer
+	paths['qemu-arguments'] = run + '/qemu-arguments.json'
+	arguments := json2.decode[[]string](os.read_file(paths['qemu-arguments'])!)!
+	net := arguments.index('-nic')
+	if net < 0 || net + 1 >= arguments.len || arguments[net + 1] != 'none' ||
+		arguments.filter(it in ['-nic', '-netdev', '-net']!).len != 1 {
+		return error('production graphical run does not disable QEMU networking')
+	}
+}
+
 fn hex_digest(value json2.Any) bool {
 	if value !is string || value.str().len != 64 { return false }
 	for byte in value.str().bytes() {
@@ -294,6 +352,7 @@ fn retain() ! {
 		'qemu-framebuffer-ordinary-seat-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots',
+		'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'] {
 		return error('requires the selected architecture ordinary-seat receipt')
 	}
@@ -314,7 +373,8 @@ fn retain() ! {
 	}
 	installed := receipt.platform.ends_with('installed-root-two-boots')
 	release_routing := receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
-	refresh := receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
+	production := receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
+	refresh := production || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
 	first_run := refresh || release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 	if release_routing && digest(run + '/source/guest/release_routing.v')! !=
 		sha256.sum($embed_file('software-graphical-guest/release_routing.v').to_string().bytes()).hex() {
@@ -325,6 +385,14 @@ fn retain() ! {
 		admit_serial(run + '/serial-2.log', true, first_run, release_routing, refresh, 2, arch)!
 		admit_shutdown(run + '/shutdown-1.jsonl', 1)!
 		admit_shutdown(run + '/shutdown-2.jsonl', 2)!
+	}
+	if production {
+		if digest(run + '/source/guest/production.v')! !=
+			sha256.sum($embed_file('software-graphical-guest/production.v').to_string().bytes()).hex() {
+			return error('qualified production observer differs from the embedded source')
+		}
+		admit_production_serial(run + '/serial.log', 1)!
+		admit_production_serial(run + '/serial-2.log', 2)!
 	}
 	mut paths := {
 		'controller': os.abs_path(os.args[4])
@@ -357,6 +425,7 @@ fn retain() ! {
 		paths['shutdown-2'] = run + '/shutdown-2.jsonl'
 		paths['installed-declaration'] = run + '/rootfs/usr/share/software-graphical-installed.json'
 	}
+	if production { admit_production_inputs(run, receipt, mut paths)! }
 	if first_run {
 		paths['release-declaration'] = run + '/rootfs/usr/share/vinix-packages/applications.json'
 		declaration := json2.decode[json2.Any](os.read_file(paths['release-declaration'])!)!.as_map()
@@ -399,6 +468,10 @@ fn retain() ! {
 	if first_run { required_shots << ['first-run-01-card', 'first-run-02-proposal', 'first-run-03-reboot-desktop'] }
 	if refresh {
 		required_shots << ['first-run-refresh-01-catalog', 'first-run-refresh-02-administrator', 'first-run-refresh-03-password-mask']
+	}
+	if production {
+		required_shots << ['production-01-registration', 'production-02-greeter', 'production-03-shutdown-menu',
+			'production-04-reboot-greeter', 'production-05-shutdown-menu']
 	}
 	if release_routing {
 		required_shots << ['release-routing-01-desktop', 'release-routing-02-extra-refused',
@@ -452,7 +525,8 @@ fn retain() ! {
 		}
 	}
 	os.mkdir_all(out)!
-	prefix := out + if release_routing { '/software-release-routing-native-' + arch } else if refresh {
+	prefix := out + if production { '/software-first-run-production-native-' + arch
+	} else if release_routing { '/software-release-routing-native-' + arch } else if refresh {
 		'/software-first-run-refresh-native-' + arch
 	} else if first_run {
 		'/software-first-run-native-' + arch

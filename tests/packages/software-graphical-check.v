@@ -258,6 +258,34 @@ fn key(mut monitor qmpclient.Monitor, code string) ! {
 	}
 }
 
+fn type_graphical_text(mut monitor qmpclient.Monitor, value string) ! {
+	for byte in value.bytes() {
+		key(mut monitor, if byte == ` ` { 'spc' } else { byte.ascii_str() })!
+	}
+}
+
+fn production_login(mut child os.Process, mut monitor qmpclient.Monitor, log string, deadline u64,
+	work string, boot int) ! {
+	if boot == 1 {
+		wait_marker(mut child, log, deadline, 'SOFTWARE GRAPHICAL PRODUCTION root registration READY')!
+		time.sleep(time.second)
+		shot(mut monitor, work, 'production-01-registration')!
+		type_graphical_text(mut monitor, 'alex')!
+		key(mut monitor, 'tab')!
+		type_graphical_text(mut monitor, 'graphical acceptance password')!
+		key(mut monitor, 'tab')!
+		type_graphical_text(mut monitor, 'graphical acceptance password')!
+		key(mut monitor, 'ret')!
+	}
+	wait_marker(mut child, log, deadline, 'SOFTWARE GRAPHICAL PRODUCTION ordinary greeter uid=101 READY')!
+	time.sleep(time.second)
+	shot(mut monitor, work, if boot == 1 { 'production-02-greeter' } else { 'production-04-reboot-greeter' })!
+	type_graphical_text(mut monitor, 'alex')!
+	key(mut monitor, 'tab')!
+	type_graphical_text(mut monitor, 'graphical acceptance password')!
+	key(mut monitor, 'ret')!
+}
+
 fn wait_marker(mut child os.Process, log string, deadline u64, marker string) ! {
 	for {
 		if healthy(mut child, log, deadline)!.contains(marker) { return }
@@ -303,7 +331,7 @@ fn wait_label(mut child os.Process, mut monitor qmpclient.Monitor, log string,
 }
 
 fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work string, ordinary bool,
-	installed bool, first_run bool, release_routing bool, first_run_refresh bool, boot int,
+	installed bool, first_run bool, release_routing bool, first_run_refresh bool, production bool, boot int,
 	previous screenshotcore.Image) !screenshotcore.Image {
 	log := work + if boot == 1 { '/serial.log' } else { '/serial-2.log' }
 	mut child := os.new_process(qemu)
@@ -326,6 +354,7 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 	defer { shutdown_log.close() }
 	mut shutdown := shutdown_connect(qmp + '.power', mut shutdown_log, deadline, boot)!
 	defer { shutdown.close() or {} }
+	if production { production_login(mut child, mut monitor, log, deadline, work, boot)! }
 	if first_run && boot == 1 {
 		wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN pre-ready compositor')!
 		for {
@@ -502,10 +531,12 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 		point(mut monitor, 800, 500)!
 		checkpoint := shot(mut monitor, work, '08-counter-three')!
 		press_before_shutdown(mut monitor, 930, 56)!
+		if production { production_shutdown(mut child, mut monitor, log, deadline, work, boot)! }
 		shutdown_event(mut shutdown, mut shutdown_log, deadline)!
 		wait_poweroff(mut child, log, deadline, 1, arch == 'aarch64')!
 		return checkpoint
 	}
+	if production { production_shutdown(mut child, mut monitor, log, deadline, work, boot)! }
 	shutdown_event(mut shutdown, mut shutdown_log, deadline)!
 	wait_poweroff(mut child, log, deadline, 2, arch == 'aarch64')!
 	return previous
@@ -513,9 +544,23 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 
 fn type_graphical_password(mut monitor qmpclient.Monitor) ! {
 	click(mut monitor, 100, 166)!
-	for byte in 'graphical acceptance password'.bytes() {
-		key(mut monitor, if byte == ` ` { 'spc' } else { byte.ascii_str() })!
+	type_graphical_text(mut monitor, 'graphical acceptance password')!
+}
+
+fn installed_checkpoint(boot int) string {
+	return if boot == 1 {
+		'SOFTWARE GRAPHICAL INSTALLED BOOT 1 acquired pointer-saved cold-boot checkpoint PASS'
+	} else {
+		'SOFTWARE GRAPHICAL INSTALLED BOOT 2 retained Counter reopened and pointer-saved PASS'
 	}
+}
+
+fn production_shutdown(mut child os.Process, mut monitor qmpclient.Monitor, log string, deadline u64,
+	work string, boot int) ! {
+	wait_marker(mut child, log, deadline, installed_checkpoint(boot))!
+	click(mut monitor, 20, 750)!
+	shot(mut monitor, work, if boot == 1 { 'production-03-shutdown-menu' } else { 'production-05-shutdown-menu' })!
+	press_before_shutdown(mut monitor, 375, 700)!
 }
 
 fn wait_poweroff(mut child os.Process, log string, deadline u64, boot int, kernel_serial bool) ! {
@@ -527,16 +572,52 @@ fn wait_poweroff(mut child os.Process, log string, deadline u64, boot int, kerne
 	}
 	child.wait()
 	transcript := os.read_file(log)!
-	marker := if boot == 1 {
-		'SOFTWARE GRAPHICAL INSTALLED BOOT 1 acquired pointer-saved cold-boot checkpoint PASS'
-	} else {
-		'SOFTWARE GRAPHICAL INSTALLED BOOT 2 retained Counter reopened and pointer-saved PASS'
-	}
+	marker := installed_checkpoint(boot)
 	if child.code != 0 || !transcript.contains(marker) ||
 		(kernel_serial && !transcript.contains('syspower: power off: stopping devices')) ||
 		transcript.contains('sysdisk: running from memory') || transcript.contains('sysdisk: updating the system on') {
 		return error('installed graphical boot did not complete from its admitted disk: ' + log)
 	}
+}
+
+fn stage_production_init(host hwhost.Host, input string, image string, guest string,
+	mut artifacts map[string]string, mut artifact_paths map[string]string) !map[string]string {
+	if host.arch == 'x86_64' &&
+		os.read_file(input + '/sbin/init')! != os.read_file(host.root + '/build-support/init-amd64/desktop-init')! {
+		return error('production x86 init must match build-support/init-amd64/desktop-init')
+	}
+	for directory in ['/root', '/dev', '/proc', '/sys', '/var/log'] {
+		os.mkdir_all(image + directory)!
+	}
+	os.chmod(image + '/root', 0o700)!
+	mut proof := map[string]string{}
+	for path in ['/sbin/init', '/bin/busybox', '/lib/ld-musl-' + host.arch + '.so.1',
+		'/usr/sbin/vinix-volume', '/usr/sbin/vinix-system', '/usr/share/vinix/actions/power-off'] {
+		source := input + path
+		target := image + path
+		if !os.is_file(source) || os.is_link(source) || os.exists(target) || os.is_link(target) {
+			return error('production helper requires an ordinary staged input and unused destination: ' + path)
+		}
+		os.mkdir_all(os.dir(target))!
+		invoke('cp', ['-p', source, target])!
+		pin(mut artifacts, mut artifact_paths, 'production-stage' + path, source)!
+		pin(mut artifacts, mut artifact_paths, 'production-image' + path, target)!
+		if artifacts['production-stage' + path] != artifacts['production-image' + path] {
+			return error('production input changed while staging: ' + path)
+		}
+		proof[path] = artifacts['production-image' + path]
+	}
+	for applet in ['sh', 'mkdir', 'chmod', 'rm', 'ln', 'sleep', 'kill', 'mount', 'cat', 'sync', 'zsh'] {
+		path := '/bin/' + applet
+		os.symlink('busybox', image + path)!
+		proof['@link:' + path] = 'busybox'
+	}
+	observer := '/usr/libexec/vinix-version-check'
+	os.mkdir_all(os.dir(image + observer))!
+	invoke('cp', ['-p', guest, image + observer])!
+	pin(mut artifacts, mut artifact_paths, 'production-observer', image + observer)!
+	proof[observer] = artifacts['production-observer']
+	return proof
 }
 
 fn check() ! {
@@ -558,6 +639,7 @@ fn check() ! {
 	first_run := options['--first-run'] or { 'false' }
 	release_routing := options['--release-routing'] or { 'false' }
 	first_run_refresh := options['--first-run-refresh'] or { 'false' }
+	production := '--production-root' in options
 	if ordinary !in ['true', 'false'] { return error('--ordinary must be true or false') }
 	if installed !in ['true', 'false'] || (installed == 'true' && ordinary != 'true') {
 		return error('--installed=true requires --ordinary=true')
@@ -571,6 +653,9 @@ fn check() ! {
 	if first_run_refresh !in ['true', 'false'] ||
 		(first_run_refresh == 'true' && (first_run != 'true' || release_routing == 'true')) {
 		return error('--first-run-refresh=true requires first-run Review mode')
+	}
+	if production && first_run_refresh != 'true' {
+		return error('--production-root requires --first-run-refresh=true')
 	}
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
 	root := hwhost.find_root(@FILE)!
@@ -701,12 +786,17 @@ fn check() ! {
 	guest := hwhost.build_program_with_flags(host, work + '/source/guest', work + '/guest-build',
 		'init', ['.'], ['-enable-globals'])!
 	os.mkdir_all(work + '/rootfs/sbin')!
-	os.cp(guest, work + '/rootfs/sbin/init')!
-	os.chmod(work + '/rootfs/sbin/init', 0o755)!
+	mut proof := map[string]string{}
+	if production {
+		proof = stage_production_init(host, required(options, '--production-root')!, work + '/rootfs', guest,
+			mut artifacts, mut artifact_paths)!
+	} else {
+		os.cp(guest, work + '/rootfs/sbin/init')!
+		os.chmod(work + '/rootfs/sbin/init', 0o755)!
+	}
 	if installed == 'true' {
 		os.write_file(work + '/rootfs/etc/software-graphical-installed', '1\n')!
 		os.write_file(work + '/rootfs/.vinix-image-id', 'vinix-software-graphical-installed-1\n')!
-		mut proof := map[string]string{}
 		for path in ['/sbin/init', '/usr/bin/vinix-desktop', '/usr/bin/vinix-package',
 			'/usr/bin/vinix-sandbox', '/usr/sbin/vinix-account', '/usr/sbin/vinix-authd',
 			'/usr/sbin/vinix-session', '/usr/share/vinix/actions/packages-change',
@@ -752,11 +842,15 @@ fn check() ! {
 				'-device', 'virtio-blk-device,drive=system']
 		} else { ['-drive', 'if=ide,format=raw,cache=writeback,file=' + work + '/system.vjfs'] }
 	}
+	if production {
+		os.write_file(work + '/qemu-arguments.json', json2.encode(arguments) + '\n')!
+		pin(mut artifacts, mut artifact_paths, 'qemu-arguments', work + '/qemu-arguments.json')!
+	}
 	checkpoint := graphical_boot(arch, host.qemu, arguments, qmp, work, ordinary == 'true',
-		installed == 'true', first_run == 'true', release_routing == 'true', first_run_refresh == 'true', 1, screenshotcore.Image{})!
+		installed == 'true', first_run == 'true', release_routing == 'true', first_run_refresh == 'true', production, 1, screenshotcore.Image{})!
 	if installed == 'true' {
 		graphical_boot(arch, host.qemu, arguments, qmp, work, true, true, first_run == 'true', release_routing == 'true',
-			first_run_refresh == 'true', 2, checkpoint)!
+			first_run_refresh == 'true', production, 2, checkpoint)!
 		pin(mut artifacts, mut artifact_paths, 'system-disk', work + '/system.vjfs')!
 		pin(mut artifacts, mut artifact_paths, 'serial-2', work + '/serial-2.log')!
 		pin(mut artifacts, mut artifact_paths, 'shutdown-2', work + '/shutdown-2.jsonl')!
@@ -805,7 +899,9 @@ fn check() ! {
 	}
 	os.write_file(work + '/qualification.json', json2.encode(GraphicalReceipt{
 		architecture: arch
-		platform:     if release_routing == 'true' {
+		platform:     if production {
+			'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
+		} else if release_routing == 'true' {
 			'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
 		} else if first_run_refresh == 'true' {
 			'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'

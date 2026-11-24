@@ -61,10 +61,10 @@ fn counter_child_present() !bool {
 	return false
 }
 
-fn wait_counter_closed(mut desktop os.Process) ! {
+fn wait_counter_closed(seat_pid int) ! {
 	deadline := time.sys_mono_now() + 30 * time.second
 	for counter_child_present()! {
-		if !desktop.is_alive() { return error('compositor exited while native Counter was closing') }
+		if !seat_alive(seat_pid) { return error('compositor exited while native Counter was closing') }
 		if time.sys_mono_now() >= deadline { return error('native Counter launch child did not finish closing') }
 		time.sleep(100 * time.millisecond)
 	}
@@ -85,7 +85,7 @@ fn command(arguments []string, input string) ! {
 	if child.code != 0 { return error(arguments.join(' ') + ': ' + output) }
 }
 
-fn check_compositor_identity(ready bool, first_run bool) !int {
+fn check_compositor_identity(ready bool, first_run bool, production bool) !int {
 	for pid in os.ls('/proc')! {
 		line := os.read_file('/proc/' + pid + '/cmdline') or { continue }
 		if !line.starts_with('/usr/bin/vinix-desktop\x00') ||
@@ -117,7 +117,7 @@ fn check_compositor_identity(ready bool, first_run bool) !int {
 			!folders.contains('XDG_DOCUMENTS_DIR="/home/alex/Documents"') {
 			return error('compositor prepared folders outside the account home')
 		}
-		if os.exists('/root/.vinix-user') || os.exists('/home/alex/.vinix-user') {
+		if (!production && os.exists('/root/.vinix-user')) || os.exists('/home/alex/.vinix-user') {
 			return error('ordinary compositor created a legacy registration record')
 		}
 		if ready {
@@ -213,43 +213,70 @@ fn run() ! {
 		['--open=Software']
 	})
 	desktop.run()
+	compositor_pid = observe_graphical_seat(GraphicalSeat{
+		pid: desktop.pid, ordinary: ordinary, installed: installed, first_run: first_run,
+		fresh: fresh, previous_inode: previous_inode,
+	})!
+	if installed {
+		stop_desktop(mut desktop, compositor_pid)!
+		stop_child(mut authentication, 'authentication service')!
+		save_graphical_checkpoint(fresh)!
+	}
+}
+
+struct GraphicalSeat {
+	pid int
+	ordinary bool
+	installed bool
+	first_run bool
+	fresh bool
+	previous_inode u64
+	production bool
+}
+
+fn observe_graphical_seat(seat GraphicalSeat) !int {
 	println('SOFTWARE GRAPHICAL waiting for real Counter pointer input')
-	path := '/home/alex/.local/share/vinix-apps/org.vinix.counter/counter.txt'
+	path := counter_path
+	refresh := first_run_refresh_enabled()
 	deadline := time.sys_mono_now() + 1200 * time.second
-	mut ready := !ordinary
+	mut ready := !seat.ordinary
+	mut compositor_pid := 0
 	mut saved := false
 	mut acquired := false
-	mut before_choice := !first_run || !fresh
-	mut reviewed := !first_run || !fresh
-	mut waiting_for_refresh := refresh && fresh
+	mut before_choice := !seat.first_run || !seat.fresh
+	mut reviewed := !seat.first_run || !seat.fresh
+	mut waiting_for_refresh := refresh && seat.fresh
 	mut ready_at := i64(0)
 	mut refreshed_at := i64(0)
 	review_delay := if release_routing_enabled() { 8 * time.second } else { 3 * time.second }
 	for {
-		if !desktop.is_alive() { return error('compositor exited') }
+		if !seat_alive(seat.pid) { return error('compositor supervisor exited') }
 		if time.sys_mono_now() >= deadline {
 			return error('Counter did not save two pointer increments')
 		}
 		if !before_choice && os.exists('/home/alex/.config/user-dirs.dirs') && os.is_dir('/run/user/1000') {
-			compositor_pid = check_compositor_identity(false, true)!
+			compositor_pid = check_compositor_identity(false, true, seat.production)!
 			check_first_run_inputs(true)!
 			before_choice = true
 		}
 		marker_inode := if !ready {
 			(os.lstat('/run/user/1000/vinix-desktop-ready') or { os.Stat{} }).inode
 		} else { u64(0) }
-		if !ready && marker_inode != 0 && marker_inode != previous_inode &&
-			(os.read_file('/run/user/1000/vinix-desktop-ready') or { '' }) == 'ready\n' {
-			compositor_pid = check_compositor_identity(true, first_run)!
-			if first_run {
+		if !ready && marker_inode != 0 && marker_inode != seat.previous_inode &&
+			(os.read_file('/run/user/1000/vinix-desktop-ready') or { '' }) == 'ready\n' &&
+			(!seat.production || (os.read_file('/run/vinix/session/active') or { '' }) == '1000\n') {
+			compositor_pid = check_compositor_identity(true, seat.first_run, seat.production)!
+			if seat.production {
+				println('SOFTWARE GRAPHICAL PRODUCTION authenticated ordinary seat uid=1000 PASS')
+			}
+			if seat.first_run {
 				check_first_run_decision()!
-				if !fresh {
+				if !seat.fresh {
 					choice := if release_routing_enabled() { 'skip' } else { 'review' }
 					println('SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=' + choice + ' PASS')
 					println('SOFTWARE FIRST RUN BOOT 2 retained ' + choice + ' decision no repeated prompt PASS')
 				}
 			}
-			if previous_marker.is_opened { previous_marker.close() }
 			println('vinix-desktop: ready')
 			ready = true
 			ready_at = time.sys_mono_now()
@@ -278,7 +305,7 @@ fn run() ! {
 				else { 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS' })
 			reviewed = true
 		}
-		if installed && fresh && !acquired && os.exists('/var/lib/vinix-packages/current/state.json') &&
+		if seat.installed && seat.fresh && !acquired && os.exists('/var/lib/vinix-packages/current/state.json') &&
 			(os.read_file('/var/log/vinix/auth.log') or { '' }).contains('uid=1000 run packages-change as alex: exit 0') {
 			verify_graphical_install()!
 			acquired = true
@@ -295,29 +322,31 @@ fn run() ! {
 			}
 			println('SOFTWARE GRAPHICAL ordinary-counter two-pointer-events persisted uid=' + stat.uid.str() + ' PASS')
 			saved = true
-			if !installed { break }
+			if !seat.installed { break }
 		}
-		if installed && value == if fresh { '3' } else { '4' } {
-			if fresh && (!saved || !acquired) { return error('installed UI acquisition/save evidence is incomplete') }
+		if seat.installed && value == if seat.fresh { '3' } else { '4' } {
+			if seat.fresh && (!saved || !acquired) { return error('installed UI acquisition/save evidence is incomplete') }
 			if (os.stat(path)!).uid != 1000 || (os.stat(os.dir(path))!).mode & 0o077 != 0 {
 				return error('installed Counter private data lost ordinary ownership/mode')
 			}
-			wait_counter_closed(mut desktop)!
-			stop_desktop(mut desktop, compositor_pid)!
-			stop_child(mut authentication, 'authentication service')!
-			if fresh { retain_installed()! }
-			C.sync()
-			println(if fresh {
-				'SOFTWARE GRAPHICAL INSTALLED BOOT 1 acquired pointer-saved cold-boot checkpoint PASS'
-			} else {
-				'SOFTWARE GRAPHICAL INSTALLED BOOT 2 retained Counter reopened and pointer-saved PASS'
-			})
-			return
+			wait_counter_closed(seat.pid)!
+			return compositor_pid
 		}
 		time.sleep(100 * time.millisecond)
 	}
 	// Keep the compositor alive for the host's reopen and framebuffer checks.
 	for !os.exists('/run/software-graphical-finish') { time.sleep(100 * time.millisecond) }
+	return compositor_pid
+}
+
+fn save_graphical_checkpoint(fresh bool) ! {
+	if fresh { retain_installed()! }
+	C.sync()
+	println(if fresh {
+		'SOFTWARE GRAPHICAL INSTALLED BOOT 1 acquired pointer-saved cold-boot checkpoint PASS'
+	} else {
+		'SOFTWARE GRAPHICAL INSTALLED BOOT 2 retained Counter reopened and pointer-saved PASS'
+	})
 }
 
 fn main() {
@@ -332,6 +361,10 @@ fn main() {
 	fd := C.open(console.str, C.O_WRONLY)
 	if fd >= 0 { C.dup2(fd, 1); C.dup2(fd, 2); if fd > 2 { C.close(fd) } }
 	println('SOFTWARE GRAPHICAL START')
+	if os.args[0] == '/usr/libexec/vinix-version-check' {
+		observe_production_init() or { eprintln('SOFTWARE GRAPHICAL FAIL: ' + err.msg()); exit(1) }
+		return
+	}
 	run() or { eprintln('SOFTWARE GRAPHICAL FAIL: ' + err.msg()) }
 	println('SOFTWARE GRAPHICAL requesting guest poweroff uid=' + os.geteuid().str())
 	result := C.reboot(0x4321fedc)

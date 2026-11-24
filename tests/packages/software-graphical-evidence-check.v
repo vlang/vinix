@@ -43,7 +43,8 @@ fn call(program string, args []string) Control {
 
 fn copied_config(platform string) bool {
 	return platform in ['qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots',
-		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots']
+		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots',
+		'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots']
 }
 
 fn clone_run(original string, work string, receipt Receipt) ! {
@@ -64,6 +65,12 @@ fn clone_run(original string, work string, receipt Receipt) ! {
 			paths[key] = os.real_path(target)
 		} else {
 			os.symlink(path, target)!
+		}
+	}
+	if receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots' {
+		for applet in ['sh', 'mkdir', 'chmod', 'rm', 'ln', 'sleep', 'kill', 'mount', 'cat', 'sync', 'zsh'] {
+			path := '/rootfs/bin/' + applet
+			os.symlink(os.readlink(original + path)!, work + path)!
 		}
 	}
 	if copied_config(receipt.platform) {
@@ -140,7 +147,8 @@ fn check() ! {
 	receipt := json2.decode[Receipt](os.read_file(original + '/qualification.json')!)!
 	installed := receipt.platform.ends_with('installed-root-two-boots')
 	release_routing := receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
-	refresh := receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
+	production := receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
+	refresh := production || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
 	first_run := refresh || release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 	base := [original, build, os.abs_path(os.args[4]), os.abs_path(os.args[5]), proof + '/baseline',
 		os.args[7]]
@@ -170,6 +178,10 @@ fn check() ! {
 	if refresh {
 		names << ['missing-refresh-screen', 'missing-refresh-cold-marker', 'missing-refresh-approval',
 			'refresh-approval-order', 'reboot-repeated-refresh']
+	}
+	if production {
+		names << ['missing-production-registration-shot', 'missing-production-greeter', 'repeated-production-registration',
+			'reordered-production-login', 'direct-observer-poweroff', 'production-stage-mismatch', 'production-network-enabled']
 	}
 	if release_routing {
 		names << ['missing-release-routing-desktop-shot', 'missing-release-routing-extra-shot',
@@ -215,6 +227,49 @@ fn check() ! {
 		args[4] = work + '/retained'
 		mut reason := ''
 		match name {
+			'missing-production-registration-shot' {
+				os.rm(work + '/production-01-registration.png')!
+				reason = 'exact required screenshot set'
+			}
+			'missing-production-greeter', 'repeated-production-registration', 'reordered-production-login', 'direct-observer-poweroff' {
+				key := if name == 'repeated-production-registration' { 'serial-2' } else { 'serial' }
+				registration := 'SOFTWARE GRAPHICAL PRODUCTION root registration READY'
+				greeter := 'SOFTWARE GRAPHICAL PRODUCTION ordinary greeter uid=101 READY'
+				mut lines := os.read_file(receipt.artifact_paths[key])!.split_into_lines()
+				match name {
+					'missing-production-greeter' {
+						lines = lines.filter(it.trim_right('\r') != greeter)
+						reason = 'missing or duplicated exact marker'
+					}
+					'repeated-production-registration' {
+						lines << registration
+						reason = 'production registration repeated on boot 2'
+					}
+					'reordered-production-login' {
+						lines = lines.filter(it.trim_right('\r') != greeter)
+						lines << greeter
+						reason = 'production login markers are out of order'
+					}
+					else {
+						lines << 'SOFTWARE GRAPHICAL requesting guest poweroff uid=0'
+						reason = 'production shutdown must use the desktop power action'
+					}
+				}
+				replace_artifact(work, receipt, key, lines.join('\n') + '\n')!
+			}
+			'production-stage-mismatch' {
+				mut artifacts := receipt.artifacts.clone()
+				artifacts['production-stage/sbin/init'] = '0'.repeat(64)
+				save_receipt(work, receipt, artifacts, receipt.artifact_paths)!
+				reason = 'production stage and installed input do not match: /sbin/init'
+			}
+			'production-network-enabled' {
+				key := 'qemu-arguments'
+				mut arguments := json2.decode[[]string](os.read_file(receipt.artifact_paths[key])!)!
+				arguments[arguments.index('-nic') + 1] = 'user'
+				replace_artifact(work, receipt, key, json2.encode(arguments) + '\n')!
+				reason = 'production graphical run does not disable QEMU networking'
+			}
 			'missing-refresh-screen' {
 				os.rm(work + '/first-run-refresh-01-catalog.png')!
 				reason = 'exact required screenshot set'

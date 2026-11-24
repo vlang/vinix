@@ -65,6 +65,15 @@ fn installed_root() !bool {
 	}
 	proof := json2.decode[map[string]string](os.read_file('/usr/share/software-graphical-installed.json')!)!
 	for path, digest in proof {
+		if path.starts_with('@link:') {
+			link := path.all_after('@link:')
+			info := os.lstat(link)!
+			if info.dev != root.dev || info.uid != 0 || info.gid != 0 ||
+				info.mode & 0o170000 != 0o120000 || os.readlink(link)! != digest {
+				return error('installed root alias differs: ' + link)
+			}
+			continue
+		}
 		info := os.lstat(path)!
 		if info.dev != root.dev || info.mode & 0o170000 != 0o100000 || info.uid != 0 || info.mode & 0o022 != 0 ||
 			(observed_file(path)!).sha256 != digest {
