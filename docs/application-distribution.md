@@ -1985,6 +1985,15 @@ with the same ID/key, then `update`. Expiry and sequence checks still apply;
 publishers must plan suitable expiry for offline use. Indexes may advertise apps
 outside the exported closure; those requests report missing payloads.
 
+In Software, choose **Go offline**, then **Refresh** to authenticate a signed
+local or bundled catalog. An image can ship a bundle for its configured HTTPS
+publisher. Use **Deployment** to review the release application file, then
+confirm and approve its installation. Keep the window in offline mode while
+reviewing and applying the deployment so both operations use the same source
+policy. **Use policy** returns the window to the configured repository policy.
+This choice applies to the current Software window. Organization policy still
+applies, including any requirement to work offline.
+
 Software's **Export offline** action exports the selected catalog package,
 all explicitly installed application roots, or an organization deployment lock,
 with their dependencies. The catalog scopes

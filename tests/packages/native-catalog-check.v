@@ -215,7 +215,7 @@ fn stage_native_inputs(inputs string, root string) ![]NativeArtifact {
 	return artifacts
 }
 
-fn stage_native_image(host hwhost.Host, inputs string, root string, work string) ![]NativeArtifact {
+fn stage_native_image(host hwhost.Host, inputs string, root string, work string, bundled_https bool) ![]NativeArtifact {
 	// Verify and capture the builder's exact inputs before using them to create
 	// complete signed release exports. The signing seed stays outside the image.
 	verified := work + '/verified-inputs'
@@ -232,9 +232,10 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 		pkgcore.publish_release(workspace, 'native', publisher + '/seed', u64(i + 1), time.now().unix() + 3600, destination)!
 	}
 	configuration := publisher + '/image-config.json'
+	url := if bundled_https { 'https://packages.example.invalid/release' } else { 'file://' + pkgcore.image_repositories_path + '/native' }
 	os.write_file(configuration, json2.encode(pkgcore.Config{ architecture: host.arch, launch_user: 'alex',
-		policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 },
-		repositories: [pkgcore.Repository{ id: 'native', url: 'file://' + pkgcore.image_repositories_path + '/native', public_key: key }] }) + '\n')!
+		policy: pkgcore.Policy{ offline: !bundled_https, reserve_bytes: 0 },
+		repositories: [pkgcore.Repository{ id: 'native', url: url, public_key: key }] }) + '\n')!
 	stage := work + '/package-stage'
 	applications := publisher + '/image-applications.json'
 	os.write_file(applications, json2.encode(NativeImageApplications{ architecture: host.arch,
@@ -264,12 +265,14 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string)
 
 fn check() !int {
 	profiles := '--profiles' in os.args
+	bundled_https := '--software-bundled-https' in os.args
 	installed := '--installed' in os.args
 	persistent := '--persistent' in os.args || installed
-	software := '--software' in os.args || persistent
+	software := '--software' in os.args || bundled_https || persistent
 	image := '--image' in os.args || software || profiles
-	arguments := os.args[1..].filter(it !in ['--image', '--software', '--persistent', '--installed', '--profiles'])
+	arguments := os.args[1..].filter(it !in ['--image', '--software', '--software-bundled-https', '--persistent', '--installed', '--profiles'])
 	if profiles && software { return error('--profiles selects the native image scenario; run Software scenarios separately') }
+	if bundled_https && persistent { return error('--software-bundled-https selects the single-boot Software scenario') }
 	options := hwhost.parse_options(arguments)!
 	if options.help || options.list { return hwhost.run_suite(if installed { installed_software_suite('', '') }
 		else if persistent { persistent_software_suite('', '') } else { native_suite('', image, software) }, arguments, @FILE) }
@@ -320,7 +323,13 @@ fn check() !int {
 		artifacts << native_artifact('image/usr/share/package-fixtures/ffmpeg.tar.xz', path)!
 		artifacts << native_artifact('image/usr/share/package-fixtures/profile-exports', root + '/usr/share/package-fixtures/profile-exports')!
 	}
-	artifacts << if image { stage_native_image(host, inputs, root, work)! } else { stage_native_inputs(inputs, root)! }
+	artifacts << if image { stage_native_image(host, inputs, root, work, bundled_https)! } else { stage_native_inputs(inputs, root)! }
+	if bundled_https {
+		marker := 'usr/share/package-fixtures/bundled-https'
+		os.write_file(root + '/' + marker, '')!
+		os.write_file(root + '/etc/hwtest-echo', '')!
+		artifacts << native_artifact('image/' + marker, root + '/' + marker)!
+	}
 	if software {
 		artifacts << stage_software_image(host, root, work)!
 		artifacts << native_artifact('image/usr/sbin/vinix-authd', root + '/usr/sbin/vinix-authd')!
@@ -330,7 +339,10 @@ fn check() !int {
 		artifacts << native_artifact(path, root + '/' + path)!
 	}
 	scenario := if installed { installed_software_suite(sandbox, disk).scenarios[0] }
-		else if persistent { persistent_software_suite(sandbox, disk).scenarios[0] } else { selection.run[0] }
+		else if persistent { persistent_software_suite(sandbox, disk).scenarios[0] } else if bundled_https {
+			hwhost.Scenario{ ...selection.run[0], required: [...selection.run[0].required,
+				'SOFTWARE IMAGE selected offline mode and installed the bundled HTTPS catalog with separate approval PASS'] }
+		} else { selection.run[0] }
 	outcome := hwhost.run_scenario(host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
 		state: work + '/native', timeout: if options.timeout > scenario.timeout { options.timeout } else { scenario.timeout }, keep: true })
 	println(hwhost.report(options.arch, outcome))

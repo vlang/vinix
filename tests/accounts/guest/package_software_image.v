@@ -14,7 +14,10 @@ fn qualify_package_software_image(mut t Test) ! {
 	configuration := os.read_file('/etc/vinix-packages/config.json')!
 	assert os.ls('/var/lib/vinix-packages')!.len == 0
 	config := pkgcore.load_config('')!
-	assert config.repositories.len == 1 && config.repositories[0].url == 'file://' + pkgcore.image_repositories_path + '/native'
+	bundled_https := os.exists('/usr/share/package-fixtures/bundled-https')
+	bundle := pkgcore.image_repositories_path + '/native'
+	assert config.repositories.len == 1 && config.policy.offline == !bundled_https
+	assert config.repositories[0].url == if bundled_https { 'https://packages.example.invalid/release' } else { 'file://' + bundle }
 	assert os.is_file(pkgcore.image_repositories_path + '/native/index.json') && !os.is_link(pkgcore.image_repositories_path)
 	image_repository_assertions(mut t)!
 	installed := run(['/usr/share/package-fixtures/software-image', 'install'], '', db, alex)
@@ -26,12 +29,14 @@ fn qualify_package_software_image(mut t Test) ! {
 	standard := run(['/usr/share/package-fixtures/software-image', 'standard'], '', db, sam)
 	assert standard.status == 0, standard.output
 	t.say(standard.output)
-	os.rename(pkgcore.image_repositories_path + '/native', pkgcore.image_repositories_path + '/native-initial')!
-	os.symlink('/usr/share/native-catalog/releases/1.1.0', pkgcore.image_repositories_path + '/native')!
+	os.rename(bundle, bundle + '-initial')!
+	update := '/usr/share/native-catalog/releases/1.1.0'
+	if bundled_https { os.rename(update, bundle)! } else { os.symlink(update, bundle)! }
 	updated := run(['/usr/share/package-fixtures/software-image', 'updates'], '', db, alex)
 	assert updated.status == 0, updated.output
 	t.say(updated.output)
-	os.rename('/usr/share/native-catalog/releases/1.1.0/objects', '/tmp/hidden-native-objects')!
+	objects := (if bundled_https { bundle } else { update }) + '/objects'
+	os.rename(objects, '/tmp/hidden-native-objects')!
 	reinstalled := run(['/usr/share/package-fixtures/software-image', 'reinstall'], '', db, alex)
 	assert reinstalled.status == 0, reinstalled.output
 	t.say(reinstalled.output)

@@ -143,6 +143,7 @@ mut:
 	launch_label    string = 'Launch'
 	service_path    string = '/usr/bin/vinix-package'
 	offline         bool
+	offline_requested bool
 	repository_mode bool
 	repository_status pkgprotocol.RepositoryConfiguration
 	repository_selected int = -1
@@ -285,10 +286,14 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.policy_worker = .none
 	a.cleanup_worker = .none
 	a.worker = os.new_process(a.service_path.clone())
-	mut owned := []string{cap: arguments.len + 1}
+	mut owned := []string{cap: arguments.len + 3}
 	authorized := a.administration_required && pkgadmin.administrative(arguments)
 	if authorized { owned << 'admin'.clone() }
 	if software_progress_command(arguments) { owned << '--progress'.clone() }
+	if a.offline_requested && arguments.len > 0
+		&& arguments[0] !in ['run', 'run-args', 'run-window', 'run-terminal', 'run-terminal-args']! {
+		owned << '--offline'.clone()
+	}
 	for argument in arguments { owned << argument.clone() }
 	a.worker.set_args(owned)
 	if a.worker_health { a.worker.set_redirect_stdio() } else { a.worker.set_redirect_stdio_merged() }
@@ -1026,6 +1031,17 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 			a.filter_rows()
 			if a.update_error.len > 0 { a.set_update_status() }
 		}
+		'software.offline' {
+			if !a.catalog_browsable() { return }
+			a.offline_requested = !a.offline_requested
+			a.focus = false
+			a.select_all = false
+			a.set_status(if a.offline_requested {
+				'Working offline in Software. Refresh to read signed catalogs from bundled or local repositories.'
+			} else {
+				'Software will use the configured repository policy.'
+			})
+		}
 		'software.refresh' {
 			a.clear_review()
 			a.start(['update'], false)
@@ -1357,6 +1373,9 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		children << software_button('software.updates', 'Updates', 210, 46, 90)
 		children << software_button('software.reload', 'Reload', 308, 46, 90)
 		children << software_button('software.repositories', 'Repositories', 406, 46, 142)
+		if a.catalog_browsable() {
+			children << a.offline_button(556, 46, 70)
+		}
 	}
 	for slot in 0 .. a.page_rows {
 		if reviewing {

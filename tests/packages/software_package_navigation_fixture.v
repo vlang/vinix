@@ -5,6 +5,7 @@ import json2
 import os
 import time
 import ui2
+import tools.packages.pkgadmin
 import tools.packages.pkgprotocol
 import desktop.packagecore
 
@@ -208,6 +209,27 @@ fn package_navigation_review(operation string, names []string) pkgprotocol.Revie
 fn software_package_navigation_service_fixture(args []string) !bool {
 	mode := os.getenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION')
 	if mode == '' || args.len < 2 { return false }
+	if mode == 'offline' {
+		path := os.getenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION_RECEIPT') + '.release'
+		if args[1] == 'admin' {
+			pkgadmin.validate_arguments(args[2..])!
+			refresh := args[2..] == ['--progress', '--offline', 'update']
+			assert refresh || args[2..] == ['--progress', '--offline', 'deployment-apply', 'c'.repeat(64), path]
+			mut approved := [2]u8{}
+			for i in 0 .. approved.len { assert C.read(0, &approved[i], 1) == 1 }
+			assert approved == [u8(`!`), `\n`]!
+			if !refresh { os.write_file(os.getenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION_RECEIPT'), json2.encode(args[2..]))! }
+			println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete' }))
+		} else if args[1..] == ['--offline', 'deployment-review', path] {
+			println(json2.encode(fixture_review('deploy', ['editor'])))
+		} else if args[1..] == ['run', 'editor'] {
+			println('Fixture application ran with its usual launch arguments.')
+		} else {
+			assert args[1..] in [['--offline', 'view'], ['view']]
+			println(json2.encode(SoftwareView{ format: 1, architecture: 'aarch64', offline: args[1] == '--offline' }))
+		}
+		return true
+	}
 	if mode.starts_with('review-') && args[1] == 'review' {
 		assert args[2] in package_navigation_operations
 		text := json2.encode(package_navigation_review(args[2], args[3..]))
@@ -282,6 +304,64 @@ fn check_package_navigation_paste_guard(mut app SoftwareApp) {
 		assert app.scroll == scroll && app.selected == row && app.status == status && app.output.len == output_length
 		assert if pid == 0 { app.worker == unsafe { nil } } else { app.worker != unsafe { nil } && app.worker.pid == pid && C.kill(pid, 0) == 0 }
 	}
+}
+
+fn check_software_offline_navigation(receipt string) ! {
+	path := receipt + '.release'
+	os.write_file(path, '{}')!
+	defer { os.rm(path) or {}; os.rm(receipt) or {} }
+	os.setenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION', 'offline', true)
+	defer { os.unsetenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION') }
+	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
+		release_deployment_path: path.clone(), output: []u8{cap: 8192} }
+	defer { app.close_app() }
+	for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 180, 220)]! {
+		tree := app.build(size)!
+		assert tree.children.any(it.id == 'software.refresh')
+		assert tree.children.any(it.id == 'software.offline' && it.text == 'Go offline')
+		free_window_tree(tree)
+	}
+	app.handle('software.offline')!
+	assert app.offline_requested && app.worker == unsafe { nil }
+	compact := app.build(ui2.rect(0, 0, 180, 220))!
+	assert compact.children.any(it.id == 'software.offline' && it.text == 'Use policy')
+	free_window_tree(compact)
+	app.handle('software.refresh')!
+	assert app.admin_prompt && app.worker.args == ['admin', '--progress', '--offline', 'update']
+	app.handle('software.offline')!
+	assert app.offline_requested && app.admin_prompt
+	app.admin_paste_input('!')
+	app.handle('software.admin.approve')!
+	wait_for_software(mut app)
+	assert app.offline && app.offline_requested && app.status.contains('Offline mode')
+	assert !os.exists(receipt) && !app.admin_prompt
+
+	app.handle('software.deployment')!
+	app.handle('software.deployment.release')!
+	assert app.worker.args == ['--offline', 'deployment-review', path] && !app.admin_prompt
+	wait_for_software(mut app)
+	assert app.review_ready && !os.exists(receipt)
+	app.handle('software.offline')!
+	assert app.offline_requested && app.review_ready && !app.admin_prompt
+	app.handle('software.confirm')!
+	assert app.admin_prompt && !os.exists(receipt)
+	assert app.worker.args == ['admin', '--progress', '--offline', 'deployment-apply', 'c'.repeat(64), path]
+	app.admin_paste_input('!')
+	app.handle('software.admin.approve')!
+	wait_for_software(mut app)
+	assert os.exists(receipt) && app.offline && app.offline_requested && !app.deployment_mode
+
+	seed_package_navigation_catalog(mut app)
+	app.handle('software.run')!
+	assert app.worker.args == ['run', 'editor'] && !app.admin_prompt
+	wait_for_software(mut app)
+	assert app.status.contains('usual launch arguments')
+	app.handle('software.offline')!
+	app.handle('software.reload')!
+	assert !app.offline_requested && app.worker.args == ['view']
+	wait_for_software(mut app)
+	assert !app.offline
+	println('Software offline mode: wide/compact controls, approved offline refresh, frozen release review/apply, normal launch and policy return passed')
 }
 
 fn check_software_package_navigation() ! {
@@ -386,6 +466,7 @@ fn check_software_package_navigation() ! {
 		assert !other.package_screen_active() && !other.package_review_running()
 	}
 	assert app.query.bytestr() == 'Editor' && app.filter == 1
+	check_software_offline_navigation(receipt)!
 	println('Software package navigation: all five operations, partial and complete-before-exit Stop/Cancel/Escape, fresh retry, frozen catalog state, compact review/details/status/progress/failures, protected apply/refresh and reload passed')
 }
 
@@ -405,7 +486,9 @@ fn check_software_package_navigation_memory() ! {
 		for warmup in 0 .. 2 {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
+				app.handle('software.offline')!
 				free_window_tree(app.build(ui2.rect(0, 0, 640, 610))!); free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+				app.handle('software.offline')!
 				for index, text in texts {
 					operation := package_navigation_operations[index]
 					app.review = operation.clone()

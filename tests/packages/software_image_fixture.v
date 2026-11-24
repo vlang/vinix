@@ -191,7 +191,8 @@ fn image_release_audit(mut app SoftwareApp, phase string, version string) ! {
 	assert app.release_deployment_available
 	image_compact_deployment_action(mut app, 'software.deployment.release-audit')!
 	assert app.worker_audit && !app.admin_prompt && app.review == ''
-	assert app.worker.args == ['--json', 'deployment-audit', pkgprotocol.image_applications_path]
+	arguments := ['--json', 'deployment-audit', pkgprotocol.image_applications_path]
+	assert app.worker.args == if app.offline_requested { ['--offline', ...arguments] } else { arguments }
 	image_wait(mut app)!
 	assert app.audit_ready && app.audit_snapshot.rows.len == 3 && !app.worker_failed, app.status
 	assert app.audit_snapshot.matches == (version == '1.0.0')
@@ -263,10 +264,19 @@ fn image_run() ! {
 	image_wait(mut app)!
 	assert app.launch_label == 'Launch' // the root image's launch_user cannot change this identity
 	phase := os.args[1]
+	bundled_https := os.exists('/usr/share/package-fixtures/bundled-https')
+	if bundled_https {
+		assert !app.offline && !app.offline_requested
+		compact := ui2.rect(0, 0, 320, 240)
+		image_control_at(mut app, 'software.offline', compact)!
+		assert app.offline_requested && app.worker == unsafe { nil }
+	}
 	if phase.starts_with('cold-') {
 		image_cold_maintenance(mut app, phase, password)!
 	} else if phase == 'install' {
-		image_control(mut app, 'software.refresh')!
+		if bundled_https {
+			image_control_at(mut app, 'software.refresh', ui2.rect(0, 0, 320, 240))!
+		} else { image_control(mut app, 'software.refresh')! }
 		image_control(mut app, 'software.admin.cancel')!
 		assert app.worker == unsafe { nil } && app.status.contains('cancelled')
 		image_control(mut app, 'software.refresh')!
@@ -286,6 +296,9 @@ fn image_run() ! {
 		image_control(mut app, 'software.confirm')!
 		assert image_approve(mut app, password)!
 		assert app.rows.all(it.installed_version == '1.0.0') && !app.worker_failed
+		if bundled_https {
+			println('SOFTWARE IMAGE selected offline mode and installed the bundled HTTPS catalog with separate approval PASS')
+		}
 		println('SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS')
 		image_release_audit(mut app, 'initial-installed', '1.0.0')!
 		println('SOFTWARE IMAGE compact-deployment 320x240 keyboard paging visible release review and audit separate approval PASS')

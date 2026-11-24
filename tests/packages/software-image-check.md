@@ -97,3 +97,23 @@ CLI image scenario; the default retains the explicit-enrollment native scenario.
 - [AArch64 receipt](results/2026-10-16/software-image-aarch64.json), [serial](results/2026-10-16/software-image-aarch64.serial.txt), [QMP](results/2026-10-16/software-image-aarch64.qmp.txt)
 - [x86-64 receipt](results/2026-10-16/software-image-x86_64.json), [serial](results/2026-10-16/software-image-x86_64.serial.txt), [QMP](results/2026-10-16/software-image-x86_64.qmp.txt)
 - [Host checks](results/2026-10-16/software-image-host.txt), [source/toolchain/artifact ledger](results/2026-10-16/software-image-toolchain.json), [guest invocation](results/2026-10-16/software-image-guest.v)
+
+## Offline mode with a bundled HTTPS publisher
+
+Use `--software-bundled-https` in place of `--software` in the single-boot
+runner above. It stages the signed Native SDK catalog for an HTTPS publisher
+with a reserved fixture hostname and a policy that permits online operation.
+Set `VFLAGS='-nocache -enable-globals'` for the current account tools. If the
+staged UI module uses V's FontStash binding, include the compiler tree's
+`thirdparty/fontstash` directory in the cross compiler's header search path.
+
+The ordinary account selects **Go offline** in the compact catalog, then
+refreshes, reviews and approves the release through the real Software
+controller and authentication service. The guest verifies the signed package
+state, replaces the bundled baseline with a newer signed release and exercises
+offline upgrade, rollback and cached reinstall. It checks that the staged
+configuration bytes and account permissions survive the workflow.
+
+The host navigation fixture checks both catalog layouts, the exact offline
+option before and after administrator authorization, frozen deployment
+arguments, normal application launch and return to the configured policy.

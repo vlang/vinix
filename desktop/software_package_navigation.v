@@ -7,6 +7,10 @@ fn (a &SoftwareApp) catalog_browsable() bool {
 	return a.package_screen_active() && a.worker == unsafe { nil } && a.review == '' && a.launch_request == ''
 }
 
+fn (a &SoftwareApp) offline_button(x int, y int, width int) ui2.Element {
+	return software_button('software.offline', if a.offline_requested { 'Use policy' } else { 'Go offline' }, x, y, width)
+}
+
 fn (mut a SoftwareApp) keep_catalog_selection_visible() {
 	position := a.matching.index(a.selected)
 	if position < 0 { return }
@@ -175,16 +179,21 @@ fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
 	readable := a.package_review_readable() && !a.details_mode
 	browsable := a.catalog_browsable() && !a.details_mode
+	compact_controls := browsable && width >= 180 && height >= 220
 	launchable := browsable && a.launch_options_available() && width >= 180 && height >= 220
 	children << software_label('Software', 14, 8, if a.status_readable() && width >= 180 { 60 } else { width - 28 }, 28, false)
 	if a.status_readable() && width >= 180 { children << software_button('software.status', 'Read status', width - 104, 8, 90) }
 	button_width := if width > 202 { 174 } else { width - 28 }
+	half_width := (width - 40) / 2
 	if a.details_mode {
 		children << software_button('software.details.back', if a.review != '' { 'Back to review' } else { 'Back to catalog' }, 14, 46, button_width)
 	} else if a.package_review_running() {
 		children << software_button('software.review.stop', 'Stop review', 14, 46, button_width)
 	} else if a.verification_running() {
 		children << software_button('software.verify.stop', 'Stop verifying', 14, 46, button_width)
+	} else if compact_controls {
+		children << software_button('software.reload', 'Reload', 14, 46, half_width)
+		children << software_button('software.refresh', 'Refresh', width - 14 - half_width, 46, half_width)
 	} else if a.worker == unsafe { nil } {
 		children << software_button(if a.review != '' { 'software.cancel' } else { 'software.reload' },
 			if a.review != '' { 'Cancel review' } else { 'Reload catalog' }, 14, 46, button_width)
@@ -197,14 +206,13 @@ fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
 		next_y += 38
 	}
 	if browsable {
-		paired := launchable && width >= 320
-		browse_width := if paired { (width - 40) / 2 } else { button_width }
-		children << software_button('software.catalog.browse', 'Browse catalog', 14, next_y, browse_width)
-		if paired {
-			children << software_button('software.run-options', 'Launch options', width - 14 - browse_width, next_y, browse_width)
+		children << software_button('software.catalog.browse', if width < 220 && compact_controls { 'Browse' } else { 'Browse catalog' },
+			14, next_y, if compact_controls { half_width } else { button_width })
+		if compact_controls {
+			children << a.offline_button(width - 14 - half_width, next_y, half_width)
 		}
 		next_y += 38
-		if launchable && !paired {
+		if launchable {
 			children << software_button('software.run-options', 'Launch options', 14, next_y, button_width)
 			next_y += 38
 		}
