@@ -718,12 +718,30 @@ and lowercase object digests follow the existing signed repository layout.
 Initramfs hard links must name earlier regular files outside the protected
 package paths. The verifier refuses archive entries under symbolic-link parents.
 
-To require an independently reviewed selection, build the host helper and
-generate one plan per target with the candidate package input environment.
+Build the local verification helper with V:
 
 ```sh
 v -backend c -prod -cc cc -path '@vlib|@vmodules|.|build-support|tools/accounts' \
     -o /tmp/vinix-package-receipt build-support/isoboot/package-receipt.v
+```
+
+Downloaders can repeat package verification with the ISO and its published
+receipt. First compare both files with the release's trusted `SHA256SUMS`.
+Then run the host helper against the two local files:
+
+```sh
+/tmp/vinix-package-receipt verify-receipt vinix-arm64.iso vinix-packages-arm64.json
+```
+
+The helper checks the captured ISO's digest before extracting it. It then
+checks the embedded configuration, signed indexes and payloads, reviewed
+HTTPS origins, and application declaration offline. Successful verification
+prints the resulting receipt. Bundled signed indexes must still be current.
+
+To require an independently reviewed selection, generate one plan per target
+with the candidate package input environment.
+
+```sh
 mkdir reviewed-package-plans
 /tmp/vinix-package-receipt plan x86_64 > reviewed-package-plans/amd64.json
 /tmp/vinix-package-receipt plan aarch64 > reviewed-package-plans/arm64.json

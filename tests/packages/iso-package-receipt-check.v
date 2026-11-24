@@ -288,6 +288,46 @@ fn check_origin_notes(tool string, receipt string, work string, arch string, id 
 	os.write_file(work + '/origin-url-refusal.log', output_url)!
 }
 
+fn check_published_receipt(tool string, iso string, receipt string, work string, origin string) ! {
+	original := os.read_file(receipt)!
+	code, output := command([tool, 'verify-receipt', iso, receipt])
+	os.write_file(work + '/published-verifier.log', output)!
+	if code != 0 || output != original { return error('published receipt did not reproduce: ' + output) }
+
+	changed := work + '/changed-receipt.json'
+	mut fields := json2.decode[json2.Any](original)!.as_map()
+	for key, diagnostic in {
+		'iso_sha256': 'ISO SHA-256 differs from the package receipt'
+		'configuration_sha256': 'ISO package configuration differs from the preflight selection'
+		'deployment_sha256': 'ISO application declaration differs from the preflight selection'
+	} {
+		actual := fields[key]!
+		fields[key] = json2.Any('0'.repeat(64))
+		os.write_file(changed, json2.encode(fields))!
+		refused, reason := command([tool, 'verify-receipt', iso, changed])
+		os.write_file(work + '/published-' + key + '-refusal.log', reason)!
+		if refused == 0 || !reason.contains(diagnostic) {
+			return error('published receipt accepted a different ${key}: ' + reason)
+		}
+		fields[key] = actual
+	}
+	if origin != '' {
+		os.write_file(changed, original.replace(origin, origin + 'changed'))!
+		refused, reason := command([tool, 'verify-receipt', iso, changed])
+		os.write_file(work + '/published-origin-refusal.log', reason)!
+		if refused == 0 || !reason.contains('ISO package URL differs from the reviewed HTTPS origin') {
+			return error('published receipt accepted a different reviewed origin: ' + reason)
+		}
+	}
+	fields['format'] = json2.Any(2)
+	os.write_file(changed, json2.encode(fields))!
+	refused, reason := command([tool, 'verify-receipt', iso, changed])
+	os.write_file(work + '/published-format-refusal.log', reason)!
+	if refused == 0 || !reason.contains('invalid ISO package receipt') {
+		return error('unsupported published receipt format was accepted: ' + reason)
+	}
+}
+
 fn run() ! {
 	if os.args.len == 4 && os.args[1] in ['fixture', 'hosted-fixture']! {
 		return prepare_fixture(os.args[2], os.abs_path(os.args[3]), os.args[1] == 'hosted-fixture')
@@ -444,6 +484,7 @@ fn run() ! {
 			}
 			if scenario == 'match' {
 				check_origin_notes(tool, receipt, work, arch, publisher['id']!.str(), origin)!
+				check_published_receipt(tool, iso, receipt, work, origin)!
 			}
 		} else if code == 0 || !output.contains(diagnostic) {
 			return error('unexpected ISO verification outcome for ${scenario}: ${output}')

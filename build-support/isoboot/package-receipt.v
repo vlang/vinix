@@ -205,8 +205,11 @@ fn capture_package_members(archive string, root string, expected Selection) ! {
 	}
 }
 
-fn check_iso(iso string, work string, expected Selection) !Receipt {
+fn check_iso(iso string, work string, expected Selection, expected_sha256 string) !Receipt {
 	before := pkgcore.hash_file(iso)!
+	if expected_sha256 != '' && before != expected_sha256 {
+		return error('ISO SHA-256 differs from the package receipt')
+	}
 	archive := work + '/initramfs.tar.gz'
 	mut extract := os.new_process(os.find_abs_path_of_executable('xorriso')!)
 	defer { extract.close() }
@@ -344,14 +347,28 @@ fn run() ! {
 		println(json2.encode(package_selection(input, arch, map[string]string{})!))
 		return
 	}
-	if os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged']! {
-		return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | checksums RECEIPT.json | origins RECEIPT.json SHA256')
+	if os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']! {
+		return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }
+	if os.args[1] == 'verify-receipt' {
+		receipt := json2.decode[Receipt](os.read_file(os.args[3])!)!
+		receipt_architecture(receipt)!
+		expected := Selection{
+			architecture: receipt.architecture
+			configuration_sha256: receipt.configuration_sha256
+			deployment_sha256: receipt.deployment_sha256
+			applications: receipt.applications
+			publishers: receipt.publishers
+		}
+		iso := receipt_image(os.args[2], work, false)!
+		println(json2.encode(check_iso(iso, work, expected, receipt.iso_sha256)!))
+		return
+	}
 	expected := json2.decode[Selection](os.read_file(os.args[3])!)!
 	iso := receipt_image(os.args[2], work, os.args[1] == 'verify-staged')!
-	println(json2.encode(check_iso(iso, work, expected)!))
+	println(json2.encode(check_iso(iso, work, expected, '')!))
 }
 
 fn main() {
