@@ -26,3 +26,23 @@ v -prod -enable-globals -path '@vlib|@vmodules|.|tools/accounts' \
 /tmp/release-origin-readback-check /tmp/vinix-package /tmp/https-fixture \
   NEW_WORK [MIXED_RELEASE PUBLIC_KEY_HEX]
 ```
+
+## Qualification
+
+At `e4d3b2840`, the production and ASan/UBSan builds passed the small positive
+case and eleven refusal controls. ASan/UBSan instrumented the package CLI with
+leak detection disabled. The production build also matched all 2,158 distinct
+objects across 20 signed package variants in the mixed catalog. Its log shows
+2,162 requests for the mixed export, including both pairs of metadata reads.
+The existing release, image repository and HTTPS transport checks passed, and
+the production stager built static tools for AArch64 and x86-64.
+
+The qualification used real signed exports and a loopback TLS origin with a
+disposable publisher. Public hosting and production publisher enrollment
+remain release gates.
+
+The signed inputs, source, executables, command and request logs, and target
+builds are archived in
+`~/.local/state/vinix/r14-origin-readback-JnPfFi/qualification.tar.gz`.
+Its SHA-256 is `75196b4cffe966b7cd29fa6b4bb38cd647943f17ff2354f702802a3c9e751d11`.
+All 4,507 entries in `bundle.sha256` matched after independent extraction.
