@@ -5,6 +5,7 @@ import crypto.sha256
 import hwhost
 import json2
 import os
+import plainiso
 import time
 import tools.packages.pkgcore
 import tools.packages.pkgprotocol
@@ -141,6 +142,7 @@ fn installed_software_suite(sandbox string, disk string) hwhost.Suite {
 				'PACKAGE INSTALLED BOOT 3 retained upgrade rollback uninstall cached reinstall PASS',
 				'PACKAGE INSTALLED BOOT 4 retained reinstall tools provenance registration private data PASS',
 				'PACKAGE INSTALLED RELEASE exact declaration disk identity mode digest PASS',
+				'PACKAGE INSTALLED RELEASE additive approval kept existing roots and private data PASS',
 				'SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS',
 				...release_audit_markers()],
 			forbidden: forbidden,
@@ -152,7 +154,8 @@ fn stage_installed_proof(root string, guest string) !NativeArtifact {
 	mut files := [native_artifact('/sbin/init', guest)!]
 	for path in ['/usr/bin/vinix-package', '/usr/bin/vinix-sandbox', '/usr/sbin/vinix-account', '/usr/sbin/vinix-authd',
 		'/usr/sbin/vinix-session', '/usr/share/package-fixtures/software-image',
-		'/usr/share/vinix/actions/packages-change', '/usr/share/vinix/actions/packages-launch', pkgprotocol.image_applications_path]! {
+		'/usr/share/vinix/actions/packages-change', '/usr/share/vinix/actions/packages-launch',
+		pkgprotocol.image_applications_path, '/usr/share/package-fixtures/release-additions.json']! {
 		files << native_artifact(path, root + path)!
 	}
 	path := '/usr/share/package-fixtures/installed-image.json'
@@ -235,7 +238,7 @@ fn stage_field_releases(publisher string, root string, baseline_required bool) !
 }
 
 fn stage_native_image(host hwhost.Host, inputs string, root string, work string, bundled_https bool,
-	targeted_refresh bool, enrollment_refresh bool) ![]NativeArtifact {
+	targeted_refresh bool, enrollment_refresh bool, installed bool) ![]NativeArtifact {
 	// Verify and capture the builder's exact inputs before using them to create
 	// complete signed release exports. The signing seed stays outside the image.
 	verified := work + '/verified-inputs'
@@ -268,6 +271,17 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string,
 		packages: ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello'] }) + '\n')!
 	hwhost.run_tool([host.v, '-nocache', '-no-skip-unused', '-path', '@vlib|@vmodules|' + host.root + '|' + host.root + '/tools/accounts',
 		'-o', stage, host.root + '/tools/packages/stage.v'], {}, work + '/stage-build.log', 300)!
+	if installed {
+		additions := '/usr/share/package-fixtures/release-additions.json'
+		// Export outside the image, then install this separate fixture input.
+		exported := work + '/release-additions.json'
+		hwhost.run_tool([stage, '--arch', host.arch, '--staging', root, '--config', configuration,
+			'--repositories', publisher + '/bundle', '--check', '--require-app', 'org.vinix.counter',
+			'--export-deployment', exported], {}, work + '/stage-additions.log', 300)!
+		os.cp(exported, root + additions)!
+		os.chmod(root + additions, 0o644)!
+		artifacts << native_artifact('image' + additions, root + additions)!
+	}
 	mut arguments := [stage, '--arch', host.arch, '--staging', root, '--config', configuration, '--repositories', publisher + '/bundle', '--applications', applications]
 	compiler := os.getenv('CC_' + host.arch.to_upper())
 	if compiler != '' { arguments << ['--cc', compiler] }
@@ -354,7 +368,11 @@ fn check() !int {
 		artifacts << native_artifact('image/usr/share/package-fixtures/ffmpeg.tar.xz', path)!
 		artifacts << native_artifact('image/usr/share/package-fixtures/profile-exports', root + '/usr/share/package-fixtures/profile-exports')!
 	}
-	artifacts << if image { stage_native_image(host, inputs, root, work, bundled_https, targeted_refresh, enrollment_refresh)! } else { stage_native_inputs(inputs, root)! }
+	artifacts << if image {
+		stage_native_image(host, inputs, root, work, bundled_https, targeted_refresh, enrollment_refresh, installed)!
+	} else {
+		stage_native_inputs(inputs, root)!
+	}
 	if bundled_https {
 		marker := 'usr/share/package-fixtures/bundled-https'
 		os.write_file(root + '/' + marker, '')!
@@ -398,7 +416,12 @@ fn check() !int {
 						'SOFTWARE IMAGE stale selected URL or key refused before metadata fetch or publication PASS']
 				} else { []string{} }] }
 		} else { selection.run[0] }
-	outcome := hwhost.run_scenario(host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
+	boot_host := if installed && host.arch == 'x86_64' {
+		hwhost.Host{ ...host, root: plainiso.prepare(repository, work)! }
+	} else {
+		host
+	}
+	outcome := hwhost.run_scenario(boot_host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
 		state: work + '/native', timeout: if options.timeout > scenario.timeout { options.timeout } else { scenario.timeout }, keep: true })
 	println(hwhost.report(options.arch, outcome))
 	if outcome.interrupted { return 130 }
@@ -416,4 +439,10 @@ fn check() !int {
 	return 0
 }
 
-fn main() { exit(check() or { eprintln(err); 2 }) }
+fn main() {
+	if plainiso.requested() {
+		plainiso.build() or { eprintln(err); exit(1) }
+		return
+	}
+	exit(check() or { eprintln(err); 2 })
+}

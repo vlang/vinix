@@ -140,6 +140,16 @@ fn qualify_package_software_persistence(mut t Test) ! {
 		install_result := run(['/usr/share/package-fixtures/software-image', 'install'], '', db, alex)
 		if install_result.status != 0 { return error('initial Software install failed: ' + install_result.output) }
 		t.say(install_result.output)
+		if installed {
+			approval := 'uid=1000 run packages-change as alex: exit 0'
+			log_start := os.read_file('/var/log/vinix/auth.log')!.count(approval)
+			added := run(['/usr/share/package-fixtures/software-image', 'release-additions'], '', db, alex)
+			if added.status != 0 { return error('additive Software install failed: ' + added.output) }
+			t.say(added.output)
+			log_end := os.read_file('/var/log/vinix/auth.log')!.count(approval)
+			assert log_end == log_start + 2, 'only the removal and approved addition may authorize a change'
+			t.say('PACKAGE INSTALLED RELEASE additive approval kept existing roots and private data PASS')
+		}
 		standard := run(['/usr/share/package-fixtures/software-image', 'standard'], '', db, sam)
 		if standard.status != 0 { return error('standard Software launch failed: ' + standard.output) }
 		t.say(standard.output)

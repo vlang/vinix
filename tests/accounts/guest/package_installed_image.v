@@ -13,7 +13,8 @@ const package_installed_observation = '/root/package-installed-observation.json'
 const package_installed_files = ['/sbin/init', '/usr/bin/vinix-package', '/usr/bin/vinix-sandbox',
 	'/usr/sbin/vinix-account', '/usr/sbin/vinix-authd', '/usr/sbin/vinix-session',
 	'/usr/share/package-fixtures/software-image', '/usr/share/vinix/actions/packages-change',
-	'/usr/share/vinix/actions/packages-launch', pkgprotocol.image_applications_path]
+	'/usr/share/vinix/actions/packages-launch', pkgprotocol.image_applications_path,
+	'/usr/share/package-fixtures/release-additions.json']
 
 fn package_installed_root() !bool {
 	mut root := C.stat{}
@@ -44,7 +45,7 @@ fn package_installed_root() !bool {
 		if u64(bytes.len) != file.bytes || sha256.sum(bytes).hex() != file.sha256 {
 			return error('installed tool differs from its production-staged input: ' + file.role)
 		}
-		if file.role == pkgprotocol.image_applications_path {
+		if file.role in [pkgprotocol.image_applications_path, '/usr/share/package-fixtures/release-additions.json']! {
 			assert info.st_mode & 0o7777 == 0o644 && info.st_nlink == 1 && file.bytes > 0
 		}
 	}

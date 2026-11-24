@@ -68,8 +68,8 @@ fn image_control_at(mut app SoftwareApp, id string, size ui2.Rect) ! {
 fn image_compact_deployment_action(mut app SoftwareApp, id string) ! {
 	size := ui2.rect(0, 0, 320, 240)
 	image_free_tree(app.build(size)!)
-	for _ in 0 .. 8 { app.key_input('\x1b[5~') }
-	for _ in 0 .. 8 {
+	for _ in 0 .. software_deployment_form_actions.len { app.key_input('\x1b[5~') }
+	for _ in 0 .. software_deployment_form_actions.len {
 		tree := app.build(size)!
 		found := image_tree_has(tree, id)
 		image_free_tree(tree)
@@ -300,6 +300,47 @@ fn image_cold_maintenance(mut app SoftwareApp, phase string, password string) ! 
 	image_memo(mut app, false)!
 }
 
+fn image_add_release(mut app SoftwareApp, password string) ! {
+	release := '/usr/share/package-fixtures/release-additions.json'
+	counter := 'org.vinix.counter'
+	keepers := ['org.vinix.memo', 'org.vinix.package-hello']
+	image_select(mut app, counter)!
+	image_apply(mut app, 'software.remove', password)!
+	assert app.rows.any(it.id == counter && it.installed_version == '')
+	assert app.rows.filter(it.requested).map(it.id).sorted() == keepers
+
+	app.release_deployment_path = release.clone()
+	before := image_release_observation()!
+	compact := ui2.rect(0, 0, 320, 240)
+	image_control_at(mut app, 'software.deployment', compact)!
+	for approve in [false, true]! {
+		image_compact_deployment_action(mut app, 'software.deployment.release-add')!
+		assert app.worker_review && !app.admin_prompt && app.deployment_pending == release
+		image_wait(mut app)!
+		assert app.review_ready && !app.admin_prompt && app.review_snapshot.operation == 'deploy-add', app.status
+		assert app.review_snapshot.names == [counter]
+		assert app.review_snapshot.requested == [counter, ...keepers]
+		assert app.review_snapshot.rows.filter(it.action == 'install').map(it.id) == [counter]
+		assert app.review_snapshot.rows.filter(it.action == 'keep').map(it.id) == keepers
+		assert app.review_snapshot.rows.all(it.version == '1.0.0' && it.repository == 'native')
+		assert image_release_observation()! == before
+		fingerprint := app.review_snapshot.fingerprint.clone()
+		defer { unsafe { fingerprint.free() } }
+		image_control(mut app, 'software.confirm')!
+		assert app.admin_prompt && app.worker.args == ['admin', '--progress', 'deployment-add-apply', fingerprint, release]
+		if !approve {
+			image_control(mut app, 'software.admin.cancel')!
+			assert app.worker == unsafe { nil } && image_release_observation()! == before
+		} else {
+			assert image_approve(mut app, password)!
+		}
+	}
+	assert !app.worker_failed && app.rows.len == 3 && app.rows.all(it.requested && it.installed_version == '1.0.0'), app.status
+	assert image_release_observation()! != before
+	image_counter_reopen(mut app)!
+	image_memo(mut app, false)!
+}
+
 fn image_run() ! {
 	assert os.geteuid() in [1000, 1001]
 	password := if os.geteuid() == 1000 { 'alex has a password' } else { 'sam has another' }
@@ -321,6 +362,8 @@ fn image_run() ! {
 	}
 	if phase.starts_with('cold-') {
 		image_cold_maintenance(mut app, phase, password)!
+	} else if phase == 'release-additions' {
+		image_add_release(mut app, password)!
 	} else if phase == 'install' {
 		compact := ui2.rect(0, 0, 320, 240)
 		image_control_at(mut app, 'software.mirror', compact)!
