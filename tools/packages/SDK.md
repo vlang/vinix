@@ -443,6 +443,23 @@ An unavailable or invalid bundled object is fetched over HTTPS. A retained
 download prefix continues through the HTTPS resume path. See
 [online upgrade qualification](../../tests/packages/release-origin-check.md#bundled-payload-reuse-during-online-upgrades).
 
+#### Refresh one repository
+
+Pass an enrolled repository ID to refresh only that source. This is useful
+when a local repository has new signed metadata and the system already has a
+newer cached HTTPS index than the one bundled with the image.
+
+```sh
+vinix-package --offline update field
+vinix-package admin --offline update field
+```
+
+Every other configured repository must already have an authenticated cached
+index for its exact configured URL and publisher key. A missing, expired,
+invalid or replayed index prevents publication of the combined catalog.
+Use `update` without an ID to refresh all configured repositories.
+See [installed guest qualification](../../tests/packages/release-origin-check.md#targeted-offline-refresh).
+
 #### Move a bundled publisher to its HTTPS repository
 
 After the initial offline install, use the **Repositories** page in Software to

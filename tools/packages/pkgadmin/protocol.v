@@ -46,7 +46,10 @@ pub fn validate_arguments(arguments []string) ! {
 	args := unsafe { arguments[at..] }
 	for value in args { if !printable(value) { return error('invalid administrator package argument') } }
 	command := args[0]
-	if command == 'update' && args.len == 1 { return }
+	if command == 'update' {
+		if args.len == 1 || (args.len == 2 && identifier(args[1])) { return }
+		return error('administrator update takes at most one repository ID')
+	}
 	if args.len < 2 || !hex(args[1], 64) { return error('administrator package changes require their exact review fingerprint') }
 	match command {
 		'cleanup-apply' { if args.len == 2 { return } }

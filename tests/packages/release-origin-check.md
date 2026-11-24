@@ -207,3 +207,19 @@ The evidence archive is
 Its SHA-256 is `22c60d01db901ddd5683cb50a614628732637493648c80aa04704820a167621e`.
 Independent extraction matched all 8,814 inventory entries and both decoded
 VJFS disk digests.
+
+## Targeted offline refresh
+
+Pass `--targeted-refresh` after `NEW_WORK` with the installed runner. It
+stages the signed HTTPS baseline and adds a locally signed `field` repository
+with two releases. On the second boot it accepts the newer HTTPS index and
+confirms that a full offline refresh refuses the older bundled HTTPS index.
+After switching the local fixture to its second release, it runs
+`vinix-package --offline update field`.
+
+The targeted update must save the exact new field index and signature and
+retain the exact cached HTTPS snapshot. The repository configuration,
+application lock and active generation are checked byte for byte. The
+request log must still contain just the seven requests from the online
+refresh, runtime acquisition and replay controls. The third boot checks
+the signed deployment and replay floor after rollback.

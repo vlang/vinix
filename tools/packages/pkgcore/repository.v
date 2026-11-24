@@ -75,18 +75,23 @@ fn catalog_from_snapshots(config Config, snapshots []Snapshot, history TrustHist
 		if !accepted { close_authenticated_catalog(Catalog{ packages: packages }) }
 	}
 	for repository in config.repositories {
-		mut position := -1
-		mut count := 0
-		for index, snapshot in snapshots {
-			if snapshot.repository == repository { position = index; count++ }
-		}
-		if count != 1 {
-			return error('${repository.id}: no authenticated cached index; run update')
-		}
-		append_authenticated_index(repository, snapshots[position], history, now, mut packages, mut owners)!
+		append_authenticated_index(repository, matching_snapshot(snapshots, repository)!, history, now,
+			mut packages, mut owners)!
 	}
 	accepted = true
 	return Catalog{ packages: packages }
+}
+
+fn matching_snapshot(snapshots []Snapshot, repository Repository) !Snapshot {
+	mut position := -1
+	mut count := 0
+	for index, snapshot in snapshots {
+		if snapshot.repository == repository { position = index; count++ }
+	}
+	if count != 1 {
+		return error('${repository.id}: no authenticated cached index; run update')
+	}
+	return snapshots[position]
 }
 
 fn append_authenticated_index(repository Repository, snapshot Snapshot, history TrustHistory, now i64,
@@ -161,10 +166,35 @@ pub fn refresh(config Config, directory string) !Catalog {
 }
 
 fn refresh_locked(config Config, directory string) !Catalog {
-	return refresh_progress(config, directory, no_progress)
+	return refresh_progress(config, directory, '', no_progress)
 }
 
-fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Progress)) !Catalog {
+fn fetch_snapshot(config Config, directory string, work string, repository Repository,
+	report fn (pkgprotocol.Progress)) !Snapshot {
+	message := 'Updating trusted repository ' + repository.id
+	println(message)
+	defer { unsafe { message.free() } }
+	base := repository_fetch_base(directory, repository, config.policy.offline, false)!
+	index_path := work + '/index.json'
+	sig_path := work + '/index.sig'
+	index_url := base + '/index.json'
+	sig_url := base + '/index.sig'
+	defer { unsafe { index_path.free(); sig_path.free(); base.free(); index_url.free(); sig_url.free() } }
+	fetch_progress(index_url, index_path, max_metadata, false, config.policy.offline,
+		pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.json' }, report)!
+	fetch_progress(sig_url, sig_path, 256, false, config.policy.offline,
+		pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.sig' }, report)!
+	text := read_metadata(index_path)!
+	raw_signature := read_metadata(sig_path) or { unsafe { text.free() }; return err }
+	signature := raw_signature.trim_space()
+	unsafe { raw_signature.free() }
+	return Snapshot{ repository: repository, text: text, signature: signature }
+}
+
+fn refresh_progress(config Config, directory string, selected string, report fn (pkgprotocol.Progress)) !Catalog {
+	if selected != '' && !config.repositories.any(it.id == selected) {
+		return error('${selected}: repository is not configured')
+	}
 	previous := read_snapshots(directory)!
 	defer { close_decoded_snapshots(previous) }
 	mut history := history_with_snapshots(config, directory, previous)!
@@ -172,7 +202,7 @@ fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Prog
 	mut snapshots := []Snapshot{}
 	unsafe { snapshots.flags |= .noslices }
 	defer {
-		// These records own fetched text/signatures and borrow Config identities.
+		// These records own their text/signatures and borrow Config identities.
 		unsafe {
 			for snapshot in snapshots { snapshot.text.free(); snapshot.signature.free() }
 			(&array(&snapshots)).free()
@@ -195,29 +225,18 @@ fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Prog
 		}
 	}
 	for repository in config.repositories {
-		message := 'Updating trusted repository ' + repository.id
-		println(message)
-		defer { unsafe { message.free() } }
-		base := repository_fetch_base(directory, repository, config.policy.offline, false)!
-		index_path := work + '/index.json'
-		sig_path := work + '/index.sig'
-		index_url := base + '/index.json'; sig_url := base + '/index.sig'
-		defer { unsafe { index_path.free(); sig_path.free(); base.free(); index_url.free(); sig_url.free() } }
-		fetch_progress(index_url, index_path, max_metadata, false, config.policy.offline,
-			pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.json' }, report)!
-		fetch_progress(sig_url, sig_path, 256, false, config.policy.offline,
-			pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.sig' }, report)!
-		text := read_metadata(index_path)!
-		raw_signature := read_metadata(sig_path) or { unsafe { text.free() }; return err }
-		signature := raw_signature.trim_space()
-		unsafe { raw_signature.free() }
-		snapshot := Snapshot{ repository: repository, text: text, signature: signature }
+		snapshot := if selected != '' && repository.id != selected {
+			cached := matching_snapshot(previous, repository)!
+			Snapshot{ repository: repository, text: cached.text.clone(), signature: cached.signature.clone() }
+		} else {
+			fetch_snapshot(config, directory, work, repository, report)!
+		}
 		pointer := unsafe { &snapshot }
 		unsafe { snapshots.push_many(pointer, 1) }
 		report(pkgprotocol.Progress{ phase: 'verify', repository: repository.id, path: 'index.json' })
-		index := verify_index(repository, text, signature, time.now().unix())!
+		index := verify_index(repository, snapshot.text, snapshot.signature, time.now().unix())!
 		defer { close_decoded_index(index) }
-		next := remember_index(history, repository, index, text)!
+		next := remember_index(history, repository, index, snapshot.text)!
 		close_decoded_history(history)
 		history = next
 		// Authenticate and check replay first. Refuse this prefix before fetching

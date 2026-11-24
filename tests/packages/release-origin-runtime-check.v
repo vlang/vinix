@@ -107,6 +107,38 @@ fn unchanged_entrypoint(arch string, id string, baseline pkgcore.Index, update p
 	return files[0].sha256
 }
 
+fn stage_local_update(target string, work string) ! {
+	config_path := target + '/etc/vinix-packages/config.json'
+	config := json2.decode[pkgcore.Config](os.read_file(config_path)!)!
+	seed := work + '/field-seed'
+	key := pkgcore.keygen(seed)!
+	defer { os.rm(seed) or {} }
+	fixture := '/usr/share/release-origin'
+	repository := pkgcore.Repository{ id: 'field', url: 'file://' + fixture + '/field', public_key: key }
+	payload := work + '/field-payload'
+	manifest := work + '/field.json'
+	os.mkdir_all(payload)!
+	for version in ['1.0.0', '2.0.0']! {
+		sequence := if version == '1.0.0' { u64(1) } else { u64(2) }
+		os.write_file(payload + '/field.txt', version + '\n')!
+		os.write_file(manifest, json2.encode(pkgcore.Package{
+			id: 'field-data', name: 'Field data', version: version, architecture: 'all',
+			kind: 'data', license: 'MIT',
+		}))!
+		workspace := work + '/field-' + version
+		pkgcore.pack(manifest, payload, workspace)!
+		name := if sequence == 1 { 'field' } else { 'field-next' }
+		destination := target + fixture + '/' + name
+		mut release := pkgcore.publish_release(workspace, repository.id, seed, sequence,
+			time.now().unix() + 86400, destination)!
+		release.close()
+	}
+	os.write_file(config_path, json2.encode(pkgcore.Config{
+		...config
+		repositories: [...config.repositories, repository]
+	}) + '\n')!
+}
+
 fn start_fixture(host hwhost.Host, root string, work string) !(&os.Process, string) {
 	server := work + '/https-fixture'
 	hwhost.run_tool([host.v, '-o', server, root + '/tests/packages/https-fixture.v'], map[string]string{},
@@ -154,9 +186,10 @@ fn verify_requests(work string, object_requests []string, preconfigured bool) ! 
 
 fn check() ! {
 	reuse := os.args.len == 9 && os.args[8] == '--reuse-bundle'
-	preconfigured := reuse || (os.args.len == 9 && os.args[8] == '--bundled-https')
+	targeted := os.args.len == 9 && os.args[8] == '--targeted-refresh'
+	preconfigured := reuse || targeted || (os.args.len == 9 && os.args[8] == '--bundled-https')
 	if (os.args.len != 8 && !preconfigured) || os.args[1] !in ['aarch64', 'x86_64'] {
-		return error('usage: release-origin-runtime-check ARCH KERNEL CURL_ROOT BASELINE_BUNDLE UPDATE_BUNDLE CONFIG NEW_WORK [--bundled-https|--reuse-bundle]')
+		return error('usage: release-origin-runtime-check ARCH KERNEL CURL_ROOT BASELINE_BUNDLE UPDATE_BUNDLE CONFIG NEW_WORK [--bundled-https|--reuse-bundle|--targeted-refresh]')
 	}
 	arch := os.args[1]
 	kernel := os.abs_path(os.args[2])
@@ -224,6 +257,7 @@ fn check() ! {
 	os.cp(work + '/ca.pem', fixture + '/ca.pem')!
 	os.write_file(fixture + '/endpoint', endpoint + '\n')!
 	if preconfigured { os.write_file(fixture + '/bundled-https', '')! }
+	if targeted { stage_local_update(target, work)! }
 	if reuse {
 		tests := BundleReuse{
 			local: unchanged_entrypoint(arch, 'org.vinix.counter', baseline, updated)!
@@ -270,6 +304,11 @@ fn check() ! {
 				},
 				...if reuse {
 					['HWTEST PASS bundled payload reused, corrupt payload fetched and HTTPS prefix resumed']
+				} else {
+					[]string{}
+				},
+				...if targeted {
+					['HWTEST PASS targeted offline refresh advanced field and retained the HTTPS snapshot']
 				} else {
 					[]string{}
 				},

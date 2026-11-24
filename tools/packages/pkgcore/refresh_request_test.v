@@ -176,6 +176,79 @@ fn test_refresh_replies_outlive_configuration_and_other_replies() {
 	}
 }
 
+fn test_targeted_refresh_keeps_authenticated_unselected_repositories() {
+	for arch in ['aarch64', 'x86_64']! {
+		work := os.temp_dir() + '/vinix-targeted-refresh-' + os.getpid().str() + '-' + arch
+		defer { os.rmdir_all(work) or {} }
+		root := work + '/root'
+		config_path := root + '/etc/vinix-packages/config.json'
+		directory := state_directory(root)
+		cache := directory + '/catalog.json'
+		history := directory + '/trust-history.json'
+		os.mkdir_all(os.dir(config_path))!
+		os.mkdir_all(work + '/local')!
+		private := signing.new_key_from_seed([]u8{len: 32, init: 7})
+		key := private.public_key().hex()
+		local := Repository{ id: 'local', url: 'file://' + work + '/local', public_key: key }
+		remote := Repository{ id: 'remote', url: 'https://127.0.0.1:1/remote', public_key: key }
+		save_configuration(config_path, Config{ architecture: arch, repositories: [local, remote] })!
+		guard := acquire(directory)!
+		guard.release()
+		now := time.now().unix()
+		old_local, old_local_sig := refresh_request_signed(local, arch, 'local-app', 1, now + 3600, '')!
+		new_local, new_local_sig := refresh_request_signed(local, arch, 'local-app', 2, now + 3600, '')!
+		remote_text, remote_sig := refresh_request_signed(remote, arch, 'remote-app', 7, now + 3600, '')!
+		local_snapshot := Snapshot{ repository: local, text: old_local, signature: old_local_sig }
+		remote_snapshot := Snapshot{ repository: remote, text: remote_text, signature: remote_sig }
+		os.write_file(cache, json2.encode([local_snapshot, remote_snapshot]))!
+		os.write_file(work + '/local/index.json', new_local)!
+		os.write_file(work + '/local/index.sig', new_local_sig)!
+		offline := Service{root: root, offline: true}
+		if _ := offline.refresh() { assert false }
+		else { assert err.msg().contains('offline mode') }
+		assert !os.exists(history)
+		for _ in 0 .. 2 {
+			mut catalog := offline.refresh_repository('local')!
+			assert catalog.packages.len == 2 && catalog.packages[0].sequence == 2 && catalog.packages[1].sequence == 7
+			catalog.close()
+		}
+		snapshots := read_snapshots(directory)!
+		assert snapshots[0].text == new_local && snapshots[1] == remote_snapshot
+		configuration := os.read_file(config_path)!
+		valid_history := os.read_file(history)!
+		stale_text, stale_sig := refresh_request_signed(remote, arch, 'remote-app', 6, now + 3600, '')!
+		expired_text, expired_sig := refresh_request_signed(remote, arch, 'remote-app', 8, now - 60, '')!
+		for mode in ['missing', 'duplicate', 'changed-url', 'bad-signature', 'stale', 'expired']! {
+			unselected := match mode {
+				'missing' { []Snapshot{} }
+				'duplicate' { [remote_snapshot, remote_snapshot] }
+				'changed-url' { [Snapshot{ ...remote_snapshot, repository: Repository{ ...remote, url: remote.url + '/wrong' } }] }
+				'bad-signature' { [Snapshot{ ...remote_snapshot, signature: '0'.repeat(128) }] }
+				'stale' { [Snapshot{ ...remote_snapshot, text: stale_text, signature: stale_sig }] }
+				else { [Snapshot{ ...remote_snapshot, text: expired_text, signature: expired_sig }] }
+			}
+			before := json2.encode([snapshots[0], ...unselected])
+			os.write_file(cache, before)!
+			if _ := offline.refresh_repository('local') { assert false }
+			else {
+				expected := match mode {
+					'duplicate' { 'duplicate cached repository identity' }
+					'bad-signature' { 'signature verification failed' }
+					'stale' { 'repository rollback or sequence equivocation refused' }
+					'expired' { 'expired' }
+					else { 'no authenticated cached index' }
+				}
+				assert err.msg().contains(expected), mode + ': ' + err.msg()
+			}
+			assert os.read_file(cache)! == before && os.read_file(history)! == valid_history
+			assert os.read_file(config_path)! == configuration && !os.exists(directory + '/refresh')
+		}
+		if _ := offline.refresh_repository('unknown') { assert false }
+		else { assert err.msg().contains('repository is not configured') }
+	}
+	println('TARGETED REFRESH retains exact cached HTTPS identity and refuses missing, mismatched, invalid, stale or expired snapshots PASS')
+}
+
 fn refresh_request_publication_fault(event pkgprotocol.Progress) {
 	if event.phase != 'verify' { return }
 	directory := os.getenv('VINIX_REFRESH_FAULT_DIRECTORY')

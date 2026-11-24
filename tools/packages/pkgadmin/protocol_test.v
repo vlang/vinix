@@ -3,7 +3,8 @@ module pkgadmin
 
 fn test_reviewed_admin_requests_and_bound_completion() {
 	fingerprint := 'a'.repeat(64)
-	for arguments in [['update'], ['--progress', 'update'], ['--progress', '--offline', 'apply', fingerprint, 'install', 'org.vinix.memo'],
+	for arguments in [['update'], ['--progress', 'update'], ['--progress', '--offline', 'update', 'field.local'],
+		['--progress', '--offline', 'apply', fingerprint, 'install', 'org.vinix.memo'],
 		['apply', fingerprint, 'upgrade'], ['apply', fingerprint, 'repair'], ['apply', fingerprint, 'rollback'], ['cleanup-apply', fingerprint], ['repo-apply', fingerprint, 'revoke', 'publisher'],
 		['repo-apply', fingerprint, 'enroll', 'publisher', 'file:///media/with spaces; $literal', fingerprint],
 		['deployment-apply', fingerprint, '/etc/company/approved apps.json'], ['policy-apply', fingerprint, '/etc/company/policy.json'],
@@ -30,7 +31,8 @@ fn test_admin_transport_refuses_launches_alternate_roots_and_unreviewed_changes(
 		['apply', fingerprint, 'install', '--root'], ['apply', fingerprint, 'install', 'bad; id'],
 		['apply', fingerprint, 'upgrade', 'extra'], ['apply', fingerprint, 'repair', 'app'], ['repo-apply', fingerprint, 'revoke', 'publisher', 'extra'],
 		['policy-apply', fingerprint, 'relative.json'], ['apply', fingerprint, 'deploy', 'app'],
-		['update', 'extra'], ['--offline', '--progress', 'update']] {
+		['update', 'field', 'extra'], ['update', '--offline'], ['update', '/tmp/field'],
+		['update', ''], ['--offline', '--progress', 'update']] {
 		mut refused := false
 		validate_arguments(arguments) or { refused = true; unsafe { err.free() } }
 		assert refused, arguments.str()

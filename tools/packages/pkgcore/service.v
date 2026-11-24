@@ -28,13 +28,24 @@ fn (service Service) configuration() !Config {
 }
 
 pub fn (service Service) refresh() !Catalog {
+	return service.refresh_selected('')
+}
+
+// Refresh one configured source. Every other source must have a current,
+// authenticated snapshot for its exact configured identity.
+pub fn (service Service) refresh_repository(id string) !Catalog {
+	if !identifier(id) { return error('invalid repository ID') }
+	return service.refresh_selected(id)
+}
+
+fn (service Service) refresh_selected(id string) !Catalog {
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
 	config := service.configuration()!
 	defer { close_decoded_configuration(config) }
-	return refresh_progress(config, directory, service.progress)
+	return refresh_progress(config, directory, id, service.progress)
 }
 
 pub fn (service Service) transact(operation string, names []string, options TransactionOptions) !State {

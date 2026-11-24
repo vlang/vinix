@@ -35,6 +35,12 @@ struct BundleReuse {
 	resume string
 }
 
+struct CachedOrigin {
+	repository pkgprotocol.Repository
+	text string
+	signature string
+}
+
 fn require(condition bool, reason string) ! {
 	if !condition { return error(reason) }
 }
@@ -181,6 +187,37 @@ fn check_bundle_reuse(probe BundleReuse, id string) ! {
 	println('HWTEST PASS bundled payload reused, corrupt payload fetched and HTTPS prefix resumed')
 }
 
+fn cached_origins() !map[string]CachedOrigin {
+	mut origins := map[string]CachedOrigin{}
+	for snapshot in json2.decode[[]CachedOrigin](os.read_file(store + '/catalog.json')!)! {
+		if snapshot.repository.id in origins { return error('duplicate cached origin') }
+		origins[snapshot.repository.id] = snapshot
+	}
+	return origins
+}
+
+fn refresh_field_repository(id string) ! {
+	prior := checkpoint('before-targeted-refresh')!
+	old := cached_origins()!
+	os.rename(assets + 'field', assets + 'field-previous')!
+	os.rename(assets + 'field-next', assets + 'field')!
+	package_command(['--offline', 'update', 'field'], 0, 'Updating trusted repository field')!
+	current := cached_origins()!
+	field := current['field']!
+	require(current.len == 2 && current[id]! == old[id]! && field.repository == old['field']!.repository &&
+		field.text == os.read_file(assets + 'field/index.json')! &&
+		field.signature == os.read_file(assets + 'field/index.sig')!.trim_space() && field.text != old['field']!.text,
+		'targeted refresh did not preserve the exact HTTPS catalog and load the new field catalog')!
+	next := checkpoint('before-targeted-refresh')!
+	for path in [config, lock_path, store + '/current/state.json']! {
+		require(prior.files[path]! == next.files[path]!, 'targeted refresh changed ' + path)!
+	}
+	require(prior.current == next.current &&
+		prior.files[store + '/trust-history.json']! != next.files[store + '/trust-history.json']!,
+		'targeted refresh did not advance repository history with the current generation retained')!
+	println('HWTEST PASS targeted offline refresh advanced field and retained the HTTPS snapshot')
+}
+
 fn migrate(document pkgprotocol.DeploymentDocument, previous Checkpoint, endpoint string, id string, key string) ! {
 	audit(document, false)!
 	version := run_program('/usr/bin/curl', ['--disable', '--version'], 0, 'OpenSSL/')!
@@ -196,6 +233,7 @@ fn migrate(document pkgprotocol.DeploymentDocument, previous Checkpoint, endpoin
 			'HTTPS refresh or refused bundled replay changed configuration or trusted state')!
 		println('HWTEST PASS bundled HTTPS publisher retained configuration and refused an offline replay')
 	}
+	if os.is_dir(assets + 'field-next') { refresh_field_repository(id)! }
 	probe_path := assets + 'bundle-reuse.json'
 	reuse := os.exists(probe_path)
 	probe := if reuse { json2.decode[BundleReuse](os.read_file(probe_path)!)! } else { BundleReuse{} }
