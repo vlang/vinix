@@ -251,6 +251,9 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 	// Record authenticated sequence/digest floors before exposing the new cache.
 	// Revocation and empty refreshes never discard identities from this history.
 	save_history(directory, history)!
+	$if package_refresh_crash_fixture ? {
+		report(pkgprotocol.Progress{ phase: 'history-committed' })
+	}
 	cache_path := directory + '/catalog.json'
 	defer { unsafe { cache_path.free() } }
 	atomic_write(cache_path, encoded)!

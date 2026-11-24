@@ -75,3 +75,29 @@ device I/O errors, or model loss of the host's write cache. Physical-device and
 filesystem crash consistency still require wider qualification. Application
 execution and permissions are checked separately by
 [the production sandbox suite](runtime-check.md).
+
+## Selected repository refresh cuts
+
+Add `--refresh` to the persistence command and use a fresh state directory.
+The fixture installs version 1 from a local publisher, seeds an authenticated
+HTTPS snapshot from its image bundle, then withdraws that bundle. It stages a
+new local release and interrupts an offline refresh of that repository alone.
+
+| Case | Cut point | Local sequence after reboot |
+| --- | --- | --- |
+| `refresh-cut-fetched` | Both signed metadata files have been copied into the refresh workspace. | Catalog 1, history 1. |
+| `refresh-cut-history` | Sequence 2 and its digest have been persisted to trust history. | Catalog 1, history 2. The stale catalog refuses an upgrade review. |
+| `refresh-cut-catalog` | The catalog replacement has completed before the worker retires its workspace. | Catalog 2, history 2. |
+
+In the two cases with the new floor, the regular CLI refuses the old signed
+index and a differently signed index at sequence 2. It accepts the exact
+sequence-2 retry in every case and can repeat it without changing the catalog
+or history. The cached HTTPS snapshot, its trust floor, the repository
+configuration and the installed generation stay intact. The fixture verifies
+the active payload before and after recovery and checks workspace retirement.
+
+The cut worker calls the same `Service.refresh_repository` path as the CLI.
+Only that worker is built with the intermediate history checkpoint. Preparation
+and recovery use the ordinary package binary. The cut suspends the worker at
+completed application checkpoints, and the host kills QEMU before rebooting
+the same ext2 disk.

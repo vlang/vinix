@@ -70,6 +70,40 @@ fn keygen_persistence_suite(image string) hwhost.Suite {
 	}] }
 }
 
+fn refresh_persistence_suite(image string) hwhost.Suite {
+	base := persistence_suite(image)
+	mut scenarios := []hwhost.Scenario{}
+	for phase in ['fetched', 'history', 'catalog']! {
+		name := 'refresh-cut-' + phase
+		marker := 'PACKAGE REFRESH CUT ' + phase
+		scenarios << hwhost.Scenario{
+			...base.scenarios[0]
+			name: name
+			about: 'SIGKILL after refresh ' + phase + ', reboot the same ext2 disk and retry'
+			required: ['HWTEST START ' + name, marker, 'PACKAGE REFRESH RECOVERY ' + phase,
+				'HWTEST PASS ' + name]
+			forbidden: ['V panic:', 'HWTEST FAIL']
+			reboots: [hwhost.Reboot{ power_cut_after: marker }]
+		}
+	}
+	return hwhost.Suite{
+		...base
+		name: 'package-refresh-persistence'
+		scenarios: scenarios
+		programs: [...base.programs, hwhost.Program{
+			source: 'tests/packages/refresh-cut-worker.v'
+			path: 'usr/share/package-fixtures/refresh-cut-worker'
+			flags: ['-enable-globals', '-d', 'package_refresh_crash_fixture']
+		}]
+	}
+}
+
+fn selected_persistence_suite(image string, keygen bool, refresh bool) hwhost.Suite {
+	if keygen { return keygen_persistence_suite(image) }
+	if refresh { return refresh_persistence_suite(image) }
+	return persistence_suite(image)
+}
+
 fn check_recovered_key(directory string) ! {
 	first := os.read_file(directory + '/packages-keygen/serial.log')!
 	second := os.read_file(directory + '/packages-keygen/serial-2.log')!
@@ -82,13 +116,17 @@ fn check_recovered_key(directory string) ! {
 
 fn persistence_check() !int {
 	keygen := '--keygen' in os.args[1..]
-	args := os.args[1..].filter(it != '--keygen')
+	refresh := '--refresh' in os.args[1..]
+	if keygen && refresh { return error('select either --keygen or --refresh') }
+	args := os.args[1..].filter(it !in ['--keygen', '--refresh']!)
 	options := hwhost.parse_options(args)!
 	if options.help || options.list {
-		if options.help { println('--keygen selects publisher seed cut/recovery (requires --state-dir); default tests package transactions') }
-		return hwhost.run_suite(if keygen { keygen_persistence_suite('') } else { persistence_suite('') }, args, @FILE)
+		if options.help {
+			println('--keygen tests publisher seed recovery; --refresh tests selected catalog refresh; default tests package transactions')
+		}
+		return hwhost.run_suite(selected_persistence_suite('', keygen, refresh), args, @FILE)
 	}
-	if keygen && options.state_dir == '' { return error('--keygen requires --state-dir to compare both serial public keys') }
+	if (keygen || refresh) && options.state_dir == '' { return error('--keygen and --refresh require --state-dir') }
 	if !os.is_file(options.kernel) { return error('--kernel is not a file: ${options.kernel}') }
 	work := os.temp_dir() + '/vinix-package-persistence-' + os.getpid().str()
 	os.mkdir_all(work)!
@@ -103,7 +141,7 @@ fn persistence_check() !int {
 	}
 	hwhost.run_tool([tool, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-m', '0', '-O',
 		'none,filetype,sparse_super,large_file', image], map[string]string{}, work + '/format.log', 60)!
-	suite := if keygen { keygen_persistence_suite(image) } else { persistence_suite(image) }
+	suite := selected_persistence_suite(image, keygen, refresh)
 	status := hwhost.run_suite(suite, [...args, '--kernel', kernel], @FILE)
 	if status == 0 && options.state_dir != '' {
 		if keygen { check_recovered_key(options.state_dir)! }
@@ -114,6 +152,10 @@ fn persistence_check() !int {
 			persistence_artifact('initial-ext2', image)!,
 			persistence_artifact('guest', options.state_dir + '/guest/init')!,
 			persistence_artifact('package-service', options.state_dir + '/guest/root/usr/bin/vinix-package')!]
+		if refresh {
+			artifacts << persistence_artifact('refresh-cut-worker',
+				options.state_dir + '/guest/root/usr/share/package-fixtures/refresh-cut-worker')!
+		}
 		for scenario in selected {
 			for name in ['serial.log', 'serial-2.log'] {
 				artifacts << persistence_artifact(scenario.name + '/' + name, options.state_dir + '/' + scenario.name + '/' + name)!
