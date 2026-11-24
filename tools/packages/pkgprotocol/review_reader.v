@@ -59,7 +59,7 @@ fn (mut r MetadataReader) parse_review() !Review {
 	r.expect(`{`)!
 	mut value := Review{}
 	mut accepted := false
-	defer { if !accepted { value.close() } }
+	defer { if !accepted { close_review(value) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -315,14 +315,18 @@ fn (mut r MetadataReader) parse_review_packages() ![]ReviewPackage {
 	mut values := []ReviewPackage{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe { for value in values { close_review_package(value) }; (&array(&values)).free() } } }
+	defer {
+		if !accepted {
+			for row in values { close_review_package(row) }
+			unsafe { values.free() }
+		}
+	}
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == 8192 { return error('package metadata array exceeds entry limit') }
 		value := r.parse_review_package()!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << value
 	}
 	accepted = true
 	return values

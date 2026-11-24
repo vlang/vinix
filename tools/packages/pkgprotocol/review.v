@@ -157,8 +157,7 @@ fn close_review_package(row ReviewPackage) {
 	}
 }
 
-// Decoded responses own their strings. UI reload/cancel/close retires all of them.
-pub fn (mut review Review) close() {
+fn close_review(review Review) {
 	unsafe {
 		review.operation.free()
 		for name in review.names { name.free() }
@@ -170,5 +169,10 @@ pub fn (mut review Review) close() {
 		for row in review.rows { close_review_package(row) }
 		(&array(&review.rows)).free()
 	}
+}
+
+// Decoded responses own their strings. UI reload/cancel/close retires all of them.
+pub fn (mut review Review) close() {
+	close_review(review)
 	review = Review{}
 }

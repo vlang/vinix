@@ -3,6 +3,13 @@ module pkgprotocol
 
 import json2
 
+$if track_heap ? {
+	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
+}
+fn C.vinix_heap_begin()
+fn C.vinix_heap_end() u64
+fn C.vinix_heap_count() u32
+
 fn complete_review_fixture(operation string) Review {
 	return Review{ format: 1, operation: operation, names: ['app'], requested: ['app'], architecture: 'aarch64',
 		fingerprint: 'a'.repeat(64), rows: [ReviewPackage{ id: 'app', name: 'Application é🚀', description: 'A complete description',
@@ -120,4 +127,32 @@ fn test_review_bounds_are_checked_during_collection_and_scalar_decoding() {
 	for index in 0 .. 4097 { repositories << Repository{ ...complete_status_fixture().repositories[0], id: 'publisher-' + index.str() } }
 	assert !accepts_metadata(1, json2.encode(RepositoryStatus{ ...complete_status_fixture(), repositories: repositories }))
 	assert accepts_metadata(1, json2.encode(RepositoryStatus{ ...complete_status_fixture(), repositories: repositories[..4096] }))
+}
+
+fn test_review_decoding_retires_completed_rows_on_partial_and_trailing_refusals() {
+	base := complete_review_fixture('install')
+	row := base.rows[0]
+	complete := json2.encode(Review{ ...base,
+		rows: [row, ReviewPackage{ ...row, id: 'dependency', requested: false }] })
+	partial := complete.replace('"id":"dependency"', '"id":false')
+	trailing := complete + ' trailing'
+	defer { unsafe { complete.free(); partial.free(); trailing.free() } }
+	assert partial != complete
+	for pass in 0 .. 2 {
+		$if track_heap ? { if pass == 1 { C.vinix_heap_begin() } }
+		for _ in 0 .. 64 {
+			mut review := decode_review(complete)!
+			assert review.rows.len == 2 && review.rows[1].id == 'dependency'
+			review.close()
+			review.close()
+			assert !accepts_metadata(0, partial)
+			assert !accepts_metadata(0, trailing)
+		}
+		if pass == 1 {
+			$if track_heap ? {
+				kept := C.vinix_heap_end()
+				assert kept == 0 && C.vinix_heap_count() == 0
+			}
+		}
+	}
 }
