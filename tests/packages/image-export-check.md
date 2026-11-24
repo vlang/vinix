@@ -125,3 +125,28 @@ reviewed offline maintenance. Full desktop image builds, production publisher
 enrollment/catalog migration, graphical login/presentation and broader runtime/
 device/crash qualification remain separate roadmap 14 work. Kernel code is
 unchanged.
+
+## Captured export directory
+
+At `141a0f1221fc584c0774a24f3fa1870a897660b4`, the export refused both
+parent and image-root replacements after preparing the deployment. The
+fixtures checked that the displaced and replacement directories held their
+expected contents and that restoring the original directory allowed a retry.
+The production stager also resolved an outside symlink followed by `..` and
+reopened the saved lock. Lock bytes matched the baseline on both target
+declarations.
+
+The host export, image input, configuration, repository and atomic-write
+suites passed. The export fixture passed under ASan/UBSan with leak detection
+disabled and under a separate 32-descriptor limit.
+
+Both TCG guests passed all nine programs and initiated shutdown. AArch64
+finished in 176.0 seconds on a fresh run with a 360-second deadline after
+its initial concurrent run reached the 180-second deadline. x86-64 finished
+in 182.7 seconds. All 13 artifact sizes and digests matched for each target.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-deployment-parent-capture-VvN6M2/qualification.tar.gz)
+contains the source snapshot, signed inputs, host checks, both target receipts
+and the initial timeout logs. The independent checker verified all 232 sealed
+files. Archive SHA-256 is
+`0b9948ce84d8b8634724d94e3b847d0933ab7143474c2c40da0ee7afeb042da8`.
