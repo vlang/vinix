@@ -41,15 +41,7 @@ struct Selection {
 	publishers []pkgcore.IsoOfflinePublisher
 }
 
-struct Receipt {
-	format int = 1
-	iso_sha256 string
-	configuration_sha256 string
-	deployment_sha256 string
-	architecture string
-	applications []string
-	publishers []pkgcore.IsoOfflinePublisher
-}
+type Receipt = pkgcore.IsoPackageReceipt
 
 struct ArchiveAudit {
 	release_time i64

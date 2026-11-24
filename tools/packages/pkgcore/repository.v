@@ -262,6 +262,7 @@ fn refresh_progress_from(config Config, directory string, selected string, media
 		check_repository_workspace(directory, parent, target)!
 		index := verify_index(repository, snapshot.text, snapshot.signature, time.now().unix())!
 		defer { close_decoded_index(index) }
+		if batch := media { batch.check_receipt_snapshot(repository, index, snapshot.text)! }
 		if index.expires < expires { expires = index.expires }
 		next := remember_index(history, repository, index, snapshot.text)!
 		close_decoded_history(history)

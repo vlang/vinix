@@ -89,14 +89,7 @@ fn check_signed_release(directory string, id string, public_key string, options 
 		if digest != pin.index_sha256 || index.sequence != pin.sequence {
 			return error('offline repository index differs from the ISO package receipt: ${id}')
 		}
-		mut bytes := u64(0)
-		for _, object in objects {
-			if object.bytes > ~u64(0) - bytes { return error('offline repository payload sizes overflow: ${id}') }
-			bytes += object.bytes
-		}
-		if bytes != pin.payload_bytes {
-			return error('offline repository payload bytes differ from the ISO package receipt: ${id}')
-		}
+		check_iso_offline_payload_bytes(*pin, objects)!
 	}
 	release_closures(index, public_key)!
 	verify_release_stage(release, text, trimmed, objects, true)!
@@ -125,6 +118,17 @@ fn check_signed_release(directory string, id string, public_key string, options 
 		expires:       index.expires
 		package_count: index.packages.len
 		object_count:  objects.len
+	}
+}
+
+fn check_iso_offline_payload_bytes(pin IsoOfflinePublisher, objects map[string]Payload) ! {
+	mut bytes := u64(0)
+	for _, object in objects {
+		if object.bytes > ~u64(0) - bytes { return error('offline repository payload sizes overflow: ${pin.id}') }
+		bytes += object.bytes
+	}
+	if bytes != pin.payload_bytes {
+		return error('offline repository payload bytes differ from the ISO package receipt: ${pin.id}')
 	}
 }
 

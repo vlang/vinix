@@ -167,6 +167,52 @@ fn check_pinned_additions(binary string, root string, path string, text string, 
 	println('DEPLOYMENT PIN CLI exact bytes across coverage, review and apply, digest substitution and omission refusal, and restored retry PASS')
 }
 
+fn import_pinned_media(binary string, work string, root string, media string, receipt pkgcore.IsoPackageReceipt) ! {
+	path := work + '/ISO receipt é.json'
+	text := json2.encode(receipt) + '\n'
+	digest := sha256.hexhash(text)
+	args := ['update-media', media, path, digest]
+	os.write_file(path, text + ' ')!
+	assert command_status(binary, root, args, 1)!.contains('ISO package receipt SHA-256 differs')
+	assert !os.exists(root + '/var')
+	os.write_file(path, text)!
+	lock_path := media + '/' + pkgprotocol.deployment_mirror_filename
+	original := os.read_file(lock_path)!
+	os.write_file(lock_path, original + ' ')!
+	assert command_status(binary, root, args, 1)!.contains('release lock differs')
+	os.write_file(lock_path, original)!
+	other_arch := if receipt.architecture == 'x86_64' { 'aarch64' } else { 'x86_64' }
+	wrong_arch := json2.encode(pkgcore.IsoPackageReceipt{ ...receipt, architecture: other_arch })
+	os.write_file(path, wrong_arch)!
+	assert command_status(binary, root, ['update-media', media, path, sha256.hexhash(wrong_arch)], 1)!.contains('receipt architecture differs')
+	pin := receipt.publishers[0]
+	wrong_key := json2.encode(pkgcore.IsoPackageReceipt{ ...receipt,
+		publishers: [pkgcore.IsoOfflinePublisher{ ...pin, public_key: '0'.repeat(64) }] })
+	os.write_file(path, wrong_key)!
+	assert command_status(binary, root, ['update-media', media, path, sha256.hexhash(wrong_key)], 1)!.contains('differs from the enrolled key')
+	wrong_size := json2.encode(pkgcore.IsoPackageReceipt{ ...receipt,
+		publishers: [pkgcore.IsoOfflinePublisher{ ...pin, payload_bytes: pin.payload_bytes + 1 }] })
+	os.write_file(path, wrong_size)!
+	assert command_status(binary, root, ['update-media', media, path, sha256.hexhash(wrong_size)], 1)!.contains('payload bytes differ')
+	os.write_file(path, text)!
+	publisher := media + '/trusted'
+	saved := work + '/reviewed-publisher'
+	os.rename(publisher, saved)!
+	assert command_status(binary, root, args, 1)!.contains('publishers differ')
+	mut replacement := pkgcore.publish_release(work + '/repository', 'trusted', work + '/seed', 4,
+		time.now().unix() + 3600, publisher)!
+	replacement.close()
+	assert command_status(binary, root, args, 1)!.contains('index differs from the ISO package receipt')
+	state := pkgcore.state_directory(root)
+	assert !os.exists(state + '/catalog.json') && !os.exists(state + '/trust-history.json')
+	assert os.ls(state + '/objects')!.len == 0
+	os.rename(publisher, work + '/other-publisher')!
+	os.rename(saved, publisher)!
+	command(binary, root, args)!
+	command(binary, root, args)!
+	println('DEPLOYMENT MEDIA CLI exact receipt, deployment lock and signed index gate import before acquisition PASS')
+}
+
 fn version(work string, architecture string, value string) ! {
 	for id in ['app', 'runtime', 'assets'] {
 		os.mkdir_all(work + '/sources/' + id + '/bin')!
@@ -255,7 +301,8 @@ fn check() ! {
 	for index, id in ['app', 'runtime'] { os.write_file(work + '/repository/manifests/' + id + '-' + architecture + '-1.0.0.json', old_manifests[index])! }
 	media := work + '/approved-media'
 	os.mkdir(media, mode: 0o755)!
-	pkgcore.publish_release(work + '/repository', 'trusted', work + '/seed', 3, time.now().unix() + 3600, media + '/trusted')!
+	mut release := pkgcore.publish_release(work + '/repository', 'trusted', work + '/seed', 3, time.now().unix() + 3600, media + '/trusted')!
+	defer { release.close() }
 	media_deployment := media + '/' + pkgprotocol.deployment_mirror_filename
 	os.write_file(media_deployment, first)!
 	os.chmod(media_deployment, 0o644)!
@@ -267,7 +314,18 @@ fn check() ! {
 	mut absent := pkgprotocol.decode_deployment_audit(audit_command(binary, consumer, path, false)!)!; defer { absent.close() }
 	assert absent.generation == 0 && absent.rows.len == 3 && absent.rows.all(it.status == 'missing')
 	assert !os.exists(consumer + '/var')
-	command(binary, consumer, ['update-media', media])!
+	objects := media + '/trusted/objects'
+	mut payload_bytes := u64(0)
+	for object in os.ls(objects)! { payload_bytes += os.file_size(objects + '/' + object) }
+	import_pinned_media(binary, work, consumer, media, pkgcore.IsoPackageReceipt{
+		iso_sha256: sha256.hexhash('fixture ISO')
+		configuration_sha256: sha256.hexhash(consumer_config_text)
+		deployment_sha256: saved.sha256
+		architecture: architecture
+		applications: ['app']
+		publishers: [pkgcore.IsoOfflinePublisher{ id: 'trusted', public_key: key, sequence: release.sequence,
+			index_sha256: release.index_sha256, payload_bytes: payload_bytes }]
+	})!
 	assert os.read_file(consumer_config)! == consumer_config_text
 	local_lock := save_media_lock(binary, consumer, media, work + '/saved-release', architecture, first, saved.sha256)!
 	os.rename(media, work + '/disconnected-media')!

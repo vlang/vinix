@@ -15,6 +15,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  update [REPOSITORY_ID [IDENTITY_SHA256]] | search [QUERY] | info ID | list | status | updates | view\n' +
 	'  update-media REPOSITORY_ID RELEASE_DIRECTORY [REPOSITORY_ID RELEASE_DIRECTORY ...]\n' +
 	'  update-media MEDIA_DIRECTORY\n' +
+	'  update-media MEDIA_DIRECTORY ISO_RECEIPT.json RECEIPT_SHA256\n' +
 	'  admin [--progress] [--offline] update|update-media|apply|cleanup-apply|repo-apply|deployment-apply|deployment-add-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
 	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify | health\n' +
 	'  cleanup-review | cleanup-apply REVIEW_FINGERPRINT (obsolete generations only)\n' +
@@ -533,8 +534,13 @@ fn checked(arguments []string) !int {
 				catalog.close()
 				return 0
 			}
+			if names.len == 3 {
+				mut catalog := service.import_repository_media_bundle_with_receipt(names[0], names[1], names[2])!
+				catalog.close()
+				return 0
+			}
 			if names.len == 0 || names.len % 2 != 0 {
-				return error('update-media requires an absolute media directory or repository ID and absolute release directory pairs')
+				return error('update-media requires an absolute media directory with optional receipt and digest, or repository ID and release directory pairs')
 			}
 			mut sources := []pkgcore.RepositoryMediaSource{cap: names.len / 2}
 			defer { unsafe { sources.free() } }

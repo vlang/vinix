@@ -2,6 +2,7 @@
 module pkgcore
 
 import os
+import json2
 import tools.packages.pkgprotocol
 
 // An administrative client stores a root, an offline flag and an optional
@@ -62,7 +63,7 @@ pub fn (service Service) import_repository_media_batch(sources []RepositoryMedia
 		if source.id in selected { return error('duplicate offline media repository: ${source.id}') }
 		selected[source.id] = true
 	}
-	return service.import_repository_media_sources(sources, '')
+	return service.import_repository_media_sources(sources, '', none)
 }
 
 // Import enrolled repositories found directly inside an exported bundle.
@@ -70,10 +71,31 @@ pub fn (service Service) import_repository_media_bundle(source string) !Catalog 
 	if !source.starts_with('/') || !printable(source, 4096) {
 		return error('offline media bundle requires an absolute directory')
 	}
-	return service.import_repository_media_sources([], source)
+	return service.import_repository_media_sources([], source, none)
 }
 
-fn (service Service) import_repository_media_sources(sources []RepositoryMediaSource, bundle string) !Catalog {
+// Import exactly the media named by an independently verified ISO receipt.
+pub fn (service Service) import_repository_media_bundle_with_receipt(source string, path string, expected_sha256 string) !Catalog {
+	if !source.starts_with('/') || !printable(source, 4096) || !path.starts_with('/')
+		|| !printable(path, 4096) || !digest_valid(expected_sha256) {
+		return error('offline media receipt import requires absolute media and receipt paths and a SHA-256 digest')
+	}
+	text := read_metadata(path)!
+	defer { unsafe { text.free() } }
+	digest := index_digest(text)
+	defer { unsafe { digest.free() } }
+	if digest != expected_sha256 { return error('ISO package receipt SHA-256 differs from the expected digest') }
+	receipt := json2.decode[IsoPackageReceipt](text)!
+	defer { receipt.close_decoded() }
+	if receipt.format != 1 || !digest_valid(receipt.iso_sha256) || !digest_valid(receipt.configuration_sha256)
+		|| !digest_valid(receipt.deployment_sha256) || receipt.applications.len == 0
+		|| receipt.publishers.len == 0 || receipt.publishers.len > max_image_repository_indexes {
+		return error('offline media import requires an ISO package receipt with applications and bundled publishers')
+	}
+	return service.import_repository_media_sources([], source, receipt)
+}
+
+fn (service Service) import_repository_media_sources(sources []RepositoryMediaSource, bundle string, receipt ?IsoPackageReceipt) !Catalog {
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
@@ -83,7 +105,7 @@ fn (service Service) import_repository_media_sources(sources []RepositoryMediaSo
 	for source in sources {
 		if !config.repositories.any(it.id == source.id) { return error('${source.id}: repository is not configured') }
 	}
-	mut batch := RepositoryMediaBatch{}
+	mut batch := RepositoryMediaBatch{ receipt: receipt }
 	defer { batch.close() }
 	if bundle != '' {
 		batch.open_bundle(bundle, config)!

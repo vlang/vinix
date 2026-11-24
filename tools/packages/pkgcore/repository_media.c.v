@@ -19,6 +19,7 @@ mut:
 	sources map[string]RepositoryMedia
 	bundle ?RepositoryMedia
 	has_deployment bool
+	receipt ?IsoPackageReceipt
 }
 
 fn (mut batch RepositoryMediaBatch) close() {
@@ -51,8 +52,27 @@ fn (mut batch RepositoryMediaBatch) open_bundle(directory string, config Config)
 		batch.sources[repository.id] = open_repository_media(path)!
 	}
 	batch.has_deployment = bundle.member_exists(pkgprotocol.deployment_mirror_filename)!
+	batch.check_receipt_publishers(config)!
 	batch.check_bundle()!
 	if batch.sources.len == 0 { return error('offline media bundle contains no enrolled repositories') }
+}
+
+fn (batch &RepositoryMediaBatch) check_receipt_publishers(config Config) ! {
+	if receipt := batch.receipt {
+		if receipt.architecture != config.architecture { return error('offline media receipt architecture differs from the installation') }
+		if batch.sources.len != receipt.publishers.len { return error('offline media publishers differ from the ISO package receipt') }
+		mut seen := map[string]bool{}
+		defer { unsafe { seen.free() } }
+		for pin in receipt.publishers {
+			if pin.id in seen || pin.id !in batch.sources || pin.sequence == 0 || !digest_valid(pin.index_sha256) {
+				return error('invalid or missing offline media publisher pin: ${pin.id}')
+			}
+			if !config.repositories.any(it.id == pin.id && it.public_key == pin.public_key) {
+				return error('ISO package receipt publisher key differs from the enrolled key: ${pin.id}')
+			}
+			seen[pin.id] = true
+		}
+	}
 }
 
 fn (batch &RepositoryMediaBatch) check_bundle() ! {
@@ -70,9 +90,33 @@ fn (batch &RepositoryMediaBatch) check_bundle() ! {
 			path := bundle.path + '/' + name
 			defer { unsafe { path.free() } }
 			export_stage_file(path)!
+			if receipt := batch.receipt {
+				deployment := read_release_lock_matching_digest(path, receipt.deployment_sha256)!
+				defer { unsafe { deployment.free() } }
+				check_offline_application_list(deployment, receipt.architecture, receipt.applications)!
+			}
+		} else if batch.receipt != none {
+			return error('offline media is missing the ISO package receipt deployment lock')
 		}
 		export_stage_directory(bundle.path, entries, 0)!
 		bundle.check()!
+	}
+}
+
+fn (batch &RepositoryMediaBatch) check_receipt_snapshot(repository Repository, index Index, text string) ! {
+	if receipt := batch.receipt {
+		for pin in receipt.publishers {
+			if pin.id != repository.id { continue }
+			digest := index_digest(text)
+			defer { unsafe { digest.free() } }
+			if digest != pin.index_sha256 || index.sequence != pin.sequence {
+				return error('offline repository index differs from the ISO package receipt: ${repository.id}')
+			}
+			objects := signed_release_objects(index, 0)!
+			defer { unsafe { objects.free() } }
+			check_iso_offline_payload_bytes(pin, objects)!
+			return
+		}
 	}
 }
 

@@ -844,6 +844,18 @@ vinix-package --offline deployment-add-review "$vinix_deployment"
 vinix-package admin --offline deployment-add-apply DEPLOYMENT_FINGERPRINT "$vinix_deployment"
 ```
 
+To bind the import itself to the reviewed release, pass the absolute path to
+its ISO package receipt and the receipt's SHA-256 from the trusted release
+checksums. The import checks the exact receipt bytes, target architecture,
+deployment lock, publisher set and enrolled keys. It authenticates and pins
+the same signed indexes used to plan payload acquisition and publish the
+catalog. Use the receipt's `deployment_sha256` again when saving the lock
+and reviewing its deployment on the installed system.
+
+```sh
+vinix-package admin update-media /media/usb/release-apps /review/vinix-packages-arm64.json RECEIPT_SHA256
+```
+
 `deployment-media-save MEDIA_DIRECTORY NEW_FILE [EXPECTED_SHA256]` checks the
 bundle's nonempty format-2 lock against the current authenticated catalog,
 policy and installed state. It saves the exact bytes to a new file outside the

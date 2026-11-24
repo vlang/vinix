@@ -15,6 +15,35 @@ pub:
 	reviewed_origin string @[omitempty]
 }
 
+pub struct IsoPackageReceipt {
+pub:
+	format int = 1
+	iso_sha256 string
+	configuration_sha256 string
+	deployment_sha256 string
+	architecture string
+	applications []string
+	publishers []IsoOfflinePublisher
+}
+
+fn (receipt IsoPackageReceipt) close_decoded() {
+	unsafe {
+		receipt.iso_sha256.free()
+		receipt.configuration_sha256.free()
+		receipt.deployment_sha256.free()
+		receipt.architecture.free()
+		for application in receipt.applications { application.free() }
+		(&array(&receipt.applications)).free()
+		for publisher in receipt.publishers {
+			publisher.id.free()
+			publisher.public_key.free()
+			publisher.index_sha256.free()
+			publisher.reviewed_origin.free()
+		}
+		receipt.publishers.free()
+	}
+}
+
 // Verify a mode-preserving copy of exported media against the trusted ISO
 // receipt's application and publisher pins. This does not need an ISO copy,
 // package state, private scratch storage, or the repository origin.
@@ -56,11 +85,7 @@ fn verify_iso_offline_media_at(directory string, architecture string, applicatio
 	export_stage_file(lock_path)!
 	deployment := read_release_lock_matching_digest(lock_path, deployment_sha256)!
 	defer { unsafe { deployment.free() } }
-	mut document := decode_deployment(deployment, architecture)!
-	defer { document.close() }
-	if document.format != 2 || document.packages.len == 0 || document.packages != applications {
-		return error('offline media application declaration differs from the ISO package receipt')
-	}
+	check_offline_application_list(deployment, architecture, applications)!
 	mut expires := max_i64
 	for publisher in publishers {
 		if !atomic_captured_parent_matches(root, fd) { return error('ISO offline media root changed during verification') }
@@ -74,6 +99,14 @@ fn verify_iso_offline_media_at(directory string, architecture string, applicatio
 	export_stage_metadata(lock_path, deployment)!
 	check_offline_media_root(root, fd, entries)!
 	if expires <= release_index_time(release_time) { return error('offline media repository expired during verification') }
+}
+
+fn check_offline_application_list(deployment string, architecture string, applications []string) ! {
+	mut document := decode_deployment(deployment, architecture)!
+	defer { document.close() }
+	if document.format != 2 || document.packages.len == 0 || document.packages != applications {
+		return error('offline media application declaration differs from the ISO package receipt')
+	}
 }
 
 fn check_offline_media_root(root string, fd int, entries map[string]u64) ! {
