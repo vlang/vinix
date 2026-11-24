@@ -1229,6 +1229,32 @@ handoff logs. The independent checker verified all 1,052 sealed files.
 Archive SHA-256 is
 `16d9f13f2138e12b164f991a4692c49ec6cb6db4199a836deb31c0165a062cce`.
 
+### Verify a downloaded ISO against its package receipt
+
+At `ee5e1818671716e9ad15ace868fc9f39e3ddb900`,
+`package-receipt verify-receipt ISO RECEIPT.json` reuses the release verifier
+without needing a separate build plan. It compares the captured ISO with the
+receipt's SHA-256 before invoking the extractor. It then checks the embedded
+package inputs and emits the regenerated receipt. The SDK documents the
+trusted-checksum prerequisite and the current signed-index expiry check.
+
+Production and ASan/UBSan builds passed 33 legacy and 35 hosted fixture cases
+per target. The added checks reproduced each matching receipt and refused
+altered ISO, configuration and deployment digests, a changed reviewed URL,
+and an unsupported receipt format. Sanitizer runs disabled leak detection
+and symbolization.
+
+Both builds reproduced the retained mixed-catalog receipts and the
+configuration-only receipts byte for byte for AArch64 and x86-64.
+The mixed-catalog pair also reproduced with only `xorriso` on PATH.
+Pairing the x86-64 ISO with the AArch64 receipt refused with an empty PATH,
+which confirms the digest check runs before extractor lookup.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-published-receipt-check-MThFpK/qualification.tar.gz)
+contains the source, signed fixtures, retained ISOs, receipts and logs.
+The independent checker verified all 804 sealed files. Archive SHA-256 is
+`5be8927877f19a377f065f6280dcabd340f9c2d2b24595daac2a0c0d3dd99c8d`.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
