@@ -1170,6 +1170,39 @@ The fixtures, verification logs and retained ISO input checksums are in
 Its SHA-256 is `b9540411300a7a5edcaa741c0c1bc21c8fa30a7e9e6679f637cde00913aa8e8b`.
 All 304 entries in the extracted `qualification.sha256` passed.
 
+### Reviewed HTTPS origins in ISO plans and receipts
+
+At `2d966738c7ff7e1a8698c0e3088a06f3ec677eac`, image preflight reports a
+publisher's `reviewed_origin` only when its hosted pin matched the effective
+configuration. The ISO plan retains that URL. Final verification compares it
+with the embedded configuration before including it in the public receipt.
+
+The prior planner produced identical bytes when a hosted pin was replaced
+with its digest-only row. The new planner emits distinct plans for those two
+inputs, which the release driver's exact-plan comparison can distinguish.
+Legacy fixture plans and receipts matched the prior build byte for byte.
+
+The production and ASan/UBSan builds passed 33 legacy and 35 hosted ISO
+cases per target. The new refusal cases changed the reviewed URL in the
+plan or changed the embedded URL and recomputed the configuration digest.
+Verification of a captured private ISO and verification of the same bytes
+through the ordinary CLI produced identical receipts. Sanitizer runs
+disabled leak detection and symbolization.
+
+Normal staging used the retained loopback TLS readback pins to build both
+mixed-catalog ISO fixtures. The plan and receipt retained the exact URL and
+all seven application roots per target. The staged declaration locked ten
+packages, and the embedded signed repository passed payload verification.
+The ISO fixtures were verified on the host. The separate AArch64 and x86-64
+QEMU image-input suites passed all five programs and shut down in 95.796
+and 101.689 seconds respectively. All nine artifact digests matched for
+each guest.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-hosted-origin-receipt-XxVqQm/qualification.tar.gz)
+contains the source, host and guest builds, fixture ISOs, plans and receipts.
+The independent checker verified all 3,024 sealed files. Archive SHA-256 is
+`7283174c77e090afbc0f0ba028af47f72578bd8e48ff7d01f57eea0c6bf50d9f`.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
