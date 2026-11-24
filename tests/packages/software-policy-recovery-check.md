@@ -78,3 +78,29 @@ Archive SHA256:
 It also preserves the three earlier compile failures: missing hosted types,
 unadapted native UI branches, and the existing Clang 23 Unix-socket pointer
 diagnostic. Those attempts provide no runtime qualification.
+
+## Policy and deployment decoder retention
+
+At `ae0f7e1ceaf25077eecc4d817501f894c6de9263`, the policy and deployment
+readers append decoded records by value and release partial records and
+documents through by-value cleanup. Policy validation uses the same rules
+through both the public methods and the readers.
+
+At `e6d5c3cdc`, the focused policy matrix retained 674,304 bytes over 512
+attempts and the deployment matrix retained 117,248 bytes over 320 attempts.
+The final matrices retained zero bytes and zero allocation records across
+valid replies, late malformed fields and trailing-data refusals. The
+1,000-cycle Software policy navigation fixture went from 2,656,000 retained
+bytes to zero. The separate policy memory fixture also completed with zero
+retained bytes after previously reaching the tracker limit. Deployment
+navigation retained zero tracked bytes at both revisions.
+
+On 2026-11-24, all 27 protocol test files and the full host Software fixture
+passed. The focused ASan/UBSan checks passed with process leak detection
+disabled. The focused tests linked statically for AArch64 and x86_64.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-policy-deployment-readers-yHxBBB/qualification.tar.gz)
+contains the committed sources, baseline and fixed logs, generated code, and
+target builds. The independent checker verified all 569 sealed files.
+Archive SHA-256 is
+`e7b19f93201086914c982f35da05deb83ce614c1ba958a66ef8cecfa63f1a8c5`.
