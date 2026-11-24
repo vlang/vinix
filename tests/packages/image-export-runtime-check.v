@@ -31,6 +31,7 @@ fn image_export_suite() hwhost.Suite {
 		], scenarios: [hwhost.Scenario{ name: 'packages-image-export', arches: ['aarch64', 'x86_64'],
 			about: 'explicit canonical image deployment export: namespace/new-file protection, failure cleanup and ordinary reviewed offline installation',
 			required: ['HWTEST START packages-image-export',
+				'ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS',
 				'IMAGE CATALOG captured both-host exact locks, stable source removal, publish ordering, canonical bytes/digest/mode, no consumer state and identical-file preservation PASS',
 				'IMAGE CATALOG occupied and late file/link/dangling/FIFO/directory/hardlink/shared-write destinations refuse unchanged before publication; removal and retry PASS',
 				'IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS',

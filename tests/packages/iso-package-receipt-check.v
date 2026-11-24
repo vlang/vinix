@@ -492,6 +492,70 @@ fn check_installed_receipt(tool string, iso string, receipt string, work string,
 	defer { repaired.close() }
 	assert repaired.requested == state.requested && repaired.packages == state.packages
 	println('ISO deployment export exact lock, exclusive publication, historical read and reviewed recovery PASS')
+	check_offline_export(tool, iso, receipt, work, state)!
+}
+
+fn check_offline_export(tool string, iso string, receipt string, work string, expected pkgcore.State) ! {
+	media := work + '/offline-media'
+	root := work + '/root'
+	args := [tool, 'export-offline', iso, receipt]
+	code, output := command([...args, media])
+	os.write_file(work + '/offline-media-export.log', output)!
+	if code != 0 { return error('offline media export failed: ' + output) }
+	report := json2.decode[json2.Any](output)!.as_map()
+	assert report['format']!.int() == 1 && report['destination']!.str() == media
+	assert output.contains('"receipt":' + os.read_file(receipt)!.trim_space() + '}')
+	deployment := media + '/' + pkgprotocol.deployment_mirror_filename
+	assert os.read_file(deployment)! == os.read_file(root + '/' + declaration)!
+	assert os.lstat(deployment)!.mode & 0o7777 == 0o644
+	assert os.lstat(media)!.mode & 0o7777 == 0o755
+	mut config_document := pkgcore.load_config(root)!
+	defer { config_document.close() }
+	repository := config_document.repositories[0]
+	assert os.ls(media)!.sorted() == [pkgprotocol.deployment_mirror_filename, repository.id].sorted()
+	original := root + '/' + repositories + '/' + repository.id
+	exported := media + '/' + repository.id
+	for metadata in ['index.json', 'index.sig'] {
+		assert os.read_file(exported + '/' + metadata)! == os.read_file(original + '/' + metadata)!
+	}
+	objects := os.ls(original + '/objects')!.sorted()
+	assert os.ls(exported + '/objects')!.sorted() == objects
+	for object in objects { assert pkgcore.hash_file(exported + '/objects/' + object)! == object }
+
+	occupied, _ := command([...args, media])
+	assert occupied == 1
+	assert os.read_file(deployment)! == os.read_file(root + '/' + declaration)!
+	dangling := work + '/offline-dangling'
+	os.symlink(work + '/missing-media', dangling)!
+	alias, _ := command([...args, dangling])
+	assert alias == 1 && os.is_link(dangling) && !os.exists(work + '/missing-media')
+	bad_receipt := work + '/offline-wrong-iso-receipt.json'
+	os.write_file(bad_receipt, os.read_file(receipt)!.replace(pkgcore.hash_file(iso)!, '0'.repeat(64)))!
+	missing := work + '/offline-refused'
+	wrong_digest, message := command([tool, 'export-offline', iso, bad_receipt, missing])
+	assert wrong_digest == 1 && message.contains('ISO SHA-256 differs') && !os.exists(missing)
+	assert !os.ls(work)!.any(it.starts_with('.vinix-iso-offline-'))
+
+	// Exercise the copied media from an empty store with only the original key
+	// and the new local URL. Local enrollment and deployment each need a review.
+	fresh := work + '/offline-clean-root'
+	os.mkdir_all(os.dir(fresh + '/' + config))!
+	os.write_file(fresh + '/' + config, json2.encode(pkgcore.Config{ architecture: config_document.architecture }))!
+	local := pkgcore.Repository{ ...repository, url: 'file://' + exported }
+	trust := pkgcore.review_repository(fresh, 'enroll', local, true)!
+	assert trust.index_sha256 == pkgcore.hash_file(original + '/index.json')!
+	mut enrolled := pkgcore.enroll_repository_reviewed(fresh, local, true, trust.fingerprint)!
+	defer { enrolled.close() }
+	service := pkgcore.Service{ root: fresh, offline: true }
+	mut catalog := service.refresh()!
+	catalog.close()
+	mut review := service.review_deployment_additions(deployment)!
+	defer { review.close() }
+	assert service.state()!.packages.len == 0
+	mut installed := service.apply_deployment_additions(deployment, review.fingerprint)!
+	defer { installed.close() }
+	assert installed.requested == expected.requested && installed.packages == expected.packages
+	println('ISO offline media preserves signed repositories and lock, refuses replacements and restores through reviewed enrollment and deployment on a clean offline root PASS')
 }
 
 fn run() ! {
@@ -654,8 +718,20 @@ fn run() ! {
 				check_archive_receipt(tool, iso, receipt, work)!
 				check_installed_receipt(tool, iso, receipt, work, document.packages)!
 			}
-		} else if code == 0 || !output.contains(diagnostic) {
-			return error('unexpected ISO verification outcome for ${scenario}: ${output}')
+		} else {
+			if code == 0 || !output.contains(diagnostic) {
+				return error('unexpected ISO verification outcome for ${scenario}: ${output}')
+			}
+			if scenario == 'wrong-object' {
+				valid := os.read_file(out + '/match/receipt.json')!
+				changed := work + '/media-receipt.json'
+				os.write_file(changed, valid.replace(pkgcore.hash_file(out + '/match/image.iso')!, pkgcore.hash_file(iso)!))!
+				media := work + '/offline-media'
+				refused, reason := command([tool, 'export-offline', iso, changed, media])
+				os.write_file(work + '/offline-media-refusal.log', reason)!
+				assert refused == 1 && reason.contains(diagnostic) && !os.exists(media)
+				assert !os.ls(work)!.any(it.starts_with('.vinix-iso-offline-'))
+			}
 		}
 		println('ISO package receipt ${scenario} PASS')
 	}

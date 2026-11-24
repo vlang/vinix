@@ -789,6 +789,40 @@ verification. The installed system checks current publisher trust and policy
 when reviewing the exported lock. Applying the proposal requires separate
 confirmation and administrator approval.
 
+For a disconnected installation, export the verified repositories and lock
+together. This copies every repository bundled in the ISO, including its
+original signed index, signature and authenticated objects. The new directory
+contains those repositories under their publisher IDs and the exact lock as
+`_deployment.json`.
+
+```sh
+/tmp/vinix-package-receipt export-offline vinix-arm64.iso vinix-packages-arm64.json /media/usb/release-apps
+```
+
+The command needs current indexes and a release application declaration. It
+publishes a new directory atomically and prints the destination and verified
+ISO package receipt. Choose a filesystem that supports exclusive atomic rename.
+Use `TMPDIR` for verifier scratch space. The export also needs room for the
+complete bundle on the output filesystem.
+
+On the destination system, use the verified publisher ID and independently
+trusted public key to review each required repository at its local media URL.
+Apply the reviewed repository changes, refresh offline and review the copied
+lock. For example, with one publisher:
+
+```sh
+vinix-package --offline repo-review enroll PUBLISHER file:///media/usb/release-apps/PUBLISHER PUBLIC_KEY_HEX
+vinix-package admin --offline repo-apply REPO_FINGERPRINT enroll PUBLISHER file:///media/usb/release-apps/PUBLISHER PUBLIC_KEY_HEX
+vinix-package admin --offline update PUBLISHER
+vinix-package --offline deployment-add-review /media/usb/release-apps/_deployment.json
+vinix-package admin --offline deployment-add-apply DEPLOYMENT_FINGERPRINT /media/usb/release-apps/_deployment.json
+```
+
+Review the URL change if the publisher is already enrolled. The destination
+enforces its current trust, replay history and organization policy. An older
+ISO can be audited or used to export its lock at the trusted release time.
+Offline acquisition requires currently valid signed indexes.
+
 For a release that advertises the same catalog on both architectures, generate
 both plans with the candidate package input environment:
 

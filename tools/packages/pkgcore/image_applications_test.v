@@ -55,6 +55,62 @@ fn image_apps_config(work string, architecture string, key string, policy Policy
 	return path
 }
 
+fn test_iso_offline_media_exclusive_publication_retires_stages_and_preserves_outside_data() {
+	work, key := image_apps_fixture()!
+	defer { os.rmdir_all(work) or {} }
+	root := work + '/image'
+	parent := work + '/media-parent'
+	saved := work + '/saved-parent'
+	destination := parent + '/release'
+	os.mkdir(root)!
+	os.mkdir(parent)!
+	source := image_apps_config(work, 'aarch64', key, Policy{})!
+	mut configuration := prepare_image_configuration(root, 'aarch64', source)!
+	defer { configuration.close() }
+	mut repositories := configuration.prepare_repositories(work + '/bundle')!
+	defer { repositories.close() }
+	mut applications := configuration.prepare_applications(&repositories, ['editor', 'modern'])!
+	defer { applications.close() }
+	bundle := unsafe { &repositories }
+	deployment := applications.text
+	mut refused := false
+	write_iso_offline_media(destination, fn (_ &IsoOfflineMedia) ! {}) or {
+		refused = err.msg().contains('missing its deployment lock')
+	}
+	assert refused && os.ls(parent)!.len == 0
+	refused = false
+	write_iso_offline_media(destination, fn [bundle, deployment, destination] (media &IsoOfflineMedia) ! {
+		media.write(bundle, deployment)!
+		os.mkdir(destination)!
+		os.write_file(destination + '/keep', 'concurrent owner')!
+	}) or { refused = err.msg().contains('without replacing') }
+	assert refused && os.ls(parent)! == ['release']
+	assert os.read_file(destination + '/keep')! == 'concurrent owner'
+	os.rmdir_all(destination)!
+	refused = false
+	write_iso_offline_media(destination, fn [bundle, deployment, parent, saved] (media &IsoOfflineMedia) ! {
+		media.write(bundle, deployment)!
+		os.rename(parent, saved)!
+		os.mkdir(parent)!
+		os.write_file(parent + '/keep', 'replacement parent')!
+	}) or { refused = err.msg().contains('parent path changed') }
+	assert refused && os.ls(saved)!.len == 0
+	assert os.ls(parent)! == ['keep'] && os.read_file(parent + '/keep')! == 'replacement parent'
+	os.rename(parent, work + '/outside')!
+	os.rename(saved, parent)!
+	write_iso_offline_media(destination, fn [bundle, deployment] (media &IsoOfflineMedia) ! {
+		media.write(bundle, deployment)!
+	})!
+	assert os.ls(parent)! == ['release']
+	assert os.ls(destination)!.sorted() == [pkgprotocol.deployment_mirror_filename, 'native', 'organization']
+	assert os.read_file(destination + '/' + pkgprotocol.deployment_mirror_filename)! == deployment
+	for id in ['native', 'organization']! {
+		assert os.read_file(destination + '/' + id + '/index.json')! == os.read_file(work + '/bundle/' + id + '/index.json')!
+	}
+	assert os.ls(root)!.len == 0
+	println('ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS')
+}
+
 fn test_image_catalog_refuses_identical_replaced_capture_before_report_and_declaration() {
 	for architecture in ['aarch64', 'x86_64']! {
 		work, key := image_apps_fixture()!; defer { os.rmdir_all(work) or {} }

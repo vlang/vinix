@@ -4,7 +4,6 @@ module main
 import crypto.sha256
 import json2
 import os
-import rand
 import strconv
 import tarstream
 import time
@@ -15,6 +14,8 @@ import tools.packages.pkgprotocol
 const config_path = '/etc/vinix-packages/config.json'
 const repository_path = pkgcore.image_repositories_path
 const declaration_path = pkgprotocol.image_applications_path
+
+fn C.mkdtemp(&char) &char
 
 struct IndexSummary {
 	id string
@@ -81,18 +82,30 @@ struct DeploymentExport {
 	release_time i64 @[omitempty]
 }
 
+struct OfflineMediaExport {
+	format int = 1
+	destination string
+	receipt Receipt
+}
+
+fn check_inputs(configuration &pkgcore.ImageConfiguration, repositories &pkgcore.ImageRepositories, declaration string) !Preflight {
+	report := if declaration == '' {
+		configuration.check_repositories(repositories)!
+	} else {
+		configuration.check_application_file(repositories, declaration)!
+	}
+	defer { unsafe { report.free() } }
+	return json2.decode[Preflight](report)
+}
+
 fn preflight(root string, arch string, config string, bundle string, declaration string, indexes string) !Preflight {
 	mut configuration := pkgcore.prepare_image_configuration(root, arch, config)!
 	defer { configuration.close() }
 	mut repositories := unsafe { &configuration }.prepare_repositories_for_index_file(bundle, indexes, root)!
 	defer { repositories.close() }
-	report := if declaration == '' {
-		unsafe { &configuration }.check_repositories(unsafe { &repositories })!
-	} else {
-		unsafe { &configuration }.check_application_file(unsafe { &repositories }, declaration)!
-	}
+	report := check_inputs(unsafe { &configuration }, unsafe { &repositories }, declaration)!
 	repositories.retire()!
-	return json2.decode[Preflight](report)
+	return report
 }
 
 fn package_selection(input Preflight, arch string, reviewed_origins map[string]string) !Selection {
@@ -229,7 +242,7 @@ fn capture_package_members(archive string, root string, expected Selection) ! {
 	}
 }
 
-fn check_iso(iso string, work string, expected Selection, expected_sha256 string, release_time i64) !Receipt {
+fn check_iso(iso string, work string, expected Selection, expected_sha256 string, release_time i64, offline_media ?&pkgcore.IsoOfflineMedia) !Receipt {
 	before := pkgcore.hash_file(iso)!
 	if expected_sha256 != '' && before != expected_sha256 {
 		return error('ISO SHA-256 differs from the package receipt')
@@ -250,14 +263,27 @@ fn check_iso(iso string, work string, expected Selection, expected_sha256 string
 	repositories := root + repository_path
 	bundle := if os.is_dir(repositories) && os.ls(repositories)!.len > 0 { repositories } else { '' }
 	declaration := if os.is_file(root + declaration_path) { root + declaration_path } else { '' }
-	input := if release_time == 0 {
-		preflight(root, expected.architecture, '', bundle, declaration, '')!
-	} else {
-		mut configuration := pkgcore.prepare_image_configuration(root, expected.architecture, '')!
-		defer { configuration.close() }
+	mut configuration := pkgcore.prepare_image_configuration(root, expected.architecture, '')!
+	defer { configuration.close() }
+	if release_time != 0 {
 		report := unsafe { &configuration }.audit_archived_image(bundle, declaration, root, release_time)!
-		json2.decode[Preflight](report)!
+		defer { unsafe { report.free() } }
+		return validate_image_receipt(iso, before, expected, json2.decode[Preflight](report)!)
 	}
+	mut captured := unsafe { &configuration }.prepare_repositories_in(bundle, root)!
+	defer { captured.close() }
+	input := check_inputs(unsafe { &configuration }, unsafe { &captured }, declaration)!
+	verified := validate_image_receipt(iso, before, expected, input)!
+	if media := offline_media {
+		deployment := pkgcore.read_release_lock_matching_digest(declaration, verified.deployment_sha256)!
+		defer { unsafe { deployment.free() } }
+		media.write(unsafe { &captured }, deployment)!
+	}
+	captured.retire()!
+	return verified
+}
+
+fn validate_image_receipt(iso string, before string, expected Selection, input Preflight) !Receipt {
 	if input.configuration_sha256 != expected.configuration_sha256 {
 		return error('ISO package configuration differs from the preflight selection')
 	}
@@ -332,9 +358,14 @@ fn print_reviewed_origins(path string, digest string) ! {
 fn workspace() !string {
 	selected := os.getenv('TMPDIR')
 	temp := if selected != '' { selected } else { os.temp_dir() }
-	work := os.join_path(temp, 'vinix-iso-packages-' + rand.ulid())
-	os.mkdir(work, mode: 0o700)!
-	return work
+	pattern := os.join_path(temp, 'vinix-iso-packages-XXXXXX')
+	defer { unsafe { pattern.free() } }
+	mut path := pattern.bytes()
+	path << u8(0)
+	defer { unsafe { path.free() } }
+	created := C.mkdtemp(unsafe { &char(path.data) })
+	if created == unsafe { nil } { return error('cannot create a private ISO verification workspace in ' + temp) }
+	return unsafe { cstring_to_vstring(created).clone() }
 }
 
 // Only the release driver lends an existing capture. Other readers get an
@@ -389,7 +420,7 @@ fn archived_release_time(value string) !i64 {
 	return release_time
 }
 
-fn verify_published_image(source string, receipt Receipt, work string, release_time i64) !Receipt {
+fn verify_published_image(source string, receipt Receipt, work string, release_time i64, offline_media ?&pkgcore.IsoOfflineMedia) !Receipt {
 	receipt_architecture(receipt)!
 	expected := Selection{
 		architecture: receipt.architecture
@@ -399,7 +430,7 @@ fn verify_published_image(source string, receipt Receipt, work string, release_t
 		publishers: receipt.publishers
 	}
 	iso := receipt_image(source, work, false)!
-	return check_iso(iso, work, expected, receipt.iso_sha256, release_time)
+	return check_iso(iso, work, expected, receipt.iso_sha256, release_time, offline_media)
 }
 
 fn read_application_receipt(path string) !Receipt {
@@ -424,12 +455,27 @@ fn export_deployment(arguments []string) ! {
 	pkgcore.atomic_write_new_after(destination, fn [source, receipt, release_time] () !string {
 		work := workspace()!
 		defer { os.rmdir_all(work) or {} }
-		verified := verify_published_image(source, receipt, work, release_time)!
+		verified := verify_published_image(source, receipt, work, release_time, none)!
 		return pkgcore.read_release_lock_matching_digest(work + '/root' + declaration_path,
 			verified.deployment_sha256)
 	})!
 	println(json2.encode(DeploymentExport{ iso_sha256: receipt.iso_sha256, architecture: receipt.architecture,
 		destination: destination, sha256: receipt.deployment_sha256, release_time: release_time }))
+}
+
+fn export_offline(arguments []string) ! {
+	if arguments.len != 3 {
+		return error('usage: package-receipt export-offline ISO RECEIPT.json NEW_DIRECTORY')
+	}
+	source := arguments[0]
+	receipt := read_application_receipt(arguments[1])!
+	destination := arguments[2]
+	pkgcore.write_iso_offline_media(destination, fn [source, receipt] (media &pkgcore.IsoOfflineMedia) ! {
+		work := workspace()!
+		defer { os.rmdir_all(work) or {} }
+		verify_published_image(source, receipt, work, 0, media)!
+	})!
+	println(json2.encode(OfflineMediaExport{ destination: destination, receipt: receipt }))
 }
 
 fn verify_installed(arguments []string) !int {
@@ -445,7 +491,7 @@ fn verify_installed(arguments []string) !int {
 	if saved.architecture != receipt.architecture { return error('installed snapshot architecture differs from the ISO receipt') }
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }
-	verified := verify_published_image(arguments[0], receipt, work, release_time)!
+	verified := verify_published_image(arguments[0], receipt, work, release_time, none)!
 	mut coverage := pkgcore.audit_saved_deployment_coverage(work + '/root' + declaration_path,
 		verified.deployment_sha256, arguments[2], saved)!
 	defer { coverage.close() }
@@ -484,23 +530,26 @@ fn run() ! {
 	if os.args.len >= 2 && os.args[1] == 'export-deployment' {
 		return export_deployment(os.args[2..])
 	}
+	if os.args.len >= 2 && os.args[1] == 'export-offline' {
+		return export_offline(os.args[2..])
+	}
 	archive := os.args.len == 5 && os.args[1] == 'verify-archive'
 	if !archive && (os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']!) {
-		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | export-deployment ISO RECEIPT.json NEW_FILE [RELEASE_UNIX_TIME] | checksums RECEIPT.json | origins RECEIPT.json SHA256')
+		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | export-deployment ISO RECEIPT.json NEW_FILE [RELEASE_UNIX_TIME] | export-offline ISO RECEIPT.json NEW_DIRECTORY | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }
 	if archive || os.args[1] == 'verify-receipt' {
 		release_time := if archive { archived_release_time(os.args[4])! } else { i64(0) }
 		receipt := json2.decode[Receipt](os.read_file(os.args[3])!)!
-		verified := verify_published_image(os.args[2], receipt, work, release_time)!
+		verified := verify_published_image(os.args[2], receipt, work, release_time, none)!
 		if archive { println(json2.encode(ArchiveAudit{release_time: release_time, receipt: verified})) }
 		else { println(json2.encode(verified)) }
 		return
 	}
 	expected := json2.decode[Selection](os.read_file(os.args[3])!)!
 	iso := receipt_image(os.args[2], work, os.args[1] == 'verify-staged')!
-	println(json2.encode(check_iso(iso, work, expected, '', 0)!))
+	println(json2.encode(check_iso(iso, work, expected, '', 0, none)!))
 }
 
 fn main() {
