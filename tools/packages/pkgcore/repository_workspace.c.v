@@ -28,27 +28,27 @@ fn capture_repository_workspace(parent int, name string) !(bool, StageTarget) {
 	return true, StageTarget{name: name, device: u64(info.st_dev), inode: u64(info.st_ino)}
 }
 
-fn create_enrollment_workspace(parent int) !StageTarget {
-	found, abandoned := capture_repository_workspace(parent, 'enrollment')!
+fn create_repository_workspace(parent int, name string) !StageTarget {
+	found, abandoned := capture_repository_workspace(parent, name)!
 	if found { retire_stage(parent, abandoned)! }
 	// Creating relative to the captured parent stops a replaced state path
 	// from receiving the new workspace. EEXIST never adopts a replacement.
-	if C.mkdirat(parent, c'enrollment', 0o700) != 0 {
-		return error('cannot create private enrollment workspace; check permissions and inspect existing entries')
+	if C.mkdirat(parent, name.str, 0o700) != 0 {
+		return error('cannot create private ${name} workspace; check permissions and inspect existing entries')
 	}
-	present, target := capture_repository_workspace(parent, 'enrollment')!
-	if !present { return error('cannot capture new enrollment workspace') }
+	present, target := capture_repository_workspace(parent, name)!
+	if !present { return error('cannot capture new ${name} workspace') }
 	return target
 }
 
-fn check_enrollment_workspace(directory string, parent int, target StageTarget) ! {
+fn check_repository_workspace(directory string, parent int, target StageTarget) ! {
 	mut folder := C.stat{}
 	if C.fstat(parent, unsafe { &folder }) != 0
 		|| !atomic_parent_matches(directory, u64(folder.st_dev), u64(folder.st_ino)) {
-		return error('enrollment workspace parent changed; restore it before retrying')
+		return error('${target.name} workspace parent changed; restore it before retrying')
 	}
 	present, observed := capture_repository_workspace(parent, target.name)!
 	if !present || observed != target {
-		return error('enrollment workspace identity changed; retain it for inspection')
+		return error('${target.name} workspace identity changed; retain it for inspection')
 	}
 }

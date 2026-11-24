@@ -120,6 +120,21 @@ These runs qualify recovery at completed metadata checkpoints on QEMU ext2.
 Cuts during writes, physical storage power loss and wider filesystem
 qualification remain open.
 
+### Refresh workspace recovery
+
+Both full and selected refresh create the scratch directory relative to the
+captured package state directory. They check both directory identities between
+metadata transfers, after reporting verification progress and before publishing
+history or the catalog. A workspace replacement causes refusal and preserves
+the replacement and its contents. Cleanup can still retire work through the
+captured parent if the state pathname moves.
+
+The host regression moves the fetched index into a replacement directory while
+the copy still holds the original file open. The refresh must refuse before
+fetching the signature into that directory. Additional cases replace the
+workspace or its parent at verification and check both metadata files before
+retrying the original signed update.
+
 ## Reviewed publisher enrollment cuts
 
 Add `--enrollment` to the persistence command and use a fresh state directory.

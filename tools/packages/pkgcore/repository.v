@@ -169,7 +169,7 @@ fn refresh_locked(config Config, directory string) !Catalog {
 	return refresh_progress(config, directory, '', no_progress)
 }
 
-fn fetch_snapshot(config Config, directory string, work string, repository Repository,
+fn fetch_snapshot(config Config, directory string, work string, repository Repository, parent int, target StageTarget,
 	report fn (pkgprotocol.Progress)) !Snapshot {
 	message := 'Updating trusted repository ' + repository.id
 	println(message)
@@ -180,10 +180,15 @@ fn fetch_snapshot(config Config, directory string, work string, repository Repos
 	index_url := base + '/index.json'
 	sig_url := base + '/index.sig'
 	defer { unsafe { index_path.free(); sig_path.free(); base.free(); index_url.free(); sig_url.free() } }
+	// Progress can run caller code. Each transfer checks its own file, and
+	// the workspace check also rejects a moved file in a different directory.
+	check_repository_workspace(directory, parent, target)!
 	fetch_progress(index_url, index_path, max_metadata, false, config.policy.offline,
 		pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.json' }, report)!
+	check_repository_workspace(directory, parent, target)!
 	fetch_progress(sig_url, sig_path, 256, false, config.policy.offline,
 		pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.sig' }, report)!
+	check_repository_workspace(directory, parent, target)!
 	text := read_metadata(index_path)!
 	raw_signature := read_metadata(sig_path) or { unsafe { text.free() }; return err }
 	signature := raw_signature.trim_space()
@@ -214,11 +219,7 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 	defer { unsafe { work.free() } }
 	parent := repository_workspace_parent(directory, 'refresh')!
 	defer { C.close(parent) }
-	found, abandoned := capture_repository_workspace(parent, 'refresh')!
-	if found { retire_stage(parent, abandoned)! }
-	owned_directory(work, 0o700)!
-	present, target := capture_repository_workspace(parent, 'refresh')!
-	if !present { return error('cannot capture refresh workspace') }
+	target := create_repository_workspace(parent, 'refresh')!
 	defer {
 		retire_stage(parent, target) or {
 			message := err.msg(); unsafe { message.free(); err.free() }
@@ -229,11 +230,12 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 			cached := matching_snapshot(previous, repository)!
 			Snapshot{ repository: repository, text: cached.text.clone(), signature: cached.signature.clone() }
 		} else {
-			fetch_snapshot(config, directory, work, repository, report)!
+			fetch_snapshot(config, directory, work, repository, parent, target, report)!
 		}
 		pointer := unsafe { &snapshot }
 		unsafe { snapshots.push_many(pointer, 1) }
 		report(pkgprotocol.Progress{ phase: 'verify', repository: repository.id, path: 'index.json' })
+		check_repository_workspace(directory, parent, target)!
 		index := verify_index(repository, snapshot.text, snapshot.signature, time.now().unix())!
 		defer { close_decoded_index(index) }
 		next := remember_index(history, repository, index, snapshot.text)!
@@ -250,10 +252,12 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 	defer { if !published { close_authenticated_catalog(catalog) } }
 	// Record authenticated sequence/digest floors before exposing the new cache.
 	// Revocation and empty refreshes never discard identities from this history.
+	check_repository_workspace(directory, parent, target)!
 	save_history(directory, history)!
 	$if package_refresh_crash_fixture ? {
 		report(pkgprotocol.Progress{ phase: 'history-committed' })
 	}
+	check_repository_workspace(directory, parent, target)!
 	cache_path := directory + '/catalog.json'
 	defer { unsafe { cache_path.free() } }
 	atomic_write(cache_path, encoded)!

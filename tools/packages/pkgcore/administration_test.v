@@ -133,13 +133,13 @@ fn test_enrollment_workspace_checks_preserve_replacements_at_both_levels() {
 	defer { guard.release() }
 	parent := repository_workspace_parent(directory, 'enrollment')!
 	defer { C.close(parent) }
-	target := create_enrollment_workspace(parent)!
+	target := create_repository_workspace(parent, 'enrollment')!
 	work := directory + '/enrollment'
 	moved := directory + '/moved'
 	os.rename(work, moved)!
 	os.mkdir(work)!
 	os.write_file(work + '/keep', 'replacement workspace')!
-	if _ := check_enrollment_workspace(directory, parent, target) {
+	if _ := check_repository_workspace(directory, parent, target) {
 		assert false, 'workspace replacement passed identity check'
 	} else {
 		assert err.msg().contains('enrollment workspace identity changed')
@@ -157,7 +157,7 @@ fn test_enrollment_workspace_checks_preserve_replacements_at_both_levels() {
 	os.mkdir(directory)!
 	os.mkdir(work)!
 	os.write_file(work + '/keep', 'replacement parent')!
-	if _ := check_enrollment_workspace(directory, parent, target) {
+	if _ := check_repository_workspace(directory, parent, target) {
 		assert false, 'state parent replacement passed identity check'
 	} else {
 		assert err.msg().contains('enrollment workspace parent changed')

@@ -249,6 +249,91 @@ fn test_targeted_refresh_keeps_authenticated_unselected_repositories() {
 	println('TARGETED REFRESH retains exact cached HTTPS identity and refuses missing, mismatched, invalid, stale or expired snapshots PASS')
 }
 
+fn refresh_workspace_replacement(event pkgprotocol.Progress) {
+	mode := os.getenv('VINIX_REFRESH_WORKSPACE_MODE')
+	if mode == 'metadata' {
+		if event.phase != 'metadata' || event.path != 'index.json' || event.current == 0 { return }
+	} else if event.phase != 'verify' {
+		return
+	}
+	directory := os.getenv('VINIX_REFRESH_WORKSPACE_DIRECTORY')
+	work := directory + '/refresh'
+	if mode == 'parent' {
+		os.rename(directory, directory + '-saved') or { panic(err) }
+	} else {
+		os.rename(work, directory + '/saved-work') or { panic(err) }
+	}
+	os.mkdir_all(work) or { panic(err) }
+	if mode == 'metadata' {
+		// Preserve the open output file's identity at its original pathname.
+		// The enclosing directory has changed even though the file check passes.
+		os.rename(directory + '/saved-work/index.json', work + '/index.json') or { panic(err) }
+	}
+	os.write_file(work + '/index.sig', 'replacement signature') or { panic(err) }
+}
+
+fn test_refresh_preserves_replaced_workspaces_and_authenticated_state() {
+	for mode in ['metadata', 'verify', 'parent']! {
+		work := os.real_path(os.temp_dir()) + '/vinix-refresh-replace-' + os.getpid().str() + '-' + mode
+		defer { os.rmdir_all(work) or {} }
+		root := work + '/root'
+		config_path := root + '/etc/vinix-packages/config.json'
+		directory := state_directory(root)
+		os.mkdir_all(os.dir(config_path))!
+		os.mkdir_all(work + '/source')!
+		private := signing.new_key_from_seed([]u8{len: 32, init: 7})
+		repository := Repository{ id: 'fixture', url: 'file://' + work + '/source',
+			public_key: private.public_key().hex() }
+		save_configuration(config_path, Config{ architecture: 'aarch64', repositories: [repository] })!
+		expires := time.now().unix() + 3600
+		first, first_sig := refresh_request_signed(repository, 'aarch64', 'app', 1, expires, '')!
+		next, next_sig := refresh_request_signed(repository, 'aarch64', 'app', 2, expires, '')!
+		os.write_file(work + '/source/index.json', first)!
+		os.write_file(work + '/source/index.sig', first_sig)!
+		service := Service{ root: root, offline: true }
+		mut initial := service.refresh()!
+		initial.close()
+		configuration := os.read_file(config_path)!
+		catalog := os.read_file(directory + '/catalog.json')!
+		history := os.read_file(directory + '/trust-history.json')!
+		os.write_file(work + '/source/index.json', next)!
+		os.write_file(work + '/source/index.sig', next_sig)!
+
+		os.setenv('VINIX_REFRESH_WORKSPACE_MODE', mode, true)
+		os.setenv('VINIX_REFRESH_WORKSPACE_DIRECTORY', directory, true)
+		defer {
+			os.unsetenv('VINIX_REFRESH_WORKSPACE_MODE')
+			os.unsetenv('VINIX_REFRESH_WORKSPACE_DIRECTORY')
+		}
+		fault := Service{ ...service, progress: refresh_workspace_replacement }
+		if _ := fault.refresh_repository(repository.id) {
+			assert false, 'refresh accepted a replacement directory'
+		} else {
+			expected := if mode == 'parent' { 'refresh workspace parent changed' } else { 'refresh workspace identity changed' }
+			assert err.msg().contains(expected), err.msg()
+		}
+		assert os.read_file(directory + '/refresh/index.sig')! == 'replacement signature'
+		assert os.read_file(config_path)! == configuration
+		saved := if mode == 'parent' { directory + '-saved' } else { directory }
+		assert os.read_file(saved + '/catalog.json')! == catalog
+		assert os.read_file(saved + '/trust-history.json')! == history
+		if mode == 'parent' {
+			assert !os.exists(directory + '/catalog.json') && !os.exists(directory + '/trust-history.json')
+			assert !os.exists(saved + '/refresh')
+			os.rmdir_all(directory)!
+			os.rename(saved, directory)!
+		} else {
+			assert os.is_dir(directory + '/saved-work')
+			os.rmdir_all(directory + '/refresh')!
+			os.rename(directory + '/saved-work', directory + '/refresh')!
+		}
+		mut recovered := service.refresh_repository(repository.id)!
+		assert recovered.packages.len == 1 && recovered.packages[0].sequence == 2
+		recovered.close()
+		assert !os.exists(directory + '/refresh')
+	}
+}
+
 fn refresh_request_publication_fault(event pkgprotocol.Progress) {
 	if event.phase != 'verify' { return }
 	directory := os.getenv('VINIX_REFRESH_FAULT_DIRECTORY')
