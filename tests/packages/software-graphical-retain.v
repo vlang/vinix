@@ -7,6 +7,7 @@ import json2
 import os
 import stbi
 import tools.packages.pkgcore
+import tools.packages.pkgprotocol
 
 struct Receipt {
 	architecture string
@@ -48,7 +49,7 @@ fn release_routing_markers() []string {
 		'SOFTWARE RELEASE ROUTING exact software.release-review acknowledged PASS']
 }
 
-fn admit_first_run_serial(transcript string, boot int, arch string, release_routing bool, refresh bool) ! {
+fn admit_first_run_serial(transcript string, boot int, arch string, release_routing bool, refresh bool, staged bool) ! {
 	value := if release_routing { 'skip' } else { 'review' }
 	decision := 'SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=' + value + ' PASS'
 	exact_marker(transcript, decision)!
@@ -73,21 +74,27 @@ fn admit_first_run_serial(transcript string, boot int, arch string, release_rout
 	proposals := transcript.split_into_lines().filter(it.starts_with('SOFTWARE FIRST RUN PROPOSAL '))
 	if proposals.len != 1 { return error('missing or duplicated complete first-run proposal') }
 	review := json2.decode[json2.Any](proposals[0].all_after('SOFTWARE FIRST RUN PROPOSAL '))!.as_map()
+	expected := if staged { ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello'] }
+		else { ['org.vinix.counter'] }
+	rows := review['rows']!.as_array()
 	if review['operation']!.str() != 'deploy' || review['architecture']!.str() != arch ||
 		review['generation']!.f64() != 0 || review['fingerprint']!.str().len != 64 ||
-		review['names']!.as_array().map(it.str()) != ['org.vinix.counter'] ||
-		review['requested']!.as_array().map(it.str()) != ['org.vinix.counter'] ||
-		review['rows']!.as_array().len != 1 {
+		review['names']!.as_array().map(it.str()) != expected ||
+		review['requested']!.as_array().map(it.str()) != expected || rows.len != expected.len {
+		if staged { return error('first-run proposal differs from the complete staged catalog') }
 		return error('first-run proposal differs from the complete declared Counter set')
 	}
-	row := review['rows']!.as_array()[0].as_map()
-	if row['id']!.str() != 'org.vinix.counter' || row['version']!.str() != '1.0.0' ||
-		row['installed_version']!.str() != '' || row['architecture']!.str() != arch ||
-		row['kind']!.str() != 'native' || row['repository']!.str() != 'native' ||
-		row['license']!.str() != 'MIT' || row['public_key']!.str().len != 64 ||
-		row['permissions']!.as_array().map(it.str()) != ['display'] ||
-		row['requested']! != json2.Any(true) || row['action']!.str() != 'install' {
-		return error('first-run proposal has incomplete publisher, permission or install details')
+	for i, row_value in rows {
+		row := row_value.as_map()
+		permissions := if expected[i] == 'org.vinix.package-hello' { ['files'] } else { ['display'] }
+		if row['id']!.str() != expected[i] || row['version']!.str() != '1.0.0' ||
+			row['installed_version']!.str() != '' || row['architecture']!.str() != arch ||
+			row['kind']!.str() != 'native' || row['repository']!.str() != 'native' ||
+			row['license']!.str() != 'MIT' || row['public_key']!.str().len != 64 ||
+			row['permissions']!.as_array().map(it.str()) != permissions ||
+			row['requested']! != json2.Any(true) || row['action']!.str() != 'install' {
+			return error('first-run proposal has incomplete publisher, permission or install details')
+		}
 	}
 	ready := transcript.index('SOFTWARE GRAPHICAL ordinary-compositor') or { return error('missing first-run ordinary ready identity') }
 	approved := transcript.index('SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved') or { return error('missing first-run approval result') }
@@ -121,7 +128,7 @@ fn admit_first_run_serial(transcript string, boot int, arch string, release_rout
 	}
 }
 
-fn admit_serial(path string, installed bool, first_run bool, release_routing bool, refresh bool, boot int, arch string) ! {
+fn admit_serial(path string, installed bool, first_run bool, release_routing bool, refresh bool, staged bool, boot int, arch string) ! {
 	transcript := os.read_file(path)!
 	mut forbidden := ['SOFTWARE GRAPHICAL FAIL', 'KERNEL PANIC', 'V panic:', 'FATAL EXCEPTION']
 	if installed { forbidden << ['sysdisk: running from memory', 'sysdisk: updating the system on'] }
@@ -129,18 +136,83 @@ fn admit_serial(path string, installed bool, first_run bool, release_routing boo
 		if transcript.contains(marker) { return error('forbidden serial marker: ' + marker) }
 	}
 	exact_marker(transcript, 'SOFTWARE GRAPHICAL ordinary-compositor uid=1000 home=/home/alex PASS')!
-	if first_run { admit_first_run_serial(transcript, boot, arch, release_routing, refresh)! }
+	if first_run { admit_first_run_serial(transcript, boot, arch, release_routing, refresh, staged)! }
 	if installed { exact_marker(transcript, 'SOFTWARE GRAPHICAL native Counter launch child closed PASS')! }
 	if installed && arch == 'aarch64' { exact_marker(transcript, 'syspower: power off: stopping devices')! }
 	if boot == 1 {
 		exact_marker(transcript, 'SOFTWARE GRAPHICAL ordinary-counter two-pointer-events persisted uid=1000 PASS')!
 		if installed {
-			exact_marker(transcript, 'SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved exact Counter install PASS')!
+			exact_marker(transcript, if staged { 'SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved exact staged apps install PASS' }
+				else { 'SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved exact Counter install PASS' })!
 			exact_marker(transcript, 'SOFTWARE GRAPHICAL INSTALLED BOOT 1 acquired pointer-saved cold-boot checkpoint PASS')!
 		}
 	} else {
 		exact_marker(transcript, 'SOFTWARE GRAPHICAL INSTALLED BOOT 2 retained Counter reopened and pointer-saved PASS')!
 	}
+}
+
+fn admit_staged_audit(transcript string, arch string, lock_digest string, expected []string) !u64 {
+	prefix := 'SOFTWARE FIRST RUN STAGED AUDIT '
+	lines := transcript.split_into_lines().filter(it.starts_with(prefix))
+	if lines.len != 1 { return error('missing or duplicated exact staged deployment audit') }
+	mut audit := pkgprotocol.decode_deployment_audit(lines[0].all_after(prefix).trim_right('\r'))!
+	defer { audit.close() }
+	if audit.architecture != arch || audit.generation == 0 || audit.deployment_sha256 != lock_digest ||
+		!audit.matches || audit.rows.map(it.id) != expected ||
+		audit.rows.any(it.status != 'match' || it.installed_version != '1.0.0') {
+		return error('staged deployment audit differs from the retained image lock')
+	}
+	return audit.generation
+}
+
+fn admit_staged_catalog(run string, receipt Receipt, mut paths map[string]string) ! {
+	lock_digest := receipt.artifacts['release-declaration'] or { return error('missing staged lock receipt') }
+	mode := '/etc/software-graphical-staged-catalog'
+	paths['staged-catalog-mode'] = run + '/rootfs' + mode
+	proof := json2.decode[map[string]string](os.read_file(paths['installed-declaration'])!)!
+	original := receipt.artifact_paths['staged-lock-original'] or { return error('missing original staged lock path') }
+	if lock_digest != receipt.artifacts['staged-lock-original'] || original == os.real_path(paths['release-declaration']) ||
+		proof[pkgprotocol.image_applications_path] != lock_digest ||
+		proof[mode] != receipt.artifacts['staged-catalog-mode'] ||
+		os.read_file(paths['staged-catalog-mode'])! != '1\n' {
+		return error('staged application lock differs from the admitted image bytes')
+	}
+	mut document := pkgprotocol.decode_deployment_document(os.read_file(paths['release-declaration'])!)!
+	defer { document.close() }
+	expected := ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello']
+	if document.format != 2 || document.architecture != receipt.architecture || document.packages != expected ||
+		document.locked.map(it.id) != expected {
+		return error('staged catalog does not declare the complete native SDK set')
+	}
+	config := pkgcore.load_config(run + '/rootfs')!
+	if config.repositories.len != 1 || config.repositories[0].id != 'native' {
+		return error('staged catalog requires the native publisher')
+	}
+	repository := config.repositories[0]
+	base := run + '/rootfs' + pkgcore.image_repositories_path + '/native'
+	// Runtime expiry was checked during refresh. Retained signed bytes can be
+	// independently verified after expiry.
+	index := pkgcore.verify_index(repository, os.read_file(base + '/index.json')!,
+		os.read_file(base + '/index.sig')!, 0)!
+	serial := os.read_file(run + '/serial.log')!
+	prefix := 'SOFTWARE FIRST RUN PROPOSAL '
+	proposal := serial.split_into_lines().filter(it.starts_with(prefix))[0]
+	review := json2.decode[json2.Any](proposal.all_after(prefix))!.as_map()
+	rows := review['rows']!.as_array()
+	for i, pin in document.locked {
+		if pin.architecture != receipt.architecture || pin.version != '1.0.0' ||
+			pin.repository != repository.id || pin.minimum_sequence != index.sequence ||
+			pin.public_key != repository.public_key || rows[i].as_map()['public_key']!.str() != pin.public_key {
+			return error('staged catalog publisher or release identity differs from the bundled index')
+		}
+		matches := index.packages.filter(it.id == pin.id && it.architecture == pin.architecture && it.version == pin.version)
+		if matches.len != 1 || pkgcore.package_metadata_digest(matches[0])! != pin.metadata_sha256 {
+			return error('staged catalog pin differs from the bundled package metadata')
+		}
+	}
+	generation := admit_staged_audit(serial, receipt.architecture, lock_digest, expected)!
+	reopened := admit_staged_audit(os.read_file(run + '/serial-2.log')!, receipt.architecture, lock_digest, expected)!
+	if generation != reopened { return error('staged catalog generation changed across cold boot') }
 }
 
 fn admit_production_serial(path string, boot int) ! {
@@ -353,6 +425,7 @@ fn retain() ! {
 		'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots',
 		'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots',
+		'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'] {
 		return error('requires the selected architecture ordinary-seat receipt')
 	}
@@ -373,16 +446,17 @@ fn retain() ! {
 	}
 	installed := receipt.platform.ends_with('installed-root-two-boots')
 	release_routing := receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
-	production := receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
+	staged := receipt.platform == 'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots'
+	production := staged || receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
 	refresh := production || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
 	first_run := refresh || release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 	if release_routing && digest(run + '/source/guest/release_routing.v')! !=
 		sha256.sum($embed_file('software-graphical-guest/release_routing.v').to_string().bytes()).hex() {
 		return error('qualified graphical fixture differs from the embedded source: guest/release_routing.v')
 	}
-	admit_serial(run + '/serial.log', installed, first_run, release_routing, refresh, 1, arch)!
+	admit_serial(run + '/serial.log', installed, first_run, release_routing, refresh, staged, 1, arch)!
 	if installed {
-		admit_serial(run + '/serial-2.log', true, first_run, release_routing, refresh, 2, arch)!
+		admit_serial(run + '/serial-2.log', true, first_run, release_routing, refresh, staged, 2, arch)!
 		admit_shutdown(run + '/shutdown-1.jsonl', 1)!
 		admit_shutdown(run + '/shutdown-2.jsonl', 2)!
 	}
@@ -429,7 +503,9 @@ fn retain() ! {
 	if first_run {
 		paths['release-declaration'] = run + '/rootfs/usr/share/vinix-packages/applications.json'
 		declaration := json2.decode[json2.Any](os.read_file(paths['release-declaration'])!)!.as_map()
-		if release_routing {
+		if staged {
+			admit_staged_catalog(run, receipt, mut paths)!
+		} else if release_routing {
 			admit_release_routing_declaration(declaration, arch, os.read_file(run + '/serial.log')!)!
 		} else if declaration.len != 3 || declaration['format']! != json2.Any(f64(1)) ||
 			declaration['architecture']!.str() != arch ||
@@ -525,7 +601,8 @@ fn retain() ! {
 		}
 	}
 	os.mkdir_all(out)!
-	prefix := out + if production { '/software-first-run-production-native-' + arch
+	prefix := out + if staged { '/software-first-run-production-staged-' + arch
+	} else if production { '/software-first-run-production-native-' + arch
 	} else if release_routing { '/software-release-routing-native-' + arch } else if refresh {
 		'/software-first-run-refresh-native-' + arch
 	} else if first_run {

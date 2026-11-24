@@ -306,7 +306,7 @@ fn observe_graphical_seat(seat GraphicalSeat) !int {
 			reviewed = true
 		}
 		if seat.installed && seat.fresh && !acquired && os.exists('/var/lib/vinix-packages/current/state.json') &&
-			(os.read_file('/var/log/vinix/auth.log') or { '' }).contains('uid=1000 run packages-change as alex: exit 0') {
+			acquisition_approved(refresh) {
 			verify_graphical_install()!
 			acquired = true
 		}

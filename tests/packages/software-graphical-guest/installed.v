@@ -34,6 +34,13 @@ fn package_approvals() []string {
 	return (os.read_file('/var/log/vinix/auth.log') or { '' }).split_into_lines().filter(it.contains('run packages-change'))
 }
 
+fn acquisition_approved(refresh bool) bool {
+	// The active generation can become visible before the authorized writer
+	// exits. A refresh approval cannot stand in for the deployment's exit.
+	approved := package_approvals().filter(it.contains('uid=1000 run packages-change as alex: exit 0'))
+	return approved.len >= if refresh { 2 } else { 1 }
+}
+
 fn require_no_installation() ! {
 	base := '/var/lib/vinix-packages'
 	for name in ['state.json', 'current'] {
@@ -122,8 +129,13 @@ fn verify_graphical_install() ! {
 	// The CLI invocation here is read-only production validation of its result.
 	command(['/usr/bin/vinix-package', 'verify'], '')!
 	state := json2.decode[json2.Any](os.read_file('/var/lib/vinix-packages/current/state.json')!)!.as_map()
-	if state['requested']!.as_array().map(it.str()) != ['org.vinix.counter'] || state['packages']!.as_array().len != 1 ||
-		state['packages']!.as_array()[0].as_map()['package']!.as_map()['id']!.str() != 'org.vinix.counter' {
+	expected := first_run_packages()
+	mut installed := []string{}
+	for entry in state['packages']!.as_array() {
+		installed << entry.as_map()['package']!.as_map()['id']!.str()
+	}
+	installed.sort()
+	if state['requested']!.as_array().map(it.str()) != expected || installed != expected {
 		return error('Software installed a different package set')
 	}
 	log := os.read_file('/var/log/vinix/auth.log')!
@@ -134,5 +146,9 @@ fn verify_graphical_install() ! {
 		check_first_run_refresh_approvals(2)!
 		println('SOFTWARE FIRST RUN REFRESH separate catalog and installation approvals PASS')
 	}
-	println('SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved exact Counter install PASS')
+	println(if staged_catalog_enabled() {
+		'SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved exact staged apps install PASS'
+	} else {
+		'SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved exact Counter install PASS'
+	})
 }

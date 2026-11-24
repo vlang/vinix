@@ -26,6 +26,8 @@ struct Evidence {
 	controls  []Control
 }
 
+const staged_catalog_platform = 'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots'
+
 fn digest(path string) !string {
 	return sha256.sum(os.read_bytes(path)!).hex()
 }
@@ -44,7 +46,7 @@ fn call(program string, args []string) Control {
 fn copied_config(platform string) bool {
 	return platform in ['qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots',
-		'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots']
+		'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots', staged_catalog_platform]
 }
 
 fn clone_run(original string, work string, receipt Receipt) ! {
@@ -67,7 +69,7 @@ fn clone_run(original string, work string, receipt Receipt) ! {
 			os.symlink(path, target)!
 		}
 	}
-	if receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots' {
+	if receipt.platform in ['qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots', staged_catalog_platform] {
 		for applet in ['sh', 'mkdir', 'chmod', 'rm', 'ln', 'sleep', 'kill', 'mount', 'cat', 'sync', 'zsh'] {
 			path := '/rootfs/bin/' + applet
 			os.symlink(os.readlink(original + path)!, work + path)!
@@ -147,7 +149,8 @@ fn check() ! {
 	receipt := json2.decode[Receipt](os.read_file(original + '/qualification.json')!)!
 	installed := receipt.platform.ends_with('installed-root-two-boots')
 	release_routing := receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
-	production := receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
+	staged := receipt.platform == staged_catalog_platform
+	production := staged || receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
 	refresh := production || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
 	first_run := refresh || release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 	base := [original, build, os.abs_path(os.args[4]), os.abs_path(os.args[5]), proof + '/baseline',
@@ -182,6 +185,10 @@ fn check() ! {
 	if production {
 		names << ['missing-production-registration-shot', 'missing-production-greeter', 'repeated-production-registration',
 			'reordered-production-login', 'direct-observer-poweroff', 'production-stage-mismatch', 'production-network-enabled']
+	}
+	if staged {
+		names << ['staged-original-lock-mismatch', 'missing-staged-audit', 'staged-audit-lock-digest',
+			'staged-audit-missing-app', 'staged-audit-changed-generation', 'staged-proposal-wrong-publisher']
 	}
 	if release_routing {
 		names << ['missing-release-routing-desktop-shot', 'missing-release-routing-extra-shot',
@@ -227,6 +234,49 @@ fn check() ! {
 		args[4] = work + '/retained'
 		mut reason := ''
 		match name {
+			'staged-original-lock-mismatch' {
+				mut artifacts := receipt.artifacts.clone()
+				artifacts['staged-lock-original'] = '0'.repeat(64)
+				save_receipt(work, receipt, artifacts, receipt.artifact_paths)!
+				reason = 'staged application lock differs from the admitted image bytes'
+			}
+			'missing-staged-audit', 'staged-audit-lock-digest', 'staged-audit-missing-app', 'staged-audit-changed-generation' {
+				key := if name == 'staged-audit-changed-generation' { 'serial-2' } else { 'serial' }
+				prefix := 'SOFTWARE FIRST RUN STAGED AUDIT '
+				mut lines := os.read_file(receipt.artifact_paths[key])!.split_into_lines()
+				if name == 'missing-staged-audit' {
+					lines = lines.filter(!it.starts_with(prefix))
+					reason = 'missing or duplicated exact staged deployment audit'
+				} else {
+					original_line := lines.filter(it.starts_with(prefix))[0]
+					mut audit := json2.decode[json2.Any](original_line.all_after(prefix))!.as_map()
+					reason = 'staged deployment audit differs from the retained image lock'
+					match name {
+						'staged-audit-lock-digest' { audit['deployment_sha256'] = json2.Any('0'.repeat(64)) }
+						'staged-audit-missing-app' { audit['rows'] = json2.Any(audit['rows']!.as_array()[..2]) }
+						else {
+							audit['generation'] = json2.Any(audit['generation']!.f64() + 1)
+							reason = 'staged catalog generation changed across cold boot'
+						}
+					}
+					lines = lines.map(if it == original_line { prefix + json2.encode(audit) } else { it })
+				}
+				replace_artifact(work, receipt, key, lines.join('\n') + '\n')!
+			}
+			'staged-proposal-wrong-publisher' {
+				prefix := 'SOFTWARE FIRST RUN PROPOSAL '
+				lines := os.read_file(receipt.artifact_paths['serial'])!.split_into_lines()
+				original_line := lines.filter(it.starts_with(prefix))[0]
+				mut proposal := json2.decode[json2.Any](original_line.all_after(prefix))!.as_map()
+				mut rows := proposal['rows']!.as_array()
+				mut application := rows[0].as_map()
+				application['public_key'] = json2.Any('0'.repeat(64))
+				rows[0] = json2.Any(application)
+				proposal['rows'] = json2.Any(rows)
+				replacement := lines.map(if it == original_line { prefix + json2.encode(proposal) } else { it })
+				replace_artifact(work, receipt, 'serial', replacement.join('\n') + '\n')!
+				reason = 'staged catalog publisher or release identity differs from the bundled index'
+			}
 			'missing-production-registration-shot' {
 				os.rm(work + '/production-01-registration.png')!
 				reason = 'exact required screenshot set'
@@ -456,7 +506,9 @@ fn check() ! {
 					else { declaration['extra'] = json2.Any(true) }
 				}
 				replace_artifact(work, receipt, 'release-declaration', json2.encode(declaration) + '\n')!
-				reason = if release_routing {
+				reason = if staged {
+					'staged application lock differs from the admitted image bytes'
+				} else if release_routing {
 					'release-routing declaration differs from the exact architecture-matched Counter lock'
 				} else { 'first-run declaration differs from the complete architecture-matched Counter set' }
 			}
@@ -546,6 +598,8 @@ fn check() ! {
 							'missing or duplicated complete first-run proposal'
 						} else if name in ['proposal-permissions', 'proposal-publisher'] {
 							'first-run proposal has incomplete publisher, permission or install details'
+						} else if staged {
+							'first-run proposal differs from the complete staged catalog'
 						} else {
 							'first-run proposal differs from the complete declared Counter set'
 						}

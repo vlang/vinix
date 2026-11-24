@@ -176,3 +176,16 @@ The evidence archive is
 Its SHA-256 is `1417bfe053165c7114c18597ae246e3e847ec5b93ad71594ca21a5bfa1c5330a`.
 Independent extraction matched all 18,332 inventory entries. Both
 decoded VJFS disks matched their original digests.
+
+## First-run production login with the staged native catalog
+
+Add `--staged-catalog=true` to the production-login command. Supply a fresh
+`--rootfs` from `native-catalog-check --software-bundled-https` and omit
+`--publisher`. This mode uses the format-2 lock produced by image staging
+for Counter, Memo and Package Hello. The controller checks each pin against
+the bundled signed index and preserves the lock bytes and signed bundle.
+
+The login workflow reviews all three apps before installation. On each boot
+the observer runs a read-only deployment audit after Counter has closed.
+The evidence check requires all three installed entries to match the
+staged lock digest and the same active generation across both boots.

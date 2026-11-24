@@ -124,5 +124,6 @@ fn observe_production_init() ! {
 		pid: manager, ordinary: true, installed: true, first_run: true, fresh: fresh,
 		previous_inode: previous_inode, production: true,
 	})!
+	if staged_catalog_enabled() { check_staged_catalog_installed()! }
 	save_graphical_checkpoint(fresh)!
 }

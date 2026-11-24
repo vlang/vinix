@@ -15,6 +15,7 @@ import screenshotcore
 import stbi
 import time
 import tools.packages.pkgcore
+import tools.packages.pkgprotocol
 
 #include <signal.h>
 #include <poll.h>
@@ -345,9 +346,11 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 	child.run()
 	// Full-strength scrypt for setup and approval executes through x86 TCG.
 	deadline := u64(time.sys_mono_now() + 1200 * time.second)
-	// Guest entry proves QEMU has created both monitor listeners. The first-run
-	// card still precedes desktop readiness and receives no input until identity.
-	wait_marker(mut child, log, deadline, 'SOFTWARE GRAPHICAL START')!
+	// The optional helper starts alongside production init's other children.
+	// Use its verified manager marker after those startup traces settle.
+	entry := if production { 'SOFTWARE GRAPHICAL PRODUCTION direct-child graphical manager PASS' }
+		else { 'SOFTWARE GRAPHICAL START' }
+	wait_marker(mut child, log, deadline, entry)!
 	mut monitor := qmpclient.connect_bounded(qmp, deadline, unsafe { nil })!
 	defer { monitor.close() }
 	mut shutdown_log := os.create(work + '/shutdown-' + boot.str() + '.jsonl')!
@@ -620,6 +623,34 @@ fn stage_production_init(host hwhost.Host, input string, image string, guest str
 	return proof
 }
 
+fn admit_staged_catalog(input string, arch string, repository pkgcore.Repository) ! {
+	path := input + pkgprotocol.image_applications_path
+	info := os.lstat(path)!
+	if info.mode & 0o170000 != 0o100000 || info.mode & 0o777 != 0o644 {
+		return error('staged application lock must be an ordinary 0644 file')
+	}
+	mut document := pkgprotocol.decode_deployment_document(os.read_file(path)!)!
+	defer { document.close() }
+	expected := ['org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello']
+	if document.format != 2 || document.architecture != arch || document.packages != expected ||
+		document.locked.map(it.id) != expected {
+		return error('staged catalog requires the complete native SDK image application lock')
+	}
+	base := input + pkgcore.image_repositories_path + '/native'
+	index := pkgcore.verify_index(repository, os.read_file(base + '/index.json')!,
+		os.read_file(base + '/index.sig')!, time.now().unix())!
+	for pin in document.locked {
+		if pin.architecture != arch || pin.repository != repository.id || pin.public_key != repository.public_key ||
+			pin.minimum_sequence != index.sequence || pin.version != '1.0.0' {
+			return error('staged application identity differs from the bundled release: ' + pin.id)
+		}
+		matches := index.packages.filter(it.id == pin.id && it.architecture == arch && it.version == pin.version)
+		if matches.len != 1 || pkgcore.package_metadata_digest(matches[0])! != pin.metadata_sha256 {
+			return error('staged application metadata differs from the bundled release: ' + pin.id)
+		}
+	}
+}
+
 fn check() ! {
 	$if prod {} $else { return error('compile the graphical controller with -prod to freeze its embedded source') }
 	embedded_controller := $embed_file('software-graphical-check.v').to_string()
@@ -640,6 +671,7 @@ fn check() ! {
 	release_routing := options['--release-routing'] or { 'false' }
 	first_run_refresh := options['--first-run-refresh'] or { 'false' }
 	production := '--production-root' in options
+	staged_catalog := options['--staged-catalog'] or { 'false' }
 	if ordinary !in ['true', 'false'] { return error('--ordinary must be true or false') }
 	if installed !in ['true', 'false'] || (installed == 'true' && ordinary != 'true') {
 		return error('--installed=true requires --ordinary=true')
@@ -656,6 +688,10 @@ fn check() ! {
 	}
 	if production && first_run_refresh != 'true' {
 		return error('--production-root requires --first-run-refresh=true')
+	}
+	if staged_catalog !in ['true', 'false'] ||
+		(staged_catalog == 'true' && (!production || '--publisher' in options)) {
+		return error('--staged-catalog=true requires production init and the unmodified image bundle')
 	}
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
 	root := hwhost.find_root(@FILE)!
@@ -681,10 +717,14 @@ fn check() ! {
 		!os.is_file(input + pkgcore.image_repositories_path + '/native/index.json')) {
 		return error('first-run refresh requires a bundled HTTPS repository and an online-capable policy')
 	}
+	if staged_catalog == 'true' { admit_staged_catalog(input, arch, configuration.repositories[0])! }
 	os.mkdir_all(work + '/rootfs')!
 	os.mkdir_all(work + '/source')!
 	mut artifacts := map[string]string{}
 	mut artifact_paths := map[string]string{}
+	if staged_catalog == 'true' {
+		pin(mut artifacts, mut artifact_paths, 'staged-lock-original', input + pkgprotocol.image_applications_path)!
+	}
 	if arch == 'x86_64' {
 		os.write_file(work + '/source/plainiso.v', plainiso.source())!
 		pin(mut artifacts, mut artifact_paths, 'source/plainiso.v', work + '/source/plainiso.v')!
@@ -721,9 +761,15 @@ fn check() ! {
 	if first_run == 'true' {
 		if os.exists(work + '/rootfs/usr/bin/pkg') { return error('first-run fixture requires no legacy pkg') }
 		declaration := work + '/rootfs/usr/share/vinix-packages/applications.json'
-		os.write_file(declaration, json2.encode({'format': json2.Any(1),
-			'architecture': json2.Any(arch), 'packages': json2.Any([json2.Any('org.vinix.counter')])}) + '\n')!
-		os.chmod(declaration, 0o644)!
+		if staged_catalog == 'true' {
+			path := work + '/rootfs/etc/software-graphical-staged-catalog'
+			os.write_file(path, '1\n')!
+			pin(mut artifacts, mut artifact_paths, 'staged-catalog-mode', path)!
+		} else {
+			os.write_file(declaration, json2.encode({'format': json2.Any(1),
+				'architecture': json2.Any(arch), 'packages': json2.Any([json2.Any('org.vinix.counter')])}) + '\n')!
+			os.chmod(declaration, 0o644)!
+		}
 		os.write_file(work + '/rootfs/etc/software-graphical-first-run', '1\n')!
 		if first_run_refresh == 'true' {
 			path := work + '/rootfs/etc/software-graphical-first-run-refresh'
@@ -780,6 +826,9 @@ fn check() ! {
 	if first_run == 'true' {
 		pin(mut artifacts, mut artifact_paths, 'release-declaration',
 			work + '/rootfs/usr/share/vinix-packages/applications.json')!
+		if staged_catalog == 'true' && artifacts['staged-lock-original'] != artifacts['release-declaration'] {
+			return error('staged application lock changed during image capture')
+		}
 	}
 	os.cp(desktop, work + '/rootfs/usr/bin/vinix-desktop')!
 	os.chmod(work + '/rootfs/usr/bin/vinix-desktop', 0o755)!
@@ -807,6 +856,9 @@ fn check() ! {
 			proof['/usr/share/vinix-packages/applications.json'] = artifacts['release-declaration']
 			if first_run_refresh == 'true' {
 				proof['/etc/software-graphical-first-run-refresh'] = artifacts['first-run-refresh-mode']
+			}
+			if staged_catalog == 'true' {
+				proof['/etc/software-graphical-staged-catalog'] = artifacts['staged-catalog-mode']
 			}
 		}
 		os.write_file(work + '/rootfs/usr/share/software-graphical-installed.json', json2.encode(proof) + '\n')!
@@ -899,7 +951,9 @@ fn check() ! {
 	}
 	os.write_file(work + '/qualification.json', json2.encode(GraphicalReceipt{
 		architecture: arch
-		platform:     if production {
+		platform:     if staged_catalog == 'true' {
+			'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots'
+		} else if production {
 			'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
 		} else if release_routing == 'true' {
 			'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
