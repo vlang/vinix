@@ -1,10 +1,12 @@
 # Native release applications at first login
 
-When `/usr/share/vinix-packages/applications.json` is an ordinary file, a new
-ordinary account is offered **Review release applications** and **Skip for now**
-before its first desktop session becomes ready. This does not depend on legacy
-registration or `/usr/bin/pkg`. Images without the declaration retain the legacy
-optional-app picker.
+When the protected `/usr/share/vinix-packages/applications.json` declares a
+nonempty application set for the running architecture, a new ordinary account
+is offered **Review release applications** and **Skip for now** before its
+first desktop session becomes ready. This does not depend on legacy
+registration or `/usr/bin/pkg`. A missing or empty declaration keeps the
+legacy optional-app picker available. An invalid declaration leaves setup
+pending and produces a diagnostic in the desktop log.
 
 The prompt explains that the proposal covers the complete declared application
 set and may remove other installed packages. Review opens Software and waits for
@@ -108,3 +110,35 @@ The archive is
 `~/.local/state/vinix/r14-manual-release-refresh-dBKsQA/qualification.tar.gz`.
 Its SHA-256 is `bee9e40252c82ec536070f794a2afead5bb77f97911bce5d979d8ba04a73708d`.
 Independent extraction matched all 919 inventory entries.
+
+## Release declaration admission at first login
+
+At `d476d581b`, the baseline host fixture reproduced a first-login prompt
+for a malformed declaration. At `d332ebc602e14544dcadeb268275e44e50d8f7d2`,
+the setup picker uses the protected release declaration reader. Host suites
+cover absent and empty declarations, malformed input, wrong architectures,
+missing locks, writable ancestors and aliases. Refusal preserves setup
+markers, and restoring the declaration makes review available at the next
+login. Both supported formats can open first-login review. The broker route
+continues to require the locked format.
+
+The focused host suites passed in normal, production and ASan/UBSan builds.
+Process leak detection was disabled for the sanitizer run. The broader
+`app_selection` host suite aborts in stylesheet cleanup on the baseline and
+the changed code. Both production compositors linked statically.
+
+The installed AArch64 and x86_64 guests booted twice with format-1 declarations
+and the new compositors. An ordinary account reviewed the signed Counter
+proposal after offline catalog refresh, approved installation separately and
+reopened its saved data on the second boot. Both retained the Review choice
+and shut down through guest poweroff on each boot. The first AArch64 attempt
+was stopped after kernel diagnostics split an installation marker in the
+serial stream. The unchanged retry passed. The graphical retainer verified
+61 AArch64 and 68 x86_64 artifact digests.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-first-login-declaration-JE5nGe/qualification.tar.gz)
+contains the source snapshot, host and target build evidence, and retained
+guest screenshots and transcripts. The independent archive checker verified
+all 5,777 sealed entries. The complete guest runs remain at the paths
+recorded with their pinned receipts. Archive SHA-256 is
+`26cbb5a32b66273781d11e9544c0dbc6c30f36eb0a7a2075d51c7723ce206c05`.
