@@ -301,6 +301,8 @@ Files use flushed mode-0644 temporaries; links use exclusive random temporary
 names and atomic renames. Replacing a leaf alias never changes its target.
 Existing action and application-registration overrides are retained, including
 dangling aliases; an override appearing during publication refuses the build.
+Before reporting success, the stager checks that every preserved override and
+newly published integration entry still has the expected identity.
 The Software launcher is atomically replaced. Existing controlled state-directory
 permissions are retained, and no consumer package state is initialized.
 

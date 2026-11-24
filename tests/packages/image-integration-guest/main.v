@@ -8,7 +8,7 @@ fn C.dup2(int, int) int
 fn C.sync()
 fn C.reboot(int) int
 fn C.sleep(u32) u32
-fn C.readlinkat(int, &char, voidptr, usize) isize
+fn C.readlinkat(int, &char, voidptr, uint) int
 
 fn image_integration_files() ! {
 	for pair in [
@@ -21,8 +21,8 @@ fn image_integration_files() ! {
 	for pair in [['/usr/bin/vinix-software', '/usr/bin/vinix-desktop'],
 		['/usr/share/applications/vinix-packages', '/var/lib/vinix-packages/current/share/applications']] {
 		mut bytes := [128]u8{}
-		count := C.readlinkat(C.AT_FDCWD, pair[0].str, unsafe { &bytes[0] }, usize(bytes.len))
-		if count != pair[1].len || unsafe { tos(&bytes[0], int(count)) } != pair[1] { return error('staged image integration link differs: ' + pair[0]) }
+		count := C.readlinkat(C.AT_FDCWD, pair[0].str, unsafe { &bytes[0] }, uint(bytes.len))
+		if count != pair[1].len || unsafe { tos(&bytes[0], count) } != pair[1] { return error('staged image integration link differs: ' + pair[0]) }
 	}
 	if os.is_link('/var/lib/vinix-packages') || os.ls('/var/lib/vinix-packages')!.len != 0 { return error('image staging initialized consumer state') }
 	println('IMAGE INTEGRATION native staged licenses/actions/launcher/registration and empty consumer state PASS')

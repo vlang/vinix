@@ -145,8 +145,8 @@ struct ImageIntegrationOutput {
 	leaf string
 	device u64
 	inode u64
-	temporary_device u64
-	temporary_inode u64
+	entry_device u64
+	entry_inode u64
 	bytes int
 	link string
 	keep bool
@@ -158,8 +158,9 @@ fn (output &ImageIntegrationOutput) matches(name string) bool {
 	if name == '' { return false }
 	mut info := C.stat{}
 	if C.fstatat(output.parent, name.str, unsafe { &info }, C.AT_SYMLINK_NOFOLLOW) != 0
-		|| u64(info.st_dev) != output.temporary_device || u64(info.st_ino) != output.temporary_inode
-		|| info.st_uid != u32(C.geteuid()) || info.st_nlink != 1 { return false }
+		|| u64(info.st_dev) != output.entry_device || u64(info.st_ino) != output.entry_inode { return false }
+	if output.keep { return true }
+	if info.st_uid != u32(C.geteuid()) || info.st_nlink != 1 { return false }
 	if output.link == '' { return output.fd >= 0 && atomic_name_matches(output.parent, name, output.fd) }
 	if info.st_mode & 0o170000 != 0o120000 { return false }
 	mut target := [128]u8{}
@@ -185,14 +186,21 @@ fn (plan &ImageIntegration) check_parent(output &ImageIntegrationOutput) ! {
 	}
 }
 
-fn (plan &ImageIntegration) check_output(output &ImageIntegrationOutput) ! {
+fn (plan &ImageIntegration) check_output(output &ImageIntegrationOutput, name string) ! {
 	plan.check_parent(output)!
-	if output.keep { return }
-	if !output.matches(output.leaf) { return error('image integration temporary changed; inspect ' + output.relative + '/' + output.leaf) }
+	if output.keep {
+		if !output.matches(name) { return error('image integration override changed: ' + name) }
+		return
+	}
+	leaf := if output.published { name } else { output.leaf }
+	if !output.matches(leaf) {
+		if output.published { return error('image integration entry saved, but final identity check failed: ' + name) }
+		return error('image integration temporary changed; inspect ' + output.relative + '/' + leaf)
+	}
 	if output.link == '' {
 		mut info := C.stat{}
-		check_atomic_temporary(output.parent, output.leaf, output.fd, output.bytes)!
-		if C.fstat(output.fd, unsafe { &info }) != 0 || info.st_mode & 0o7777 != 0o644 { return error('image integration temporary permissions changed') }
+		check_atomic_temporary(output.parent, leaf, output.fd, output.bytes)!
+		if C.fstat(output.fd, unsafe { &info }) != 0 || info.st_mode & 0o7777 != 0o644 { return error('image integration file permissions changed: ' + name) }
 	}
 }
 
@@ -237,7 +245,9 @@ fn (plan &ImageIntegration) publish_with(options ImageIntegrationOptions) ! {
 		output = ImageIntegrationOutput{ ...output, device: u64(info.st_dev), inode: u64(info.st_ino) }
 		present := C.fstatat(parent, image_integration_names[i].str, unsafe { &info }, C.AT_SYMLINK_NOFOLLOW) == 0
 		if !present && C.errno != C.ENOENT { return error('cannot inspect image integration entry') }
-		if i >= 3 && present { output = ImageIntegrationOutput{ ...output, keep: true } }
+		if i >= 3 && present {
+			output = ImageIntegrationOutput{ ...output, entry_device: u64(info.st_dev), entry_inode: u64(info.st_ino), keep: true }
+		}
 		else {
 			if present && info.st_mode & 0o170000 !in [0o100000, 0o120000]! { return error('image integration destination must be a file or leaf alias: ' + image_integration_names[i]) }
 			if i in [2, 5]! {
@@ -249,7 +259,7 @@ fn (plan &ImageIntegration) publish_with(options ImageIntegrationOptions) ! {
 				output = ImageIntegrationOutput{ ...output, fd: fd, leaf: leaf, bytes: data.len }
 			}
 			if C.fstatat(parent, output.leaf.str, unsafe { &info }, C.AT_SYMLINK_NOFOLLOW) != 0 { return error('cannot capture image integration temporary') }
-			output = ImageIntegrationOutput{ ...output, temporary_device: u64(info.st_dev), temporary_inode: u64(info.st_ino) }
+			output = ImageIntegrationOutput{ ...output, entry_device: u64(info.st_dev), entry_inode: u64(info.st_ino) }
 			path := plan.root + '/' + relative + '/' + output.leaf
 			defer { unsafe { path.free() } }
 			options.checkpoint('created', path)!
@@ -273,16 +283,16 @@ fn (plan &ImageIntegration) publish_with(options ImageIntegrationOptions) ! {
 	defer { C.close(state) }
 	mut state_info := C.stat{}
 	if C.fstat(state, unsafe { &state_info }) != 0 { return error('cannot capture image package state directory') }
-	state_output := ImageIntegrationOutput{ relative: 'var/lib/vinix-packages', device: u64(state_info.st_dev), inode: u64(state_info.st_ino), keep: true }
+	state_output := ImageIntegrationOutput{ relative: 'var/lib/vinix-packages', device: u64(state_info.st_dev), inode: u64(state_info.st_ino) }
 	options.checkpoint('ready', plan.root)!
-	for output in outputs { plan.check_output(unsafe { &output })! }
+	for i, output in outputs { plan.check_output(unsafe { &output }, image_integration_names[i])! }
 	// Recheck package state too; a substituted alias must not survive a reported
 	// successful build even though no consumer state is written here.
 	plan.check_parent(unsafe { &state_output })!
 	for i, mut output in outputs {
-		plan.check_output(unsafe { &output })!
-		if output.keep { continue }
 		name := image_integration_names[i]
+		plan.check_output(unsafe { &output }, name)!
+		if output.keep { continue }
 		code := if i >= 3 { atomic_publish_new(output.parent, output.leaf, name) }
 			else { C.renameat(output.parent, output.leaf.str, output.parent, name.str) }
 		if code != 0 { return error('cannot publish image integration entry; existing overrides are retained: ' + name) }
@@ -296,7 +306,8 @@ fn (plan &ImageIntegration) publish_with(options ImageIntegrationOptions) ! {
 		// The temporary name no longer exists. Recheck the full parent chain.
 		plan.check_parent(output)!
 	}
-	for output in outputs { plan.check_parent(unsafe { &output })! }
+	// A later publication can outlast an earlier entry's identity check.
+	for i, output in outputs { plan.check_output(unsafe { &output }, image_integration_names[i])! }
 	plan.check_parent(unsafe { &state_output })!
 }
 

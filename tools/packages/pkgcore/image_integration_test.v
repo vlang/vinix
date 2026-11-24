@@ -210,3 +210,71 @@ fn test_image_integration_captures_sources_and_publishes_through_controlled_dire
 	}
 	println('IMAGE INTEGRATION ' + cases.str() + ' source/capture/publication/refusal cases preserve overrides and outside data; stable descriptors PASS')
 }
+
+fn integration_relocate_output(phase string, path string) ! {
+	mode := os.getenv('VINIX_INTEGRATION_MODE')
+	root := os.getenv('VINIX_INTEGRATION_WORK') + '/image'
+	if mode == 'missing-override' && phase == 'ready' {
+		leaf := root + '/usr/share/vinix/actions/packages-change'
+		os.rename(leaf, leaf + '.saved')!
+	} else if phase == 'published' && path.ends_with('/vinix-packages') {
+		leaf := if mode == 'replaced-override' {
+			root + '/usr/share/vinix/actions/packages-change'
+		} else {
+			root + '/usr/share/licenses/vinix-packages/ed25519-MIT.txt'
+		}
+		os.rename(leaf, leaf + '.saved')!
+		// Keep even the bytes identical so the check has to compare identity.
+		os.write_file(leaf, os.read_file(leaf + '.saved')!)!
+	}
+}
+
+fn test_image_integration_requires_published_and_preserved_entries_at_completion() {
+	defer {
+		os.unsetenv('VINIX_INTEGRATION_MODE')
+		os.unsetenv('VINIX_INTEGRATION_WORK')
+	}
+	for mode in ['missing-override', 'replaced-override', 'replaced-notice']! {
+		work := os.real_path(os.temp_dir()) + '/vinix-image-integration-output-' + os.getpid().str() + '-' + time.now().unix_micro().str()
+		defer { os.rmdir_all(work) or {} }
+		root := work + '/image'
+		source := work + '/repository'
+		integration_fixture(root, source, false)!
+		override := root + '/usr/share/vinix/actions/packages-change'
+		notice := root + '/usr/share/licenses/vinix-packages/ed25519-MIT.txt'
+		os.write_file(override, 'administrator action')!
+		mut configuration := prepare_image_configuration(root, 'aarch64', '')!
+		defer { configuration.close() }
+		before := integration_descriptors()
+		mut plan := unsafe { &configuration }.prepare_integration(source)!
+		defer { plan.close() }
+		os.setenv('VINIX_INTEGRATION_MODE', mode, true)
+		os.setenv('VINIX_INTEGRATION_WORK', work, true)
+		mut problem := ''
+		unsafe { &plan }.publish_with(ImageIntegrationOptions{ checkpoint: integration_relocate_output }) or {
+			problem = err.msg()
+		}
+		leaf := if mode == 'replaced-notice' { notice } else { override }
+		expected := if mode == 'replaced-notice' { 'final identity check failed: ed25519-MIT.txt' } else { 'override changed: packages-change' }
+		assert problem.contains(expected), mode + ': ' + problem
+		saved := leaf + '.saved'
+		bytes := if mode == 'replaced-notice' { 'captured integration input 0' } else { 'administrator action' }
+		assert os.read_file(saved)! == bytes
+		if mode == 'missing-override' {
+			assert !os.exists(leaf)
+			assert os.read_file(notice)! == 'previous 0'
+		} else {
+			assert os.read_file(leaf)! == bytes
+			os.rename(leaf, leaf + '.replacement')!
+		}
+		os.rename(saved, leaf)!
+		unsafe { &plan }.publish()!
+		assert os.read_file(override)! == 'administrator action'
+		assert os.read_file(notice)! == 'captured integration input 0'
+		assert os.is_link(root + '/usr/share/applications/vinix-packages')
+		assert os.ls(root + '/var/lib/vinix-packages')!.len == 0
+		plan.close()
+		assert integration_descriptors() == before
+	}
+	println('IMAGE INTEGRATION moved overrides and replaced published notices refuse before success; restored retry and descriptor retirement PASS')
+}

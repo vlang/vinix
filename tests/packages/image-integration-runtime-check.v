@@ -16,6 +16,7 @@ fn suite() hwhost.Suite {
 			about: 'Captured license/action bytes, controlled image integration and production-staged tools', ending: .poweroff, timeout: 300,
 			required: ['HWTEST START packages-image-integration', 'HWTEST PASS packages-image-integration',
 				'IMAGE INTEGRATION 82 source/capture/publication/refusal cases preserve overrides and outside data; stable descriptors PASS',
+				'IMAGE INTEGRATION moved overrides and replaced published notices refuse before success; restored retry and descriptor retirement PASS',
 				'IMAGE INTEGRATION native staged licenses/actions/launcher/registration and empty consumer state PASS',
 				'IMAGE INTEGRATION native production-staged package/session/Linux-runner execution PASS'],
 			forbidden: ['V panic:', 'HWTEST FAIL', 'Out of memory'] }] }
