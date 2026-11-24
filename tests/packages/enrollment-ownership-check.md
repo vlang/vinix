@@ -84,3 +84,38 @@ Evidence:
 - [x86_64 report](results/2026-10-15/enrollment-ownership-x86_64.txt)
 - [x86_64 serial](results/2026-10-15/enrollment-ownership-x86_64.serial.txt)
 - [x86_64 QMP](results/2026-10-15/enrollment-ownership-x86_64.qmp.txt)
+
+## Complete enrollment and revocation requests
+
+Enrollment and revocation transfer the retained publisher identities,
+architecture, launch account and policy into their returned configuration.
+They retire the old list and removed or replaced identity. Refusals retire
+the loaded configuration and any proposal. The CLI closes its configuration
+and review replies after use. V callers can retire owned results with
+`Config.close()`.
+
+On 2026-11-24, revision `da38fe0b5b73f89fe224311f5248f296193ec9fe` retained
+zero tracked allocations across 704 complete requests after four warmups per
+case. The 22 scopes cover both architecture declarations, signed enrollment
+and key replacement, direct and reviewed revocation, stale approval, missing
+identity, a held writer lock, unsafe configuration permissions and denied
+configuration writes. Revocation still works with damaged maintenance metadata.
+A denied enrollment configuration write preserves the old configuration and
+the newly durable replay floor. A denied revocation write preserves the exact
+configuration, cache and history.
+
+The same fixture at baseline `59a6d7d26` retained 37,856 bytes in 32 successful
+enrollments and 51,840 bytes in 32 successful revocations for each architecture
+declaration. These are scoped heap measurements. Six normal host suites, the
+focused ASan/UBSan run with leak detection disabled, and the real normal and
+production CLI lifecycle checks passed.
+
+The AArch64 enrollment and x86_64 revocation fixtures each passed a cut after
+the configuration flush. Each recovered on the same QEMU ext2 disk and ended
+with a guest-originated shutdown. Both target receipts matched all seven
+retained artifact sizes and digests.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-trust-ownership-NcGOY9/qualification.tar.gz)
+contains both source revisions, host checks, target builds and guest evidence.
+The independent archive checker verified all 109 sealed files. Archive SHA-256
+is `2208ca7ddf80913985b280af243636121fb91f6470cacba84030fd5ced838e83`.
