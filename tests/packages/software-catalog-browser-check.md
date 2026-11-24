@@ -72,3 +72,32 @@ pre-fix binary/C/fixture are retained and pinned.
 - [desktop architecture checks](results/2026-10-16/software-catalog-browser-desktop.txt)
 - [execution notes](results/2026-10-16/software-catalog-browser-attempts.txt)
 - [compiler/source/artifact ledger](results/2026-10-16/software-catalog-browser-toolchain.json)
+
+## Maintenance reviews from the compact browser
+
+At `74dab654224e98d729ecf150d0f7a283e82fefae`, the 320×240 browser can
+review install or uninstall for the selected package, or resolve updates for
+the entire installed set. The host fixture checks both size cutoffs, control
+geometry, stale actions, dependency uninstall refusal and exact worker
+arguments. It then checks compact plan reading, full confirmation visibility
+and preserved catalog selection after cancellation. The same test at
+`0df507615` failed at the missing review control.
+
+On 2026-11-24, the complete Software fixture passed in normal and ASan/UBSan
+builds with sanitizer process leak detection disabled. The compact mirror
+driver passed all five focused host modes, both Linux production C-generation
+checks and its supplementary complete Software fixture. The 1,000-cycle
+package navigation and plan reader checks retained zero tracked bytes. The
+broader `view-memory` mode hit the allocation tracker limit while decoding
+installed dependencies on both revisions.
+
+AArch64 and x86_64 headless QEMU tests drove the actual compact controls and
+completed the reviewed upgrade, rollback, Memo uninstall and cached
+reinstall with separate administrator approval. Memo kept its private data.
+Both guests initiated shutdown and all 60 receipt entries matched per target.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-compact-package-reviews-rZG2L4/qualification.tar.gz)
+contains the baseline, committed changes, generated code, host checks and
+guest receipts. The independent checker verified all 1,818 sealed files and
+symlinks. Archive SHA-256 is
+`3020930524f6b51991a0eb4b11df449090ac6f81bdbf2a3311460f78549931b3`.
