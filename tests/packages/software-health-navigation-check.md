@@ -71,3 +71,31 @@ graphical or broader release acceptance is claimed.
 - [desktop architecture checks](results/2026-10-15/software-health-navigation-desktop.txt)
 - [execution notes](results/2026-10-15/software-health-navigation-attempts.txt)
 - [compiler/source/artifact ledger](results/2026-10-15/software-health-navigation-toolchain.json)
+
+## Health, progress and registration decoder retention
+
+At `5f13c2659b8bc9910b5d0a0df57f9a1d668eec6d`, health and registration
+decoders append records by value. Health, registration and progress
+validation and cleanup keep parser temporaries on the stack. The registry
+fixture also frees error strings by value to keep its own descriptors out
+of the measurement.
+
+At `5dd8bb265`, the health and registration allocation loops reached the
+tracker's record limit. The focused progress check retained 360,000 bytes
+over 1,000 cycles. After the decoder fixes, the registry fixture still
+retained 72,000 bytes in its error message descriptors. The fixture cleanup
+removed those allocations.
+
+On 2026-11-24, the final health, progress, registration reader and registry
+checks each retained zero tracked bytes over 1,000 cycles. Both Software
+health modes also retained zero tracked bytes over 1,000 cycles. All 27
+protocol test files and the full host Software fixture passed. ASan/UBSan
+passed for the three protocol checks and the registry fixture with process
+leak detection disabled. The Software and registry fixtures linked
+statically on AArch64 and x86_64.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-installed-readers-5gOYSo/qualification.tar.gz)
+contains the committed sources, baseline and fixed logs, generated code, and
+target builds. The independent checker verified all 693 sealed files.
+Archive SHA-256 is
+`4b3854272a66eba7096c6c45f3c82bd828bbfc109cc14e2897ee03965c1cb794`.
