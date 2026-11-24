@@ -6,6 +6,31 @@ import json2
 $if track_heap ? {
 	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
 }
+
+fn test_saved_media_receipts_require_nonempty_typed_counts_and_no_generation() {
+	text := json2.encode(DeploymentMediaSaved{ architecture: 'x86_64', destination: '/部署/media; $literal.json',
+		sha256: 'c'.repeat(64), roots: 2, packages: 7 })
+	mut saved := decode_deployment_media_saved(text)!
+	assert saved.architecture == 'x86_64' && saved.destination == '/部署/media; $literal.json'
+	assert saved.sha256 == 'c'.repeat(64) && saved.roots == 2 && saved.packages == 7
+	saved.close(); saved.close()
+	for bad in [text.replace('"format":1', '"format":1,"generation":7'),
+		text.replace('"format":1', '"format":1,"unknown":7'), text.replace('"roots":2', '"roots":2,"roots":2'),
+		text.replace('"roots":2', '"roots":0').replace('"packages":7', '"packages":0'),
+		text.replace('"roots":2', '"roots":"2"'), text.replace('"roots":2', '"roots":8'),
+		text.replace('"packages":7', '"packages":4097'), text.replace('"packages":7', '"packages":null'),
+		text.replace(',"packages":7', ''), text + '{}', ' '.repeat(32 * 1024 + 1)] {
+		mut refused := false
+		decode_deployment_media_saved(bad) or { refused = true; unsafe { err.free() } }
+		assert refused
+	}
+	decode_deployment_saved(text) or {
+		unsafe { err.free() }
+		println('DEPLOYMENT MEDIA SAVED PROTOCOL exact fields, nonempty counts and receipt type separation PASS')
+		return
+	}
+	assert false, 'installed receipt must require a generation'
+}
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 

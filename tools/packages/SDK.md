@@ -842,6 +842,10 @@ bundle. Supply `deployment_sha256` from the trusted release receipt to require
 that exact digest. `--json` reports the destination, architecture, digest and
 root and package counts. Run it directly as the owner of the destination.
 After it succeeds you can disconnect the media and review the local file.
+In Software, open **Deployment → Save media lock…** after importing the media.
+Enter the media directory and a new destination file. The receipt shows the
+saved SHA-256. **Review additions** opens a proposal for the release apps
+alongside your installed applications and requires separate approval to apply.
 
 Use explicit repository and directory pairs to select individual publishers
 or import from several locations:

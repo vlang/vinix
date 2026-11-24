@@ -139,7 +139,9 @@ fn check_software_deployment_form() ! {
 	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 	assert app.deployment_action == 0
 	for _ in 0 .. 12 { app.handle('software.deployment.action.next')! }
-	assert app.deployment_action == 4
+	assert software_deployment_form_actions[app.deployment_action] == 'software.deployment.media-save'
+	app.handle('software.deployment.action.previous')!
+	assert software_deployment_form_actions[app.deployment_action] == 'software.policy'
 	app.key_input('\x1b'); assert !app.deployment_mode && app.selected == 0 && app.query.bytestr() == 'kept search' && app.filter == 1
 	println('Software compact catalog: Deployment and Export offline entries, bounds, review isolation and Back retain catalog state PASS')
 	println('Software compact deployment: complete bounded help and controls at 320x240, literal editing, keyboard/pager/resize anchors, optional actions, stale chooser, status/failure, review/audit/snapshot/policy/release routing and separate confirmation PASS')

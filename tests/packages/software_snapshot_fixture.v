@@ -8,6 +8,7 @@ import ui2
 import tools.packages.pkgprotocol
 
 const software_snapshot_fixture_path = '/private/tmp/部署 with spaces; $literal/organization-managed-installed-applications/recovery-records-with-complete-historical-metadata/requested-roots-and-transitive-runtime-data-dependencies/retained-versions-and-publisher-sequence-floors/installed applications and exact historical runtimes.json'
+const software_media_fixture_source = '/media/发行 with spaces; $unexpanded'
 
 fn software_snapshot_fixture_receipt(path string) pkgprotocol.DeploymentSnapshotSaved {
 	return pkgprotocol.DeploymentSnapshotSaved{ generation: if path == '/empty-save.json' { u64(0) } else { u64(7) },
@@ -17,7 +18,9 @@ fn software_snapshot_fixture_receipt(path string) pkgprotocol.DeploymentSnapshot
 }
 
 fn software_snapshot_service_fixture(args []string) bool {
-	if args.len < 3 || args[1] != '--json' || args[2] != 'deployment-snapshot-save' { return false }
+	if args.len < 3 || args[1] != '--json' { return false }
+	if args[2] == 'deployment-media-save' { return software_media_save_service_fixture(args) }
+	if args[2] != 'deployment-snapshot-save' { return false }
 	assert args.len == 4 && os.args[1] == '--json'
 	path := args[3]
 	if path == '/existing-save.json' { eprintln('destination already exists; existing file preserved'); exit(1) }
@@ -39,6 +42,113 @@ fn software_snapshot_service_fixture(args []string) bool {
 		if path == '/late-failed-save.json' { eprintln('Saved, but directory flush failed. Inspect the destination before retrying.'); exit(24) }
 	}
 	return true
+}
+
+fn software_media_save_fixture_receipt(path string) pkgprotocol.DeploymentMediaSaved {
+	return pkgprotocol.DeploymentMediaSaved{ architecture: 'x86_64', destination: path,
+		sha256: 'c'.repeat(64), roots: 2, packages: 7 }
+}
+
+fn software_media_save_service_fixture(args []string) bool {
+	assert args.len == 5 && os.args[1] == '--json' && args[3] == software_media_fixture_source
+	path := args[4]
+	if path == '/existing-media-lock.json' { eprintln('destination exists'); exit(12) }
+	if path == '/snapshot-receipt.json' { print(json2.encode(software_snapshot_fixture_receipt(path))); return true }
+	if path == '/oversized-media-lock.json' { print('x'.repeat(32 * 1024 + 1)); return true }
+	text := json2.encode(software_media_save_fixture_receipt(if path == '/wrong-media-lock.json' {
+		'/different-lock.json'
+	} else { path }))
+	if path == '/partial-media-lock.json' { print(text[..text.len / 2]); return true }
+	if path == '/failed-media-lock.json' { print(text); exit(24) }
+	print(text[..17]); flush_stdout()
+	time.sleep(time.millisecond)
+	print(text[17..]); flush_stdout()
+	if path == software_snapshot_fixture_path {
+		mut release := u8(0)
+		assert C.read(0, &release, 1) == 1
+	}
+	return true
+}
+
+fn check_software_media_save() ! {
+	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
+		output: []u8{cap: 8192}, query: 'kept media search'.bytes(), selected: 5 }
+	defer { app.close_app() }
+	app.handle('software.deployment')!
+	wide := app.build(ui2.rect(0, 0, 640, 610))!
+	assert wide.children.any(it.id == 'software.deployment.media-save')
+	free_window_tree(wide)
+	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+	deployment_form_select(mut app, 'software.deployment.media-save')!
+	assert app.snapshot_mode && app.snapshot_media && app.focus
+	source := app.build(ui2.rect(0, 0, 320, 240))!
+	assert source.children.any(it.id == 'software.snapshot.save' && it.text == 'Next')
+	deployment_form_geometry(source, 320, 240)
+	free_window_tree(source)
+	app.paste_input('relative'); app.handle('software.snapshot.save')!
+	assert app.worker == unsafe { nil } && app.snapshot_media_source == '' && app.status.contains('absolute media directory')
+	app.key_input('\x01'); app.paste_input(software_media_fixture_source)
+	app.handle('software.snapshot.save')!
+	assert app.snapshot_media_source == software_media_fixture_source && app.deployment_path.len == 0 && app.focus
+	app.handle('software.snapshot.save')!
+	assert app.worker == unsafe { nil } && app.status.contains('absolute deployment file')
+	app.paste_input(software_snapshot_fixture_path)
+	save := app.build(ui2.rect(0, 0, 320, 240))!
+	assert save.children.any(it.id == 'software.snapshot.save' && it.text == 'Save media lock')
+	deployment_form_geometry(save, 320, 240)
+	free_window_tree(save)
+	app.handle('software.snapshot.save')!
+	assert app.worker_snapshot && !app.admin_prompt && !app.prepare_close()
+	assert app.worker.args == ['--json', 'deployment-media-save', software_media_fixture_source, software_snapshot_fixture_path]
+	for _ in 0 .. 300 {
+		app.poll()
+		if app.output.len > 0 && app.output.last() == `}` { break }
+		time.sleep(time.millisecond)
+	}
+	assert app.output.len > 0 && app.output.last() == `}` && !app.snapshot_ready && !app.prepare_close()
+	app.handle('software.snapshot.back')!; app.handle('software.snapshot.review')!; app.key_input('\x1b')
+	assert app.snapshot_media && app.worker_snapshot && !app.snapshot_ready
+	software_repository_text(mut app.deployment_path, '/changed-form.json')
+	assert C.write(app.worker.stdio_fd[0], c'x', 1) == 1
+	wait_for_software(mut app)
+	assert app.snapshot_ready && app.snapshot_media_saved.destination == software_snapshot_fixture_path
+	assert app.snapshot_media_saved.roots == 2 && app.snapshot_media_saved.packages == 7
+	check_software_report_reader(mut app)!
+	compact := app.build(ui2.rect(0, 0, 320, 240))!
+	assert compact.children.any(it.id == 'software.snapshot.review' && it.text == 'Review additions')
+	assert compact.children.any(it.id == 'software.report.read')
+	deployment_form_geometry(compact, 320, 240)
+	free_window_tree(compact)
+	app.handle('software.snapshot.export')!
+	assert app.snapshot_media && !app.mirror_mode
+	app.handle('software.snapshot.review')!
+	assert !app.snapshot_mode && app.snapshot_media_source == '' && app.snapshot_media_saved.destination == ''
+	assert app.worker.args == ['deployment-add-review', software_snapshot_fixture_path] && !app.admin_prompt
+	wait_for_software(mut app)
+	assert app.review_ready && app.review == 'deploy-add' && !app.admin_prompt
+	app.handle('software.cancel')!
+	for path in ['/match-audit.json', '/snapshot-receipt.json', '/wrong-media-lock.json', '/partial-media-lock.json',
+		'/failed-media-lock.json', '/oversized-media-lock.json', '/existing-media-lock.json'] {
+		app.handle('software.deployment.media-save')!
+		app.paste_input(software_media_fixture_source); app.handle('software.snapshot.save')!
+		app.paste_input(path); app.handle('software.snapshot.save')!
+		wait_for_software(mut app)
+		if path == '/match-audit.json' {
+			assert app.snapshot_ready
+			app.handle('software.snapshot.audit')!
+			assert app.audit_additions && app.worker.args == ['--json', 'deployment-add-audit', path]
+			wait_for_software(mut app); assert app.audit_ready && app.audit_snapshot.matches
+			app.handle('software.audit.back')!
+		} else {
+			assert !app.snapshot_ready && app.failure_heading.contains('Save media lock')
+			assert app.snapshot_media_saved.destination == '' && app.details_pages.len == 0
+			app.handle('software.snapshot.review')!
+			assert app.worker == unsafe { nil } && app.review == '' && !app.admin_prompt
+			app.handle('software.snapshot.back')!
+		}
+	}
+	assert app.query.bytestr() == 'kept media search' && app.selected == 5
+	println('Software media lock: literal paths, compact and wide access, writer guard, strict receipt, additive review and coverage PASS')
 }
 
 fn check_software_snapshot_navigation() ! {
@@ -135,6 +245,7 @@ fn check_software_snapshot_navigation() ! {
 
 fn check_software_snapshot() ! {
 	check_software_snapshot_navigation()!
+	check_software_media_save()!
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
 		output: []u8{cap: 8192}, query: []u8{cap: 256}, selected: 5, filter: 1 }
 	defer { app.close_app() }
@@ -232,13 +343,19 @@ fn check_software_snapshot_memory() ! {
 	$if !track_heap ? { return error('compile with -d track_heap') }
 	$if track_heap ? {
 		text := json2.encode(software_snapshot_fixture_receipt(software_snapshot_fixture_path))
+		media := json2.encode(software_media_save_fixture_receipt(software_snapshot_fixture_path))
 		mut app := SoftwareApp{ deployment_mode: true, output: []u8{cap: 8192} }
 		defer { app.close_app() }
 		app.initialize_deployment_field()
 		for warmup in 0 .. 2 {
 			if warmup == 1 { C.vinix_heap_begin() }
-			for _ in 0 .. 1000 {
-				app.begin_deployment_snapshot()
+			for i in 0 .. 2000 {
+				media_mode := i % 2 == 1
+				app.begin_deployment_snapshot_mode(media_mode)
+				if media_mode {
+					app.paste_input(software_media_fixture_source)
+					app.save_deployment_snapshot()
+				}
 				app.paste_input(software_snapshot_fixture_path); app.key_input('\x01')
 				for input in ['\x1b', '\x01', '\x08', '\x7f', '\r', '\n', '/bad\xc2\x85path', '\xff']! {
 					app.paste_input(input); assert app.focus && app.select_all && app.snapshot_mode
@@ -248,7 +365,7 @@ fn check_software_snapshot_memory() ! {
 				app.paste_input('\x1b'); assert app.snapshot_mode
 				free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 				app.snapshot_pending = software_snapshot_fixture_path.clone()
-				app.output.clear(); for byte in text { app.output << byte }
+				app.output.clear(); for byte in if media_mode { media } else { text } { app.output << byte }
 				assert app.load_deployment_snapshot()
 				report_reader_cycle(mut app)!
 				tree := app.build(ui2.rect(0, 0, 900, 660))!
@@ -260,7 +377,7 @@ fn check_software_snapshot_memory() ! {
 				app.handle_deployment_snapshot('software.snapshot.previous')
 				app.handle_deployment_snapshot('software.snapshot.back')
 				// Invalid receipts also release any partially owned metadata.
-				app.begin_deployment_snapshot()
+				app.begin_deployment_snapshot_mode(media_mode)
 				app.snapshot_pending = '/wrong.json'.clone()
 				assert !app.load_deployment_snapshot()
 				app.handle_deployment_snapshot('software.snapshot.back')
@@ -268,6 +385,6 @@ fn check_software_snapshot_memory() ! {
 		}
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'deployment save UI retained ${kept} bytes'
-		println('Software deployment saving: 1000 literal paste/control refusal/blur/full/compact/receipt/paging/mismatch/retirement cycles retain zero tracked bytes')
+		println('Software deployment saving: 1000 installed and 1000 media paste/render/receipt/paging/mismatch/retirement cycles retain zero tracked bytes')
 	}
 }

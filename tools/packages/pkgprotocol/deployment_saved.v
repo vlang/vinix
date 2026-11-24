@@ -17,13 +17,16 @@ pub:
 }
 
 pub fn (saved &DeploymentSnapshotSaved) validate() ! {
-	if saved.format != 1 || saved.architecture !in ['aarch64', 'x86_64']! || !digest(saved.sha256)
-		|| saved.destination == '' || !printable(saved.destination, 4096) || !utf8.validate_str(saved.destination)
-		|| saved.roots > saved.packages || saved.packages > 4096
-		|| ((saved.roots == 0) != (saved.packages == 0))
-		|| (saved.generation == 0 && saved.packages != 0) {
+	if !saved.fields_valid() || (saved.generation == 0 && saved.packages != 0) {
 		return error('invalid saved deployment snapshot receipt')
 	}
+}
+
+fn (saved &DeploymentSnapshotSaved) fields_valid() bool {
+	return !(saved.format != 1 || saved.architecture !in ['aarch64', 'x86_64']! || !digest(saved.sha256)
+		|| saved.destination == '' || !printable(saved.destination, 4096) || !utf8.validate_str(saved.destination)
+		|| saved.roots > saved.packages || saved.packages > 4096
+		|| ((saved.roots == 0) != (saved.packages == 0)))
 }
 
 pub fn (mut saved DeploymentSnapshotSaved) close() {
@@ -31,10 +34,36 @@ pub fn (mut saved DeploymentSnapshotSaved) close() {
 	saved = DeploymentSnapshotSaved{}
 }
 
+// Successful publication of a nonempty deployment lock from offline media.
+pub struct DeploymentMediaSaved {
+pub:
+	format int = 1
+	architecture string
+	destination string
+	sha256 string
+	roots u64
+	packages u64
+}
+
+pub fn (mut saved DeploymentMediaSaved) close() {
+	unsafe { saved.architecture.free(); saved.destination.free(); saved.sha256.free() }
+	saved = DeploymentMediaSaved{}
+}
+
 const deployment_saved_keys = ['format', 'generation', 'architecture', 'destination', 'sha256', 'roots', 'packages']
 
 pub fn decode_deployment_saved(text string) !DeploymentSnapshotSaved {
-	if text.len > 32 * 1024 { return error('saved deployment snapshot receipt exceeds its bound') }
+	return decode_saved_deployment_receipt(text, false)
+}
+
+pub fn decode_deployment_media_saved(text string) !DeploymentMediaSaved {
+	saved := decode_saved_deployment_receipt(text, true)!
+	return DeploymentMediaSaved{ architecture: saved.architecture, destination: saved.destination,
+		sha256: saved.sha256, roots: saved.roots, packages: saved.packages }
+}
+
+fn decode_saved_deployment_receipt(text string, media bool) !DeploymentSnapshotSaved {
+	if text.len > 32 * 1024 { return error('saved deployment receipt exceeds its bound') }
 	mut r := &MetadataReader{ text: text }; defer { unsafe { free(r) } }
 	r.expect(`{`)!
 	mut saved := &DeploymentSnapshotSaved{}
@@ -59,8 +88,14 @@ pub fn decode_deployment_saved(text string) !DeploymentSnapshotSaved {
 		}
 	}
 	r.spaces()
-	if seen != 127 || r.position != text.len { return error('incomplete or trailing saved deployment snapshot receipt') }
-	saved.validate()!
+	// Media receipts have no installed generation (field 1).
+	expected := if media { u16(125) } else { u16(127) }
+	if seen != expected || r.position != text.len { return error('unexpected or incomplete saved deployment receipt') }
+	if media {
+		if !saved.fields_valid() || saved.roots == 0 { return error('invalid saved deployment media receipt') }
+	} else {
+		saved.validate()!
+	}
 	accepted = true
 	return *saved
 }

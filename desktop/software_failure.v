@@ -49,6 +49,7 @@ fn software_failure_operation(arguments []string) string {
 			'deployment-audit' { 'Check installed deployment' }
 			'deployment-add-audit' { 'Check release coverage' }
 			'deployment-snapshot-save' { 'Save installed deployment' }
+			'deployment-media-save' { 'Save media lock' }
 			'mirror', 'mirror-review', 'mirror-apply', 'mirror-deployment-review', 'mirror-deployment-apply' { 'Offline repository export' }
 			'run', 'run-args' { 'Launch application' }
 			else { 'Package service operation' }
@@ -94,7 +95,7 @@ fn (mut a SoftwareApp) capture_failure(arguments []string, code int) {
 	number := code.str()
 	a.failure_heading = if code == 0 && a.worker_failed && a.worker_verify { 'Verify installed software · incomplete response'.clone() }
 		else if a.worker_failed && a.worker_audit { 'Check installed deployment · incomplete response'.clone() }
-		else if a.worker_failed && a.worker_snapshot { 'Save installed deployment · incomplete response'.clone() }
+		else if a.worker_failed && a.worker_snapshot { software_failure_operation(arguments) + ' · incomplete response' }
 		else if code == 0 && a.worker_failed && a.worker_health { 'Inspect installed software health · incomplete response'.clone() }
 		else if code == 0 && a.worker_failed { software_failure_operation(arguments) + ' · response too large' }
 		else { software_failure_operation(arguments) + ' · exit ' + number }

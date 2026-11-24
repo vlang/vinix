@@ -70,6 +70,7 @@ fn (mut a SoftwareApp) handle_deployment(event_id string) {
 		'software.deployment.review' { a.begin_deployment_review() }
 		'software.deployment.audit' { a.begin_deployment_audit() }
 		'software.deployment.snapshot' { a.begin_deployment_snapshot() }
+		'software.deployment.media-save' { a.begin_deployment_snapshot_mode(true) }
 		'software.deployment.back' {
 			a.deployment_mode = false
 			a.focus = false
@@ -135,9 +136,9 @@ fn (mut a SoftwareApp) deployment_paste_input(input string) {
 fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 	a.deployment_form_compact = false
 	a.initialize_deployment_field()
-	// Include all four actions, progress and failure controls without growing
+	// Include the actions, progress and failure controls without growing
 	// the manual-free frame buffer on each redraw.
-	mut children := frame_elements(20)
+	mut children := frame_elements(21)
 	children << software_label('Software · Deployment', 14, 8, width - 188, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.deployment.back', 'Back to catalog', width - 174, 8, 160)
@@ -156,6 +157,7 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 		children << software_button('software.deployment.audit', 'Check installed', 210, 286, 160)
 		children << software_button('software.policy', 'Organization policy', 14, 330, 180)
 		children << software_button('software.deployment.snapshot', 'Save installed…', 210, 330, 160)
+		children << software_button('software.deployment.media-save', 'Save media lock…', 386, 330, 184)
 		if a.release_deployment_available {
 			children << software_button('software.deployment.release', 'Review release apps', 14, 374, 180)
 			children << software_button('software.deployment.release-audit', 'Check release apps', 210, 374, 160)

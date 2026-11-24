@@ -6,10 +6,11 @@ import ui2
 const software_deployment_form_actions = ['software.deployment.choose', 'software.deployment.review',
 	'software.deployment.audit', 'software.deployment.snapshot', 'software.policy',
 	'software.deployment.release', 'software.deployment.release-audit', 'software.failure',
-	'software.deployment.release-add', 'software.deployment.release-coverage']
+	'software.deployment.release-add', 'software.deployment.release-coverage',
+	'software.deployment.media-save']
 const software_deployment_form_titles = ['Choose file…', 'Review deployment', 'Check installed',
 	'Save installed…', 'Organization policy', 'Review release apps', 'Check release apps', 'Failure details',
-	'Add release apps', 'Check release coverage']
+	'Add release apps', 'Check release coverage', 'Save media lock…']
 const software_deployment_form_help = [
 	'Choose a file. Selection fills the path; it starts no package changes.',
 	'Review the full app set and removals. Applying it needs separate approval.',
@@ -21,6 +22,7 @@ const software_deployment_form_help = [
 	'Read the complete failure report. This starts no package changes.',
 	'Review release apps alongside your installed applications. Applying it needs separate approval.',
 	'Check the pinned release apps and dependencies. Other installed apps are allowed.',
+	'Copy a verified release lock to a new file after importing the offline media.',
 ]
 
 fn (a &SoftwareApp) deployment_form_idle() bool {

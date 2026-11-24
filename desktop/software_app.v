@@ -76,6 +76,9 @@ mut:
 	snapshot_ready bool
 	snapshot_pending string
 	snapshot_saved pkgprotocol.DeploymentSnapshotSaved
+	snapshot_media_saved pkgprotocol.DeploymentMediaSaved
+	snapshot_media bool
+	snapshot_media_source string
 	audit_mode bool
 	audit_additions bool
 	audit_ready bool
