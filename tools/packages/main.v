@@ -51,6 +51,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
 	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n' +
 	'  check-release-export RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX\n' +
+	'  write-release-index-pins NEW_FILE RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX [RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX...]\n' +
 	'  check-release-origin RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX HTTPS_URL\n'
 
 fn publisher_reply[T](mut info T) {
@@ -287,6 +288,22 @@ fn checked(arguments []string) !int {
 			}
 			mut info := pkgcore.check_release_export(names[0], names[1], names[2])!
 			publisher_reply(mut info)
+			return 0
+		}
+		'write-release-index-pins' {
+			if names.len < 4 || (names.len - 1) % 3 != 0 || root_option || as_json {
+				return error('write-release-index-pins requires a new file and RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX triples without --root or --json')
+			}
+			mut sources := []pkgcore.ReleaseIndexSource{cap: (names.len - 1) / 3}
+			defer { unsafe { sources.free() } }
+			for i := 1; i < names.len; i += 3 {
+				sources << pkgcore.ReleaseIndexSource{
+					directory:  names[i]
+					id:         names[i + 1]
+					public_key: names[i + 2]
+				}
+			}
+			pkgcore.write_release_index_pins(names[0], sources)!
 			return 0
 		}
 		'check-release-origin' {

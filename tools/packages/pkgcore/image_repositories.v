@@ -5,6 +5,7 @@ import os
 import time
 
 pub const image_repositories_path = '/usr/share/vinix-packages/repositories'
+const max_image_repository_indexes = 4096
 
 struct ImageRepository {
 	id string
@@ -170,7 +171,7 @@ pub fn (configuration &ImageConfiguration) prepare_repositories_for_index_file(s
 		length := end - start - if end < text.len && end > start && text[end - 1] == `\r` { 1 } else { 0 }
 		line := unsafe { tos(text.str + start, length) }
 		separator := line.index(' ') or { -1 }
-		if separator < 1 || required.len == 4096 {
+		if separator < 1 || required.len == max_image_repository_indexes {
 			return error('image repository index file requires one repository ID and lowercase SHA-256 digest per line, up to 4096 indexes')
 		}
 		required << ImageRepositoryIndex{

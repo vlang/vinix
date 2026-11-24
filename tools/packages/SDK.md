@@ -588,6 +588,9 @@ respective targets. Write one repository ID and its lowercase SHA-256 digest
 per line, separated by a single space. The file supports 1–4096 distinct IDs
 and LF or CRLF line endings. A final newline is optional.
 
+Use `vinix-package write-release-index-pins` to produce this file from the
+[signed release exports](#write-image-index-pins-from-signed-exports).
+
 Explicit `--require-index` flags replace the environment file in direct
 staging. Otherwise a selected file must be readable and valid. Desktop cache
 keys include the effective file path and bytes. ISO preflight applies the same
@@ -1232,6 +1235,24 @@ payload's size and digest. It emits the same format-1 JSON fields as
 with the reviewed publication receipt. A copy reports its own absolute directory.
 The check runs locally without a signing seed, an installed package system or
 network access.
+
+#### Write image index pins from signed exports
+
+```sh
+vinix-package --offline write-release-index-pins /release/reviewed-indexes.txt \
+  /release/bundle/company company COMPANY_PUBLIC_KEY_HEX \
+  /release/bundle/tools tools TOOLS_PUBLIC_KEY_HEX
+```
+
+Supply one release directory, repository ID and independently verified public
+key per publisher. The command verifies every complete export locally and then
+publishes the new pin file atomically. The destination's parent must already
+exist outside the release directories. Repository IDs are unique and sorted,
+so repeating the command with the same signed inputs produces identical bytes.
+
+Point `VINIX_PACKAGE_IMAGE_INDEXES` or its target-specific override at the
+saved file. The file pins the exact authenticated index bytes. Publisher trust
+and image policy still come from the reviewed staging configuration.
 
 #### Check the hosted release
 

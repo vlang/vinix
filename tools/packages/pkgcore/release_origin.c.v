@@ -22,7 +22,7 @@ pub fn (mut info ReleaseOriginInfo) close() {
 // Verify the publisher's complete local export without contacting its origin.
 pub fn check_release_export(directory string, id string, public_key string) !ReleaseInfo {
 	if !identifier(id) { return error('invalid release repository ID') }
-	return check_signed_release(directory, id, public_key, '')
+	return check_signed_release(directory, id, public_key, '', '')
 }
 
 // Compare a hosted repository with a complete signed export using the caller's
@@ -32,11 +32,11 @@ pub fn check_release_origin(directory string, id string, public_key string, url 
 	if !url.starts_with('https://') || !pkgprotocol.valid_repository_url(url) {
 		return error('release origin requires a valid HTTPS repository URL')
 	}
-	release := check_signed_release(directory, id, public_key, url)!
+	release := check_signed_release(directory, id, public_key, url, '')!
 	return ReleaseOriginInfo{ url: url.clone(), release: release }
 }
 
-fn check_signed_release(directory string, id string, public_key string, url string) !ReleaseInfo {
+fn check_signed_release(directory string, id string, public_key string, url string, pin_parent string) !ReleaseInfo {
 	path := publisher_path(directory)!
 	defer { unsafe { path.free() } }
 	fd := capture_prepared_root(path, 'signed release export')!
@@ -48,6 +48,12 @@ fn check_signed_release(directory string, id string, public_key string, url stri
 		return error('signed release export changed during admission')
 	}
 	check_export_parent(release, 'signed release export')!
+	if pin_parent != '' {
+		publisher_outside_source(fd, pin_parent) or {
+			unsafe { err.free() }
+			return error('release index pins must be saved outside each signed release export in an accessible directory')
+		}
+	}
 	index_path := release + '/index.json'
 	signature_path := release + '/index.sig'
 	defer {

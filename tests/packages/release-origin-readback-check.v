@@ -137,6 +137,73 @@ fn check_local_export(cli string, work string, local string, key string, origina
 	println('RELEASE EXPORT offline receipt, ten refusals and exact retry PASS')
 }
 
+fn check_index_pins(cli string, work string, local string, key string) ! {
+	seed := work + '/secondary-seed'
+	defer { os.rm(seed) or {} }
+	secondary := work + '/release secondary'
+	secondary_key := run(work + '/pin-keygen', [cli, 'keygen', seed], 0, '')!.trim_space()
+	expires := (time.now().unix() + 7200).str()
+	run(work + '/pin-publish-secondary', [cli, 'publish-release', work + '/workspace',
+		'secondary', seed, '1', expires, secondary], 0, '')!
+	history := work + '/workspace/.publisher/history.json'
+	history_digest := pkgcore.hash_file(history)!
+	original := inventory(local)!
+	secondary_original := inventory(secondary)!
+	first := [local, 'fixture', key]
+	second := [secondary, 'secondary', secondary_key]
+	first_line := 'fixture ' + original['index.json'] + '\n'
+	expected := first_line + 'secondary ' + secondary_original['index.json'] + '\n'
+	command := [cli, 'write-release-index-pins']
+
+	path := os.getenv('PATH')
+	os.setenv('PATH', work + '/no-tools', true)
+	defer { os.setenv('PATH', path, true) }
+	pins := work + '/image-indexes.txt'
+	single := work + '/single-index.txt'
+	retry := work + '/retry-indexes.txt'
+	run(work + '/pin-single', [cli, '--offline', command[1], single, ...first], 0, '')!
+	run(work + '/pin-batch', [...command, pins, ...second, ...first], 0, '')!
+	run(work + '/pin-retry', [...command, retry, ...first, ...second], 0, '')!
+	if os.read_file(single)! != first_line || os.read_file(pins)! != expected
+		|| os.read_file(retry)! != expected {
+		return error('saved index pins differ from canonical signed index digests')
+	}
+
+	failed := work + '/failed-indexes.txt'
+	run(work + '/pin-duplicate', [...command, failed, ...first, ...first], 1,
+		'duplicate release repository ID')!
+	run(work + '/pin-wrong-key', [...command, failed, ...first, secondary, 'secondary', key],
+		1, 'signature verification failed')!
+	run(work + '/pin-incomplete', [...command, failed, ...first, secondary], 1, 'triples')!
+	run(work + '/pin-root', [cli, '--root', '/', command[1], failed, ...first], 1, 'without --root')!
+	run(work + '/pin-json', [cli, '--json', command[1], failed, ...first], 1, 'or --json')!
+	run(work + '/pin-existing', [...command, pins, ...first], 1, 'destination already exists')!
+	alias := work + '/pin-link'
+	os.symlink(pins, alias)!
+	run(work + '/pin-existing-link', [...command, alias, ...first], 1, 'destination already exists')!
+	parent_alias := work + '/pin-parent-link'
+	os.symlink(secondary + '/objects', parent_alias)!
+	nested := parent_alias + '/../pins.txt'
+	run(work + '/pin-inside-export', [...command, nested, ...first, ...second], 1,
+		'must be saved outside each signed release export')!
+
+	object := secondary + '/objects/' + pkgcore.hash_file(work + '/payload/content')!
+	os.write_file(object, 'x'.repeat(int(os.file_size(object))))!
+	run(work + '/pin-damaged-second', [...command, failed, ...first, ...second], 1,
+		'export payload changed')!
+	os.cp(work + '/payload/content', object)!
+	if os.exists(failed) || os.exists(nested) || !os.is_link(alias) || os.read_file(alias)! != expected
+		|| inventory(local)! != original || inventory(secondary)! != secondary_original
+		|| pkgcore.hash_file(history)! != history_digest {
+		return error('release index pin refusal changed an export, publisher history or pin destination')
+	}
+	run(work + '/pin-restored-second', [...command, failed, ...first, ...second], 0, '')!
+	if os.read_file(failed)! != expected {
+		return error('restored export did not produce the original pins')
+	}
+	println('RELEASE INDEX PINS canonical offline writes, exact retry and nine refusals PASS')
+}
+
 fn check() ! {
 	if os.args.len !in [4, 6] {
 		return error('usage: release-origin-readback-check VINIX_PACKAGE HTTPS_FIXTURE NEW_WORK [MIXED_RELEASE PUBLIC_KEY_HEX]')
@@ -152,6 +219,7 @@ fn check() ! {
 	local := work + '/release 1'
 	original := inventory(local)!
 	check_local_export(cli, work, local, key, original)!
+	check_index_pins(cli, work, local, key)!
 	local_mode := (os.lstat(local)!).mode
 	served := work + '/served'
 	os.cp_all(local, served, false)!
