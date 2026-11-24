@@ -223,3 +223,23 @@ application lock and active generation are checked byte for byte. The
 request log must still contain just the seven requests from the online
 refresh, runtime acquisition and replay controls. The third boot checks
 the signed deployment and replay floor after rollback.
+
+At `a5de07e1285441332cd8f5cd124458f0d334c534`, both 2 GiB installed guests passed
+across three cold boots and three guest-initiated shutdowns. AArch64 took
+138.383 seconds under HVF and x86-64 took 295.291 seconds under TCG. Each
+made seven HTTPS requests, including one for the updated SQLite runtime.
+The targeted update made zero HTTPS requests.
+
+The previous CLI refused the repository argument. With the change, all four
+host suites passed for refresh requests, package service, image repositories
+and administrator arguments. The focused test also passed under ASan and
+UBSan with leak detection disabled. It checks that missing, duplicate,
+identity-mismatched, invalid, stale and expired cached indexes preserve
+catalog and history bytes. The existing scoped heap checks reported retained
+allocations on both revisions with V `2655544`. The archive retains both logs.
+
+The source, signed inputs, boot media, logs and installed disks are archived in
+`~/.local/state/vinix/r14-targeted-refresh-tXDftO/qualification.tar.gz`.
+Its SHA-256 is `2ae6b38459762012ac572b59630ebdba450dcf66cd7a130f04f4912589349d49`.
+Independent extraction matched all 8,836 inventory entries and both decoded
+VJFS disk digests.
