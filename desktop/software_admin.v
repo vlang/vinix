@@ -31,7 +31,7 @@ fn (mut a SoftwareApp) begin_admin_prompt() {
 fn (mut a SoftwareApp) cancel_admin() {
 	if !a.admin_prompt { return }
 	refreshing := a.repository_worker == .refresh
-	if a.repository_worker == .targeted_refresh { a.repository_worker = .none }
+	if a.repository_worker in [.targeted_refresh, .media_import] { a.repository_worker = .none }
 	if a.worker != unsafe { nil } {
 		// No credential has been submitted, so the unprivileged client has
 		// started no authorized transaction and can be retired immediately.

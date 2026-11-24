@@ -416,8 +416,8 @@ fn (mut a SoftwareApp) load_view() bool {
 	a.clear_details()
 	a.clear_launch_options()
 	a.clear_review()
-	// Keep the deployment form beneath release refresh for Back and retry.
-	if !a.release_catalog_mode { a.deployment_mode = false }
+	// Keep Deployment beneath its release and offline media refresh forms.
+	if !a.release_catalog_mode && !a.snapshot_mode { a.deployment_mode = false }
 	a.mirror_mode = false
 	text := editor_bytes_text(a.output)
 	view := pkgprotocol.decode_software_view(text) or {
@@ -688,6 +688,14 @@ fn (mut a SoftwareApp) poll() bool {
 		a.operation_line('Verification ended without a complete result. Retry Verify installed.')
 		a.worker_failed = true
 	}
+	if a.repository_worker == .media_import {
+		// Recover the exact approved directory before retiring the worker argv.
+		software_repository_text(mut a.deployment_path, a.worker.args.last())
+		if code == 0 && (!a.progress_seen || a.progress_snapshot.phase != 'complete') {
+			a.operation_line('The media import ended without a complete result. Check the catalog before retrying.')
+			a.worker_failed = true
+		}
+	}
 	if code != 0 || a.worker_failed { a.capture_failure(a.worker.args, code) }
 	view := a.worker_view
 	reviewing := a.worker_review
@@ -704,10 +712,10 @@ fn (mut a SoftwareApp) poll() bool {
 		return true
 	}
 	a.retire_worker()
-	if repository_worker == .targeted_refresh { a.repository_worker = .none }
+	if repository_worker in [.targeted_refresh, .media_import, .media_catalog] { a.repository_worker = .none }
 	a.clear_admin_prompt()
 	if code != 0 || ((verifying || health || cleanup_worker != .none
-		|| repository_worker in [.enroll, .refresh, .targeted_refresh]) && a.worker_failed) {
+		|| repository_worker in [.enroll, .refresh, .targeted_refresh, .media_import, .media_catalog]) && a.worker_failed) {
 		if data_worker == .purge && a.data_ready { a.prepare_personal_data_details() }
 		if cleanup_worker != .none { a.clear_cleanup_review() }
 		if policy_worker == .review { a.clear_policy_review(); a.prepare_policy_pages(false) }
@@ -733,6 +741,7 @@ fn (mut a SoftwareApp) poll() bool {
 			'The package service failed. Check administrator access, repository configuration and disk space.'
 		}) }
 		unsafe { diagnostic.free() }
+		if repository_worker == .media_catalog { a.media_catalog_failed() }
 	} else if health {
 		// The report was admitted only after both pipes drained and exit 0.
 	} else if cleanup_worker == .review {
@@ -762,6 +771,8 @@ fn (mut a SoftwareApp) poll() bool {
 	} else if repository_worker == .targeted_refresh {
 		a.clear_failure()
 		a.set_status('Selected repository refreshed.')
+	} else if repository_worker == .media_import {
+		a.reload_imported_media_catalog()
 	} else if repository_worker in [.revoke, .refresh] {
 		unsafe { a.repository_result.free() }
 		a.repository_result = if repository_worker == .revoke {
@@ -769,7 +780,14 @@ fn (mut a SoftwareApp) poll() bool {
 		} else { 'Repository trusted and its catalog refreshed.'.clone() }
 		a.read_repositories()
 	} else if view {
-		if !a.worker_failed && a.load_view() && a.release_catalog_mode && a.catalog_error == '' {
+		loaded := !a.worker_failed && a.load_view()
+		if repository_worker == .media_catalog {
+			if loaded && a.catalog_error == '' {
+				a.set_status('Media imported. Software is offline. Save the media lock if the bundle includes one.')
+			} else { a.media_catalog_failed() }
+			return true
+		}
+		if loaded && a.release_catalog_mode && a.catalog_error == '' {
 			a.release_catalog_mode = false
 			additions := a.release_catalog_additions
 			a.release_catalog_additions = false

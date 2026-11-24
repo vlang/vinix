@@ -5,7 +5,7 @@ import ui2
 import tools.packages.pkgprotocol
 
 fn software_progress_command(arguments []string) bool {
-	return arguments.len > 0 && arguments[0] in ['update', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'deployment-add-apply', 'rollback', 'verify', 'mirror', 'mirror-apply', 'mirror-deployment-apply']
+	return arguments.len > 0 && arguments[0] in ['update', 'update-media', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'deployment-add-apply', 'rollback', 'verify', 'mirror', 'mirror-apply', 'mirror-deployment-apply']
 }
 
 fn (mut a SoftwareApp) clear_progress() {
@@ -47,6 +47,8 @@ fn (mut a SoftwareApp) operation_line(line string) {
 		a.progress_seen = true
 		text := if a.verification_running() && event.phase == 'complete' {
 			'Verification checks finished; waiting for the service to exit.'.clone()
+		} else if a.repository_worker == .media_import && event.phase == 'complete' {
+			'Media import finished; waiting for the service to exit.'.clone()
 		} else if a.repository_worker in [.refresh, .targeted_refresh] && event.phase == 'complete' {
 			'Repository refresh finished; waiting for the service to exit.'.clone()
 		} else { software_progress_text(event) }
@@ -63,6 +65,7 @@ fn (mut a SoftwareApp) operation_line(line string) {
 	// Keep human success text/late diagnostics for final admission, without
 	// replacing the waiting status with success-looking output in the meantime.
 	if a.verification_running() && a.progress_seen && a.progress_snapshot.phase == 'complete' { return }
+	if a.repository_worker == .media_import && a.progress_seen && a.progress_snapshot.phase == 'complete' { return }
 	tail := software_output_tail(a.output)
 	a.set_status(tail)
 	unsafe { tail.free() }

@@ -9,6 +9,7 @@ import tools.packages.pkgprotocol
 
 const software_snapshot_fixture_path = '/private/tmp/部署 with spaces; $literal/organization-managed-installed-applications/recovery-records-with-complete-historical-metadata/requested-roots-and-transitive-runtime-data-dependencies/retained-versions-and-publisher-sequence-floors/installed applications and exact historical runtimes.json'
 const software_media_fixture_source = '/media/发行 with spaces; $unexpanded'
+const software_import_fixture_lock = '/home/test/local release lock.json'
 
 fn software_snapshot_fixture_receipt(path string) pkgprotocol.DeploymentSnapshotSaved {
 	return pkgprotocol.DeploymentSnapshotSaved{ generation: if path == '/empty-save.json' { u64(0) } else { u64(7) },
@@ -49,6 +50,145 @@ fn software_media_save_fixture_receipt(path string) pkgprotocol.DeploymentMediaS
 		sha256: 'c'.repeat(64), roots: 2, packages: 7 }
 }
 
+fn software_media_import_service_fixture() !bool {
+	work := os.getenv('VINIX_SOFTWARE_MEDIA_IMPORT_FIXTURE')
+	if work == '' { return false }
+	mode := os.getenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE')
+	args := os.args[1..]
+	if args.len >= 3 && args[0] == 'admin' && args[1] == '--progress' && args[2] == 'update-media' {
+		assert args == ['admin', '--progress', 'update-media', software_media_fixture_source]
+		mut credential := [2]u8{}
+		for index in 0 .. credential.len { assert C.read(0, &credential[index], 1) == 1 }
+		assert credential[1] == `\n`
+		if credential[0] == `?` { eprintln('Fixture refused administrator approval.'); exit(21) }
+		assert credential[0] == `!`
+		os.write_file(work + '/approved', mode)!
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{
+			phase: 'verify', repository: 'trusted', path: 'index.json' }))
+		if mode == 'incomplete' { return true }
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
+		flush_stdout()
+		if mode == 'late' { eprintln('Fixture refused publication after the progress frame.'); exit(23) }
+		if mode == 'hold' {
+			for _ in 0 .. 5000 {
+				if os.exists(work + '/release') { return true }
+				time.sleep(time.millisecond)
+			}
+			return error('fixture import was not released')
+		}
+		return true
+	}
+	if args == ['--offline', 'view'] {
+		os.write_file(work + '/catalog-read', mode)!
+		if mode == 'bad-view' { println('incomplete catalog'); return true }
+		println(json2.encode(SoftwareView{ format: 1, architecture: 'x86_64', offline: true, rows: [SoftwareRow{
+			id: 'editor', name: 'Imported Editor', version: '1.0.0', description: 'Write text', kind: 'native',
+			architecture: 'x86_64', repository: 'trusted', public_key: 'a'.repeat(64), license: 'MIT' }] }))
+		return true
+	}
+	if args == ['--offline', '--json', 'deployment-media-save', software_media_fixture_source, software_import_fixture_lock] {
+		println(json2.encode(software_media_save_fixture_receipt(software_import_fixture_lock)))
+		return true
+	}
+	if args == ['--offline', 'deployment-add-review', software_import_fixture_lock] {
+		println(json2.encode(fixture_review('deploy-add', ['editor'])))
+		return true
+	}
+	return false
+}
+
+fn check_software_media_import() ! {
+	work := os.temp_dir() + '/vinix-software-media-import-' + os.getpid().str()
+	os.mkdir(work)!
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_FIXTURE', work, true)
+	defer {
+		os.unsetenv('VINIX_SOFTWARE_MEDIA_IMPORT_FIXTURE')
+		os.unsetenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE')
+		os.rmdir_all(work) or {}
+	}
+	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
+		output: []u8{cap: 8192}, query: 'editor'.bytes() }
+	defer { app.close_app() }
+	app.handle('software.deployment')!
+	app.handle('software.deployment.media-save')!
+	wide := app.build(ui2.rect(0, 0, 640, 610))!
+	assert wide.children.any(it.id == 'software.snapshot.import' && it.text == 'Import media')
+	free_window_tree(wide)
+	app.paste_input('relative'); app.handle('software.snapshot.import')!
+	assert app.worker == unsafe { nil } && !app.admin_prompt && app.status.contains('absolute media directory')
+	app.key_input('\x01'); app.paste_input(software_media_fixture_source)
+	app.handle('software.snapshot.import')!
+	assert app.admin_prompt && app.worker.args == ['admin', '--progress', 'update-media', software_media_fixture_source]
+	app.key_input('!'); app.handle('software.admin.cancel')!
+	assert app.worker == unsafe { nil } && app.repository_worker == .none && !app.offline_requested
+	assert app.admin_password.all(it == 0) && !os.exists(work + '/approved')
+	for mode in ['auth', 'incomplete', 'late']! {
+		os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', mode, true)
+		app.handle('software.snapshot.import')!
+		app.key_input(if mode == 'auth' { '?' } else { '!' })
+		app.handle('software.admin.approve')!
+		wait_for_software(mut app)
+		assert app.snapshot_mode && !app.snapshot_ready && app.snapshot_media_source == '' && !app.offline_requested
+		assert app.failure_heading.contains('Import offline media') && !os.exists(work + '/catalog-read')
+		assert editor_bytes_text(app.deployment_path) == software_media_fixture_source
+		if mode == 'incomplete' { assert app.status.contains('without a complete result') }
+		if mode == 'late' { assert app.status.contains('refused publication') }
+		compact := app.build(ui2.rect(0, 0, 320, 240))!
+		deployment_form_geometry(compact, 320, 240)
+		assert compact.children.any(it.id == 'software.failure') && compact.children.any(it.id == 'software.snapshot.import')
+		free_window_tree(compact)
+	}
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'hold', true)
+	app.handle('software.snapshot.import')!
+	app.key_input('!'); app.handle('software.admin.approve')!
+	assert !app.admin_prompt && app.admin_password.all(it == 0)
+	for _ in 0 .. 5000 {
+		app.poll()
+		if app.progress_seen && app.progress_snapshot.phase == 'complete' { break }
+		time.sleep(time.millisecond)
+	}
+	assert app.worker != unsafe { nil } && app.progress_snapshot.phase == 'complete'
+	assert app.status.contains('waiting for the service to exit') && !app.offline_requested
+	compact := app.build(ui2.rect(0, 0, 320, 240))!
+	deployment_form_geometry(compact, 320, 240)
+	assert compact.children.any(it.id == 'software.progress')
+	assert !compact.children.any(it.id == 'software.snapshot.save' || it.id == 'software.snapshot.import' || it.id == 'software.snapshot.back')
+	free_window_tree(compact)
+	assert !app.prepare_close()
+	app.handle('software.snapshot.back')!; app.handle('software.cancel')!; app.key_input('\x1b')
+	app.handle('software.snapshot.save')!; app.handle('software.snapshot.import')!
+	assert app.worker != unsafe { nil } && app.repository_worker == .media_import
+	assert !os.exists(work + '/catalog-read')
+	software_repository_text(mut app.deployment_path, '/retargeted-media')
+	os.write_file(work + '/release', '')!
+	wait_for_software(mut app)
+	assert app.offline && app.offline_requested && app.repository_worker == .none && app.status.contains('Media imported'), app.status
+	assert app.snapshot_mode && app.deployment_mode && app.snapshot_media_source == ''
+	assert app.rows.len == 1 && app.rows[0].name == 'Imported Editor' && app.query.bytestr() == 'editor'
+	assert os.read_file(work + '/catalog-read')! == 'hold'
+	assert editor_bytes_text(app.deployment_path) == software_media_fixture_source
+	app.handle('software.snapshot.save')!
+	assert app.worker == unsafe { nil } && app.snapshot_media_source == software_media_fixture_source
+	app.paste_input(software_import_fixture_lock); app.handle('software.snapshot.save')!
+	assert app.worker.args == ['--offline', '--json', 'deployment-media-save', software_media_fixture_source, software_import_fixture_lock]
+	wait_for_software(mut app)
+	assert app.snapshot_ready && app.snapshot_media_saved.destination == software_import_fixture_lock
+	app.handle('software.snapshot.review')!
+	assert app.worker.args == ['--offline', 'deployment-add-review', software_import_fixture_lock]
+	wait_for_software(mut app); assert app.review_ready && app.review == 'deploy-add' && !app.admin_prompt
+	app.handle('software.cancel')!
+	// A saved import remains available if the follow-up catalog read is bad.
+	app.offline_requested = false
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'bad-view', true)
+	app.handle('software.deployment.media-save')!; app.paste_input(software_media_fixture_source)
+	app.handle('software.snapshot.import')!; app.key_input('!'); app.handle('software.admin.approve')!
+	wait_for_software(mut app)
+	assert app.status.contains('Media imported, but the offline catalog could not be reloaded')
+	assert app.snapshot_mode && app.deployment_mode && app.offline_requested && app.repository_worker == .none
+	assert app.rows.len == 1 && editor_bytes_text(app.deployment_path) == software_media_fixture_source
+	println('Software media import: administrator approval and cancellation, literal frozen source, progress/exit guards, offline catalog reload, failure and offline save/review handoff PASS')
+}
+
 fn software_media_save_service_fixture(args []string) bool {
 	assert args.len == 5 && os.args[1] == '--json' && args[3] == software_media_fixture_source
 	path := args[4]
@@ -82,7 +222,8 @@ fn check_software_media_save() ! {
 	deployment_form_select(mut app, 'software.deployment.media-save')!
 	assert app.snapshot_mode && app.snapshot_media && app.focus
 	source := app.build(ui2.rect(0, 0, 320, 240))!
-	assert source.children.any(it.id == 'software.snapshot.save' && it.text == 'Next')
+	assert source.children.any(it.id == 'software.snapshot.import' && it.text == 'Import media')
+	assert source.children.any(it.id == 'software.snapshot.save' && it.text == 'Save media lock')
 	deployment_form_geometry(source, 320, 240)
 	free_window_tree(source)
 	app.paste_input('relative'); app.handle('software.snapshot.save')!
@@ -246,6 +387,7 @@ fn check_software_snapshot_navigation() ! {
 fn check_software_snapshot() ! {
 	check_software_snapshot_navigation()!
 	check_software_media_save()!
+	check_software_media_import()!
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
 		output: []u8{cap: 8192}, query: []u8{cap: 256}, selected: 5, filter: 1 }
 	defer { app.close_app() }
@@ -353,6 +495,8 @@ fn check_software_snapshot_memory() ! {
 				media_mode := i % 2 == 1
 				app.begin_deployment_snapshot_mode(media_mode)
 				if media_mode {
+					free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+					free_window_tree(app.build(ui2.rect(0, 0, 900, 660))!)
 					app.paste_input(software_media_fixture_source)
 					app.save_deployment_snapshot()
 				}

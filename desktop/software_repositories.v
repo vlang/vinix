@@ -13,6 +13,8 @@ enum SoftwareRepositoryWorker {
 	revoke
 	refresh
 	targeted_refresh
+	media_import
+	media_catalog
 }
 
 fn software_repository_text(mut buffer []u8, text string) {

@@ -30,17 +30,52 @@ fn (mut a SoftwareApp) begin_deployment_snapshot_mode(media bool) {
 	a.deployment_path.clear()
 	a.snapshot_mode = true; a.focus = true
 	a.snapshot_media = media
-	a.set_status(if media { 'Enter the offline media directory after importing it into the catalog.' }
+	a.set_status(if media { 'Import signed repositories with administrator approval, or save the release lock from media you already imported.' }
 		else { 'Choose a new filename for the installed deployment. Existing files are preserved.' })
+}
+
+fn (mut a SoftwareApp) media_directory_valid(path string) bool {
+	if software_deployment_path_valid(path) { return true }
+	a.set_status('Enter an absolute media directory path without control characters (at most 4096 bytes).')
+	return false
+}
+
+fn (mut a SoftwareApp) import_offline_media() {
+	path := editor_bytes_text(a.deployment_path)
+	if !a.media_directory_valid(path) { return }
+	mut args := ['update-media', path]
+	a.start(args, false)
+	unsafe { (&array(&args)).free() }
+	if a.worker != unsafe { nil } {
+		a.clear_failure()
+		a.repository_worker = .media_import
+		a.focus = false; a.select_all = false
+		if !a.admin_prompt { a.set_status('Importing the signed offline repositories…') }
+	}
+}
+
+fn (mut a SoftwareApp) reload_imported_media_catalog() {
+	a.clear_failure()
+	a.offline_requested = true
+	mut args := ['view']
+	a.start(args, true)
+	unsafe { (&array(&args)).free() }
+	if a.worker != unsafe { nil } {
+		a.repository_worker = .media_catalog
+		a.set_status('Media imported. Reloading the offline catalog…')
+	} else { a.media_catalog_failed() }
+}
+
+fn (mut a SoftwareApp) media_catalog_failed() {
+	message := 'Media imported, but the offline catalog could not be reloaded. ' + a.status
+	a.set_status(message)
+	unsafe { message.free() }
 }
 
 fn (mut a SoftwareApp) save_deployment_snapshot() {
 	path := editor_bytes_text(a.deployment_path)
 	if a.snapshot_media && a.snapshot_media_source == '' {
-		if !software_deployment_path_valid(path) {
-			a.set_status('Enter an absolute media directory path without control characters (at most 4096 bytes).')
-			return
-		}
+		if !a.media_directory_valid(path) { return }
 		a.snapshot_media_source = path.clone()
 		a.deployment_path.clear()
 		a.focus = true; a.select_all = false
@@ -149,6 +184,9 @@ fn (mut a SoftwareApp) handle_deployment_snapshot(event_id string) {
 		'software.snapshot.back' { a.clear_deployment_snapshot() }
 		'software.snapshot.another' { a.begin_deployment_snapshot_mode(a.snapshot_media) }
 		'software.snapshot.export' { if !a.snapshot_media { a.export_deployment_snapshot() } }
+		'software.snapshot.import' {
+			if a.snapshot_media && a.snapshot_media_source == '' && !a.snapshot_ready { a.import_offline_media() }
+		}
 		'software.deployment.path' { if !a.snapshot_ready { a.focus = true; a.select_all = false } }
 		'software.snapshot.save' { if !a.snapshot_ready { a.save_deployment_snapshot() } }
 		'software.snapshot.previous' { if a.details_page > 0 { a.details_page-- } }
@@ -190,13 +228,14 @@ fn (mut a SoftwareApp) snapshot_paste_input(input string) {
 }
 
 fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(7)
+	mut children := frame_elements(8)
 	source_step := a.snapshot_media && a.snapshot_media_source == ''
 	title := if a.snapshot_media { 'Save media lock' } else { 'Save installed' }
 	saved_title := if a.snapshot_media { 'Media lock saved' } else { 'Installed deployment saved' }
+	media_progress := a.repository_worker == .media_import && a.progress_seen
 	if width < 320 || height < 240 {
 		children << software_label(if a.snapshot_media {
-			if a.snapshot_ready { 'Media lock saved · enlarge for details' } else { 'Save media lock · enlarge for details' }
+			if a.snapshot_ready { 'Media lock saved · enlarge for details' } else { 'Offline media · enlarge for controls' }
 		} else {
 			if a.snapshot_ready { 'Installed deployment saved · enlarge for details' } else { 'Save installed · enlarge for details' }
 		}, 14, 8, width - 28, 28, false)
@@ -206,26 +245,40 @@ fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 			children << software_button('software.snapshot.back', 'Back', 14, 46, button_width)
 			if failure { children << software_button('software.failure', 'Failure', 26 + button_width, 46, button_width) }
 		} else {
-			children << software_label('Wait for saving to finish.', 14, 46, width - 28, 28, false)
+			children << software_label(if source_step { 'Wait for offline media.' } else { 'Wait for saving to finish.' }, 14, 46, width - 28, 28, false)
 		}
 		children << software_label(a.status, 14, 78, width - 28, if height > 86 { height - 86 } else { 1 }, false)
 		return ui2.screen(app_surface, children)
 	}
 	if !a.snapshot_ready {
 		idle := a.worker == unsafe { nil }
-		children << software_label(title, 14, 8, if idle { width - 98 } else { width - 28 }, 28, false)
+		children << software_label(if source_step { 'Offline media' } else { title }, 14, 8, if idle { width - 98 } else { width - 28 }, 28, false)
 		if idle { children << software_button('software.snapshot.back', 'Back', width - 70, 8, 56) }
-		children << software_label(if source_step { 'Offline media directory (absolute path)' } else { 'New deployment file (absolute path)' }, 14, 42, width - 28, 18, false)
+		children << software_label(if source_step { 'Media directory (absolute path)' } else { 'New deployment file (absolute path)' }, 14, 42, width - 28, 18, false)
 		children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 64, width - 28, a.focus)
+		mut status_y := 142
 		if idle {
 			failure := a.failure_pages.len > 0
-			button_width := if failure { (width - 40) / 2 } else { if width > 202 { 174 } else { width - 28 } }
-			children << software_button('software.snapshot.save', if source_step { 'Next' } else { title }, 14, 104, button_width)
-			if failure { children << software_button('software.failure', 'Failure details', 26 + button_width, 104, button_width) }
+			button_width := if failure || source_step { (width - 40) / 2 } else { 174 }
+			if source_step {
+				children << software_button('software.snapshot.import', 'Import media', 14, 104, button_width)
+				children << software_button('software.snapshot.save', title, 26 + button_width, 104, button_width)
+				if failure {
+					children << software_button('software.failure', 'Failure details', 14, 142, button_width)
+					status_y = 180
+				}
+			} else {
+				children << software_button('software.snapshot.save', title, 14, 104, button_width)
+				if failure { children << software_button('software.failure', 'Failure details', 26 + button_width, 104, button_width) }
+			}
 		} else {
-			children << software_label('Wait for saving to finish.', 14, 104, width - 28, 28, false)
+			children << software_label(if source_step { 'Wait for offline media.' } else { 'Wait for saving to finish.' }, 14, 104, width - 28, 28, false)
+			if media_progress {
+				children << a.progress_bar(width, 240)
+				status_y = 152
+			}
 		}
-		children << software_label(a.status, 14, 142, width - 28, if height > 150 { height - 150 } else { 1 }, false)
+		children << software_label(a.status, 14, status_y, width - 28, height - status_y - 8, false)
 		return ui2.screen(app_surface, children)
 	}
 	children << software_label(saved_title, 14, 8, width - 28, 28, false)
@@ -255,7 +308,9 @@ fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Element {
 	if width < 640 || height < 610 { return a.build_snapshot_compact(width, height) }
 	mut children := frame_elements(28)
-	children << software_label(if a.snapshot_media { 'Save media lock' } else { 'Save installed deployment' }, 14, 8, width - 28, 28, false)
+	source_step := a.snapshot_media && a.snapshot_media_source == ''
+	title := if source_step { 'Offline media' } else if a.snapshot_media { 'Save media lock' } else { 'Save installed deployment' }
+	children << software_label(title, 14, 8, width - 28, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.snapshot.back', 'Back to deployment', 14, 46, if width > 202 { 188 } else { width - 28 })
 	}
@@ -273,11 +328,12 @@ fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Elem
 			children << software_button('software.snapshot.export', 'Export offline…', 406, height - 130, 180)
 		}
 	} else {
-		source_step := a.snapshot_media && a.snapshot_media_source == ''
 		children << software_label(if source_step { 'Offline media directory (absolute path)' } else { 'New deployment file (absolute path)' }, 14, 94, width - 28, 28, false)
 		children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 128, width - 28, a.focus)
 		if a.snapshot_media {
-			if !source_step {
+			if source_step {
+				children << software_label('Import a bundle controlled by your administrator. Software uses enrolled publisher keys to check the signed repositories and cache packages from the media.', 14, 174, width - 28, 60, false)
+			} else {
 				children << software_label('Save a local copy of the authenticated release lock. Choose a new filename outside the media. Existing files are preserved.', 14, 174, width - 28, 60, false)
 			}
 		} else {
@@ -285,9 +341,12 @@ fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Elem
 			children << software_label('This saves metadata, not application payloads or personal data. Restoring needs trusted repositories or offline media, explicit license consent and a fresh review.', 14, 246, width - 28, 60, false)
 		}
 		if a.worker == unsafe { nil } {
-			children << software_button('software.snapshot.save', if source_step { 'Next' } else if a.snapshot_media { 'Save media lock' } else { 'Save installed' }, 14, 326, 180)
+			if source_step { children << software_button('software.snapshot.import', 'Import media', 14, 326, 180) }
+			children << software_button('software.snapshot.save', if a.snapshot_media { 'Save media lock' } else { 'Save installed' }, if source_step { 210 } else { 14 }, 326, 180)
 		}
 	}
-	a.add_status_footer(mut children, width, height, false)
+	progress := a.repository_worker == .media_import && a.progress_seen
+	if progress { children << a.progress_bar(width, height) }
+	a.add_status_footer(mut children, width, height, progress)
 	return ui2.screen(app_surface, children)
 }
