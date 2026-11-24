@@ -25,7 +25,8 @@ pub fn decode_personal_data(text string) !PersonalDataStatus {
 	mut reader := &MetadataReader{ text: text }
 	defer { unsafe { free(reader) } }
 	reader.expect(`{`)!
-	mut status := PersonalDataStatus{}
+	mut status := &PersonalDataStatus{}
+	defer { unsafe { free(status) } }
 	mut accepted := false
 	defer { if !accepted { status.close() } }
 	mut seen := u16(0)
@@ -36,23 +37,23 @@ pub fn decode_personal_data(text string) !PersonalDataStatus {
 		seen |= u16(1) << field
 		if field == 0 {
 			reader.expect(`1`)!
-			status = PersonalDataStatus{ ...status, format: 1 }
+			unsafe { *status = PersonalDataStatus{ ...status, format: 1 } }
 		} else {
-			status = PersonalDataStatus{ ...status, rows: reader.rows()! }
+			unsafe { *status = PersonalDataStatus{ ...status, rows: reader.rows()! } }
 		}
 	}
 	reader.spaces()
 	if seen != 3 || reader.position != text.len { return error('incomplete or trailing personal data status') }
 	status.validate()!
 	accepted = true
-	return status
+	return *status
 }
 
 fn (mut r MetadataReader) row() !PersonalData {
 	r.expect(`{`)!
 	mut row := PersonalData{}
 	mut accepted := false
-	defer { if !accepted { unsafe { row.id.free(); row.diagnostic.free() } } }
+	defer { if !accepted { close_personal_data_row(row) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -76,19 +77,12 @@ fn (mut r MetadataReader) rows() ![]PersonalData {
 	mut rows := []PersonalData{cap: 16}
 	unsafe { rows.flags |= .noslices }
 	mut accepted := false
-	defer {
-		if !accepted {
-			mut discarded := PersonalDataStatus{ rows: rows }
-			discarded.close()
-		}
-	}
+	defer { if !accepted { close_personal_data_rows(rows) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if rows.len == 4096 { return error('personal data row count exceeds its bound') }
-		row := r.row()!
-		pointer := unsafe { &row }
-		unsafe { rows.push_many(pointer, 1) }
+		rows << r.row()!
 	}
 	accepted = true
 	return rows
@@ -106,10 +100,19 @@ pub fn (status &PersonalDataStatus) validate() ! {
 	}
 }
 
-pub fn (mut status PersonalDataStatus) close() {
+fn close_personal_data_row(row PersonalData) {
 	unsafe {
-		for row in status.rows { row.id.free(); row.diagnostic.free() }
-		(&array(&status.rows)).free()
+		row.id.free()
+		row.diagnostic.free()
 	}
+}
+
+fn close_personal_data_rows(rows []PersonalData) {
+	for row in rows { close_personal_data_row(row) }
+	unsafe { (&array(&rows)).free() }
+}
+
+pub fn (mut status PersonalDataStatus) close() {
+	close_personal_data_rows(status.rows)
 	status = PersonalDataStatus{}
 }

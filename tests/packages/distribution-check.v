@@ -215,6 +215,10 @@ fn check() ! {
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/repository-configuration-memory',
 			repository + '/tools/packages/pkgprotocol/repository_configuration_test.v'])!
 		run(work + '/repository-configuration-memory', [])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/personal-data-decoder-memory',
+			repository + '/tools/packages/pkgprotocol/personal_data_test.v'])!
+		run(work + '/personal-data-decoder-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/window-decoder-memory',

@@ -3,6 +3,35 @@ module pkgprotocol
 
 import json2
 
+$if track_heap ? {
+	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
+	fn C.vinix_heap_begin()
+	fn C.vinix_heap_end() u64
+}
+
+fn test_personal_data_decoding_releases_complete_and_partial_rows() {
+	valid := '{"format":1,"rows":[{"id":"app","installed":true,"diagnostic":""},{"id":"other","installed":false,"diagnostic":"owned"}]}'
+	invalid := valid.replace('"diagnostic":"owned"', r'"diagnostic":"\ud800"')
+	defer { unsafe { invalid.free() } }
+	mut status := &PersonalDataStatus{}
+	defer { unsafe { free(status) } }
+	$if track_heap ? { C.vinix_heap_begin() }
+	for _ in 0 .. 256 {
+		unsafe { *status = decode_personal_data(valid)! }
+		assert status.rows.len == 2 && status.rows[0].installed
+		assert status.rows[1].id == 'other' && status.rows[1].diagnostic == 'owned'
+		status.close()
+		mut refused := false
+		decode_personal_data(invalid) or { refused = true; unsafe { err.free() } }
+		assert refused
+	}
+	$if track_heap ? {
+		retained := C.vinix_heap_end()
+		assert retained == 0, 'personal data decoding retained ${retained} bytes'
+		println('Personal data decoding: 256 complete and partial-row cycles retained zero tracked bytes')
+	}
+}
+
 fn test_personal_data_status_rejects_unsupported_ambiguous_and_unbounded_rows() {
 	for text in ['{}', '{"format":2,"rows":[]}', '{"format":1,"rows":[{"id":"../other","installed":false,"diagnostic":""}]}',
 		'{"format":1,"rows":[{"id":"app","installed":false,"diagnostic":""},{"id":"app","installed":false,"diagnostic":""}]}',
