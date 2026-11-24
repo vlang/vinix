@@ -132,7 +132,7 @@ The cut CLI applies that approval through the normal `repo-apply` path.
 | `enrollment-cut-history` | Sequence 2 and its digest have been persisted. | The replay floor is durable and the new publisher remains disabled. |
 | `enrollment-cut-configuration` | The configuration replacement and flush have completed. | The same floor is durable and the new publisher is enabled. |
 
-Both boots recover the exact catalog and installed generation from before
+Both cases recover the exact catalog and installed generation from before
 enrollment. The regular CLI refuses sequence 1, a different signed index at
 sequence 2 and the original approval. A new review binds the exact sequence-2
 index to the recovered trust state. Applying it retires the abandoned
@@ -142,3 +142,22 @@ app and keeps the original publisher snapshot and installed generation.
 Only the cut CLI is compiled with the checkpoints. It pauses while holding
 the writer lock, and QEMU is killed before cleanup or a guest sync. Preparation
 and recovery use the regular CLI.
+
+On 2026-11-24, revision `981868d00cd9ff29be85f0321239af9ca23c57d7`
+passed both cuts on AArch64 (HVF) and x86_64 (TCG). All four runs verified
+SIGKILL at the selected checkpoint and guest shutdown after recovery. The
+test confirmed the checkpoint symbol only in the cut CLI on both targets.
+The host administration and trust-recovery suites and the selected-refresh
+regression passed. The administration suite also passed under ASan/UBSan
+with leak detection disabled.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-enrollment-crash-jGaipQ/qualification.tar.gz)
+contains the source snapshot, target tools and inputs, initial ext2 images,
+and serial and QMP logs. The runs used `--failures-only`. All nine receipt
+sizes and digests matched per target. The independent archive checker
+verified all 94 sealed file payloads and the gzip stream. Archive SHA-256
+`1bd4bc60d439a7bf1f8c8baa41c878067a3ce661f0e0bdb79a60258042d759ab`.
+
+These runs qualify the reviewed enrollment sequence on disposable QEMU ext2
+disks. Production publisher enrollment and physical storage crash testing
+remain separate release requirements.
