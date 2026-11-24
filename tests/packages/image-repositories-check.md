@@ -95,3 +95,35 @@ controller mode retains explicit enrollment for the legacy native-catalog check.
 - [Source/toolchain/artifact ledger](results/2026-10-16/image-repositories-toolchain.json), [V host checks](results/2026-10-16/image-repositories-host.v), [V guest invocation](results/2026-10-16/image-repositories-guest.v)
 - [AArch64 CLI receipt](results/2026-10-16/image-repositories-aarch64.json), [serial](results/2026-10-16/image-repositories-aarch64.serial.txt), [staging](results/2026-10-16/image-repositories-aarch64.stage.txt), [Software receipt](results/2026-10-16/image-repositories-aarch64.software.json), [Software serial](results/2026-10-16/image-repositories-aarch64.software.serial.txt)
 - [x86-64 CLI receipt](results/2026-10-16/image-repositories-x86_64.json), [serial](results/2026-10-16/image-repositories-x86_64.serial.txt), [staging](results/2026-10-16/image-repositories-x86_64.stage.txt), [Software receipt](results/2026-10-16/image-repositories-x86_64.software.json), [Software serial](results/2026-10-16/image-repositories-x86_64.software.serial.txt)
+
+## Captured repository publication directories
+
+At `8f2b7cfc5bb3aa46a6726cf9d4026a110c2e2938`, publication holds the
+destination ancestor used for the disk-space check. New directories are opened
+relative to that ancestor, and the final bundle is published through the
+captured parent. Preservation also checks the identity of the existing bundle
+directory before and after verification.
+
+The regression replaces the ancestor during budgeting on fresh and partly
+populated roots, then checks both directories for unintended writes. It also
+replaces a verified bundle with a byte-identical copy before preservation.
+Restoring the original directories permits publication and idempotent retry.
+Host image configuration, bundle, image input, catalog, release and mirror
+checks passed. The bundle fixture also passed with a 32-descriptor limit and
+under ASan/UBSan with leak detection disabled.
+
+Normal production staging published the exact signed bundle for both targets.
+A second stage preserved each bundle's inode, mode, modification time and
+bytes. The package store was empty after staging.
+
+Both TCG guests passed five programs and initiated shutdown. AArch64 completed
+in 94.2 seconds and x86-64 in 98.4 seconds with a 360-second deadline. All nine
+receipt artifact sizes and digests matched per target. These runs cover
+initramfs guests with retained kernels. Installed-device durability and
+production publisher enrollment remain open.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-bundle-parent-capture-lnpB97/qualification.tar.gz)
+contains the source snapshot, host checks, signed staging inputs and outputs,
+guest builds and receipts. The independent checker verified all 196 sealed
+files. Archive SHA-256 is
+`a1dbec239bd001c887478f1d2e355bc4a928fb44103aaaaf768a1e7ea737075d`.
