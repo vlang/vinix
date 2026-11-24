@@ -43,6 +43,7 @@ fn image_export_suite() hwhost.Suite {
 				'NEW METADATA existing file/alias/dangling/FIFO/directory/hardlink destinations refuse without replacement or blocking PASS',
 				'NEW METADATA checkpoint/write/space/flush failures, destination races, mode/parent/final substitutions, cleanup and saved-file retry refusal PASS',
 				'NEW METADATA concurrent publishers admit exactly one complete file with canonical final mode and no temporary leftovers PASS',
+				'NEW METADATA preparation refusal, captured-parent replacement and exclusive retry PASS',
 				'IMAGE REQUIREMENTS FILE exact-byte digests, canonical both-host joint locks, inline parity, whitespace/order provenance and independent reports without publication PASS',
 				'IMAGE REQUIREMENTS FILE schema/host/empty/invalid/oversized/conflicting sets and missing/aliased/special/oversized files refuse unchanged; restore/retry PASS',
 				'IMAGE REQUIREMENTS LOCK both targets retain an older reviewed version and sequence floor, refuse changed pins or closure, and publish through the matching capture PASS',

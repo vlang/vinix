@@ -72,6 +72,15 @@ struct InstalledVerification {
 	coverage pkgprotocol.DeploymentAudit
 }
 
+struct DeploymentExport {
+	format int = 1
+	iso_sha256 string
+	architecture string
+	destination string
+	sha256 string
+	release_time i64 @[omitempty]
+}
+
 fn preflight(root string, arch string, config string, bundle string, declaration string, indexes string) !Preflight {
 	mut configuration := pkgcore.prepare_image_configuration(root, arch, config)!
 	defer { configuration.close() }
@@ -393,17 +402,42 @@ fn verify_published_image(source string, receipt Receipt, work string, release_t
 	return check_iso(iso, work, expected, receipt.iso_sha256, release_time)
 }
 
+fn read_application_receipt(path string) !Receipt {
+	receipt_text := pkgcore.read_metadata(path)!
+	defer { unsafe { receipt_text.free() } }
+	receipt := json2.decode[Receipt](receipt_text)!
+	receipt_architecture(receipt)!
+	if receipt.applications.len == 0 || !pkgcore.digest_valid(receipt.deployment_sha256) {
+		return error('an ISO package receipt with an application declaration is required')
+	}
+	return receipt
+}
+
+fn export_deployment(arguments []string) ! {
+	if arguments.len !in [3, 4]! {
+		return error('usage: package-receipt export-deployment ISO RECEIPT.json NEW_FILE [RELEASE_UNIX_TIME]')
+	}
+	release_time := if arguments.len == 4 { archived_release_time(arguments[3])! } else { i64(0) }
+	source := arguments[0]
+	receipt := read_application_receipt(arguments[1])!
+	destination := arguments[2]
+	pkgcore.atomic_write_new_after(destination, fn [source, receipt, release_time] () !string {
+		work := workspace()!
+		defer { os.rmdir_all(work) or {} }
+		verified := verify_published_image(source, receipt, work, release_time)!
+		return pkgcore.read_release_lock_matching_digest(work + '/root' + declaration_path,
+			verified.deployment_sha256)
+	})!
+	println(json2.encode(DeploymentExport{ iso_sha256: receipt.iso_sha256, architecture: receipt.architecture,
+		destination: destination, sha256: receipt.deployment_sha256, release_time: release_time }))
+}
+
 fn verify_installed(arguments []string) !int {
 	if arguments.len !in [4, 5]! {
 		return error('usage: package-receipt verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME]')
 	}
 	release_time := if arguments.len == 5 { archived_release_time(arguments[4])! } else { i64(0) }
-	receipt_text := pkgcore.read_metadata(arguments[1])!
-	defer { unsafe { receipt_text.free() } }
-	receipt := json2.decode[Receipt](receipt_text)!
-	if receipt.applications.len == 0 || !pkgcore.digest_valid(receipt.deployment_sha256) {
-		return error('installed release verification requires an ISO receipt with an application declaration')
-	}
+	receipt := read_application_receipt(arguments[1])!
 	saved_text := pkgcore.read_metadata(arguments[3])!
 	defer { unsafe { saved_text.free() } }
 	mut saved := pkgprotocol.decode_deployment_saved(saved_text)!
@@ -447,9 +481,12 @@ fn run() ! {
 	if os.args.len >= 2 && os.args[1] == 'verify-installed' {
 		exit(verify_installed(os.args[2..])!)
 	}
+	if os.args.len >= 2 && os.args[1] == 'export-deployment' {
+		return export_deployment(os.args[2..])
+	}
 	archive := os.args.len == 5 && os.args[1] == 'verify-archive'
 	if !archive && (os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']!) {
-		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | checksums RECEIPT.json | origins RECEIPT.json SHA256')
+		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | export-deployment ISO RECEIPT.json NEW_FILE [RELEASE_UNIX_TIME] | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }

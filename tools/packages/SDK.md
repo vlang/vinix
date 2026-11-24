@@ -775,6 +775,20 @@ failure. An optional final `RELEASE_UNIX_TIME` checks bundled index expiry
 at the trusted historical release time and includes it in the result.
 Use payload health checks to verify the installed files themselves.
 
+To recover the exact release lock from the verified ISO for a new review:
+
+```sh
+/tmp/vinix-package-receipt export-deployment vinix-arm64.iso vinix-packages-arm64.json release.json
+vinix-package deployment-add-review release.json
+```
+
+The exporter saves the embedded format-2 lock to a new file and prints its
+destination, architecture, ISO digest and lock digest. Existing destinations
+are preserved. An optional final `RELEASE_UNIX_TIME` enables historical
+verification. The installed system checks current publisher trust and policy
+when reviewing the exported lock. Applying the proposal requires separate
+confirmation and administrator approval.
+
 For a release that advertises the same catalog on both architectures, generate
 both plans with the candidate package input environment:
 

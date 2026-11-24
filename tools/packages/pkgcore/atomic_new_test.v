@@ -140,3 +140,30 @@ fn test_new_metadata_uses_parent_captured_before_preparation() {
 	mut info := C.stat{}
 	assert C.fstat(directory, unsafe { &info }) == 0
 }
+
+fn test_new_metadata_callback_captures_parent_before_preparing_bytes() {
+	work := new_metadata_work()!
+	defer { os.rmdir_all(work) or {} }
+	parent := work + '/parent'
+	moved := work + '/original'
+	path := parent + '/saved'
+	os.mkdir(parent)!
+	mut diagnostic := ''
+	atomic_write_new_after(path, fn () !string { return error('preparation refused') }) or { diagnostic = err.msg() }
+	assert diagnostic == 'preparation refused' && os.ls(parent)!.len == 0
+
+	atomic_write_new_after(path, fn [parent, moved] () !string {
+		os.rename(parent, moved)!
+		os.mkdir(parent)!
+		os.write_file(parent + '/existing', 'replacement')!
+		return 'prepared bytes\n'.clone()
+	}) or { diagnostic = err.msg() }
+	assert diagnostic.contains('parent path changed before writing')
+	assert os.ls(parent)! == ['existing'] && os.ls(moved)!.len == 0
+
+	atomic_write_new_after(path, fn () !string { return 'exact retry\n'.clone() })!
+	assert os.read_file(path)! == 'exact retry\n'
+	atomic_write_new_after(path, fn () !string { return error('callback ran unexpectedly') }) or { diagnostic = err.msg() }
+	assert diagnostic.contains('already exists') && os.read_file(path)! == 'exact retry\n'
+	println('NEW METADATA preparation refusal, captured-parent replacement and exclusive retry PASS')
+}

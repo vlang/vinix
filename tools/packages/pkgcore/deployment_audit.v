@@ -91,15 +91,25 @@ fn (service Service) audit_deployment_mode(path string, mode DeploymentMode) !pk
 	return audit_deployment_locked(service, directory, path, mode)
 }
 
+// Read the original lock bytes whose digest was checked by ISO verification.
+// The caller owns the returned text.
+pub fn read_release_lock_matching_digest(path string, expected_sha256 string) !string {
+	text := read_metadata(path)!
+	digest := index_digest(text)
+	defer { unsafe { digest.free() } }
+	if digest != expected_sha256 {
+		unsafe { text.free() }
+		return error('captured release lock differs from the ISO package receipt')
+	}
+	return text
+}
+
 // Compare saved metadata using the two reviewed digests. The snapshot receipt
 // supplies its recorded generation and counts, and grants no package authority.
 pub fn audit_saved_deployment_coverage(release_path string, release_sha256 string, snapshot_path string, saved pkgprotocol.DeploymentSnapshotSaved) !pkgprotocol.DeploymentAudit {
 	saved.validate()!
-	release_text := read_metadata(release_path)!
+	release_text := read_release_lock_matching_digest(release_path, release_sha256)!
 	defer { unsafe { release_text.free() } }
-	release_digest := index_digest(release_text)
-	defer { unsafe { release_digest.free() } }
-	if release_digest != release_sha256 { return error('captured release lock differs from the ISO package receipt') }
 	mut expected := decode_deployment(release_text, saved.architecture)!
 	defer { expected.close() }
 	if expected.format != 2 || expected.packages.len == 0 {
@@ -116,5 +126,5 @@ pub fn audit_saved_deployment_coverage(release_path string, release_sha256 strin
 	if u64(installed.packages.len) != saved.roots || u64(installed.locked.len) != saved.packages {
 		return error('installed snapshot counts differ from its saved receipt')
 	}
-	return compare_deployment(expected, installed, saved.generation, release_digest, .additions)
+	return compare_deployment(expected, installed, saved.generation, release_sha256, .additions)
 }

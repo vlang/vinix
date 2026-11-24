@@ -68,6 +68,19 @@ pub fn atomic_write_new(path string, text string) ! {
 	atomic_write_with(path, text, AtomicWriteOptions{ exclusive: true })!
 }
 
+// Capture the destination before expensive preparation. The callback returns
+// owned metadata, and publication uses the original parent or refuses.
+pub fn atomic_write_new_after(path string, prepare fn () !string) ! {
+	parent, name := atomic_file_path(path)!
+	defer { unsafe { parent.free(); name.free() } }
+	directory := open_atomic_parent(parent)!
+	defer { C.close(directory) }
+	check_new_atomic_destination(directory, name)!
+	text := prepare()!
+	defer { unsafe { text.free() } }
+	atomic_write_at(parent, name, text, AtomicWriteOptions{ exclusive: true, parent_fd: directory })!
+}
+
 fn atomic_publish_new(parent int, source string, destination string) int {
 	return atomic_publish_between(parent, source, parent, destination)
 }

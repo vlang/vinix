@@ -349,6 +349,46 @@ fn check_archive_receipt(tool string, iso string, receipt string, work string) !
 	}
 }
 
+fn check_export_deployment(tool string, iso string, receipt string, work string, architecture string) !string {
+	embedded := os.read_file(work + '/root/' + declaration)!
+	path := work + '/release lock é; literal.json'
+	args := [tool, 'export-deployment', iso, receipt]
+	code, output := command([...args, path])
+	os.write_file(work + '/export-verifier.log', output)!
+	if code != 0 { return error('verified release lock export failed: ' + output) }
+	result := json2.decode[json2.Any](output)!.as_map()
+	assert result['format']!.int() == 1 && result['architecture']!.str() == architecture
+	assert result['destination']!.str() == path && result['iso_sha256']!.str() == pkgcore.hash_file(iso)!
+	assert result['sha256']!.str() == pkgcore.hash_file(path)! && os.read_file(path)! == embedded
+	assert os.lstat(path)!.mode & 0o777 == 0o644
+
+	occupied, occupied_text := command([...args, path])
+	assert occupied == 1 && occupied_text.contains('already exists') && os.read_file(path)! == embedded
+	alias := work + '/release-lock-alias.json'
+	os.symlink('absent.json', alias)!
+	refused, refused_text := command([...args, alias])
+	assert refused == 1 && refused_text.contains('already exists') && os.is_link(alias)
+	assert !os.exists(work + '/absent.json')
+
+	wrong := work + '/wrong-export-receipt.json'
+	mut receipt_fields := json2.decode[json2.Any](os.read_file(receipt)!)!.as_map()
+	receipt_fields['iso_sha256'] = json2.Any('0'.repeat(64))
+	os.write_file(wrong, json2.encode(receipt_fields))!
+	absent := work + '/no-export.json'
+	bad_iso, bad_iso_text := command([tool, 'export-deployment', iso, wrong, absent])
+	assert bad_iso == 1 && bad_iso_text.contains('ISO SHA-256 differs') && !os.exists(absent)
+	bad_time, _ := command([...args, absent, '0'])
+	assert bad_time == 1 && !os.exists(absent)
+
+	historical := work + '/historical-lock.json'
+	release_time := time.now().unix() - 1
+	old_code, old_output := command([...args, historical, release_time.str()])
+	os.write_file(work + '/export-archive-verifier.log', old_output)!
+	assert old_code == 0 && os.read_file(historical)! == embedded
+	assert json2.decode[json2.Any](old_output)!.as_map()['release_time']!.i64() == release_time
+	return path
+}
+
 fn check_installed_receipt(tool string, iso string, receipt string, work string, roots []string) ! {
 	root := work + '/root'
 	// A host fixture mounts the image under an alternate root. Map local
@@ -441,6 +481,17 @@ fn check_installed_receipt(tool string, iso string, receipt string, work string,
 	assert rows.len == int(saved.packages)
 	for row in rows { assert row.as_map()['status']!.str() == 'missing' }
 	println('ISO installed coverage exact receipt, saved snapshot, archive time, drift and input refusals PASS')
+
+	release_lock := check_export_deployment(tool, iso, receipt, work, saved.architecture)!
+	mut proposal := service.review_deployment_additions(release_lock)!
+	defer { proposal.close() }
+	assert proposal.operation == 'deploy-add' && proposal.requested == state.requested
+	assert proposal.rows.len == state.packages.len && proposal.rows.all(it.action == 'install')
+	assert service.state()! == removed
+	mut repaired := service.apply_deployment_additions(release_lock, proposal.fingerprint)!
+	defer { repaired.close() }
+	assert repaired.requested == state.requested && repaired.packages == state.packages
+	println('ISO deployment export exact lock, exclusive publication, historical read and reviewed recovery PASS')
 }
 
 fn run() ! {
