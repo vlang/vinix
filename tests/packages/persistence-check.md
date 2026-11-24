@@ -241,3 +241,21 @@ packages. Payload verification and uninstall remain available. Refresh clears
 the retired catalog, while uninstall preserves the personal file, its owner
 and mode. After catalog removal, the service can review the exact sequence-2
 index for enrollment and refuses a properly signed sequence-1 index.
+
+On 2026-11-24, revision `a866af771ce82799be5cd166feed924b0d172e74`
+passed both cuts on AArch64 (HVF) and x86_64 (TCG). Both enrollment cuts
+also passed on AArch64. The controller required SIGKILL at each cut point
+and a guest-originated shutdown after reboot. The regular package CLI lacked
+the cut checkpoint on both targets. The administration, service, trust
+recovery and host controller suites passed. The administration suite passed
+under ASan/UBSan with process leak detection disabled.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-revocation-crash-kWgbkw/qualification.tar.gz)
+contains the source snapshot, target tools, initial disks and boot logs.
+All nine receipt entries matched per AArch64 suite. All seven matched per
+x86_64 case, which ran in separate controller invocations. The independent
+archive checker verified all 162 sealed files. Archive SHA-256 is
+`5fa696e9e94ca733b361efb3af2f8c7d3074a352f3517ba77c7b64ff69e3c4c4`.
+
+These checks cover revocation checkpoints on QEMU ext2 disks. Physical storage
+power loss and interruptions within filesystem writes remain outside this run.
