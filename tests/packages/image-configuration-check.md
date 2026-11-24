@@ -107,3 +107,36 @@ normal distribution driver discovers it as a package core test.
 - [Source/toolchain/artifact pins](results/2026-10-16/image-configuration-toolchain.json), [V host checks](results/2026-10-16/image-configuration-host.v), [V guest invocation](results/2026-10-16/image-configuration-guest.v)
 - [AArch64 image receipt](results/2026-10-16/image-configuration-aarch64.json), [serial](results/2026-10-16/image-configuration-aarch64.serial.txt), [staging](results/2026-10-16/image-configuration-aarch64.stage.txt), [existing scenario](results/2026-10-16/image-configuration-aarch64.legacy.serial.txt)
 - [x86-64 image receipt](results/2026-10-16/image-configuration-x86_64.json), [serial](results/2026-10-16/image-configuration-x86_64.serial.txt), [staging](results/2026-10-16/image-configuration-x86_64.stage.txt), [existing scenario](results/2026-10-16/image-configuration-x86_64.legacy.serial.txt)
+
+## Captured configuration directories
+
+At `146c42b48392e77ea561de448cb5ffe26571fa93`, configuration publication opens
+or creates `etc/vinix-packages` relative to the captured image root. It checks
+the identities of the root and both configuration directories before writing
+or reporting preservation. For a missing configuration it also rechecks for
+consumer state after opening the directories.
+
+The fixture replaces the root, `etc` or the final parent before publication.
+It also swaps the parent of an existing configuration for a copy with identical
+configuration bytes and checks refusal. A separate case introduces publisher
+history after the directory capture and verifies that the history survives
+without a trust file being created. Restoring the original directories or
+removing the fixture history permits retry.
+
+The host configuration, input, catalog, repository and atomic-write tests
+passed. The configuration fixture passed under ASan/UBSan with leak detection
+disabled and under a separate 32-descriptor limit. Normal staging on both
+targets published configurations matching the reviewed baseline, and a second
+normal stage preserved both configurations' inodes, modes, timestamps and bytes.
+Both runs left the consumer state directory empty.
+
+The image-input suites passed in TCG guests on AArch64 (65.7 seconds) and
+x86-64 (72.2 seconds). Both guests ran all five programs, passed the replacement
+and retry marker, and initiated shutdown. All nine receipt sizes and digests
+matched per architecture.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-image-trust-parent-N1YeWP/qualification.tar.gz)
+contains the source snapshot, host checks, signed staging inputs and outputs,
+and both guest builds and receipts. The independent checker verified all 185
+sealed files. Archive SHA-256 is
+`ea365cb67c293cc7ed9f97e3224f936fcc4a4b96e2b1dcf827d68bde85b794f2`.
