@@ -30,3 +30,28 @@ qualification on both targets. [Import service qualification](repository-media-b
 The independent archive checker verified all 874 sealed files. The archive
 SHA-256 is `016d266da30777811ff9be30254d3a6fcfdb0850f38b9e6517fb03740acfeead`.
 [Qualification archive](/Users/alex/.local/state/vinix/r14-software-media-import-FjolPU/qualification.tar.gz)
+
+## Import with an ISO receipt
+
+Source revision `d5f55530b90282847554a590b77082ed84b3e547` adds
+**Import with receipt…** to the offline media screen. The form takes an
+absolute ISO receipt path and the receipt SHA-256 from trusted release
+checksums. Software freezes the media path, receipt path, and digest for
+administrator approval. Cancellation and service refusal preserve the form
+for correction or retry. A successful import reloads the catalog offline,
+then returns to the approved media directory for lock saving.
+[Offline workflow](../../tools/packages/SDK.md#offline-repository-bundles-in-release-images)
+
+The headless fixture checked the 320×240 and full-size forms, keyboard focus,
+invalid paste and incomplete digest refusals, literal Unicode and shell
+metacharacters, and the exact administrator arguments. It simulated a signed
+index mismatch and a complete progress frame before exit. Both the full
+Software suite and its ASan/UBSan run passed. Leak detection was disabled.
+The tracked save and import form check retained zero bytes across 1,000 media
+and 1,000 installed-deployment cycles. Both Linux desktop typechecks passed.
+The service has separate native QEMU qualification.
+[Receipt-bound service qualification](repository-media-bundle-check.md#receipt-bound-import)
+
+The independent archive checker verified all 863 sealed files. The archive
+SHA-256 is `3ce508a14739b28617ce2393f4eba39dd4d763a5c79ac7f0ed4d07602caefc5b`.
+[Qualification archive](/Users/alex/.local/state/vinix/r14-software-receipt-import-2N1Kxl/qualification.tar.gz)
