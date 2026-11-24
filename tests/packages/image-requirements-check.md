@@ -1203,6 +1203,32 @@ contains the source, host and guest builds, fixture ISOs, plans and receipts.
 The independent checker verified all 3,024 sealed files. Archive SHA-256 is
 `7283174c77e090afbc0f0ba028af47f72578bd8e48ff7d01f57eea0c6bf50d9f`.
 
+### Reviewed HTTPS origins in release notes
+
+At `36a44e394d0ebbeb78656927c64a513fdadd0d2f`, the release driver derives
+its publisher and architecture list from the same private receipt bytes
+pinned in `SHA256SUMS`. The renderer verifies the receipt checksum before
+reading origins and preserves Markdown punctuation in URLs as literal text.
+
+The production and ASan/UBSan verifiers passed 33 legacy and 35 hosted ISO
+cases on each target. The added renderer checks covered exact output, an
+empty legacy list, a mismatched checksum, an invalid URL, and a URL with
+backticks and angle brackets. Sanitizer runs disabled leak detection and
+symbolization.
+
+The release-driver fixture passed four cases each with two hosted inputs,
+two legacy inputs and a mixed pair. Notes showed two, zero and one reviewed
+origin respectively. Both the boot-tested and `--no-test` handoffs preserved
+the exact notes and receipt checksums. In each input set a receipt change
+during boot testing stopped the driver before notes or checksums were
+published. Build, boot and GitHub operations used local stubs in this fixture.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-hosted-release-notes-YuOzrW/qualification.tar.gz)
+contains the source, signed fixtures, test ISOs, generated notes and
+handoff logs. The independent checker verified all 1,052 sealed files.
+Archive SHA-256 is
+`16d9f13f2138e12b164f991a4692c49ec6cb6db4199a836deb31c0165a062cce`.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
