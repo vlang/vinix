@@ -10,6 +10,24 @@ const package_disk = $if arm64 { '/root' } $else { '/package-disk' }
 const package_test_root = package_disk + '/root'
 const package_state = package_test_root + '/var/lib/vinix-packages'
 
+struct PackageDiskState {
+	catalog string
+	history string
+	config string
+	active string
+	current string
+}
+
+fn observe_package_disk() !PackageDiskState {
+	return PackageDiskState{
+		catalog: os.read_file(package_state + '/catalog.json')!
+		history: os.read_file(package_state + '/trust-history.json')!
+		config: os.read_file(package_test_root + '/etc/vinix-packages/config.json')!
+		active: os.read_file(package_state + '/current/state.json')!
+		current: os.readlink(package_state + '/current')!
+	}
+}
+
 fn package_crash_checkpoint(phase string) {
 	wanted := read_text('/etc/hwtest-scenario').trim_space().all_after_last('-')
 	if phase != wanted { return }

@@ -119,3 +119,26 @@ extraction matched all 155 SHA-256 manifest entries. The archive's SHA-256 is
 These runs qualify recovery at completed metadata checkpoints on QEMU ext2.
 Cuts during writes, physical storage power loss and wider filesystem
 qualification remain open.
+
+## Reviewed publisher enrollment cuts
+
+Add `--enrollment` to the persistence command and use a fresh state directory.
+The fixture installs an app from one publisher, then obtains a read-only
+enrollment review for a second publisher with a separately supplied key.
+The cut CLI applies that approval through the normal `repo-apply` path.
+
+| Case | Cut point | Trust state after reboot |
+| --- | --- | --- |
+| `enrollment-cut-history` | Sequence 2 and its digest have been persisted. | The replay floor is durable and the new publisher remains disabled. |
+| `enrollment-cut-configuration` | The configuration replacement and flush have completed. | The same floor is durable and the new publisher is enabled. |
+
+Both boots recover the exact catalog and installed generation from before
+enrollment. The regular CLI refuses sequence 1, a different signed index at
+sequence 2 and the original approval. A new review binds the exact sequence-2
+index to the recovered trust state. Applying it retires the abandoned
+enrollment workspace. The selected refresh then loads the new publisher's
+app and keeps the original publisher snapshot and installed generation.
+
+Only the cut CLI is compiled with the checkpoints. It pauses while holding
+the writer lock, and QEMU is killed before cleanup or a guest sync. Preparation
+and recovery use the regular CLI.

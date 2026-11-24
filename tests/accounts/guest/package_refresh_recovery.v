@@ -11,24 +11,6 @@ const refresh_repository_path = package_disk + '/repository'
 const refresh_remote_bundle = package_test_root + pkgcore.image_repositories_path + '/remote'
 const refresh_cut_record = package_disk + '/refresh-cut.json'
 
-struct RefreshCutObservation {
-	catalog string
-	history string
-	config string
-	active string
-	current string
-}
-
-fn observe_refresh_cut() !RefreshCutObservation {
-	return RefreshCutObservation{
-		catalog: os.read_file(package_state + '/catalog.json')!
-		history: os.read_file(package_state + '/trust-history.json')!
-		config: os.read_file(package_test_root + '/etc/vinix-packages/config.json')!
-		active: os.read_file(package_state + '/current/state.json')!
-		current: os.readlink(package_state + '/current')!
-	}
-}
-
 fn save_refresh_cut_index(name string) ! {
 	dir := package_disk + '/' + name
 	os.mkdir(dir)!
@@ -78,7 +60,7 @@ fn prepare_refresh_cut() ! {
 	save_refresh_cut_index('old')!
 	package_root_cli(['--offline', 'update'])!
 	package_root_cli(['--offline', 'install', 'recovery-app'])!
-	checkpoint := observe_refresh_cut()!
+	checkpoint := observe_package_disk()!
 	package_disk_version('2.0.0', architecture)!
 	pkgcore.publish(refresh_repository_path, 'fixture', seed, 2, expires)!
 	save_refresh_cut_index('next')!
@@ -119,8 +101,8 @@ fn qualify_package_refresh_recovery(mut t Test) ! {
 		result := run(['/usr/share/package-fixtures/refresh-cut-worker', package_test_root, phase], '', none, none)
 		return error('cut worker exited before QEMU was killed: ' + result.output)
 	}
-	before := json2.decode[RefreshCutObservation](os.read_file(refresh_cut_record)!)!
-	recovered := observe_refresh_cut()!
+	before := json2.decode[PackageDiskState](os.read_file(refresh_cut_record)!)!
+	recovered := observe_package_disk()!
 	expected := os.read_file(package_disk + '/next/index.json')!
 	signature := os.read_file(package_disk + '/next/index.sig')!.trim_space()
 	baseline := json2.decode[[]pkgcore.Snapshot](before.catalog)!
@@ -147,7 +129,7 @@ fn qualify_package_refresh_recovery(mut t Test) ! {
 	package_root_cli(['--offline', 'verify'])!
 	if phase == 'history' {
 		refuse_refresh_cut_command(['review', 'upgrade'])
-		assert observe_refresh_cut()! == recovered
+		assert observe_package_disk()! == recovered
 	} else {
 		package_root_cli(['--offline', 'info', 'recovery-app'])!
 	}
@@ -155,13 +137,13 @@ fn qualify_package_refresh_recovery(mut t Test) ! {
 		for source in ['old', 'equivocation']! {
 			select_refresh_cut_index(source)!
 			refuse_refresh_cut_command(['update', 'fixture'])
-			assert observe_refresh_cut()! == recovered
+			assert observe_package_disk()! == recovered
 		}
 	}
 	t.say('PACKAGE REFRESH RETAINED ${phase} expected on-disk cache and history unchanged generation PASS')
 	select_refresh_cut_index('next')!
 	package_root_cli(['--offline', 'update', 'fixture'])!
-	after := observe_refresh_cut()!
+	after := observe_package_disk()!
 	snapshots := pkgcore.read_snapshots(package_state)!
 	assert snapshots.len == 2 && snapshots[0].repository == baseline[0].repository
 	assert snapshots[0].text == expected && snapshots[0].signature == signature && snapshots[1] == baseline[1]
@@ -172,7 +154,7 @@ fn qualify_package_refresh_recovery(mut t Test) ! {
 	package_root_cli(['--offline', 'info', 'recovery-app'])!
 	package_root_cli(['--offline', 'verify'])!
 	package_root_cli(['--offline', 'update', 'fixture'])!
-	assert observe_refresh_cut()! == after && !os.exists(package_state + '/refresh')
+	assert observe_package_disk()! == after && !os.exists(package_state + '/refresh')
 	t.say('PACKAGE REFRESH RECOVERY ${phase} signed retry retained other source and active generation PASS')
 }
 

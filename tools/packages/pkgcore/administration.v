@@ -121,7 +121,13 @@ pub fn enroll_repository_reviewed(root string, repository Repository, offline bo
 	// History becomes durable before trust is enabled. An interrupted attempt
 	// may remember a newer floor, but can never trust a replayed older index.
 	save_history(directory, history)!
+	$if package_enrollment_crash_fixture ? {
+		enrollment_cut_checkpoint('history')
+	}
 	save_configuration(path, next)!
+	$if package_enrollment_crash_fixture ? {
+		enrollment_cut_checkpoint('configuration')
+	}
 	return next
 }
 

@@ -91,6 +91,9 @@ fn main() {
 		'refresh-cut-fetched', 'refresh-cut-history', 'refresh-cut-catalog' {
 			scenario_package_refresh_recovery(mut t)
 		}
+		'enrollment-cut-history', 'enrollment-cut-configuration' {
+			scenario_package_enrollment_recovery(mut t)
+		}
 		'elevation' { scenario_elevation(mut t) }
 		'unprivileged' { scenario_unprivileged(mut t) }
 		'seat' { scenario_seat(mut t) }

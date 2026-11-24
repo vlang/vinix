@@ -98,10 +98,41 @@ fn refresh_persistence_suite(image string) hwhost.Suite {
 	}
 }
 
-fn selected_persistence_suite(image string, keygen bool, refresh bool) hwhost.Suite {
-	if keygen { return keygen_persistence_suite(image) }
-	if refresh { return refresh_persistence_suite(image) }
-	return persistence_suite(image)
+fn enrollment_persistence_suite(image string) hwhost.Suite {
+	base := persistence_suite(image)
+	mut scenarios := []hwhost.Scenario{}
+	for phase in ['history', 'configuration']! {
+		name := 'enrollment-cut-' + phase
+		marker := 'PACKAGE ENROLLMENT CUT ' + phase
+		scenarios << hwhost.Scenario{
+			...base.scenarios[0]
+			name: name
+			about: 'SIGKILL after enrollment ' + phase + ', reboot the same ext2 disk and re-review'
+			required: ['HWTEST START ' + name, marker, 'PACKAGE ENROLLMENT RETAINED ' + phase,
+				'PACKAGE ENROLLMENT RECOVERY ' + phase, 'HWTEST PASS ' + name]
+			forbidden: ['V panic:', 'HWTEST FAIL']
+			reboots: [hwhost.Reboot{ power_cut_after: marker }]
+		}
+	}
+	return hwhost.Suite{
+		...base
+		name: 'package-enrollment-persistence'
+		scenarios: scenarios
+		programs: [...base.programs, hwhost.Program{
+			source: 'tools/packages/main.v'
+			path: 'usr/share/package-fixtures/enrollment-cut-cli'
+			flags: ['-enable-globals', '-d', 'package_enrollment_crash_fixture']
+		}]
+	}
+}
+
+fn selected_persistence_suite(image string, mode string) hwhost.Suite {
+	return match mode {
+		'--keygen' { keygen_persistence_suite(image) }
+		'--refresh' { refresh_persistence_suite(image) }
+		'--enrollment' { enrollment_persistence_suite(image) }
+		else { persistence_suite(image) }
+	}
 }
 
 fn check_recovered_key(directory string) ! {
@@ -115,18 +146,19 @@ fn check_recovered_key(directory string) ! {
 }
 
 fn persistence_check() !int {
-	keygen := '--keygen' in os.args[1..]
-	refresh := '--refresh' in os.args[1..]
-	if keygen && refresh { return error('select either --keygen or --refresh') }
-	args := os.args[1..].filter(it !in ['--keygen', '--refresh']!)
+	modes := ['--keygen', '--refresh', '--enrollment']
+	selected_modes := modes.filter(it in os.args[1..])
+	if selected_modes.len > 1 { return error('select only one of --keygen, --refresh and --enrollment') }
+	mode := if selected_modes.len == 1 { selected_modes[0] } else { '' }
+	args := os.args[1..].filter(it !in modes)
 	options := hwhost.parse_options(args)!
 	if options.help || options.list {
 		if options.help {
-			println('--keygen tests publisher seed recovery; --refresh tests selected catalog refresh; default tests package transactions')
+			println('--keygen tests publisher seed recovery; --refresh tests selected catalog refresh; --enrollment tests reviewed publisher enrollment; default tests package transactions')
 		}
-		return hwhost.run_suite(selected_persistence_suite('', keygen, refresh), args, @FILE)
+		return hwhost.run_suite(selected_persistence_suite('', mode), args, @FILE)
 	}
-	if (keygen || refresh) && options.state_dir == '' { return error('--keygen and --refresh require --state-dir') }
+	if mode != '' && options.state_dir == '' { return error(mode + ' requires --state-dir') }
 	if !os.is_file(options.kernel) { return error('--kernel is not a file: ${options.kernel}') }
 	work := os.temp_dir() + '/vinix-package-persistence-' + os.getpid().str()
 	os.mkdir_all(work)!
@@ -141,10 +173,10 @@ fn persistence_check() !int {
 	}
 	hwhost.run_tool([tool, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-m', '0', '-O',
 		'none,filetype,sparse_super,large_file', image], map[string]string{}, work + '/format.log', 60)!
-	suite := selected_persistence_suite(image, keygen, refresh)
+	suite := selected_persistence_suite(image, mode)
 	status := hwhost.run_suite(suite, [...args, '--kernel', kernel], @FILE)
 	if status == 0 && options.state_dir != '' {
-		if keygen { check_recovered_key(options.state_dir)! }
+		if mode == '--keygen' { check_recovered_key(options.state_dir)! }
 		// Retain the exact formatted input whose digest the receipt records.
 		os.cp(image, options.state_dir + '/initial.ext2')!
 		selected := hwhost.select_scenarios(suite.scenarios, options.arch, options.scenarios)!.run
@@ -152,9 +184,13 @@ fn persistence_check() !int {
 			persistence_artifact('initial-ext2', image)!,
 			persistence_artifact('guest', options.state_dir + '/guest/init')!,
 			persistence_artifact('package-service', options.state_dir + '/guest/root/usr/bin/vinix-package')!]
-		if refresh {
+		if mode == '--refresh' {
 			artifacts << persistence_artifact('refresh-cut-worker',
 				options.state_dir + '/guest/root/usr/share/package-fixtures/refresh-cut-worker')!
+		}
+		if mode == '--enrollment' {
+			artifacts << persistence_artifact('enrollment-cut-cli',
+				options.state_dir + '/guest/root/usr/share/package-fixtures/enrollment-cut-cli')!
 		}
 		for scenario in selected {
 			for name in ['serial.log', 'serial-2.log'] {
