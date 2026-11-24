@@ -871,8 +871,14 @@ fi
 # Capture the complete upload list before boot tests can change an output.
 step "Recording checksums for release assets"
 : > "$ASSET_WORK/package-pins"
+PACKAGE_ORIGINS=()
 for receipt in ${PACKAGE_RECEIPTS[@]+"${PACKAGE_RECEIPTS[@]}"}; do
-    "$PACKAGE_WORK/receipt" checksums "$ASSET_STAGE/${receipt##*/}" >> "$ASSET_WORK/package-pins"
+    name="${receipt##*/}"
+    pins="$("$PACKAGE_WORK/receipt" checksums "$ASSET_STAGE/$name")"
+    printf '%s\n' "$pins" >> "$ASSET_WORK/package-pins"
+    digest="$(awk -v name="$name" '$2 == name { print $1 }' <<< "$pins")"
+    origins="$("$PACKAGE_WORK/receipt" origins "$ASSET_STAGE/$name" "$digest")"
+    if [ -n "$origins" ]; then PACKAGE_ORIGINS+=("$origins"); fi
 done
 "$ASSET_WORK/release-assets" record "$ASSET_DIRECTORY" "$ASSET_WORK/package-pins" \
     "${IMAGES[@]##*/}" "${BUNDLES[@]##*/}" > "$ASSET_WORK/SHA256SUMS"
@@ -966,6 +972,12 @@ describe_boot() {
             echo "- [$(basename "$receipt")](https://github.com/${REPO:-vlang/vinix}/releases/download/$TAG/$(basename "$receipt"))"
         done
         echo
+        if [ "${#PACKAGE_ORIGINS[@]}" -gt 0 ]; then
+            echo "**Reviewed HTTPS repositories**"
+            echo
+            printf '%s\n' "${PACKAGE_ORIGINS[@]}"
+            echo
+        fi
     fi
     echo "Optional apps offered by legacy setup use \`pkg install\` and need networking."
     echo "Vinix drives VirtIO and Intel e1000 cards. The images leave out"

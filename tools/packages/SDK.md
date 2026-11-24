@@ -707,9 +707,10 @@ the trailer. Package directories must be readable and searchable by ordinary
 accounts and appear before the files they contain. Each checked ISO
 has a `vinix-packages-ARCH.json` receipt with the ISO and package metadata hashes,
 bundled publisher keys and sequences, and selected application IDs. The release
-notes and `SHA256SUMS` include the receipts. The check also runs with
-`--no-test` and `--no-publish`. The host helper uses `xorriso` and links
-libarchive and zlib.
+notes link to the receipts and list their reviewed HTTPS origins by target
+when present. `SHA256SUMS` covers the receipt bytes used to produce that list.
+The check also runs with `--no-test` and `--no-publish`. The host helper uses
+`xorriso` and links libarchive and zlib.
 
 The verifier checks the exact repository member names in the archive before
 creating the host scratch tree. Publisher IDs, index and signature filenames,

@@ -258,6 +258,36 @@ fn prepare_fixture(architecture string, out string, hosted bool) ! {
 	bundle.retire()!
 }
 
+fn check_origin_notes(tool string, receipt string, work string, arch string, id string, origin string) ! {
+	digest := pkgcore.hash_file(receipt)!
+	code, output := command([tool, 'origins', receipt, digest])
+	expected := if origin == '' { '' } else { '- `${id}` on ${arch} uses `${origin}`\n' }
+	if code != 0 || output != expected { return error('unexpected reviewed origins: ' + output) }
+	os.write_file(work + '/origin-notes.md', output)!
+	code_bad, output_bad := command([tool, 'origins', receipt, '0'.repeat(64)])
+	if code_bad == 0 || !output_bad.contains('package receipt changed before release notes') {
+		return error('origin renderer accepted a different receipt digest: ' + output_bad)
+	}
+	os.write_file(work + '/origin-digest-refusal.log', output_bad)!
+	if origin == '' { return }
+
+	changed := work + '/origin-rendering.json'
+	original := os.read_file(receipt)!
+	markdown_url := 'https://packages.example.invalid/cat``alog/<file>'
+	os.write_file(changed, original.replace(origin, markdown_url))!
+	code_span, output_span := command([tool, 'origins', changed, pkgcore.hash_file(changed)!])
+	if code_span != 0 || output_span != '- `${id}` on ${arch} uses ``` ${markdown_url} ```\n' {
+		return error('origin Markdown code span did not preserve the exact URL: ' + output_span)
+	}
+	os.write_file(work + '/origin-markdown.md', output_span)!
+	os.write_file(changed, original.replace(origin, 'file:///local/origin'))!
+	code_url, output_url := command([tool, 'origins', changed, pkgcore.hash_file(changed)!])
+	if code_url == 0 || !output_url.contains('invalid reviewed HTTPS origin') {
+		return error('origin notes accepted an invalid HTTPS URL: ' + output_url)
+	}
+	os.write_file(work + '/origin-url-refusal.log', output_url)!
+}
+
 fn run() ! {
 	if os.args.len == 4 && os.args[1] in ['fixture', 'hosted-fixture']! {
 		return prepare_fixture(os.args[2], os.abs_path(os.args[3]), os.args[1] == 'hosted-fixture')
@@ -411,6 +441,9 @@ fn run() ! {
 			check_code, check_output := command([tool, 'checksums', receipt])
 			if check_code != 0 || check_output != checksums {
 				return error('release checksums differ from the verified ISO and receipt: ' + check_output)
+			}
+			if scenario == 'match' {
+				check_origin_notes(tool, receipt, work, arch, publisher['id']!.str(), origin)!
 			}
 		} else if code == 0 || !output.contains(diagnostic) {
 			return error('unexpected ISO verification outcome for ${scenario}: ${output}')

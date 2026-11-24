@@ -242,19 +242,57 @@ fn check_iso(iso string, work string, expected Selection) !Receipt {
 		applications: actual.applications, publishers: actual.publishers}
 }
 
-fn print_checksums(path string) ! {
-	raw := os.read_file(path)!
-	receipt := json2.decode[Receipt](raw)!
+fn receipt_architecture(receipt Receipt) !string {
+	if receipt.format != 1 || !pkgcore.digest_valid(receipt.iso_sha256) {
+		return error('invalid ISO package receipt')
+	}
 	arch := match receipt.architecture {
 		'x86_64' { 'amd64' }
 		'aarch64' { 'arm64' }
 		else { return error('unsupported receipt architecture: ' + receipt.architecture) }
 	}
-	if receipt.format != 1 || !pkgcore.digest_valid(receipt.iso_sha256) {
-		return error('invalid ISO package receipt')
-	}
+	return arch
+}
+
+fn print_checksums(path string) ! {
+	raw := os.read_file(path)!
+	receipt := json2.decode[Receipt](raw)!
+	arch := receipt_architecture(receipt)!
 	println('${receipt.iso_sha256}  vinix-${arch}.iso')
-	println('${sha256.sum(raw.bytes()).hex()}  vinix-packages-${arch}.json')
+	println('${sha256.hexhash(raw)}  vinix-packages-${arch}.json')
+}
+
+fn origin_code_span(origin string) string {
+	// CommonMark treats a shorter backtick run inside a code span literally.
+	mut longest := 0
+	mut run := 0
+	for byte in origin {
+		if byte == 0x60 {
+			run++
+			if run > longest { longest = run }
+		} else { run = 0 }
+	}
+	marker := '`'.repeat(longest + 1)
+	return if longest == 0 { marker + origin + marker } else { marker + ' ' + origin + ' ' + marker }
+}
+
+fn print_reviewed_origins(path string, digest string) ! {
+	raw := os.read_file(path)!
+	if !pkgcore.digest_valid(digest) || sha256.hexhash(raw) != digest {
+		return error('package receipt changed before release notes were generated')
+	}
+	receipt := json2.decode[Receipt](raw)!
+	arch := receipt_architecture(receipt)!
+	publishers := receipt.publishers.filter(it.reviewed_origin != '')
+	for publisher in publishers {
+		if !pkgcore.identifier(publisher.id) || !publisher.reviewed_origin.starts_with('https://')
+			|| !pkgprotocol.valid_repository_url(publisher.reviewed_origin) {
+			return error('invalid reviewed HTTPS origin in ISO package receipt')
+		}
+	}
+	for publisher in publishers {
+		println('- `${publisher.id}` on ${arch} uses ${origin_code_span(publisher.reviewed_origin)}')
+	}
 }
 
 fn workspace() !string {
@@ -288,6 +326,9 @@ fn run() ! {
 	if os.args.len == 3 && os.args[1] == 'checksums' {
 		return print_checksums(os.args[2])
 	}
+	if os.args.len == 4 && os.args[1] == 'origins' {
+		return print_reviewed_origins(os.args[2], os.args[3])
+	}
 	if os.args.len == 3 && os.args[1] == 'plan' {
 		arch := os.args[2]
 		if arch !in ['aarch64', 'x86_64']! { return error('unsupported package architecture: ' + arch) }
@@ -304,7 +345,7 @@ fn run() ! {
 		return
 	}
 	if os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged']! {
-		return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | checksums RECEIPT.json')
+		return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }

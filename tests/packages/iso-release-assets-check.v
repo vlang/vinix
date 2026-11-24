@@ -39,6 +39,16 @@ struct FixtureUpload {
 	asset FixtureAsset
 }
 
+struct FixturePackagePublisher {
+	id string
+	index_sha256 string
+	reviewed_origin string
+}
+
+struct FixturePackageReceipt {
+	publishers []FixturePackagePublisher
+}
+
 struct FixtureCreation {
 	id u64
 	repo string
@@ -688,6 +698,22 @@ fn verify_handoff(out string, with_packages bool, scenario string, published_not
 	if with_packages { names << ['vinix-packages-amd64.json', 'vinix-packages-arm64.json'] }
 	manifest := os.read_file(out + '/fixture-original-manifest')!
 	notes := os.read_file(out + '/fixture-original-notes')!
+	mut origins := []string{}
+	if with_packages {
+		for arch in ['amd64', 'arm64']! {
+			receipt := json2.decode[FixturePackageReceipt](os.read_file(out + '/vinix-packages-' + arch + '.json')!)!
+			for publisher in receipt.publishers {
+				if publisher.reviewed_origin != '' {
+					origins << '- `${publisher.id}` on ${arch} uses `${publisher.reviewed_origin}`'
+				}
+			}
+		}
+	}
+	heading := '**Reviewed HTTPS repositories**'
+	if notes.contains(heading) != (origins.len > 0)
+		|| (origins.len > 0 && notes.all_after(heading + '\n\n').all_before('\n\n') != origins.join('\n')) {
+		return error('release notes differ from the verified package origins')
+	}
 	mut listed := manifest.trim_right('\n').split('\n')
 	mut listed_names := listed.map(it.all_after('  '))
 	listed_names.sort()
@@ -1503,7 +1529,10 @@ fn check_prepared_recovery(root string, work string, out string, remote string, 
 }
 
 fn run() ! {
-	if os.args.len != 5 { return error('usage: iso-release-assets-check VINIX_REPO NEW_STATE AMD64_MATCH_CASE ARM64_MATCH_CASE') }
+	notes_only := os.args.len == 6 && os.args[5] == '--package-notes'
+	if os.args.len != 5 && !notes_only {
+		return error('usage: iso-release-assets-check VINIX_REPO NEW_STATE AMD64_MATCH_CASE ARM64_MATCH_CASE [--package-notes]')
+	}
 	repository := os.real_path(os.args[1])
 	work := os.abs_path(os.args[2])
 	am := os.real_path(os.args[3])
@@ -1547,6 +1576,7 @@ fn run() ! {
 		'bad-build-sidecar', 'boot-copy-changed', 'x11-after-boot', 'ios-pair-after-boot',
 		'receipt-after-boot', 'sidecar-at-handoff', 'manifest-at-handoff', 'build-only',
 		'publish-no-test', 'packages-no-test', 'prepared', 'prepared-recovery']
+	if notes_only { scenarios = ['legacy', 'packages', 'packages-no-test', 'receipt-after-boot'] }
 	for index, scenario in scenarios {
 		with_packages := scenario in ['packages', 'receipt-after-boot', 'output-change-during-upload',
 			'public-iso-during-boot', 'public-iso-during-receipt', 'packages-no-test', 'prepared']!
@@ -1556,6 +1586,15 @@ fn run() ! {
 				environment['VINIX_PACKAGE_IMAGE_CONFIG_' + arch] = dir + '/root/etc/vinix-packages/config.json'
 				environment['VINIX_PACKAGE_IMAGE_REPOSITORIES_' + arch] = dir + '/root/usr/share/vinix-packages/repositories'
 				environment['VINIX_PACKAGE_IMAGE_APPLICATIONS_' + arch] = dir + '/root/usr/share/vinix-packages/applications.json'
+				if notes_only {
+					receipt := json2.decode[FixturePackageReceipt](os.read_file(dir + '/receipt.json')!)!
+					rows := receipt.publishers.filter(it.reviewed_origin != '').map('${it.id} ${it.index_sha256} ${it.reviewed_origin}\n')
+					if rows.len > 0 {
+						pins := work + '/hosted-indexes-' + arch + '.txt'
+						os.write_file(pins, rows.join(''))!
+						environment['VINIX_PACKAGE_IMAGE_INDEXES_' + arch] = pins
+					}
+				}
 			}
 		}
 		tag := match scenario {
