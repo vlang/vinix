@@ -1286,6 +1286,37 @@ controls and QEMU logs. The independent checker verified all 920 sealed files.
 Archive SHA-256 is
 `4cfe9c15eac5af54723436fef90fb8ac310db97ce19c5f26051f1ea2085c434d`.
 
+### Paired review of the advertised catalog
+
+At `6d83f87c65bdb61750f7c34195c56cfbe29b86df`,
+`package-receipt plan-pair NEW_DIRECTORY` saves both exact release plans in
+one directory after validating a common advertised app set. The target plans
+retain their own architectures, configuration, deployment digests and reviewed
+HTTPS origin. The example declarations select Hello, Counter, Memo, Neovim,
+SQLite CLI, FFmpeg and FFprobe. [Mixed catalog declarations](../../examples/package-catalog/README.md#review-the-mixed-release-catalog)
+
+The host driver passed with the signed mixed bundle in production and ASan/UBSan
+builds. Both plans matched standalone output byte for byte. A missing second
+declaration, mismatched architecture, different valid roots and an invalid
+second index pin refused without leaving a review directory. An existing review
+remained byte-identical. The write fixture refused an oversized second plan,
+retired the first file and passed an exact retry.
+The archived format-2 input locks also reproduced both format-1 selections byte
+for byte, and the image application suite passed. The sanitizer run disabled
+leak detection. [Host driver](iso-package-review-check.v)
+
+The real release driver accepted the paired directory through
+`--package-review`. It verified both retained mixed-catalog ISOs and reproduced
+their original package receipts. All ten release asset checksums passed.
+Putting the amd64 plan in the arm64 slot stopped the driver before checkout.
+ISO construction and the companion runtime artifacts used local fixtures in
+this host check.
+
+The independent archive checker verified 2,217 sealed files, including both
+release ISOs, the signed bundle, target plans, receipts, sources and check logs.
+The archive SHA-256 is
+`5a41d5869eb406aa2f4ce5c1e70e454a31d51b426de117379303a4529df8d1dd`. [Qualification archive](/Users/alex/.local/state/vinix/r14-paired-package-review-mWp00B/qualification.tar.gz)
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
