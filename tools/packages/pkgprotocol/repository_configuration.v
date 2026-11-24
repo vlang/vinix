@@ -10,17 +10,24 @@ pub:
 }
 
 pub fn (configuration &RepositoryConfiguration) validate() ! {
+	validate_repository_configuration(configuration)!
+}
+
+fn validate_repository_configuration(configuration RepositoryConfiguration) ! {
 	if configuration.scope != 'configuration' { return error('unsupported repository configuration scope') }
 	validate_configured_repositories(configuration.format, configuration.architecture, configuration.repositories)!
 }
 
-pub fn (mut configuration RepositoryConfiguration) close() {
+fn close_repository_configuration(configuration RepositoryConfiguration) {
 	unsafe {
 		configuration.scope.free()
 		configuration.architecture.free()
-		for repository in configuration.repositories { close_repository(repository) }
-		(&array(&configuration.repositories)).free()
 	}
+	close_repositories(configuration.repositories)
+}
+
+pub fn (mut configuration RepositoryConfiguration) close() {
+	close_repository_configuration(configuration)
 	configuration = RepositoryConfiguration{}
 }
 
@@ -30,7 +37,7 @@ fn (mut r MetadataReader) parse_repository_configuration() !RepositoryConfigurat
 	r.expect(`{`)!
 	mut value := RepositoryConfiguration{}
 	mut accepted := false
-	defer { if !accepted { value.close() } }
+	defer { if !accepted { close_repository_configuration(value) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -46,7 +53,7 @@ fn (mut r MetadataReader) parse_repository_configuration() !RepositoryConfigurat
 		}
 	}
 	if seen != 15 { return error('missing repository configuration field') }
-	value.validate()!
+	validate_repository_configuration(value)!
 	accepted = true
 	return value
 }

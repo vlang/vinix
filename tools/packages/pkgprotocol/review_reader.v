@@ -155,7 +155,7 @@ fn (mut r MetadataReader) parse_repository_status() !RepositoryStatus {
 	r.expect(`{`)!
 	mut value := RepositoryStatus{}
 	mut accepted := false
-	defer { if !accepted { value.close() } }
+	defer { if !accepted { close_repository_status(value) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -171,7 +171,7 @@ fn (mut r MetadataReader) parse_repository_status() !RepositoryStatus {
 		}
 	}
 	if seen != 15 { return error('missing repository status field') }
-	value.validate()!
+	validate_repository_status(value)!
 	accepted = true
 	return value
 }
@@ -192,7 +192,7 @@ fn (mut r MetadataReader) parse_repository_review() !RepositoryReview {
 	r.expect(`{`)!
 	mut value := RepositoryReview{}
 	mut accepted := false
-	defer { if !accepted { value.close() } }
+	defer { if !accepted { close_repository_review(value) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -218,7 +218,7 @@ fn (mut r MetadataReader) parse_repository_review() !RepositoryReview {
 		}
 	}
 	if seen != 16383 { return error('missing repository review field') }
-	value.validate()!
+	validate_repository_review(value)!
 	accepted = true
 	return value
 }
@@ -239,7 +239,7 @@ fn (mut r MetadataReader) parse_mirror_review() !MirrorReview {
 	r.expect(`{`)!
 	mut value := MirrorReview{}
 	mut accepted := false
-	defer { if !accepted { value.close() } }
+	defer { if !accepted { close_mirror_review(value) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -279,7 +279,7 @@ fn (mut r MetadataReader) parse_deployment_mirror_review() !DeploymentMirrorRevi
 	r.expect(`{`)!
 	mut value := DeploymentMirrorReview{}
 	mut accepted := false
-	defer { if !accepted { value.close() } }
+	defer { if !accepted { close_deployment_mirror_review(value) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -337,14 +337,13 @@ fn (mut r MetadataReader) parse_repositories() ![]Repository {
 	mut values := []Repository{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe { for value in values { close_repository(value) }; (&array(&values)).free() } } }
+	defer { if !accepted { close_repositories(values) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == 4096 { return error('package metadata array exceeds entry limit') }
 		value := r.parse_repository()!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << value
 	}
 	accepted = true
 	return values
@@ -355,14 +354,13 @@ fn (mut r MetadataReader) parse_repository_floors() ![]RepositoryFloor {
 	mut values := []RepositoryFloor{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe { for value in values { close_repository_floor(value) }; (&array(&values)).free() } } }
+	defer { if !accepted { close_repository_floors(values) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == 4096 { return error('package metadata array exceeds entry limit') }
 		value := r.parse_repository_floor()!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << value
 	}
 	accepted = true
 	return values

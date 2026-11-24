@@ -47,8 +47,12 @@ fn mirror_destination_valid(path string) bool {
 }
 
 
-pub fn (mut mirror MirrorReview) close() {
+fn close_mirror_review(mirror MirrorReview) {
 	unsafe { mirror.input_destination.free(); mirror.destination.free() }
-	mirror.review.close()
+	close_review(mirror.review)
+}
+
+pub fn (mut mirror MirrorReview) close() {
+	close_mirror_review(mirror)
 	mirror = MirrorReview{}
 }

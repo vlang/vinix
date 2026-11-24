@@ -21,8 +21,12 @@ pub fn (review &DeploymentMirrorReview) validate() ! {
 }
 
 
-pub fn (mut review DeploymentMirrorReview) close() {
+fn close_deployment_mirror_review(review DeploymentMirrorReview) {
 	unsafe { review.deployment.free(); review.deployment_sha256.free() }
-	review.mirror.close()
+	close_mirror_review(review.mirror)
+}
+
+pub fn (mut review DeploymentMirrorReview) close() {
+	close_deployment_mirror_review(review)
 	review = DeploymentMirrorReview{}
 }

@@ -45,6 +45,7 @@ fn accepts_metadata(kind int, text string) bool {
 		2 { mut value := decode_repository_review(text) or { unsafe { err.free() }; return false }; value.close() }
 		3 { mut value := decode_mirror_review(text) or { unsafe { err.free() }; return false }; value.close() }
 		4 { mut value := decode_deployment_mirror_review(text) or { unsafe { err.free() }; return false }; value.close() }
+		5 { mut value := decode_repository_configuration(text) or { unsafe { err.free() }; return false }; value.close() }
 		else { panic('unsupported test decoder') }
 	}
 	return true
@@ -155,4 +156,63 @@ fn test_review_decoding_retires_completed_rows_on_partial_and_trailing_refusals(
 			}
 		}
 	}
+}
+
+struct ReviewEnvelopeCase {
+	name     string
+	kind     int
+	complete string
+	partial  string
+	invalid  string
+}
+
+fn test_repository_and_export_envelopes_retire_owned_metadata() {
+	status := complete_status_fixture()
+	two_sources := [status.repositories[0], Repository{ ...status.repositories[0], id: 'other' }]
+	two_floors := [status.history[0], RepositoryFloor{ ...status.history[0], sequence: 8, id: 'other' }]
+	configuration := json2.encode(RepositoryConfiguration{ format: 1, scope: 'configuration',
+		architecture: status.architecture, repositories: two_sources })
+	listing := json2.encode(RepositoryStatus{ ...status, repositories: two_sources, history: two_floors })
+	repository_review := json2.encode(complete_repository_fixture())
+	mirror := json2.encode(complete_mirror_fixture())
+	locked := json2.encode(complete_locked_fixture())
+	cases := [
+		ReviewEnvelopeCase{ name: 'configuration', kind: 5, complete: configuration,
+			partial: configuration.replace('"id":"other"', '"id":false'),
+			invalid: configuration.replace('"scope":"configuration"', '"scope":"head"') },
+		ReviewEnvelopeCase{ name: 'status', kind: 1, complete: listing,
+			partial: listing.replace('"sequence":8', '"sequence":false'),
+			invalid: listing.replace('"id":"other"', '"id":"trusted"') },
+		ReviewEnvelopeCase{ name: 'repository review', kind: 2, complete: repository_review,
+			partial: repository_review.replace('"remembered_sequence":6', '"remembered_sequence":false'),
+			invalid: repository_review.replace('"remembered_sequence":6', '"remembered_sequence":8') },
+		ReviewEnvelopeCase{ name: 'mirror review', kind: 3, complete: mirror,
+			partial: mirror.replace('"cache_available":8192', '"cache_available":false'),
+			invalid: mirror.replace('"destination":"/media/', '"destination":"media/') },
+		ReviewEnvelopeCase{ name: 'deployment mirror review', kind: 4, complete: locked,
+			partial: locked.replace('"cache_available":8192', '"cache_available":false'),
+			invalid: locked.replace('"deployment_sha256":"' + 'd'.repeat(64), '"deployment_sha256":"invalid') },
+	]
+	mut retired := true
+	for entry in cases {
+		assert entry.partial != entry.complete && entry.invalid != entry.complete
+		trailing := entry.complete + ' trailing'
+		defer { unsafe { trailing.free() } }
+		assert accepts_metadata(entry.kind, entry.complete)
+		$if track_heap ? { C.vinix_heap_begin() }
+		for _ in 0 .. 64 {
+			assert accepts_metadata(entry.kind, entry.complete)
+			assert !accepts_metadata(entry.kind, entry.partial)
+			assert !accepts_metadata(entry.kind, entry.invalid)
+			assert !accepts_metadata(entry.kind, trailing)
+		}
+		$if track_heap ? {
+			kept := C.vinix_heap_end()
+			count := C.vinix_heap_count()
+			println('REVIEW ENVELOPE ${entry.name} retained ${kept} bytes / ${count} allocations')
+			retired = retired && kept == 0 && count == 0
+		}
+	}
+	assert retired
+	println('REVIEW ENVELOPE five reply types preserve schema and ownership across success and refusal PASS')
 }

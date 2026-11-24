@@ -91,6 +91,10 @@ fn validate_configured_repositories(format int, architecture string, repositorie
 }
 
 pub fn (status &RepositoryStatus) validate() ! {
+	validate_repository_status(status)!
+}
+
+fn validate_repository_status(status RepositoryStatus) ! {
 	validate_configured_repositories(status.format, status.architecture, status.repositories)!
 	if status.history.len > 4096 { return error('unsupported repository status') }
 	for i, floor in status.history {
@@ -108,6 +112,10 @@ pub fn (status &RepositoryStatus) validate() ! {
 
 
 pub fn (review &RepositoryReview) validate() ! {
+	validate_repository_review(review)!
+}
+
+fn validate_repository_review(review RepositoryReview) ! {
 	if review.format != 1 || review.operation !in ['enroll', 'revoke'] || !digest(review.fingerprint)
 		|| review.architecture !in ['aarch64', 'x86_64'] {
 		return error('unsupported repository review')
@@ -137,18 +145,28 @@ fn close_repository_floor(floor RepositoryFloor) {
 	unsafe { floor.id.free(); floor.public_key.free(); floor.index_sha256.free() }
 }
 
+fn close_repositories(repositories []Repository) {
+	for repository in repositories { close_repository(repository) }
+	unsafe { repositories.free() }
+}
+
+fn close_repository_floors(floors []RepositoryFloor) {
+	for floor in floors { close_repository_floor(floor) }
+	unsafe { floors.free() }
+}
+
+fn close_repository_status(status RepositoryStatus) {
+	unsafe { status.architecture.free() }
+	close_repositories(status.repositories)
+	close_repository_floors(status.history)
+}
+
 pub fn (mut status RepositoryStatus) close() {
-	unsafe {
-		status.architecture.free()
-		for repository in status.repositories { close_repository(repository) }
-		(&array(&status.repositories)).free()
-		for floor in status.history { close_repository_floor(floor) }
-		(&array(&status.history)).free()
-	}
+	close_repository_status(status)
 	status = RepositoryStatus{}
 }
 
-pub fn (mut review RepositoryReview) close() {
+fn close_repository_review(review RepositoryReview) {
 	unsafe {
 		review.operation.free()
 		review.architecture.free()
@@ -160,5 +178,9 @@ pub fn (mut review RepositoryReview) close() {
 		review.fingerprint.free()
 		review.index_sha256.free()
 	}
+}
+
+pub fn (mut review RepositoryReview) close() {
+	close_repository_review(review)
 	review = RepositoryReview{}
 }
