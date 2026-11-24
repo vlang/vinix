@@ -103,3 +103,20 @@ Evidence: [before](results/2026-10-14/https-output-before.txt),
 [serial](results/2026-10-14/https-output-x86_64.serial.txt),
 [QMP](results/2026-10-14/https-output-x86_64.qmp.txt) and
 [compiler/source/artifact ledger](results/2026-10-14/https-output-toolchain.json).
+
+## Qualification runner portability, 2026-11-24
+
+Revision `37f065559` aligns the `mkfifo` mode width and the `waitpid` status
+pointer with the declarations imported by the current V toolchain. Eleven
+existing runners failed the compiler's declaration checks on macOS before
+the change. All eleven typechecked on macOS and for AArch64 and x86-64 Linux
+afterward.
+
+The maintained `distribution-check --direct-tests --https-only` command passed
+the signed TLS lifecycle and all seven destination cases. The other ten
+affected runners passed their direct macOS runs, including the metadata and
+hash races, package copy and preparation, and signing seed and key creation
+checks. The independent archive checker verified 84 sealed entries. The
+archive SHA-256 is
+`64eeadeb30a75983c93ba98945211a9d15ac4e77a296395122e8c778ef74b349`.
+[Qualification archive](/Users/alex/.local/state/vinix/r14-distribution-sweep-NmmWfI/runners.tar.gz)
