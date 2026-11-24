@@ -46,3 +46,25 @@ roots, and HTTPS requests. It stops and reaps the fixture server on exit.
 The recorded qualification uses real signed target payloads with host CLI
 execution and a disposable publisher. Native installed-system HTTPS and
 production publisher enrollment remain release gates.
+
+## Qualification
+
+At `c1a814ad0`, the production and ASan/UBSan builds passed for both target
+declarations. The sanitizer run instrumented the fixture runner and package CLI
+with leak detection disabled. Both builds fetched one new SQLite runtime object
+per target. Their HTTPS request logs, installed-state receipts and deployment
+audits matched exactly. The existing repository administration test file also
+passed.
+
+The source configuration copies explicitly enable online maintenance. The
+original offline-only configuration and its refusal are retained alongside the
+passing runs. An existing work directory was also refused without changing the
+captured configuration or HTTPS request log.
+
+The complete signed inputs, source snapshot, tool identities, command logs and
+staged roots are archived in
+`~/.local/state/vinix/r14-release-origin-M8czca/qualification.tar.gz`.
+The archive SHA-256 is `a7492c9f44f459abda345ebc080c4c5ed4c12704ede6fe08bded1b9315fa2eff`.
+The `bundle.sha256` manifest has 65,225 file and symlink entries and SHA-256
+`fd6a219803875951f30f565ae1ab3844340bbdaab3f5a97f3ece09b4cdba1491`.
+All entries matched after extraction into an independent directory.
