@@ -122,3 +122,32 @@ qualification. This increment changes no kernel code. These checks cover package
 input preflight and existing signed maintenance; complete image builds, production
 publisher/catalog migration, graphical/runtime integration and broader device/
 crash acceptance remain separate roadmap 14 work.
+
+## Reviewed repository index pins
+
+At `c67f4656d5fdfa3ee4cdc7cc045f7ea2d82117af`, `stage.v --require-index`
+accepts the repository ID and digest from an offline release check. The input
+fixture pins two bundled repositories on both architecture declarations.
+It substitutes a newer valid release signed by the same key and confirms
+that the pin refuses it before compiler lookup in both staging modes.
+Restoring the reviewed release returns the exact original preflight report
+with an unchanged target directory.
+
+Normal and production stagers and the ASan/UBSan host suite passed. Process
+leak detection was disabled. The application requirements and deployment
+export suite also passed. The separate tracked ownership fixture reached
+the same existing assertion on the baseline and changed code, with 3,056
+retained bytes in 39 allocations in its first complete AArch64 case.
+
+Real AArch64 and x86_64 staging built the target tools, published the pinned
+bundle and reported the same readback digest. A second preflight recognized
+the preserved destination. Both guests ran the new pin controls and finished
+in 56.2 and 66.9 seconds with guest-initiated QMP shutdown. Early attempts exposed a test
+process-runtime link mismatch and a Unix socket path limit. The final runs
+used the existing process API and short state paths.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-staging-index-pins-7VujQQ/qualification.tar.gz)
+contains the committed sources, signed inputs, staged roots, host checks,
+and guest builds and logs. The independent archive checker verified all
+230 sealed entries. Archive SHA-256 is
+`7131bc001ce7383f3f62d2f10d1b32d69b7bdcf3f4e1259f84d02734178257f4`.
