@@ -124,8 +124,9 @@ continues to require the locked format.
 
 The focused host suites passed in normal, production and ASan/UBSan builds.
 Process leak detection was disabled for the sanitizer run. The broader
-`app_selection` host suite aborts in stylesheet cleanup on the baseline and
-the changed code. Both production compositors linked statically.
+`app_selection` host suite aborted in stylesheet cleanup during that
+qualification. The fixture correction is recorded below. Both production
+compositors linked statically.
 
 The installed AArch64 and x86_64 guests booted twice with format-1 declarations
 and the new compositors. An ordinary account reviewed the signed Counter
@@ -142,3 +143,21 @@ guest screenshots and transcripts. The independent archive checker verified
 all 5,777 sealed entries. The complete guest runs remain at the paths
 recorded with their pinned receipts. Archive SHA-256 is
 `26cbb5a32b66273781d11e9544c0dbc6c30f36eb0a7a2075d51c7723ce206c05`.
+
+## Setup fixture frame cleanup
+
+ASan reproduced a use-after-free in the optional-app picker and Russian
+registration tests from `11cfda7a4`. Both tests reset the frame pool before
+releasing the first tree. Its cleanup then traversed reused storage and
+read stylesheet maps the newer frame had already released.
+At `e7b9ce3e33ac4e1279285677ee96ce29ab8a9a51`, both tests release each
+tree before reusing the pool, matching the live setup loops.
+
+All eight suites in the default setup runner passed. The picker, release
+choice, release routing, localized application and registration suites
+also passed under ASan and UBSan with process leak detection disabled.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-picker-stylesheet-eIHeyc/qualification.tar.gz)
+contains the baseline traces, fixed logs and source revisions. The
+independent checker verified all 33 sealed entries. Archive SHA-256 is
+`619ede0cc3e8f804fe9e22b5c93b5bae5cb6ae93e60f6dae42d8ff6bffcc3fe7`.
