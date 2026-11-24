@@ -36,7 +36,8 @@ fn check_repository_report_content(app &SoftwareApp) {
 		values << 'Signed sequence: ' + sequence; values << 'Remembered sequence: ' + remembered
 		values << 'Signed catalog entries: ' + count; values << 'Expires (Unix seconds): ' + expires
 		unsafe { sequence.free(); remembered.free(); count.free(); expires.free() }
-		assert text.contains('independently trusted channel') && text.contains('does not install applications')
+		assert text.contains('independently trusted channel')
+		assert text.contains('Confirming enables trust. Refreshing this repository requires separate approval.')
 		assert text.contains('Old-key applications lose launch and rollback trust') == (review.previous_public_key != '' && review.previous_public_key != review.public_key)
 	} else {
 		assert text.contains('Revocation disables acquisition, launch and rollback')
@@ -279,6 +280,10 @@ fn check_software_repository_navigation() ! {
 			if operation == 'enroll' && mode != 'write-apply-failed' {
 				for _ in 0 .. 1000 { app.poll(); if app.repository_worker == .refresh { break }; time.sleep(time.millisecond) }
 				assert app.repository_worker == .refresh
+				fingerprint := pkgprotocol.repository_refresh_fingerprint(pkgprotocol.Repository{
+					id: 'fixture', url: url, public_key: 'b'.repeat(64)
+				})
+				assert app.worker.args == ['--progress', 'update', 'fixture', fingerprint]
 				wait_for_repository_output(mut app, true); check_repository_writer_protected(mut app)!
 				if mode == 'write-complete' { os.setenv('VINIX_SOFTWARE_REPOSITORY_NAVIGATION', 'list-complete', true) }
 				assert C.write(app.worker.stdio_fd[0], &release, 1) == 1
