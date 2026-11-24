@@ -94,6 +94,9 @@ fn main() {
 		'enrollment-cut-history', 'enrollment-cut-configuration' {
 			scenario_package_enrollment_recovery(mut t)
 		}
+		'revocation-cut-reviewed', 'revocation-cut-configuration' {
+			scenario_package_revocation_recovery(mut t)
+		}
 		'elevation' { scenario_elevation(mut t) }
 		'unprivileged' { scenario_unprivileged(mut t) }
 		'seat' { scenario_seat(mut t) }

@@ -39,6 +39,7 @@ pub:
 	name      string = 'hardware-platform'
 	scenarios []Scenario
 	guest     string = 'tests/hardware-platform/guest'
+	guest_flags []string
 	// Directories, relative to the checkout, where the guest and the programs
 	// find modules that are not beside them.
 	module_paths []string

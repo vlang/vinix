@@ -133,11 +133,11 @@ pub fn enroll_repository_reviewed(root string, repository Repository, offline bo
 	// may remember a newer floor, but can never trust a replayed older index.
 	save_history(directory, history)!
 	$if package_enrollment_crash_fixture ? {
-		enrollment_cut_checkpoint('history')
+		repository_cut_checkpoint('enrollment', 'history')
 	}
 	save_configuration(path, next)!
 	$if package_enrollment_crash_fixture ? {
-		enrollment_cut_checkpoint('configuration')
+		repository_cut_checkpoint('enrollment', 'configuration')
 	}
 	return next
 }
@@ -162,6 +162,12 @@ pub fn revoke_repository_reviewed(root string, id string, expected string) !Conf
 	check_repository_review(expected, actual)!
 	next := Config{ ...current, repositories: current.repositories.filter(it.id != id) }
 	next.validate()!
+	$if package_revocation_crash_fixture ? {
+		repository_cut_checkpoint('revocation', 'reviewed')
+	}
 	save_configuration(path, next)!
+	$if package_revocation_crash_fixture ? {
+		repository_cut_checkpoint('revocation', 'configuration')
+	}
 	return next
 }

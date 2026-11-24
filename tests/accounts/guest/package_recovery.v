@@ -58,6 +58,12 @@ fn package_root_cli(arguments []string) !string {
 	return package_success(['--root', package_test_root, ...arguments])!
 }
 
+fn expect_package_root_refusal(arguments []string, diagnostic string) {
+	result := run(['/usr/bin/vinix-package', '--root', package_test_root, '--offline', ...arguments],
+		'', none, none)
+	assert result.status == 1 && result.output.contains(diagnostic), result.output
+}
+
 fn package_disk_version(version string, architecture string) ! {
 	source := package_disk + '/source'
 	os.write_file(source + '/version.txt', version + '\n')!

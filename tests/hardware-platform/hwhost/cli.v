@@ -305,8 +305,8 @@ pub fn run_suite(suite Suite, arguments []string, controller_source string) int 
 
 fn run_selection(host Host, suite Suite, selection Selection, kernel string, work string, timeout int, keep bool, failures_only bool) int {
 	guest_directory := os.join_path(work, 'guest')
-	guest := build_program(host, os.join_path(host.root, suite.guest), guest_directory,
-		'init', suite.module_paths) or {
+	guest := build_program_with_flags(host, os.join_path(host.root, suite.guest), guest_directory,
+		'init', suite.module_paths, suite.guest_flags) or {
 		if err is Interrupted {
 			eprintln('run: interrupted')
 			return 130

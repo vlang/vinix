@@ -80,12 +80,6 @@ fn select_enrollment_index(name string) ! {
 	}
 }
 
-fn reject_enrollment_command(arguments []string, diagnostic string) {
-	result := run(['/usr/bin/vinix-package', '--root', package_test_root, '--offline', ...arguments],
-		'', none, none)
-	assert result.status == 1 && result.output.contains(diagnostic), result.output
-}
-
 fn qualify_package_enrollment_recovery(mut t Test) ! {
 	package_disk_mount()!
 	phase := t.scenario.all_after_last('-')
@@ -122,11 +116,11 @@ fn qualify_package_enrollment_recovery(mut t Test) ! {
 	intent := enrollment_arguments(record.repository)
 	for name in ['older', 'equivocated']! {
 		select_enrollment_index(name)!
-		reject_enrollment_command(['repo-review', ...intent], 'repository rollback or sequence equivocation refused')
+		expect_package_root_refusal(['repo-review', ...intent], 'repository rollback or sequence equivocation refused')
 		assert observe_package_disk()! == recovered
 	}
 	select_enrollment_index('exact')!
-	reject_enrollment_command(['repo-apply', record.approval, ...intent], 'repository review is stale')
+	expect_package_root_refusal(['repo-apply', record.approval, ...intent], 'repository review is stale')
 	assert observe_package_disk()! == recovered
 	t.say('PACKAGE ENROLLMENT RETAINED ${phase} durable floor and expected trust configuration PASS')
 

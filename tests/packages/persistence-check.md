@@ -222,3 +222,22 @@ contains the source snapshot, nine verified receipt entries per target, the
 initial disks and logs. The runs used `--failures-only`. The independent
 archive check verified all 90 sealed files. Archive SHA-256
 `aec5383cd8610bea8412938a0a0ef5a425f72230fcf9d860cb5d3289e196b25b`.
+
+## Reviewed publisher revocation cuts
+
+Add `--revocation` to the persistence command and use a fresh state directory.
+The fixture installs two generations from a signed repository and takes the
+publisher offline. It prepares a read-only review, then passes its fingerprint
+to the normal `repo-apply` path. A dedicated build pauses with the writer lock held.
+
+| Case | Cut point | Trust state and retry after reboot |
+| --- | --- | --- |
+| `revocation-cut-reviewed` | The worker validated the approval and replacement configuration. | The publisher is still enrolled. The same approval can finish revocation. |
+| `revocation-cut-configuration` | The configuration replacement and flush have completed. | The publisher is revoked. Reapplying the approval is refused. |
+
+Each reboot checks the exact catalog, active state and replay history. Once the
+publisher is disabled, the normal launch planner and rollback CLI refuse its
+packages. Payload verification and uninstall remain available. Refresh clears
+the retired catalog, while uninstall preserves the personal file, its owner
+and mode. After catalog removal, the service can review the exact sequence-2
+index for enrollment and refuses a properly signed sequence-1 index.
