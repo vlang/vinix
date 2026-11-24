@@ -102,8 +102,13 @@ fn setup_test(v string, args []string, work string, name string) ! {
 	$if macos {
 		flags << ['-x', 'none']
 	}
-	flags << ['${work}/presenter.o', '${os.dir(compiler)}/vlib/os/execute_capture_nix.c', '-lpthread',
-		'-lm', '-o', '${work}/test']
+	vroot := os.dir(compiler)
+	flags << ['${work}/presenter.o', vroot + '/vlib/os/execute_capture_nix.c']
+	fontstash := vroot + '/vlib/fontstash/fontstash_impl.c'
+	if os.is_file(fontstash) {
+		flags << ['-I', vroot + '/thirdparty/fontstash', fontstash]
+	}
+	flags << ['-lpthread', '-lm', '-o', '${work}/test']
 	setup_run('clang', flags)!
 	println('Running ${name}')
 	setup_run('${work}/test', [])!
