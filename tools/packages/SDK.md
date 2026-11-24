@@ -414,6 +414,36 @@ their existing review and rollback rules. This is an initial offline source;
 later signed media or reviewed repository enrollment supplies new releases.
 See [bundle qualification](../../tests/packages/image-repositories-check.md).
 
+#### Move a bundled publisher to its HTTPS repository
+
+After the initial offline install, use the **Repositories** page in Software to
+review enrollment with the existing repository ID and independently verified
+publisher key at the publisher's HTTPS URL. The review shows the previous and
+proposed URLs and the signed index sequence. Confirm the change and approve
+catalog refresh separately. The organization policy must allow online access.
+
+The same reviewed workflow is available from the CLI.
+
+```sh
+vinix-package repo-review enroll REPOSITORY_ID HTTPS_URL PUBLIC_KEY_HEX
+vinix-package repo-apply REVIEW_FINGERPRINT enroll REPOSITORY_ID HTTPS_URL PUBLIC_KEY_HEX
+vinix-package update
+vinix-package review upgrade
+vinix-package apply UPGRADE_FINGERPRINT upgrade
+```
+
+The HTTPS source must serve an index signed by that same key. A sequence already
+recorded on the installed system requires identical signed index bytes. A newer
+sequence can offer new package versions. If the signed index changes between
+review and apply, review the origin again before approving. Enrollment preserves
+the installed generation and leaves catalog refresh as a separate operation.
+
+The shipped application lock still describes the versions and manifest digests
+selected for the image. An upgrade can therefore appear as drift in **Check
+release apps**. A reviewed package rollback can restore that baseline from
+retained payloads while the newer publisher sequence remains recorded. See the
+[release origin qualification](../../tests/packages/release-origin-check.md).
+
 ### Check release image package inputs
 
 Pass `--check` anywhere among `stage.v`'s options to validate the selected
