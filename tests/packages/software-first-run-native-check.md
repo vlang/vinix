@@ -140,3 +140,39 @@ The evidence is archived at
 Its SHA-256 is `4da2477914bc030ec87dc532148eee6c0a76ca14b8849c5383d0bb80980cbede`.
 Independent extraction matched all 9,547 inventory entries and both decoded
 VJFS disks matched their original receipt digests.
+
+## First-run offline refresh through production login
+
+Add `--production-root=STAGED_DESKTOP_IMAGE` to the empty-catalog command
+above. Use the matching architecture's release staging root. The controller
+copies its PID 1, BusyBox, musl loader, volume and system tools, and power
+action into the signed package fixture root. Production init starts the
+test observer through its optional version-check hook. The observer
+records installed files, process identities, package state and the Counter
+checkpoint. QMP sends all registration, login, package approval and
+shutdown input through the real desktop.
+
+At `f9b2aee46a4a1ee4d6c7424b50ea0df110508e8b`, freshly built aarch64 and
+x86-64 compositors passed on retained kernels with 1024×768 framebuffers
+and guest networking disabled. Both runs registered the first administrator
+through the root registration screen and logged in through the UID 101 greeter. The
+ordinary UID 1000 seat reviewed the release, refreshed the empty catalog
+from the signed offline bundle, and approved the Counter installation
+separately. On the second boot, the greeter logged into the retained
+account, the first-run prompt stayed dismissed, and Counter reopened at
+3 and saved 4. All four boots ended through the desktop shutdown menu
+and produced guest-initiated QMP shutdown events.
+
+The retainer checked 79 artifact digests on aarch64 and 86 on x86-64,
+including 26 screenshots per run. Each rejected 55 altered proofs,
+including missing or reordered login evidence, repeated registration,
+fixture-driven poweroff, an altered init digest and enabled networking.
+The aarch64 direct-seat mode also passed with the shared observer.
+The first production assembly attempt exposed a missing root home in
+the minimal fixture. Its logs are retained with the successful run.
+
+The evidence archive is
+`~/.local/state/vinix/r14-production-first-run-3bVLw6/qualification.tar.gz`.
+Its SHA-256 is `1417bfe053165c7114c18597ae246e3e847ec5b93ad71594ca21a5bfa1c5330a`.
+Independent extraction matched all 18,332 inventory entries. Both
+decoded VJFS disks matched their original digests.
