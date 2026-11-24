@@ -50,3 +50,28 @@ cold boots. Both guests reopen exact saved Counter labels and complete real QMP
 guest shutdown. This native result covers Review; durable Skip remains covered
 by the host checkpoint. The host report also records the broader broker and
 translation-suite failures rather than claiming a full-suite pass.
+
+## First-run catalog refresh qualification
+
+At `c40e40c6f3f947cb3d850597a33c549292033ab2`, the host Software fixture
+passed in regular and ASan/UBSan builds with leak detection disabled. It
+covered both refresh choices, wide and compact controls, back navigation,
+cancelled and refused approval, and the exact read-only commands after a
+successful refresh. Both desktop targets typechecked.
+
+The `native-catalog-check --software-bundled-https` initramfs scenario
+passed in 91.359 seconds on aarch64 and 93.615 seconds on x86-64. The
+headless Software controller and real authentication service rejected a
+wrong password, then used the signed bundled catalog to resume first-run
+review with no active package generation. A separate confirmation and
+administrator approval activated the three-app deployment. Both runs kept the
+configured HTTPS publisher, exercised offline maintenance, and ended with a
+guest-initiated QMP shutdown. The current refresh screen was exercised through
+the Software element tree. Graphical login and public publisher acceptance
+remain open for this workflow.
+
+The qualification archive is
+`~/.local/state/vinix/r14-first-run-refresh-quTAdY/qualification.tar.gz`.
+Its SHA-256 is `c09b17323bf89a02ca4bbb06bd4c26d0928e505e8552b412b4a9a35c29cae110`.
+Independent extraction matched all 914 manifest entries and all 61 receipt
+artifacts per architecture.
