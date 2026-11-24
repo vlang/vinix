@@ -117,3 +117,26 @@ and password mask, and waits for the signed catalog and read-only proposal.
 It approves installation in a second prompt and reopens the saved Counter
 after a cold boot. Retention requires the refresh screenshots, separate
 approvals in order, and a cold boot without a repeated prompt or refresh.
+
+### Empty-catalog results
+
+At `937dc04c4331cf784f1f2160539d5a6d1e467cec`, the installed aarch64
+and x86-64 guests passed with freshly built compositors at 1024×768
+and guest networking disabled. Each began with an empty catalog, approved
+offline refresh and installation in separate prompts, and reopened the
+saved Counter after a cold boot. The second boot preserved the HTTPS
+configuration, package state and private data. Both boots ended with
+guest-initiated QMP shutdown.
+
+The independent retainer verified 59 artifact digests on aarch64 and 66 on
+x86-64. Both retained 21 screenshots and rejected 48 altered-evidence cases.
+Kernel serial output interrupted the proposal JSON in an earlier ARM run.
+Its logs are retained with the accepted runs.
+The fixtures start an ordinary seat with `vinix-session` and retained
+kernels. Production login and public catalog rollout remain separate gates.
+
+The evidence is archived at
+`~/.local/state/vinix/r14-first-run-graphical-3DNZqu/qualification.tar.gz`.
+Its SHA-256 is `4da2477914bc030ec87dc532148eee6c0a76ca14b8849c5383d0bb80980cbede`.
+Independent extraction matched all 9,547 inventory entries and both decoded
+VJFS disks matched their original receipt digests.
