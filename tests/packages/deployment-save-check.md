@@ -82,3 +82,33 @@ Broader graphical, publisher, catalog and foreign-runtime gates remain open.
 - [x86_64 report](results/2026-10-15/deployment-save-x86_64.txt)
 - [x86_64 serial](results/2026-10-15/deployment-save-x86_64.serial.txt)
 - [x86_64 QMP](results/2026-10-15/deployment-save-x86_64.qmp.txt)
+
+## Captured snapshot destination
+
+At `a1efd92563ceaf2ebc2b0fa94fa09af5709cf2cf`, snapshot saving holds the
+output parent open before reading installed state. The writer uses that
+descriptor and checks that the literal parent still names it before creating
+a temporary file. The installed and fresh-store tests replace the directory
+after snapshot preparation, verify both directories, then restore the original
+and retry. The successful relative-path receipt and lock bytes match the
+expected snapshot.
+
+Host snapshot, atomic-write, deployment-observation and receipt tests passed.
+The signed CLI probe passed against a production package CLI. The snapshot
+fixture passed under ASan/UBSan with leak detection disabled. For the separate
+heap-tracked observation test, the baseline and revised builds hit the same
+three retained-allocation assertions with identical counts. Both reported
+806,400 retained bytes across the 100 public observation cycles.
+
+Both QEMU guests ran all four test programs and initiated shutdown. AArch64
+finished in 5.9 seconds under HVF and x86-64 in 26.5 seconds under TCG. Both
+verified ordinary UID 1000 saving an exact relative-path snapshot. All eight
+receipt artifact sizes and hashes matched per target. The earlier x86-64 build
+exposed a fixture `waitpid` declaration that conflicted with an imported
+declaration. The successful runs use the corrected C bindings.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-snapshot-parent-capture-DeyWD0/qualification.tar.gz)
+contains the source, host and guest builds, tracked baseline comparison,
+serial/QMP logs and both guest receipts. The independent checker verified all
+161 sealed files. Archive SHA-256 is
+`d73df1c9808f0c950bc5df4569b68bc9d1f4ca5d6b8bc0b3dd8e3e2994a9dfca`.
