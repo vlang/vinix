@@ -8,7 +8,7 @@ fn (mut r MetadataReader) software_dependency() !SoftwareDependency {
 	r.expect(`{`)!
 	mut value := SoftwareDependency{}
 	mut accepted := false
-	defer { if !accepted { unsafe { value.id.free(); value.minimum.free(); value.before.free() } } }
+	defer { if !accepted { close_software_dependency(value) } }
 	mut seen := u32(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -37,9 +37,7 @@ fn (mut r MetadataReader) software_dependencies() ![]SoftwareDependency {
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == 128 { return error('Software installed dependencies exceed their entry limit') }
-		value := r.software_dependency()!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << r.software_dependency()!
 	}
 	accepted = true
 	return values
@@ -76,18 +74,25 @@ fn (mut r MetadataReader) skip_view_number() ! {
 	}
 }
 
+fn discard_view_string(value string) {
+	unsafe { value.free() }
+}
+
 fn (mut r MetadataReader) skip_view_extension(depth int) ! {
 	if depth > 32 { return error('package presentation extension exceeds nesting limit') }
 	r.spaces()
 	if r.position >= r.text.len { return error('incomplete package presentation extension') }
 	byte := r.text[r.position]
-	if byte == `"` { value := r.quoted(8 * 1024 * 1024)!; unsafe { value.free() }; return }
+	if byte == `"` { discard_view_string(r.quoted(8 * 1024 * 1024)!); return }
 	if byte == `{` || byte == `[` {
 		r.position++
 		mut first := true
 		for r.next(first, if byte == `{` { `}` } else { `]` })! {
 			first = false
-			if byte == `{` { key := r.quoted(8 * 1024 * 1024)!; unsafe { key.free() }; r.expect(`:`)! }
+			if byte == `{` {
+				discard_view_string(r.quoted(8 * 1024 * 1024)!)
+				r.expect(`:`)!
+			}
 			r.skip_view_extension(depth + 1)!
 		}
 		return
@@ -169,14 +174,12 @@ fn (mut r MetadataReader) parse_software_rows() ![]SoftwareRow {
 	mut rows := []SoftwareRow{cap: 16}
 	unsafe { rows.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe { for row in rows { close_software_row(row) }; (&array(&rows)).free() } } }
+	defer { if !accepted { close_software_rows(rows) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if rows.len == 4096 { return error('Software view exceeds row limit') }
-		row := r.parse_software_row()!
-		pointer := unsafe { &row }
-		unsafe { rows.push_many(pointer, 1) }
+		rows << r.parse_software_row()!
 	}
 	accepted = true
 	return rows
@@ -186,7 +189,7 @@ fn (mut r MetadataReader) parse_software_view() !SoftwareView {
 	r.expect(`{`)!
 	mut view := SoftwareView{}
 	mut accepted := false
-	defer { if !accepted { view.close() } }
+	defer { if !accepted { close_software_view(view) } }
 	mut seen := u32(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -206,7 +209,7 @@ fn (mut r MetadataReader) parse_software_view() !SoftwareView {
 		}
 	}
 	if seen != 255 { return error('missing Software view field') }
-	view.validate()!
+	validate_software_view(view)!
 	accepted = true
 	return view
 }
@@ -215,8 +218,8 @@ pub fn decode_software_view(text string) !SoftwareView {
 	if text.len > 8 * 1024 * 1024 { return error('Software view exceeds reply limit') }
 	mut reader := &MetadataReader{ text: text }
 	defer { unsafe { free(reader) } }
-	mut view := reader.parse_software_view()!
+	view := reader.parse_software_view()!
 	reader.spaces()
-	if reader.position != text.len { view.close(); return error('trailing Software view metadata') }
+	if reader.position != text.len { close_software_view(view); return error('trailing Software view metadata') }
 	return view
 }

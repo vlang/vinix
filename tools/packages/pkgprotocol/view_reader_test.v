@@ -3,6 +3,13 @@ module pkgprotocol
 
 import json2
 
+$if track_heap ? {
+	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
+}
+fn C.vinix_heap_begin()
+fn C.vinix_heap_end() u64
+fn C.vinix_heap_count() u32
+
 fn fixture_software_row() SoftwareRow {
 	return SoftwareRow{ id: 'editor', name: 'Editor é🚀', description: 'Read complete metadata', version: '2.0.0',
 		installed_version: '1.0.0', installed_name: 'Installed editor', installed_kind: 'native', installed_permissions: ['display'], installed_window_protocol: 2,
@@ -18,6 +25,38 @@ fn refuses_software_view(text string) bool {
 	mut view := decode_software_view(text) or { unsafe { err.free() }; return true }
 	view.close()
 	return false
+}
+
+fn test_view_reader_retires_catalog_rows_and_dependencies_on_success_and_refusal() {
+	libraries := [SoftwareDependency{id: 'library-a', minimum: '1.0.0', before: '2.0.0'},
+		SoftwareDependency{id: 'library-b', minimum: '2.0.0', before: '3.0.0'}]
+	editor := SoftwareRow{ ...fixture_software_row(), installed_dependencies_known: true, installed_dependencies: libraries }
+	writer := SoftwareRow{ ...editor, id: 'writer' }
+	text := json2.encode(SoftwareView{format: 1, generation: 7, architecture: 'aarch64', rows: [editor, writer]})
+	extended := text.replace('"format":1,', '"format":1,"extension":{"label":"Ignored","values":[{"name":"Ignored"}]},')
+	invalid := [
+		text.replace('"before":"3.0.0"', '"before":false'),
+		text.replace('"installed_runtime":""', '"installed_runtime":false'),
+		text.replace('"id":"library-b"', '"id":"library-a"'),
+		text + ' trailing',
+		extended.replace('[{"name":"Ignored"}]', '{"incomplete":}'),
+	]!
+	for input in invalid { assert input != text }
+	assert extended != text
+	assert !refuses_software_view(text)
+	assert !refuses_software_view(extended)
+	$if track_heap ? { C.vinix_heap_begin() }
+	for _ in 0 .. 64 {
+		assert !refuses_software_view(text)
+		assert !refuses_software_view(extended)
+		for input in invalid { assert refuses_software_view(input) }
+	}
+	$if track_heap ? {
+		kept := C.vinix_heap_end()
+		count := C.vinix_heap_count()
+		println('SOFTWARE VIEW decoder retained ${kept} bytes / ${count} allocations across 448 attempts')
+		assert kept == 0 && count == 0
+	}
 }
 
 fn test_view_reader_preserves_complete_installed_and_planned_fields_and_unicode() {

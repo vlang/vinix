@@ -70,6 +70,10 @@ fn view_permissions(values []string) bool {
 }
 
 pub fn (view &SoftwareView) validate() ! {
+	validate_software_view(view)!
+}
+
+fn validate_software_view(view SoftwareView) ! {
 	if view.format != 1 || view.architecture !in ['aarch64', 'x86_64']! || view.rows.len > 4096
 		|| view.catalog_error.len > 4096 || view.update_error.len > 4096 || !view_account(view.launch_user) {
 		return error('invalid Software view header')
@@ -138,11 +142,13 @@ pub fn (view &SoftwareView) validate() ! {
 	}
 }
 
+fn close_software_dependency(value SoftwareDependency) {
+	unsafe { value.id.free(); value.minimum.free(); value.before.free() }
+}
+
 fn close_software_dependencies(values []SoftwareDependency) {
-	unsafe {
-		for value in values { value.id.free(); value.minimum.free(); value.before.free() }
-		(&array(&values)).free()
-	}
+	for value in values { close_software_dependency(value) }
+	unsafe { values.free() }
 }
 
 fn close_software_row(row SoftwareRow) {
@@ -158,11 +164,18 @@ fn close_software_row(row SoftwareRow) {
 	}
 }
 
+fn close_software_rows(rows []SoftwareRow) {
+	for row in rows { close_software_row(row) }
+	unsafe { rows.free() }
+}
+
+fn close_software_view(view SoftwareView) {
+	unsafe { view.architecture.free(); view.catalog_error.free(); view.update_error.free(); view.launch_user.free() }
+	close_software_rows(view.rows)
+}
+
 // Decoded fields and arrays are owned, including partial input on refusal.
 pub fn (mut view SoftwareView) close() {
-	unsafe {
-		view.architecture.free(); view.catalog_error.free(); view.update_error.free(); view.launch_user.free()
-		for row in view.rows { close_software_row(row) }; (&array(&view.rows)).free()
-	}
+	close_software_view(view)
 	view = SoftwareView{}
 }
