@@ -95,7 +95,8 @@ fn (a &SoftwareApp) build_catalog_browser(width int, height int) ui2.Element {
 fn (a &SoftwareApp) package_screen_active() bool {
 	return !a.deployment_mode && !a.mirror_mode && !a.repository_mode && !a.policy_mode
 		&& !a.data_mode && !a.launch_mode && !a.health_mode && !a.cleanup_mode
-		&& !a.audit_mode && !a.snapshot_mode && !a.window_mode && a.terminal_app == unsafe { nil }
+		&& !a.audit_mode && !a.snapshot_mode && !a.window_mode && !a.release_catalog_mode
+		&& a.terminal_app == unsafe { nil }
 }
 
 fn (a &SoftwareApp) package_review_running() bool {

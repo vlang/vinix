@@ -341,7 +341,8 @@ fn check() !int {
 	scenario := if installed { installed_software_suite(sandbox, disk).scenarios[0] }
 		else if persistent { persistent_software_suite(sandbox, disk).scenarios[0] } else if bundled_https {
 			hwhost.Scenario{ ...selection.run[0], required: [...selection.run[0].required,
-				'SOFTWARE IMAGE selected offline mode and installed the bundled HTTPS catalog with separate approval PASS'] }
+				'SOFTWARE IMAGE selected offline mode and installed the bundled HTTPS catalog with separate approval PASS',
+				'SOFTWARE IMAGE first-run offline refresh resumed exact release review before activation PASS'] }
 		} else { selection.run[0] }
 	outcome := hwhost.run_scenario(host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
 		state: work + '/native', timeout: if options.timeout > scenario.timeout { options.timeout } else { scenario.timeout }, keep: true })

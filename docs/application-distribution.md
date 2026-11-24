@@ -1994,6 +1994,11 @@ policy. **Use policy** returns the window to the configured repository policy.
 This choice applies to the current Software window. Organization policy still
 applies, including any requirement to work offline.
 
+On first login, **Review release applications** can also open a refresh screen
+if the catalog is unavailable. Choose **Refresh offline** for the image bundle
+or **Refresh with policy** for the configured sources. Approving refresh
+opens the release proposal, where installation has its own confirmation.
+
 Software's **Export offline** action exports the selected catalog package,
 all explicitly installed application roots, or an organization deployment lock,
 with their dependencies. The catalog scopes

@@ -265,7 +265,7 @@ fn image_run() ! {
 	assert app.launch_label == 'Launch' // the root image's launch_user cannot change this identity
 	phase := os.args[1]
 	bundled_https := os.exists('/usr/share/package-fixtures/bundled-https')
-	if bundled_https {
+	if bundled_https && phase != 'install' {
 		assert !app.offline && !app.offline_requested
 		compact := ui2.rect(0, 0, 320, 240)
 		image_control_at(mut app, 'software.offline', compact)!
@@ -274,17 +274,27 @@ fn image_run() ! {
 	if phase.starts_with('cold-') {
 		image_cold_maintenance(mut app, phase, password)!
 	} else if phase == 'install' {
+		refresh := if bundled_https { 'software.release.catalog.offline' } else { 'software.refresh' }
 		if bundled_https {
-			image_control_at(mut app, 'software.refresh', ui2.rect(0, 0, 320, 240))!
-		} else { image_control(mut app, 'software.refresh')! }
+			app.handle(software_first_run_release_action)!
+			assert app.release_catalog_mode && !app.admin_prompt && app.worker == unsafe { nil }
+		}
+		image_control_at(mut app, refresh, if bundled_https { ui2.rect(0, 0, 320, 240) } else { ui2.rect(0, 0, 960, 720) })!
 		image_control(mut app, 'software.admin.cancel')!
 		assert app.worker == unsafe { nil } && app.status.contains('cancelled')
-		image_control(mut app, 'software.refresh')!
+		image_control(mut app, refresh)!
 		image_approve(mut app, 'incorrect fixture password')!
 		assert app.failure_pages.len > 0 && app.rows.len == 0
-		image_control(mut app, 'software.refresh')!
+		image_control(mut app, refresh)!
 		assert image_approve(mut app, password)!
 		assert app.rows.len == 3 && app.offline && app.catalog_error == '', app.status
+		if bundled_https {
+			assert app.review_ready && app.deployment_pending == pkgprotocol.image_applications_path && !app.admin_prompt
+			assert !os.exists('/var/lib/vinix-packages/current')
+			println('SOFTWARE IMAGE first-run offline refresh resumed exact release review before activation PASS')
+			image_control(mut app, 'software.cancel')!
+			image_control(mut app, 'software.deployment.back')!
+		}
 		image_release_audit(mut app, 'initial-empty', '')!
 		image_control(mut app, 'software.deployment')!
 		assert app.release_deployment_available && editor_bytes_text(app.deployment_path) == pkgprotocol.image_applications_path

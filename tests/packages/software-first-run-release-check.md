@@ -14,6 +14,15 @@ removal proposal, explicit Confirm, and separate administrator approval. It adds
 no publisher trust or automatic package operation. Starting a search while the
 catalog loads retires the queued handoff instead of replacing the user's input.
 
+If the package service reports that the catalog is unavailable, Software offers
+**Refresh offline** and **Refresh with policy** before starting deployment
+review. The offline choice reads signed local or bundled indexes. The policy
+choice uses the configured repository settings. Refresh requires its own
+administrator approval. Cancellation or refusal keeps the refresh choices
+available. Successful refresh reloads the authenticated catalog and resumes
+the read-only release review. The install still requires **Confirm** and
+separate administrator approval.
+
 A successful choice writes the private per-home `.vinix-first-run-release` record
 as exactly `review\n` or `skip\n`, then consumes any legacy pending marker. Both
 choices are durable and do not repeat at the next login. Failure to save leaves

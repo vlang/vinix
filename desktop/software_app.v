@@ -173,6 +173,7 @@ mut:
 	release_deployment_path string = pkgprotocol.image_applications_path
 	release_deployment_available bool
 	release_review_requested bool
+	release_catalog_mode bool
 	mirror_mode bool
 	mirror_path []u8
 	mirror_all bool
@@ -761,6 +762,12 @@ fn (mut a SoftwareApp) poll() bool {
 		unsafe { tail.free() }
 	} else if verifying {
 		a.set_status('Installed files and launchers verified. Trust and organization policy still apply at launch.')
+	} else if a.release_catalog_mode {
+		a.start(['view'], true)
+		if a.worker != unsafe { nil } {
+			a.release_catalog_mode = false
+			a.release_review_requested = true
+		}
 	} else {
 		a.start(['view'], true)
 	}
@@ -853,6 +860,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		if a.worker == unsafe { nil } && a.failure_pages.len > 0 { a.failure_mode = true; a.focus = false }
 		return
 	}
+	if a.release_catalog_mode { a.handle_release_catalog(event_id); return }
 	if a.snapshot_mode { a.handle_deployment_snapshot(event_id); return }
 	if a.audit_mode { a.handle_deployment_audit(event_id); return }
 	if a.health_mode {
@@ -1151,6 +1159,10 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.failure_mode { a.failure_key_input(input); return }
 	if a.status_reader.mode { a.status_reader.key_input(input); return }
+	if a.release_catalog_mode {
+		if input == '\x1b' { a.handle_release_catalog('software.release.catalog.back') }
+		return
+	}
 	if a.report_reader_mode { a.report_reader_key_input(input); return }
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
 	if a.audit_mode { a.audit_key_input(input); return }
@@ -1205,6 +1217,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
 	if a.status_reader.mode { return }
+	if a.release_catalog_mode { return }
 	if a.report_reader_mode { return }
 	if a.snapshot_mode { a.snapshot_paste_input(input); return }
 	if a.audit_mode { a.audit_paste_input(input); return }
@@ -1315,6 +1328,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.status_reader.mode { return a.status_reader.build(size) }
 	width := int(size.width)
 	height := int(size.height)
+	if a.release_catalog_mode { return a.build_release_catalog(width, height) }
 	if a.details_mode { return a.build_details(width, height) }
 	if a.policy_mode && a.policy_reader_mode { return a.build_policy_reader(width, height) }
 	if a.report_reader_mode { return a.build_report_reader(width, height) }
