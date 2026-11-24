@@ -103,6 +103,15 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 		return error('package image root changed before input check')
 	}
 	image_configuration_parents(configuration.root)!
+	destination := if output.destination == '' {
+		ImageDeploymentTarget{}
+	} else {
+		configuration.capture_deployment_target(output.destination)!
+	}
+	defer {
+		if destination.directory >= 0 { C.close(destination.directory) }
+		unsafe { destination.path.free() }
+	}
 	if configuration.existing { image_configuration_architecture(configuration.root, configuration.architecture)! }
 	else {
 		if image_configuration_exists(configuration.path)! { return error('image package configuration appeared after preparation; prepare inputs again') }
@@ -156,8 +165,6 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 	rows.sort(a.id < b.id)
 	digest := index_digest(text)
 	defer { unsafe { digest.free() } }
-	target := if output.destination != '' { image_deployment_target(configuration.root, output.destination)! } else { '' }
-	defer { unsafe { target.free() } }
 	lock_text := if required.len > 0 { encode_deployment_lock(deployment, true)! } else { '' }
 	defer { unsafe { lock_text.free() } }
 	lock_digest := if lock_text != '' { index_digest(lock_text) } else { '' }
@@ -169,13 +176,19 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 		bundle_required_bytes: repositories.needed, bundle_reserve_bytes: if repositories.capture != '' { u64(64 * 1024 * 1024) } else { 0 },
 		bundled_repositories: rows, applications_checked: required.len > 0,
 		application_requirements_sha256: requirements_sha256, application_deployment: deployment,
-		application_deployment_destination: target, application_deployment_sha256: if target != '' { lock_digest } else { '' },
+		application_deployment_destination: destination.path, application_deployment_sha256: if destination.path != '' { lock_digest } else { '' },
 		image_application_deployment_path: if lock_text != '' { pkgprotocol.image_applications_path } else { '' },
 		image_application_deployment_action: image_action, image_application_deployment_sha256: lock_digest,
 		image_application_deployment_bytes: u64(lock_text.len) })
 	mut accepted := false
 	defer { if !accepted { unsafe { report.free() } } }
-	if target != '' { atomic_write_with(target, lock_text, AtomicWriteOptions{ ...output.options, exclusive: true })! }
+	if destination.path != '' {
+		output.options.checkpoint('prepared', destination.path)!
+		if !image_configuration_root_matches(configuration.root, configuration.device, configuration.inode) {
+			return error('package image root changed before deployment export')
+		}
+		atomic_write_with(destination.path, lock_text, AtomicWriteOptions{ ...output.options, exclusive: true, parent_fd: destination.directory })!
+	}
 	accepted = true
 	return ImageApplications{ root: if required.len > 0 { configuration.root.clone() } else { '' },
 		architecture: configuration.architecture.clone(), configuration: text.clone(),

@@ -37,6 +37,7 @@ fn image_export_suite() hwhost.Suite {
 				'IMAGE DEPLOYMENT EXPORT both-host exact canonical format-2 locks, inline/file parity, independent source/result digests, exclusive atomic publication and independent receipts PASS',
 				'IMAGE DEPLOYMENT EXPORT existing file/link/FIFO/directory/hardlink outputs, direct/aliased image namespaces, unsafe parents, invalid paths and invalid app sets refuse unchanged PASS',
 				'IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS',
+				'IMAGE DEPLOYMENT EXPORT replaced parent and image roots refuse before writing and exact directory restoration permits retry PASS',
 				'IMAGE DEPLOYMENT EXPORT real CLI both-host inline/file exports, option placement, compiler bypass, existing-file protection and required context preserve target images PASS',
 				'NEW METADATA existing file/alias/dangling/FIFO/directory/hardlink destinations refuse without replacement or blocking PASS',
 				'NEW METADATA checkpoint/write/space/flush failures, destination races, mode/parent/final substitutions, cleanup and saved-file retry refusal PASS',

@@ -11,17 +11,22 @@ and the normal deployment CLI. They authenticate the exact pinned manifests with
 current enrolled keys and policy and review the complete set, including removals.
 Export grants no automatic deployment authority or publisher enrollment.
 
-The [export API](../../tools/packages/pkgcore/image_deployment.v) compares parent
-directory identities against the captured image namespace before resolving
-aliases. Direct image descendants and aliases/parent traversal into the image
-refuse. A path whose filesystem meaning is outside the image remains usable.
-Output parents must already exist and pass the normal controlled-parent checks.
+The export opens the destination's actual parent and compares its ancestry
+with the captured image root. Direct image descendants and aliases or parent
+traversal into the image refuse. A path that resolves outside the image remains
+usable. Output parents must already exist and pass the controlled-parent
+checks. [Export API](../../tools/packages/pkgcore/image_deployment.v)
 
 The common exclusive metadata writer writes and flushes a private temporary,
 publishes a new name at mode 0644 and flushes the same parent descriptor. Existing
 files, links, FIFOs, directories and hard links remain intact. Handled failures
 before publication retire temporaries; failures afterward explicitly report a
 saved file. Retry never replaces a previous/concurrent output.
+
+The export keeps the directory used for containment open while preparing the
+lock and borrows it for publication. The tests replace the output parent or
+image root after preparation and verify both directories before restoring them
+for a successful retry.
 
 V builders call `ImageConfiguration.export_applications` or
 `export_application_file`. Reports own their returned text; callers free it and

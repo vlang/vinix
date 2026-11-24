@@ -688,8 +688,15 @@ fn test_image_deployment_export_preserves_existing_outputs_and_refuses_image_nam
 }
 
 fn image_export_checkpoint(phase string, temporary string) ! {
-	kind := os.file_name(os.dir(temporary))
-	if kind == 'race' && phase == 'flushed' { os.write_file(os.dir(temporary) + '/result.json', 'concurrent owner bytes')! }
+	parent := os.dir(temporary)
+	kind := os.file_name(parent)
+	if kind == 'race' && phase == 'flushed' { os.write_file(parent + '/result.json', 'concurrent owner bytes')! }
+	if phase == 'prepared' && kind in ['parent-replacement', 'image-replacement']! {
+		path := if kind == 'parent-replacement' { parent } else { os.dir(parent) + '/image' }
+		os.rename(path, path + '.moved')!
+		os.mkdir(path)!
+		os.write_file(path + '/sentinel', 'replacement contents')!
+	}
 	if kind == phase { return error('injected image export ' + phase + ' failure') }
 }
 
@@ -705,7 +712,7 @@ fn test_image_deployment_export_failure_cleanup_saved_diagnostics_and_retry_pres
 	source := image_apps_config(work, 'x86_64', key, Policy{})!
 	mut configuration := prepare_image_configuration(root, 'x86_64', source)!; defer { configuration.close() }
 	mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!; defer { repositories.close() }
-	for kind in ['created', 'written', 'flushed', 'published', 'race', 'space', 'directory-flush']! {
+	for kind in ['created', 'written', 'flushed', 'published', 'race', 'space', 'directory-flush', 'parent-replacement', 'image-replacement']! {
 		parent := work + '/' + kind; os.mkdir(parent)!
 		path := parent + '/result.json'
 		options := AtomicWriteOptions{ checkpoint: image_export_checkpoint,
@@ -716,6 +723,16 @@ fn test_image_deployment_export_failure_cleanup_saved_diagnostics_and_retry_pres
 				assert err.msg().contains('saved, but')
 				mut document := decode_deployment(os.read_file(path)!, 'x86_64')!; assert document.packages == ['editor']; document.close()
 			} else if kind == 'race' { assert os.read_file(path)! == 'concurrent owner bytes' }
+			else if kind in ['parent-replacement', 'image-replacement']! {
+				diagnostic := if kind == 'parent-replacement' { 'parent path changed before writing' } else { 'image root changed before deployment export' }
+				assert err.msg().contains(diagnostic)
+				replaced := if kind == 'parent-replacement' { parent } else { root }
+				assert os.ls(replaced)! == ['sentinel'] && os.ls(replaced + '.moved')!.len == 0
+				assert os.read_file(replaced + '/sentinel')! == 'replacement contents'
+				os.rename(replaced, replaced + '.replacement')!
+				os.rename(replaced + '.moved', replaced)!
+				assert os.ls(parent)!.len == 0
+			}
 			else { assert !os.exists(path) && !os.is_link(path) }
 		}
 		assert os.ls(parent)!.all(!it.starts_with('.package-'))
@@ -729,6 +746,7 @@ fn test_image_deployment_export_failure_cleanup_saved_diagnostics_and_retry_pres
 	}
 	assert os.ls(root)!.len == 0
 	println('IMAGE DEPLOYMENT EXPORT write/space/checkpoint/flush failures and destination races retire temporary files, report saved outputs accurately and permit safe retry without image writes PASS')
+	println('IMAGE DEPLOYMENT EXPORT replaced parent and image roots refuse before writing and exact directory restoration permits retry PASS')
 }
 
 fn test_image_deployment_export_cli_requires_explicit_context_and_saves_a_reviewable_file_without_compilers() {

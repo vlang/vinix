@@ -9,9 +9,14 @@ struct ImageDeploymentOutput {
 	options AtomicWriteOptions
 }
 
-// Export is explicitly outside the image. Compare directory identities before
-// resolving aliases, preserving the filesystem meaning of alias/.. paths.
-fn image_deployment_target(root string, destination string) !string {
+struct ImageDeploymentTarget {
+	path string
+	directory int = -1
+}
+
+// Use one output directory for containment and publication. Opening the
+// literal parent preserves the filesystem meaning of alias/.. paths.
+fn (configuration &ImageConfiguration) capture_deployment_target(destination string) !ImageDeploymentTarget {
 	if destination == '' || !printable(destination, 4096) || !utf8.validate_str(destination) || destination.ends_with('/') {
 		return error('image deployment export requires a printable UTF-8 new-file path of at most 4096 bytes')
 	}
@@ -19,22 +24,33 @@ fn image_deployment_target(root string, destination string) !string {
 	parent := os.dir(destination)
 	defer { unsafe { name.free(); parent.free() } }
 	if name in ['', '.', '..']! { return error('image deployment export requires a new file name') }
-	mut info := C.stat{}
-	if C.fstatat(C.AT_FDCWD, parent.str, unsafe { &info }, 0) != 0 || info.st_mode & 0o170000 != 0o040000 {
+	directory := C.open(parent.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NONBLOCK)
+	if directory < 0 {
 		return error('image deployment export parent directory must already exist')
 	}
-	fd := capture_prepared_root(root, 'package image root')!
-	defer { C.close(fd) }
-	publisher_outside_source(fd, parent) or {
+	mut accepted := false
+	defer { if !accepted { C.close(directory) } }
+	image := capture_prepared_root(configuration.root, 'package image root')!
+	defer { C.close(image) }
+	mut info := C.stat{}
+	if C.fstat(image, unsafe { &info }) != 0 || u64(info.st_dev) != configuration.device
+		|| u64(info.st_ino) != configuration.inode {
+		return error('package image root changed before deployment export')
+	}
+	publisher_outside_directory(image, directory) or {
 		unsafe { err.free() }
 		return error('image deployment export must be outside the target image in an accessible directory')
 	}
 	physical := publisher_real_path(parent)!
 	defer { unsafe { physical.free() } }
 	check_export_parent(physical, 'image deployment export')!
+	if C.fstat(directory, unsafe { &info }) != 0 || !atomic_parent_matches(physical, u64(info.st_dev), u64(info.st_ino)) {
+		return error('image deployment export parent directory changed during admission')
+	}
 	base := physical.trim_right('/')
 	defer { unsafe { base.free() } }
-	return base + '/' + name
+	accepted = true
+	return ImageDeploymentTarget{ path: base + '/' + name, directory: directory }
 }
 
 // The returned report names the saved canonical format-2 lock and its exact

@@ -927,7 +927,9 @@ from that captured result. It requires no target compiler and changes no image,
 consumer state, trust or policy.
 
 Choose a **new file outside the target image** in an existing controlled parent
-directory. Relative filenames resolve through their actual parent. Directory
+directory. Relative filenames resolve through their actual parent. The export
+keeps that directory open through lock preparation and refuses if the parent
+or image root has been replaced before publication. Directory
 identity checks reject image descendants reached directly or through aliases,
 including alias/parent traversal; a path that resolves outside the image remains
 usable. Parent aliases resolve once. Keep image and output ancestors controlled
