@@ -846,9 +846,17 @@ In Software, open **Deployment → Offline media…** and enter the media
 directory. **Import media** uses the enrolled keys and asks for administrator
 approval. After a successful import, Software reloads its catalog in offline
 mode. If the bundle includes a deployment lock, choose **Save media lock** and
-enter a new local filename. The receipt shows the saved SHA-256. **Review
-additions** opens a proposal for the release apps alongside your installed
-applications and requires separate approval to apply.
+enter a new local filename. To require the exact lock, paste the trusted release
+receipt's `deployment_sha256` into **Expected SHA-256**. The save receipt shows
+the digest of the local file. **Check coverage** and **Review additions** use
+that digest. Applying the review uses the same digest and requires separate
+approval.
+
+The equivalent CLI commands `deployment-add-audit FILE`, `deployment-add-review
+FILE` and `deployment-add-apply REVIEW_FINGERPRINT FILE` each accept an optional
+trailing `EXPECTED_SHA256`. With that argument, the service verifies the exact
+bytes it decodes. If the review used a digest, apply must include the same digest
+alongside the review fingerprint.
 
 Use explicit repository and directory pairs to select individual publishers
 or import from several locations:

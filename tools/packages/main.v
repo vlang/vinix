@@ -29,9 +29,10 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  deployment-snapshot-save NEW_FILE [INSTALLED_ID...]\n' +
 	'  deployment-media-save MEDIA_DIRECTORY NEW_FILE [EXPECTED_SHA256]\n' +
 	'  deployment-audit FILE (read-only metadata drift; exit 0 match, 3 drift)\n' +
-	'  deployment-add-audit FILE (read-only release coverage; extra installed apps allowed)\n' +
+	'  deployment-add-audit FILE [EXPECTED_SHA256] (read-only release coverage; extra installed apps allowed)\n' +
 	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
-	'  deployment-add-review LOCK.json | deployment-add-apply REVIEW_FINGERPRINT LOCK.json\n' +
+	'  deployment-add-review LOCK.json [EXPECTED_SHA256]\n' +
+	'  deployment-add-apply REVIEW_FINGERPRINT LOCK.json [EXPECTED_SHA256]\n' +
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  wine-prefix-review ID PRIVATE_DATA (JSON review; may create coordination files)\n' +
 	'  wine-prefix-additions ID PRIVATE_DATA [--generation N] (create missing builtin links; never retarget)\n' +
@@ -366,9 +367,12 @@ fn checked(arguments []string) !int {
 			else { println('Installed deployment snapshot saved: ${saved.destination}\nGeneration: ${saved.generation}; application roots: ${saved.roots}; packages: ${saved.packages}\nSHA-256: ${saved.sha256}') }
 		}
 		'deployment-audit', 'deployment-add-audit' {
-			if names.len != 1 { return error('${command} requires one exact deployment lock') }
 			additions := command == 'deployment-add-audit'
-			mut report := if additions { service.audit_deployment_additions(names[0])! }
+			if names.len != 1 && !(additions && names.len == 2) {
+				return error('${command} requires one exact deployment lock')
+			}
+			mut report := if names.len == 2 { service.audit_deployment_additions_with_digest(names[0], names[1])! }
+				else if additions { service.audit_deployment_additions(names[0])! }
 				else { service.audit_deployment(names[0])! }
 			defer { report.close() }
 			if as_json { println(json2.encode(report)) }
@@ -384,7 +388,8 @@ fn checked(arguments []string) !int {
 			return if report.matches { 0 } else { 3 }
 		}
 		'deployment-lock', 'deployment-snapshot', 'deployment-review', 'deployment-add-review' {
-			if command in ['deployment-review', 'deployment-add-review']! && names.len != 1 {
+			if (command == 'deployment-review' && names.len != 1)
+				|| (command == 'deployment-add-review' && names.len !in [1, 2]!) {
 				return error('${command} requires a deployment document')
 			}
 			text := if command == 'deployment-lock' {
@@ -395,7 +400,9 @@ fn checked(arguments []string) !int {
 				document.close()
 				encoded
 			} else {
-				mut review := if command == 'deployment-add-review' {
+				mut review := if names.len == 2 {
+					service.review_deployment_additions_with_digest(names[0], names[1])!
+				} else if command == 'deployment-add-review' {
 					service.review_deployment_additions(names[0])!
 				} else {
 					service.review_deployment(names[0])!
@@ -409,8 +416,13 @@ fn checked(arguments []string) !int {
 			println(text)
 		}
 		'deployment-apply', 'deployment-add-apply' {
-			if names.len != 2 { return error('${command} requires a review fingerprint and deployment document') }
-			mut state := if command == 'deployment-add-apply' {
+			additions := command == 'deployment-add-apply'
+			if names.len != 2 && !(additions && names.len == 3) {
+				return error('${command} requires a review fingerprint and deployment document')
+			}
+			mut state := if names.len == 3 {
+				service.apply_deployment_additions_with_digest(names[1], names[0], names[2])!
+			} else if additions {
 				service.apply_deployment_additions(names[1], names[0])!
 			} else {
 				service.apply_deployment(names[1], names[0])!

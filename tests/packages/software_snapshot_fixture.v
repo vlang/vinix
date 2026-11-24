@@ -90,8 +90,14 @@ fn software_media_import_service_fixture() !bool {
 		println(json2.encode(software_media_save_fixture_receipt(software_import_fixture_lock)))
 		return true
 	}
-	if args == ['--offline', 'deployment-add-review', software_import_fixture_lock] {
-		println(json2.encode(fixture_review('deploy-add', ['editor'])))
+	if args == ['--offline', 'deployment-add-review', software_import_fixture_lock, 'c'.repeat(64)] {
+		review := fixture_review('deploy-add', ['editor'])
+		println(json2.encode(pkgprotocol.Review{ ...review, fingerprint: 'e'.repeat(64) }))
+		return true
+	}
+	if args == ['admin', '--progress', '--offline', 'deployment-add-apply', 'e'.repeat(64), software_import_fixture_lock, 'c'.repeat(64)] {
+		mut intake := u8(0)
+		if C.read(0, &intake, 1) == 1 { return error('fixture unexpectedly received apply approval') }
 		return true
 	}
 	return false
@@ -174,9 +180,12 @@ fn check_software_media_import() ! {
 	wait_for_software(mut app)
 	assert app.snapshot_ready && app.snapshot_media_saved.destination == software_import_fixture_lock
 	app.handle('software.snapshot.review')!
-	assert app.worker.args == ['--offline', 'deployment-add-review', software_import_fixture_lock]
+	assert app.worker.args == ['--offline', 'deployment-add-review', software_import_fixture_lock, 'c'.repeat(64)]
 	wait_for_software(mut app); assert app.review_ready && app.review == 'deploy-add' && !app.admin_prompt
-	app.handle('software.cancel')!
+	app.handle('software.confirm')!
+	assert app.admin_prompt && app.worker.args == ['admin', '--progress', '--offline', 'deployment-add-apply',
+		'e'.repeat(64), software_import_fixture_lock, 'c'.repeat(64)]
+	app.handle('software.admin.cancel')!
 	// A saved import remains available if the follow-up catalog read is bad.
 	app.offline_requested = false
 	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'bad-view', true)
@@ -190,7 +199,8 @@ fn check_software_media_import() ! {
 }
 
 fn software_media_save_service_fixture(args []string) bool {
-	assert args.len == 5 && os.args[1] == '--json' && args[3] == software_media_fixture_source
+	assert args.len >= 5 && os.args[1] == '--json' && args[3] == software_media_fixture_source
+	assert args.len == 5 || (args.len == 6 && args[5] == 'c'.repeat(64))
 	path := args[4]
 	if path == '/existing-media-lock.json' { eprintln('destination exists'); exit(12) }
 	if path == '/snapshot-receipt.json' { print(json2.encode(software_snapshot_fixture_receipt(path))); return true }
@@ -198,6 +208,7 @@ fn software_media_save_service_fixture(args []string) bool {
 	text := json2.encode(software_media_save_fixture_receipt(if path == '/wrong-media-lock.json' {
 		'/different-lock.json'
 	} else { path }))
+	if path == '/wrong-media-digest.json' { print(text.replace('c'.repeat(64), 'a'.repeat(64))); return true }
 	if path == '/partial-media-lock.json' { print(text[..text.len / 2]); return true }
 	if path == '/failed-media-lock.json' { print(text); exit(24) }
 	print(text[..17]); flush_stdout()
@@ -236,11 +247,19 @@ fn check_software_media_save() ! {
 	app.paste_input(software_snapshot_fixture_path)
 	save := app.build(ui2.rect(0, 0, 320, 240))!
 	assert save.children.any(it.id == 'software.snapshot.save' && it.text == 'Save media lock')
+	assert save.children.any(it.id == 'software.snapshot.sha256')
 	deployment_form_geometry(save, 320, 240)
 	free_window_tree(save)
+	app.key_input('\t'); assert app.snapshot_sha256_focus
+	app.paste_input('cc'); app.handle('software.snapshot.save')!
+	assert app.worker == unsafe { nil } && app.status.contains('64 lowercase hex digits')
+	app.key_input('\x01'); app.paste_input('C'.repeat(64)); app.paste_input('c'.repeat(65)); app.paste_input('cc\n')
+	assert editor_bytes_text(app.snapshot_media_sha256) == 'cc' && app.select_all
+	app.paste_input('c'.repeat(64))
+	assert editor_bytes_text(app.deployment_path) == software_snapshot_fixture_path
 	app.handle('software.snapshot.save')!
 	assert app.worker_snapshot && !app.admin_prompt && !app.prepare_close()
-	assert app.worker.args == ['--json', 'deployment-media-save', software_media_fixture_source, software_snapshot_fixture_path]
+	assert app.worker.args == ['--json', 'deployment-media-save', software_media_fixture_source, software_snapshot_fixture_path, 'c'.repeat(64)]
 	for _ in 0 .. 300 {
 		app.poll()
 		if app.output.len > 0 && app.output.last() == `}` { break }
@@ -250,6 +269,7 @@ fn check_software_media_save() ! {
 	app.handle('software.snapshot.back')!; app.handle('software.snapshot.review')!; app.key_input('\x1b')
 	assert app.snapshot_media && app.worker_snapshot && !app.snapshot_ready
 	software_repository_text(mut app.deployment_path, '/changed-form.json')
+	software_repository_text(mut app.snapshot_media_sha256, 'a'.repeat(64))
 	assert C.write(app.worker.stdio_fd[0], c'x', 1) == 1
 	wait_for_software(mut app)
 	assert app.snapshot_ready && app.snapshot_media_saved.destination == software_snapshot_fixture_path
@@ -264,25 +284,41 @@ fn check_software_media_save() ! {
 	assert app.snapshot_media && !app.mirror_mode
 	app.handle('software.snapshot.review')!
 	assert !app.snapshot_mode && app.snapshot_media_source == '' && app.snapshot_media_saved.destination == ''
-	assert app.worker.args == ['deployment-add-review', software_snapshot_fixture_path] && !app.admin_prompt
+	assert app.worker.args == ['deployment-add-review', software_snapshot_fixture_path, 'c'.repeat(64)] && !app.admin_prompt
 	wait_for_software(mut app)
-	assert app.review_ready && app.review == 'deploy-add' && !app.admin_prompt
+	assert app.review_ready && app.review == 'deploy-add' && !app.admin_prompt && app.deployment_pending_sha256 == 'c'.repeat(64)
 	app.handle('software.cancel')!
-	for path in ['/match-audit.json', '/snapshot-receipt.json', '/wrong-media-lock.json', '/partial-media-lock.json',
+	for path in ['/match-audit.json', '/wrong-coverage-lock.json', '/wrong-media-digest.json', '/snapshot-receipt.json', '/wrong-media-lock.json', '/partial-media-lock.json',
 		'/failed-media-lock.json', '/oversized-media-lock.json', '/existing-media-lock.json'] {
 		app.handle('software.deployment.media-save')!
 		app.paste_input(software_media_fixture_source); app.handle('software.snapshot.save')!
-		app.paste_input(path); app.handle('software.snapshot.save')!
+		app.paste_input(path)
+		if path == '/wrong-media-digest.json' { app.handle('software.snapshot.sha256')!; app.paste_input('c'.repeat(64)) }
+		app.handle('software.snapshot.save')!
 		wait_for_software(mut app)
-		if path == '/match-audit.json' {
+		if path in ['/match-audit.json', '/wrong-coverage-lock.json']! {
 			assert app.snapshot_ready
 			app.handle('software.snapshot.audit')!
-			assert app.audit_additions && app.worker.args == ['--json', 'deployment-add-audit', path]
-			wait_for_software(mut app); assert app.audit_ready && app.audit_snapshot.matches
-			app.handle('software.audit.back')!
+			expected := ['--json', 'deployment-add-audit', path, 'c'.repeat(64)]
+			assert app.audit_additions && app.worker.args == expected
+			wait_for_software(mut app)
+			if path == '/match-audit.json' {
+				assert app.audit_ready && app.audit_snapshot.matches
+				app.handle('software.audit.reload')!; assert app.worker.args == expected
+				wait_for_software(mut app)
+				app.handle('software.audit.review')!
+				assert app.worker.args == ['deployment-add-review', path, 'c'.repeat(64)]
+				wait_for_software(mut app); assert app.review_ready
+				app.handle('software.cancel')!
+			} else {
+				assert !app.audit_ready && app.status.contains('different lock SHA-256')
+				app.handle('software.audit.review')!; assert app.worker == unsafe { nil }
+				app.handle('software.audit.back')!
+			}
 		} else {
 			assert !app.snapshot_ready && app.failure_heading.contains('Save media lock')
 			assert app.snapshot_media_saved.destination == '' && app.details_pages.len == 0
+			if path == '/wrong-media-digest.json' { assert app.status.contains('different SHA-256') }
 			app.handle('software.snapshot.review')!
 			assert app.worker == unsafe { nil } && app.review == '' && !app.admin_prompt
 			app.handle('software.snapshot.back')!
@@ -499,6 +535,11 @@ fn check_software_snapshot_memory() ! {
 					free_window_tree(app.build(ui2.rect(0, 0, 900, 660))!)
 					app.paste_input(software_media_fixture_source)
 					app.save_deployment_snapshot()
+					app.handle_deployment_snapshot('software.snapshot.sha256')
+					app.paste_input('abc')
+					app.key_input('\x01'); app.paste_input('BAD\n'); app.key_input('\x7f')
+					assert app.snapshot_media_sha256.len == 0
+					app.handle_deployment_snapshot('software.deployment.path')
 				}
 				app.paste_input(software_snapshot_fixture_path); app.key_input('\x01')
 				for input in ['\x1b', '\x01', '\x08', '\x7f', '\r', '\n', '/bad\xc2\x85path', '\xff']! {

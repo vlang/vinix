@@ -33,6 +33,10 @@ fn (mut a SoftwareApp) begin_deployment_review() {
 }
 
 fn (mut a SoftwareApp) begin_deployment_review_mode(additions bool) {
+	a.begin_deployment_review_with_digest(additions, '')
+}
+
+fn (mut a SoftwareApp) begin_deployment_review_with_digest(additions bool, expected_sha256 string) {
 	a.initialize_deployment_field()
 	a.clear_review()
 	path := editor_bytes_text(a.deployment_path)
@@ -42,10 +46,15 @@ fn (mut a SoftwareApp) begin_deployment_review_mode(additions bool) {
 	}
 	a.review = if additions { 'deploy-add'.clone() } else { 'deploy'.clone() }
 	a.deployment_pending = path.clone()
+	a.deployment_pending_sha256 = expected_sha256.clone()
 	a.focus = false
 	a.select_all = false
-	a.start([if additions { 'deployment-add-review' } else { 'deployment-review' },
-		a.deployment_pending], false)
+	mut args := []string{cap: 3}
+	args << if additions { 'deployment-add-review' } else { 'deployment-review' }
+	args << a.deployment_pending
+	if a.deployment_pending_sha256 != '' { args << a.deployment_pending_sha256 }
+	a.start(args, false)
+	unsafe { (&array(&args)).free() }
 	if a.worker != unsafe { nil } {
 		a.worker_review = true
 		a.set_status('Checking the deployment file, trusted publishers, dependencies, policy and disk space…')

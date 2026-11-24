@@ -13,6 +13,7 @@ fn test_reviewed_admin_requests_and_bound_completion() {
 		['repo-apply', fingerprint, 'enroll', 'publisher', 'file:///media/with spaces; $literal', fingerprint],
 		['deployment-apply', fingerprint, '/etc/company/approved apps.json'],
 		['deployment-add-apply', fingerprint, '/etc/company/approved apps.json'], ['policy-apply', fingerprint, '/etc/company/policy.json'],
+		['--progress', '--offline', 'deployment-add-apply', fingerprint, '/etc/company/approved apps.json', 'c'.repeat(64)],
 		['mirror-apply', fingerprint, '/media/offline', 'org.vinix.memo'], ['mirror-deployment-apply', fingerprint, '/media/offline', '/etc/company/lock.json']] {
 		request := Request{ nonce: 'b'.repeat(32), arguments: arguments }
 		text := request.encode()!
@@ -38,6 +39,11 @@ fn test_admin_transport_refuses_launches_alternate_roots_and_unreviewed_changes(
 		['policy-apply', fingerprint, 'relative.json'], ['apply', fingerprint, 'deploy', 'app'],
 		['deployment-add-review', '/release.json'], ['deployment-add-apply', fingerprint, 'relative.json'],
 		['deployment-add-apply', 'bad-fingerprint', '/release.json'],
+		['deployment-add-apply', fingerprint, '/release.json', 'A'.repeat(64)],
+		['deployment-add-apply', fingerprint, '/release.json', ''],
+		['deployment-add-apply', fingerprint, 'relative.json', fingerprint],
+		['deployment-apply', fingerprint, '/release.json', fingerprint],
+		['deployment-add-audit', '/release.json', fingerprint],
 		['update', 'field', 'extra'], ['update', '--offline'], ['update', '/tmp/field'],
 		['update', 'field', 'A'.repeat(64)], ['update', 'field', fingerprint, 'extra'],
 		['update', '/field', fingerprint], ['update', 'field', ''],

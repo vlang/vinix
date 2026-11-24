@@ -79,11 +79,15 @@ mut:
 	snapshot_media_saved pkgprotocol.DeploymentMediaSaved
 	snapshot_media bool
 	snapshot_media_source string
+	snapshot_media_sha256 []u8
+	snapshot_sha256_focus bool
+	snapshot_pending_sha256 string
 	audit_mode bool
 	audit_additions bool
 	audit_ready bool
 	audit_snapshot pkgprotocol.DeploymentAudit
 	audit_path string
+	audit_expected_sha256 string
 	audit_summary string
 	audit_results string
 	audit_matching []int
@@ -174,6 +178,7 @@ mut:
 	deployment_action int
 	deployment_path []u8
 	deployment_pending string // frozen file path for deployment-review/apply
+	deployment_pending_sha256 string
 	deployment_choice_pending bool
 	deployment_choice_current bool // intervening input/navigation invalidates a late selection
 	release_deployment_path string = pkgprotocol.image_applications_path
@@ -469,11 +474,13 @@ fn (mut a SoftwareApp) clear_review() {
 		(&array(&a.review_names)).free()
 		a.review_summary.free()
 		a.deployment_pending.free()
+		a.deployment_pending_sha256.free()
 	}
 	a.review = ''
 	a.review_names = []string{}
 	a.review_summary = ''
 	a.deployment_pending = ''
+	a.deployment_pending_sha256 = ''
 	a.review_ready = false
 	a.review_selected = -1
 	a.review_read_item = -1
@@ -1162,6 +1169,8 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 					['mirror-deployment-apply', a.review_snapshot.fingerprint, a.mirror_pending, a.mirror_lock_pending]
 				} else if mirroring {
 					['mirror-apply', a.review_snapshot.fingerprint, a.mirror_pending, ...a.review_snapshot.names]
+				} else if a.deployment_pending_sha256 != '' {
+					['deployment-add-apply', a.review_snapshot.fingerprint, a.deployment_pending, a.deployment_pending_sha256]
 				} else if a.deployment_pending != '' {
 					[if a.review == 'deploy-add' { 'deployment-add-apply' } else { 'deployment-apply' },
 						a.review_snapshot.fingerprint, a.deployment_pending]
@@ -1615,6 +1624,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.repository_key.free()
 		a.repository_result.free()
 		a.deployment_path.free()
+		a.snapshot_media_sha256.free()
 		a.release_deployment_path.free()
 		a.mirror_path.free()
 		a.mirror_lock_path.free()

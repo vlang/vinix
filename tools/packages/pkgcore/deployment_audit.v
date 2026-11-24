@@ -52,11 +52,13 @@ fn compare_deployment(expected DeploymentLock, installed DeploymentLock, generat
 	return report
 }
 
-fn audit_deployment_locked(service Service, directory string, path string, mode DeploymentMode) !pkgprotocol.DeploymentAudit {
+fn audit_deployment_locked(service Service, directory string, path string, mode DeploymentMode, expected_sha256 string) !pkgprotocol.DeploymentAudit {
 	config := service.configuration()!; defer { close_decoded_configuration(config) }
 	// Read exactly once. The report's digest identifies the same bytes decoded
 	// here, even if the pathname is replaced before the comparison finishes.
 	text := read_metadata(path)!; defer { unsafe { text.free() } }
+	digest := index_digest(text); defer { unsafe { digest.free() } }
+	check_deployment_sha256(digest, expected_sha256)!
 	mut expected := decode_deployment(text, config.architecture)!; defer { expected.close() }
 	if expected.format != 2 { return error('deployment audit requires an exact format-2 lock; export deployment-lock or deployment-snapshot first') }
 	if mode == .additions && expected.packages.len == 0 {
@@ -66,29 +68,33 @@ fn audit_deployment_locked(service Service, directory string, path string, mode 
 	defer { if current.generation != 0 { close_decoded_state(current) } }
 	mut installed := owned_deployment_lock(config.architecture, Plan{ requested: current.requested, packages: current.packages })!
 	defer { installed.close() }
-	digest := index_digest(text); defer { unsafe { digest.free() } }
 	return compare_deployment(expected, installed, current.generation, digest, mode)
 }
 
 // Inspect one coherent installed generation without catalog, cache, replay or
 // payload access. This is drift detection, not trust or integrity attestation.
 pub fn (service Service) audit_deployment(path string) !pkgprotocol.DeploymentAudit {
-	return service.audit_deployment_mode(path, .exact)
+	return service.audit_deployment_mode(path, .exact, '')
 }
 
 // Compare every locked pin and requested root while allowing additional
 // installed packages and explicitly requested dependencies.
 pub fn (service Service) audit_deployment_additions(path string) !pkgprotocol.DeploymentAudit {
-	return service.audit_deployment_mode(path, .additions)
+	return service.audit_deployment_mode(path, .additions, '')
 }
 
-fn (service Service) audit_deployment_mode(path string, mode DeploymentMode) !pkgprotocol.DeploymentAudit {
+pub fn (service Service) audit_deployment_additions_with_digest(path string, expected_sha256 string) !pkgprotocol.DeploymentAudit {
+	if !digest_valid(expected_sha256) { return error('expected deployment SHA-256 must be 64 lowercase hexadecimal digits') }
+	return service.audit_deployment_mode(path, .additions, expected_sha256)
+}
+
+fn (service Service) audit_deployment_mode(path string, mode DeploymentMode, expected_sha256 string) !pkgprotocol.DeploymentAudit {
 	directory := service.directory()!; defer { unsafe { directory.free() } }
 	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!; defer { guard.release() }
-		return audit_deployment_locked(service, directory, path, mode)
+		return audit_deployment_locked(service, directory, path, mode, expected_sha256)
 	}
-	return audit_deployment_locked(service, directory, path, mode)
+	return audit_deployment_locked(service, directory, path, mode, expected_sha256)
 }
 
 // Read the original lock bytes whose digest was checked by ISO verification.

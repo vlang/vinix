@@ -12,9 +12,12 @@ fn (mut a SoftwareApp) clear_deployment_snapshot() {
 	a.clear_details()
 	a.snapshot_saved.close()
 	a.snapshot_media_saved.close()
-	unsafe { a.snapshot_pending.free(); a.snapshot_media_source.free() }
+	unsafe { a.snapshot_pending.free(); a.snapshot_media_source.free(); a.snapshot_pending_sha256.free() }
 	a.snapshot_pending = ''
+	a.snapshot_pending_sha256 = ''
 	a.snapshot_media_source = ''
+	a.snapshot_media_sha256.clear()
+	a.snapshot_sha256_focus = false
 	a.snapshot_media = false
 	a.snapshot_mode = false; a.snapshot_ready = false
 	a.focus = false; a.select_all = false
@@ -86,11 +89,22 @@ fn (mut a SoftwareApp) save_deployment_snapshot() {
 		a.set_status('Enter a new absolute deployment file path without control characters (at most 4096 bytes).')
 		return
 	}
-	unsafe { a.snapshot_pending.free() }
+	if a.snapshot_media && a.snapshot_media_sha256.len !in [0, 64]! {
+		a.set_status('Enter 64 lowercase hex digits or leave the SHA-256 field empty.')
+		return
+	}
+	unsafe { a.snapshot_pending.free(); a.snapshot_pending_sha256.free() }
 	a.snapshot_pending = path.clone()
+	a.snapshot_pending_sha256 = editor_bytes_text(a.snapshot_media_sha256).clone()
 	a.focus = false; a.select_all = false
-	mut args := if a.snapshot_media { ['--json', 'deployment-media-save', a.snapshot_media_source, a.snapshot_pending] }
-		else { ['--json', 'deployment-snapshot-save', a.snapshot_pending] }
+	mut args := []string{cap: 5}
+	args << '--json'
+	if a.snapshot_media {
+		args << 'deployment-media-save'
+		args << a.snapshot_media_source
+	} else { args << 'deployment-snapshot-save' }
+	args << a.snapshot_pending
+	if a.snapshot_pending_sha256 != '' { args << a.snapshot_pending_sha256 }
 	a.start(args, true)
 	unsafe { (&array(&args)).free() }
 	if a.worker != unsafe { nil } {
@@ -151,6 +165,11 @@ fn (mut a SoftwareApp) load_deployment_snapshot() bool {
 		a.set_status('The save receipt names a different destination. The file may exist; inspect the chosen destination before continuing.')
 		return false
 	}
+	if a.snapshot_pending_sha256 != '' && a.snapshot_media_saved.sha256 != a.snapshot_pending_sha256 {
+		a.snapshot_media_saved.close()
+		a.set_status('The save receipt has a different SHA-256. The file may exist. Check the destination before retrying.')
+		return false
+	}
 	a.snapshot_ready = true
 	a.prepare_deployment_snapshot_details()
 	a.set_status(if a.snapshot_media { 'Media lock saved. You can disconnect the media and review additions from the saved file.' }
@@ -187,19 +206,28 @@ fn (mut a SoftwareApp) handle_deployment_snapshot(event_id string) {
 		'software.snapshot.import' {
 			if a.snapshot_media && a.snapshot_media_source == '' && !a.snapshot_ready { a.import_offline_media() }
 		}
-		'software.deployment.path' { if !a.snapshot_ready { a.focus = true; a.select_all = false } }
+		'software.deployment.path' {
+			if !a.snapshot_ready { a.focus = true; a.select_all = false; a.snapshot_sha256_focus = false }
+		}
+		'software.snapshot.sha256' {
+			if a.snapshot_media_source != '' && !a.snapshot_ready {
+				a.focus = true; a.select_all = false; a.snapshot_sha256_focus = true
+			}
+		}
 		'software.snapshot.save' { if !a.snapshot_ready { a.save_deployment_snapshot() } }
 		'software.snapshot.previous' { if a.details_page > 0 { a.details_page-- } }
 		'software.snapshot.next' { if a.details_page + 1 < a.details_pages.len { a.details_page++ } }
 		'software.snapshot.audit', 'software.snapshot.review' {
 			if !a.snapshot_ready { return }
 			additions := a.snapshot_media
+			expected_sha256 := a.snapshot_media_saved.sha256.clone()
 			// Restore the captured literal filename, not the mutable form value.
 			a.deployment_path.clear()
 			for byte in a.snapshot_pending { a.deployment_path << byte }
 			a.clear_deployment_snapshot()
-			if event_id == 'software.snapshot.audit' { a.begin_deployment_audit_mode(additions) }
-			else { a.begin_deployment_review_mode(additions) }
+			if event_id == 'software.snapshot.audit' { a.begin_deployment_audit_with_digest(additions, expected_sha256) }
+			else { a.begin_deployment_review_with_digest(additions, expected_sha256) }
+			unsafe { expected_sha256.free() }
 		}
 		else {}
 	}
@@ -213,11 +241,44 @@ fn (mut a SoftwareApp) snapshot_key_input(input string) {
 		} else { a.handle_deployment_snapshot('software.snapshot.back') }
 		return
 	}
-	if !a.snapshot_ready { a.deployment_key_input(input) }
+	if a.snapshot_ready { return }
+	if input == '\t' && a.snapshot_media_source != '' {
+		a.handle_deployment_snapshot(if a.snapshot_sha256_focus { 'software.deployment.path' } else { 'software.snapshot.sha256' })
+		return
+	}
+	if a.snapshot_sha256_focus && a.focus {
+		match input {
+			'\x01' { a.select_all = true }
+			'\x08', '\x7f' { console_backspace(mut a.snapshot_media_sha256, a.select_all); a.select_all = false }
+			'\r', '\n' { a.focus = false; a.select_all = false }
+			else { a.snapshot_paste_input(input) }
+		}
+		return
+	}
+	a.deployment_key_input(input)
 }
 
 fn (mut a SoftwareApp) snapshot_paste_input(input string) {
 	if a.worker != unsafe { nil } || a.snapshot_ready || !a.focus { return }
+	if a.snapshot_sha256_focus {
+		if input == '' { return }
+		length := if a.select_all { 0 } else { a.snapshot_media_sha256.len }
+		if input.len > 64 - length {
+			a.set_status('The SHA-256 field accepts at most 64 digits. The field was kept intact.')
+			return
+		}
+		for byte in input {
+			if !((byte >= `0` && byte <= `9`) || (byte >= `a` && byte <= `f`)) {
+				a.set_status('Use lowercase hexadecimal digits. The SHA-256 field was kept intact.')
+				return
+			}
+		}
+		if a.snapshot_media_sha256.cap == 0 { a.snapshot_media_sha256 = []u8{cap: 64} }
+		if a.select_all { a.snapshot_media_sha256.clear() }
+		for byte in input { a.snapshot_media_sha256 << byte }
+		a.select_all = false
+		return
+	}
 	// Pasted controls are filename data, never navigation or editing commands.
 	// Refuse the entire paste so filtering cannot silently choose another file.
 	if !software_deployment_text_valid(input) {
@@ -228,7 +289,7 @@ fn (mut a SoftwareApp) snapshot_paste_input(input string) {
 }
 
 fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(8)
+	mut children := frame_elements(9)
 	source_step := a.snapshot_media && a.snapshot_media_source == ''
 	title := if a.snapshot_media { 'Save media lock' } else { 'Save installed' }
 	saved_title := if a.snapshot_media { 'Media lock saved' } else { 'Installed deployment saved' }
@@ -252,11 +313,17 @@ fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 	}
 	if !a.snapshot_ready {
 		idle := a.worker == unsafe { nil }
+		digest_field := a.snapshot_media && !source_step
 		children << software_label(if source_step { 'Offline media' } else { title }, 14, 8, if idle { width - 98 } else { width - 28 }, 28, false)
 		if idle { children << software_button('software.snapshot.back', 'Back', width - 70, 8, 56) }
 		children << software_label(if source_step { 'Media directory (absolute path)' } else { 'New deployment file (absolute path)' }, 14, 42, width - 28, 18, false)
-		children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 64, width - 28, a.focus)
-		mut status_y := 142
+		children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, if digest_field { 60 } else { 64 }, width - 28, a.focus && !a.snapshot_sha256_focus)
+		if digest_field {
+			children << software_label('Expected SHA-256 (optional)', 14, 94, width - 28, 18, false)
+			children << console_field('software.snapshot.sha256', editor_bytes_text(a.snapshot_media_sha256), 14, 112, width - 28, a.focus && a.snapshot_sha256_focus)
+		}
+		action_y := if digest_field { 148 } else { 104 }
+		mut status_y := if digest_field { 182 } else { 142 }
 		if idle {
 			failure := a.failure_pages.len > 0
 			button_width := if failure || source_step { (width - 40) / 2 } else { 174 }
@@ -268,11 +335,11 @@ fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 					status_y = 180
 				}
 			} else {
-				children << software_button('software.snapshot.save', title, 14, 104, button_width)
-				if failure { children << software_button('software.failure', 'Failure details', 26 + button_width, 104, button_width) }
+				children << software_button('software.snapshot.save', title, 14, action_y, button_width)
+				if failure { children << software_button('software.failure', 'Failure details', 26 + button_width, action_y, button_width) }
 			}
 		} else {
-			children << software_label(if source_step { 'Wait for offline media.' } else { 'Wait for saving to finish.' }, 14, 104, width - 28, 28, false)
+			children << software_label(if source_step { 'Wait for offline media.' } else { 'Wait for saving to finish.' }, 14, action_y, width - 28, 28, false)
 			if media_progress {
 				children << a.progress_bar(width, 240)
 				status_y = 152
@@ -329,12 +396,14 @@ fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Elem
 		}
 	} else {
 		children << software_label(if source_step { 'Offline media directory (absolute path)' } else { 'New deployment file (absolute path)' }, 14, 94, width - 28, 28, false)
-		children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 128, width - 28, a.focus)
+		children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 128, width - 28, a.focus && !a.snapshot_sha256_focus)
 		if a.snapshot_media {
 			if source_step {
 				children << software_label('Import a bundle controlled by your administrator. Software uses enrolled publisher keys to check the signed repositories and cache packages from the media.', 14, 174, width - 28, 60, false)
 			} else {
-				children << software_label('Save a local copy of the authenticated release lock. Choose a new filename outside the media. Existing files are preserved.', 14, 174, width - 28, 60, false)
+				children << software_label('Expected SHA-256 (optional)', 14, 200, width - 28, 28, false)
+				children << console_field('software.snapshot.sha256', editor_bytes_text(a.snapshot_media_sha256), 14, 232, width - 28, a.focus && a.snapshot_sha256_focus)
+				children << software_label('Choose a new filename outside the media. To require the exact release lock, enter deployment_sha256 from the trusted release receipt.', 14, 280, width - 28, 54, false)
 			}
 		} else {
 			children << software_label('Save all installed applications and their exact recorded dependencies, runtimes and requested roots. Choose a new filename in a directory you can write. Existing files will never be replaced.', 14, 174, width - 28, 60, false)
@@ -342,7 +411,7 @@ fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Elem
 		}
 		if a.worker == unsafe { nil } {
 			if source_step { children << software_button('software.snapshot.import', 'Import media', 14, 326, 180) }
-			children << software_button('software.snapshot.save', if a.snapshot_media { 'Save media lock' } else { 'Save installed' }, if source_step { 210 } else { 14 }, 326, 180)
+			children << software_button('software.snapshot.save', if a.snapshot_media { 'Save media lock' } else { 'Save installed' }, if source_step { 210 } else { 14 }, if a.snapshot_media && !source_step { 348 } else { 326 }, 180)
 		}
 	}
 	progress := a.repository_worker == .media_import && a.progress_seen

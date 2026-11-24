@@ -1125,7 +1125,7 @@ const deployment_fixture_path = '/private/tmp/deployment with spaces; \$literal.
 
 fn software_deployment_service_fixture(args []string) !bool {
 	if args[1] in ['deployment-review', 'deployment-add-review']! {
-		assert args.len == 3
+		assert args.len == 3 || (args.len == 4 && args[1] == 'deployment-add-review' && args[3] == 'c'.repeat(64))
 		path := args[2]
 		if path == '/missing.json' { eprintln('fixture: deployment file unavailable'); exit(18) }
 		review := fixture_review(if args[1] == 'deployment-add-review' { 'deploy-add' } else { 'deploy' }, ['editor'])

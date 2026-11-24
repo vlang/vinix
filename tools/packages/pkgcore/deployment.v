@@ -31,6 +31,7 @@ struct DeploymentIdentity {
 	document DeploymentLock
 	plan     Plan
 	repairs  []string @[omitempty]
+	input_sha256 string @[omitempty]
 }
 
 enum DeploymentMode {
@@ -62,10 +63,21 @@ pub fn package_metadata_digest(p Package) !string {
 	return sum.hex()
 }
 
-fn read_deployment(path string, architecture string) !DeploymentLock {
+fn read_deployment(path string, architecture string, expected_sha256 string) !DeploymentLock {
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
+	if expected_sha256 != '' {
+		actual_sha256 := index_digest(text)
+		defer { unsafe { actual_sha256.free() } }
+		check_deployment_sha256(actual_sha256, expected_sha256)!
+	}
 	return decode_deployment(text, architecture)
+}
+
+fn check_deployment_sha256(actual_sha256 string, expected_sha256 string) ! {
+	if expected_sha256 != '' && actual_sha256 != expected_sha256 {
+		return error('deployment file SHA-256 differs from the expected digest')
+	}
 }
 
 fn decode_deployment(text string, architecture string) !DeploymentLock {
@@ -152,13 +164,13 @@ fn resolve_locked_deployment(config Config, catalog Catalog, current State, docu
 	return plan
 }
 
-fn deployment_fingerprint(config Config, current State, document DeploymentLock, plan Plan, repairs []string, mode DeploymentMode) string {
+fn deployment_fingerprint(config Config, current State, document DeploymentLock, plan Plan, repairs []string, mode DeploymentMode, input_sha256 string) string {
 	mut bytes := []u8{cap: 2048}
 	unsafe { bytes.flags |= .noslices }
 	defer { unsafe { bytes.free() } }
 	domain := if mode == .additions { 'vinix-deployment-add-review-1' } else { 'vinix-deployment-review-1' }
 	json2.encode_append(DeploymentIdentity{ domain: domain, config: config, current: current,
-		document: document, plan: plan, repairs: repairs }, mut bytes)
+		document: document, plan: plan, repairs: repairs, input_sha256: input_sha256 }, mut bytes)
 	return review_identity_digest(bytes)
 }
 
@@ -182,14 +194,19 @@ pub fn (service Service) lock_deployment(names []string) !DeploymentLock {
 }
 
 pub fn (service Service) review_deployment(path string) !pkgprotocol.Review {
-	return service.review_deployment_mode(path, .exact)
+	return service.review_deployment_mode(path, .exact, '')
 }
 
 pub fn (service Service) review_deployment_additions(path string) !pkgprotocol.Review {
-	return service.review_deployment_mode(path, .additions)
+	return service.review_deployment_mode(path, .additions, '')
 }
 
-fn (service Service) review_deployment_mode(path string, mode DeploymentMode) !pkgprotocol.Review {
+pub fn (service Service) review_deployment_additions_with_digest(path string, expected_sha256 string) !pkgprotocol.Review {
+	if !digest_valid(expected_sha256) { return error('expected deployment SHA-256 must be 64 lowercase hexadecimal digits') }
+	return service.review_deployment_mode(path, .additions, expected_sha256)
+}
+
+fn (service Service) review_deployment_mode(path string, mode DeploymentMode, expected_sha256 string) !pkgprotocol.Review {
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
 	guard := acquire_reader(directory)!
@@ -198,20 +215,20 @@ fn (service Service) review_deployment_mode(path string, mode DeploymentMode) !p
 	defer { close_decoded_configuration(config) }
 	current := read_state(directory, config.architecture)!
 	defer { if current.generation != 0 { close_decoded_state(current) } }
-	mut document := read_deployment(path, config.architecture)!
+	mut document := read_deployment(path, config.architecture, expected_sha256)!
 	defer { document.close() }
 	mut prepared := prepare_deployment_plan(config, directory, current, document, mode)!
 	defer { prepared.close() }
 	plan := prepared.plan
 	repairs := transaction_repairs(directory, current, plan, 'deploy')
 	defer { close_transaction_repairs(repairs) }
-	fingerprint := deployment_fingerprint(config, current, document, plan, repairs, mode)
+	fingerprint := deployment_fingerprint(config, current, document, plan, repairs, mode, expected_sha256)
 	defer { unsafe { fingerprint.free() } }
 	operation := if mode == .additions { 'deploy-add' } else { 'deploy' }
 	return review_plan(config, directory, current, operation, document.packages, plan, 0, repairs, fingerprint)
 }
 
-fn (service Service) deploy_document(path string, expected string, mode DeploymentMode) !State {
+fn (service Service) deploy_document(path string, expected string, mode DeploymentMode, expected_sha256 string) !State {
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
@@ -220,14 +237,14 @@ fn (service Service) deploy_document(path string, expected string, mode Deployme
 	defer { close_decoded_configuration(config) }
 	current := read_state(directory, config.architecture)!
 	defer { if current.generation != 0 { close_decoded_state(current) } }
-	mut document := read_deployment(path, config.architecture)!
+	mut document := read_deployment(path, config.architecture, expected_sha256)!
 	defer { document.close() }
 	mut prepared := prepare_deployment_plan(config, directory, current, document, mode)!
 	defer { prepared.close() }
 	plan := prepared.plan
 	repairs := transaction_repairs(directory, current, plan, 'deploy')
 	defer { close_transaction_repairs(repairs) }
-	fingerprint := deployment_fingerprint(config, current, document, plan, repairs, mode)
+	fingerprint := deployment_fingerprint(config, current, document, plan, repairs, mode, expected_sha256)
 	defer { unsafe { fingerprint.free() } }
 	check_review(expected, fingerprint)!
 	service.progress(pkgprotocol.Progress{ phase: 'resolve' })
@@ -236,15 +253,21 @@ fn (service Service) deploy_document(path string, expected string, mode Deployme
 }
 
 pub fn (service Service) deploy(path string) !State {
-	return service.deploy_document(path, '', .exact)
+	return service.deploy_document(path, '', .exact, '')
 }
 
 pub fn (service Service) apply_deployment(path string, expected string) !State {
 	if !digest_valid(expected) { return error('deployment apply requires a review fingerprint') }
-	return service.deploy_document(path, expected, .exact)
+	return service.deploy_document(path, expected, .exact, '')
 }
 
 pub fn (service Service) apply_deployment_additions(path string, expected string) !State {
 	if !digest_valid(expected) { return error('adding deployment apps requires a review fingerprint') }
-	return service.deploy_document(path, expected, .additions)
+	return service.deploy_document(path, expected, .additions, '')
+}
+
+pub fn (service Service) apply_deployment_additions_with_digest(path string, expected string, expected_sha256 string) !State {
+	if !digest_valid(expected) { return error('adding deployment apps requires a review fingerprint') }
+	if !digest_valid(expected_sha256) { return error('expected deployment SHA-256 must be 64 lowercase hexadecimal digits') }
+	return service.deploy_document(path, expected, .additions, expected_sha256)
 }

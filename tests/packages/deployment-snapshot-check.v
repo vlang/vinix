@@ -4,6 +4,7 @@ module main
 import json2
 import os
 import time
+import crypto.sha256
 import tools.packages.pkgcore
 import tools.packages.pkgprotocol
 import tools.packages.pkgadmin
@@ -80,6 +81,39 @@ fn ordinary_save(binary string, root string, directory string, expected string) 
 	}
 	mut status := i32(0); assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	println('DEPLOYMENT SAVE ordinary UID 1000 saves exact root-owned installed metadata into an owned relative destination without administrator authorization PASS')
+}
+
+fn check_pinned_additions(binary string, root string, path string, text string, digest string) ! {
+	before := command(binary, root, ['deployment-snapshot'])!
+	mut unpinned := pkgprotocol.decode_review(command(binary, root, ['deployment-add-review', path])!)!
+	defer { unpinned.close() }
+	mut pinned := pkgprotocol.decode_review(command(binary, root, ['--offline', 'deployment-add-review', path, digest])!)!
+	defer { pinned.close() }
+	assert pinned.fingerprint != unpinned.fingerprint && pinned.operation == 'deploy-add'
+	assert command_status(binary, root, ['deployment-add-apply', pinned.fingerprint, path], 1)!.contains('review is stale')
+	assert command_status(binary, root, ['deployment-add-apply', unpinned.fingerprint, path, digest], 1)!.contains('review is stale')
+	mut audit := pkgprotocol.decode_deployment_audit(command_status(binary, root, ['--offline', '--json', 'deployment-add-audit', path, digest], 3)!)!
+	assert audit.deployment_sha256 == digest && !audit.matches
+	audit.close()
+	// The same lock with different bytes still resolves to the same legacy plan.
+	changed := text + '\n'
+	os.write_file(path, changed)!
+	mut still_unpinned := pkgprotocol.decode_review(command(binary, root, ['deployment-add-review', path])!)!
+	assert still_unpinned.fingerprint == unpinned.fingerprint
+	still_unpinned.close()
+	for args in [['deployment-add-review', path, digest], ['--json', 'deployment-add-audit', path, digest],
+		['deployment-add-apply', pinned.fingerprint, path, digest]] {
+		assert command_status(binary, root, args, 1)!.contains('SHA-256 differs from the expected digest')
+	}
+	changed_digest := sha256.sum(changed.bytes()).hex()
+	assert command_status(binary, root, ['deployment-add-apply', pinned.fingerprint, path, changed_digest], 1)!.contains('review is stale')
+	assert command(binary, root, ['deployment-snapshot'])! == before
+	os.write_file(path, text)!
+	command(binary, root, ['--offline', 'deployment-add-apply', pinned.fingerprint, path, digest])!
+	audit = pkgprotocol.decode_deployment_audit(command(binary, root, ['--json', 'deployment-add-audit', path, digest])!)!
+	assert audit.deployment_sha256 == digest && audit.matches
+	audit.close()
+	println('DEPLOYMENT PIN CLI exact bytes across coverage, review and apply, digest substitution and omission refusal, and restored retry PASS')
 }
 
 fn version(work string, architecture string, value string) ! {
@@ -176,6 +210,7 @@ fn check() ! {
 	assert absent.generation == 0 && absent.rows.len == 3 && absent.rows.all(it.status == 'missing')
 	assert !os.exists(consumer + '/var')
 	command(binary, consumer, ['update'])!
+	check_pinned_additions(binary, consumer, path, first, saved.sha256)!
 	mut review := pkgprotocol.decode_review(command(binary, consumer, ['deployment-review', path])!)!; defer { review.close() }
 	assert review.rows.all(it.version == '1.0.0') && review.rows.len == 3
 	command(binary, consumer, ['deployment-apply', review.fingerprint, path])!
@@ -208,7 +243,7 @@ fn check() ! {
 	assert !pkgadmin.administrative(['deployment-audit', path])
 	refused = false; pkgadmin.validate_arguments(['deployment-add-audit', path]) or { refused = true }; assert refused
 	assert !pkgadmin.administrative(['deployment-add-audit', path])
-	assert command_status(binary, root, ['deployment-add-audit', path, path], 1)!.contains('requires one exact deployment lock')
+	assert command_status(binary, root, ['deployment-add-audit', path, path], 1)!.contains('expected deployment SHA-256')
 	refused = false; pkgadmin.validate_arguments(['deployment-snapshot-save', path]) or { refused = true }; assert refused
 	assert !pkgadmin.administrative(['deployment-snapshot-save', path])
 	assert command_status(binary, root, ['deployment-snapshot-save'], 1)!.contains('requires a new destination')

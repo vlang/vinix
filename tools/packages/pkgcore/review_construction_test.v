@@ -113,7 +113,8 @@ fn test_review_fingerprints_match_old_encoding_and_retire_all_hash_storage() {
 	}
 	previous := json2.encode(DeploymentIdentity{config: config, current: old, document: document, plan: plan, repairs: ['app-01']})
 	expected := index_digest(previous)
-	actual := deployment_fingerprint(config, old, document, plan, ['app-01'], .exact)
+	actual := deployment_fingerprint(config, old, document, plan, ['app-01'], .exact, '')
+	assert !previous.contains('input_sha256')
 	assert expected == actual
 	unsafe { previous.free(); expected.free(); actual.free() }
 	$if track_heap ? {
@@ -121,7 +122,7 @@ fn test_review_fingerprints_match_old_encoding_and_retire_all_hash_storage() {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. if construction_cycles() == 8 { 32 } else { 1000 } {
 				first := review_fingerprint(config, 'upgrade', [], old, plan, 0, [])
-				second := deployment_fingerprint(config, old, document, plan, [], .exact)
+				second := deployment_fingerprint(config, old, document, plan, [], .exact, '')
 				unsafe { first.free(); second.free() }
 			}
 		}

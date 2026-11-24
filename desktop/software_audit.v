@@ -15,15 +15,19 @@ fn (mut a SoftwareApp) clear_deployment_audit_report() {
 
 fn (mut a SoftwareApp) clear_deployment_audit() {
 	a.clear_deployment_audit_report()
-	unsafe { a.audit_path.free(); a.audit_query.free() }
+	unsafe { a.audit_path.free(); a.audit_query.free(); a.audit_expected_sha256.free() }
 	a.audit_query = []u8{}; a.audit_differences_only = false
-	a.audit_path = ''; a.audit_mode = false; a.audit_additions = false
+	a.audit_path = ''; a.audit_expected_sha256 = ''; a.audit_mode = false; a.audit_additions = false
 }
 
 fn (mut a SoftwareApp) read_deployment_audit() {
 	a.clear_deployment_audit_report()
 	a.focus = false; a.select_all = false
-	mut args := ['--json', if a.audit_additions { 'deployment-add-audit' } else { 'deployment-audit' }, a.audit_path]
+	mut args := []string{cap: 4}
+	args << '--json'
+	args << if a.audit_additions { 'deployment-add-audit' } else { 'deployment-audit' }
+	args << a.audit_path
+	if a.audit_expected_sha256 != '' { args << a.audit_expected_sha256 }
 	a.start(args, true)
 	unsafe { (&array(&args)).free() }
 	if a.worker != unsafe { nil } {
@@ -37,6 +41,10 @@ fn (mut a SoftwareApp) begin_deployment_audit() {
 }
 
 fn (mut a SoftwareApp) begin_deployment_audit_mode(additions bool) {
+	a.begin_deployment_audit_with_digest(additions, '')
+}
+
+fn (mut a SoftwareApp) begin_deployment_audit_with_digest(additions bool, expected_sha256 string) {
 	path := editor_bytes_text(a.deployment_path)
 	if !software_deployment_path_valid(path) {
 		a.set_status('Enter an absolute deployment file path without control characters (at most 4096 bytes).')
@@ -45,6 +53,7 @@ fn (mut a SoftwareApp) begin_deployment_audit_mode(additions bool) {
 	a.clear_review()
 	a.clear_deployment_audit()
 	a.audit_path = path.clone()
+	a.audit_expected_sha256 = expected_sha256.clone()
 	a.audit_mode = true
 	a.audit_additions = additions
 	a.read_deployment_audit()
@@ -96,6 +105,11 @@ fn (mut a SoftwareApp) load_deployment_audit(code int) bool {
 	if a.audit_additions && report.rows.any(it.status == 'unexpected') {
 		report.close()
 		a.set_status('Invalid release coverage response. Reload the report.')
+		return false
+	}
+	if a.audit_expected_sha256 != '' && report.deployment_sha256 != a.audit_expected_sha256 {
+		report.close()
+		a.set_status('The coverage report identifies a different lock SHA-256. Check the saved file before retrying.')
 		return false
 	}
 	a.audit_snapshot = report
@@ -166,8 +180,10 @@ fn (mut a SoftwareApp) handle_deployment_audit(event_id string) {
 			a.deployment_path.clear()
 			for byte in a.audit_path { a.deployment_path << byte }
 			additions := a.audit_additions
+			expected_sha256 := a.audit_expected_sha256.clone()
 			a.clear_deployment_audit()
-			a.begin_deployment_review_mode(additions)
+			a.begin_deployment_review_with_digest(additions, expected_sha256)
+			unsafe { expected_sha256.free() }
 		}
 		'software.audit.previous' { if a.details_page > 0 { a.details_page-- } }
 		'software.audit.next' { if a.details_page + 1 < a.details_pages.len { a.details_page++ } }
