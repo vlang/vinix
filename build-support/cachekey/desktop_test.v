@@ -192,7 +192,13 @@ fn test_package_image_caches_track_only_effective_target_inputs() {
 		assert arm_image == package_image_key('aarch64', env)!
 		x86_changed := package_image_key('x86_64', env)!
 		assert x86_image != x86_changed
-		fixture_write(arm + object, 'other\n')!
+		leaf := arm + object
+		mut metadata := C.vinix_cache_stat{}
+		assert C.vinix_cache_lstat(&char(leaf.str), &metadata) == 0
+		fixture_write(leaf, 'other\n')!
+		stamps := [C.timespec{metadata.st_atime, metadata.vinix_cache_atime_nsec},
+			C.timespec{metadata.st_mtime, metadata.vinix_cache_mtime_nsec}]!
+		assert C.utimensat(C.AT_FDCWD, &char(leaf.str), &stamps[0], 0) == 0
 		assert selected != fixture_key(root, v, env)!
 		assert arm_image != package_image_key('aarch64', env)!
 		assert x86_changed == package_image_key('x86_64', env)!

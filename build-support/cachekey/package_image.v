@@ -4,8 +4,8 @@ module cachekey
 import crypto.sha256
 import tools.packages.imageinputs
 
-const package_image_variables = [imageinputs.configuration, imageinputs.repositories, imageinputs.applications]!
-const package_image_labels = ['image package configuration', 'image package repository', 'image application requirements']!
+const package_image_variables = [imageinputs.configuration, imageinputs.repositories, imageinputs.applications, imageinputs.indexes]!
+const package_image_labels = ['image package configuration', 'image package repository', 'image application requirements', 'image repository index file']!
 
 fn package_image_paths(architecture string, env map[string]string) ![]string {
 	mut paths := []string{cap: package_image_variables.len}

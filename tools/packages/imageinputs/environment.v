@@ -4,6 +4,7 @@ module imageinputs
 pub const configuration = 'VINIX_PACKAGE_IMAGE_CONFIG'
 pub const repositories = 'VINIX_PACKAGE_IMAGE_REPOSITORIES'
 pub const applications = 'VINIX_PACKAGE_IMAGE_APPLICATIONS'
+pub const indexes = 'VINIX_PACKAGE_IMAGE_INDEXES'
 
 // Callers supply the package architecture used by the stager and its cache.
 pub fn environment_path(env map[string]string, variable string, architecture string) string {

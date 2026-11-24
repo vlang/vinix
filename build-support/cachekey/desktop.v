@@ -112,6 +112,7 @@ fn desktop_finish(input DesktopInputs, env map[string]string, platform string, p
 	add_text(mut digest, 'package-image-config', imageinputs.environment_path(env, imageinputs.configuration, 'aarch64'))
 	add_text(mut digest, 'package-image-repositories', imageinputs.environment_path(env, imageinputs.repositories, 'aarch64'))
 	add_text(mut digest, 'package-image-applications', imageinputs.environment_path(env, imageinputs.applications, 'aarch64'))
+	add_text(mut digest, 'package-image-indexes', imageinputs.environment_path(env, imageinputs.indexes, 'aarch64'))
 	add_text(mut digest, 'sources', tree_key(input.sources, false, 'vinix-desktop-build-content-v1')!)
 	add_text(mut digest, 'inplace-layer-generation', tree_key(input.in_place, true, 'vinix-desktop-build-metadata-v1')!)
 	for path in input.layers { add_text(mut digest, 'layer:' + path, root_generation(path)!) }

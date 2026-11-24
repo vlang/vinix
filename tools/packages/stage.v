@@ -109,7 +109,12 @@ fn stage() ! {
 	}
 	mut image_configuration := pkgcore.prepare_image_configuration(staging, architecture, configuration)!
 	defer { image_configuration.close() }
-	mut image_repositories := unsafe { &image_configuration }.prepare_repositories_for_indexes(repositories, required_indexes)!
+	mut image_repositories := if required_indexes.len > 0 {
+		unsafe { &image_configuration }.prepare_repositories_for_indexes(repositories, required_indexes)!
+	} else {
+		index_file := imageinputs.environment_path(env, imageinputs.indexes, architecture)
+		unsafe { &image_configuration }.prepare_repositories_for_index_file(repositories, index_file, '')!
+	}
 	defer { image_repositories.close() }
 	mut image_applications := pkgcore.ImageApplications{}
 	defer { image_applications.close() }

@@ -656,7 +656,7 @@ echo "  out: $OUT"
 # this release driver, including when --ref selects an older desktop source.
 package_inputs_selected() {
     local variable target
-    for variable in VINIX_PACKAGE_IMAGE_CONFIG VINIX_PACKAGE_IMAGE_REPOSITORIES VINIX_PACKAGE_IMAGE_APPLICATIONS; do
+    for variable in VINIX_PACKAGE_IMAGE_CONFIG VINIX_PACKAGE_IMAGE_REPOSITORIES VINIX_PACKAGE_IMAGE_APPLICATIONS VINIX_PACKAGE_IMAGE_INDEXES; do
         target="${variable}_$1"
         if [ -n "${!target:-}${!variable:-}" ]; then return 0; fi
     done

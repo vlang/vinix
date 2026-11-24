@@ -581,6 +581,18 @@ A newer release signed by the same publisher has a different digest and fails
 the pin. The privately captured bundle carries the admitted bytes into publication.
 The normal preflight report already includes the verified digest for each bundle.
 
+For desktop and ISO builds, set `VINIX_PACKAGE_IMAGE_INDEXES` to an absolute
+pin file path. `VINIX_PACKAGE_IMAGE_INDEXES_AARCH64` and
+`VINIX_PACKAGE_IMAGE_INDEXES_X86_64` override the generic file for their
+respective targets. Write one repository ID and its lowercase SHA-256 digest
+per line, separated by a single space. The file supports 1–4096 distinct IDs
+and LF or CRLF line endings. A final newline is optional.
+
+Explicit `--require-index` flags replace the environment file in direct
+staging. Otherwise a selected file must be readable and valid. Desktop cache
+keys include the effective file path and bytes. ISO preflight applies the same
+pins before building and checks the finished ISO against the admitted selection.
+
 ### Require an advertised application catalog
 
 Repeat `--require-app ID` for every application an image release advertises:

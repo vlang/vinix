@@ -207,6 +207,38 @@ fn run_image_index_stage(arguments []string) os.Result {
 	return os.Result{ exit_code: child.code, output: output }
 }
 
+fn check_image_index_environment(stage []string, architecture string, work string, pins []string,
+	text string, expected string) ! {
+	generic := work + '/indexes.txt'
+	target := work + '/indexes-' + architecture + '.txt'
+	variable := 'VINIX_PACKAGE_IMAGE_INDEXES_' + architecture.to_upper()
+	os.setenv('VINIX_PACKAGE_IMAGE_INDEXES', generic, true)
+	defer {
+		os.unsetenv('VINIX_PACKAGE_IMAGE_INDEXES')
+		os.unsetenv(variable)
+	}
+	os.write_file(generic, text)!
+	fallback := run_image_index_stage([...stage, '--check'])
+	assert fallback.exit_code == 0 && fallback.output == expected, fallback.output
+	os.setenv(variable, target, true)
+	os.write_file(target, text.replace('\n', '\r\n') + '\r\n')!
+	os.write_file(generic, 'invalid fallback')!
+	selected := run_image_index_stage([...stage, '--check'])
+	assert selected.exit_code == 0 && selected.output == expected, selected.output
+	os.write_file(generic, text)!
+	for invalid in ['', 'invalid line without a digest', text + '\n\n', text + '\n' + text] {
+		os.write_file(target, invalid)!
+		refused := run_image_index_stage([...stage, '--check'])
+		assert refused.exit_code == 1 && refused.output.contains('repository index'), refused.output
+	}
+	os.rm(target)!
+	os.symlink(generic, target)!
+	alias := run_image_index_stage([...stage, '--check'])
+	assert alias.exit_code == 1 && alias.output.contains('bounded regular file'), alias.output
+	explicit := run_image_index_stage([...stage, ...pins, '--check'])
+	assert explicit.exit_code == 0 && explicit.output == expected, explicit.output
+}
+
 fn test_image_input_cli_pins_reviewed_repository_indexes_before_staging() {
 	binary := os.getenv('VINIX_PACKAGE_STAGE_CHECK_CLI')
 	if binary == '' { return }
@@ -233,6 +265,8 @@ fn test_image_input_cli_pins_reviewed_repository_indexes_before_staging() {
 		assert plain.exit_code == 0, plain.output
 		pinned := run_image_index_stage([...stage, ...pins, '--check'])
 		assert pinned.exit_code == 0 && pinned.output == plain.output, pinned.output
+		check_image_index_environment(stage, architecture, work, pins,
+			'${inspected.repository} ${inspected.index_sha256}\norganization ${organization}', pinned.output)!
 		normal := run_image_index_stage([...stage, ...pins])
 		assert normal.exit_code != 0 && normal.output.contains('target compiler is missing'), normal.output
 
@@ -261,6 +295,7 @@ fn test_image_input_cli_pins_reviewed_repository_indexes_before_staging() {
 		assert retry.exit_code == 0 && retry.output == pinned.output && os.ls(root)!.len == 0, retry.output
 	}
 	println('IMAGE INPUT CHECK both-host exact reviewed index pins, signed replacement refusal and unchanged target retry PASS')
+	println('IMAGE INPUT CHECK generic and per-target index files, strict admission and explicit precedence PASS')
 }
 
 fn test_image_input_check_distinguishes_preserved_bundles_and_refuses_unsafe_or_changed_destinations() {

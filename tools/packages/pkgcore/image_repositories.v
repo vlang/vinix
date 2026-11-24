@@ -153,6 +153,39 @@ pub fn (configuration &ImageConfiguration) prepare_repositories_for_indexes(sour
 	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{ required_indexes: required })
 }
 
+// A reviewed file names one repository ID and index digest per line. The
+// temporary index pins borrow the captured file bytes during preparation.
+pub fn (configuration &ImageConfiguration) prepare_repositories_for_index_file(source string,
+	index_file string, scratch string) !ImageRepositories {
+	if index_file == '' { return configuration.prepare_repositories_in(source, scratch) }
+	text := read_metadata(index_file)!
+	defer { unsafe { text.free() } }
+	mut required := []ImageRepositoryIndex{}
+	unsafe { required.flags |= .noslices }
+	defer { unsafe { (&array(&required)).free() } }
+	mut start := 0
+	for end in 0 .. text.len + 1 {
+		if end < text.len && text[end] != `\n` { continue }
+		if start == text.len { break }
+		length := end - start - if end < text.len && end > start && text[end - 1] == `\r` { 1 } else { 0 }
+		line := unsafe { tos(text.str + start, length) }
+		separator := line.index(' ') or { -1 }
+		if separator < 1 || required.len == 4096 {
+			return error('image repository index file requires one repository ID and lowercase SHA-256 digest per line, up to 4096 indexes')
+		}
+		required << ImageRepositoryIndex{
+			id: unsafe { tos(line.str, separator) }
+			index_sha256: unsafe { tos(line.str + separator + 1, line.len - separator - 1) }
+		}
+		start = end + 1
+	}
+	if required.len == 0 { return error('image repository index file must name at least one index') }
+	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{
+		required_indexes: required
+		scratch: scratch
+	})
+}
+
 // Capture into a caller-selected scratch filesystem for temporary image checks.
 pub fn (configuration &ImageConfiguration) prepare_repositories_in(source string, scratch string) !ImageRepositories {
 	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{ scratch: scratch })

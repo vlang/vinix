@@ -32,6 +32,7 @@ fn image_input_suite() hwhost.Suite {
 				'IMAGE INPUT CHECK capture corruption, unrelated plans, appeared consumer state and replaced roots refuse with unchanged targets; stable capture survives source removal PASS',
 				'IMAGE INPUT CHECK CLI flag placement, literal paths, environment/explicit selection and reproducible compiler-free reports; normal staging and invalid-input refusals PASS',
 				'IMAGE INPUT CHECK both-host exact reviewed index pins, signed replacement refusal and unchanged target retry PASS',
+				'IMAGE INPUT CHECK generic and per-target index files, strict admission and explicit precedence PASS',
 				'IMAGE INPUT CHECK publish/preserve/none decisions, occupied configuration, aliased/special/shared-write/damaged bundles refuse without overwriting destinations PASS',
 				'IMAGE INPUT PROCESS image-check PASS', 'IMAGE INPUT PROCESS image-repositories PASS',
 				'IMAGE INPUT PROCESS image-configuration PASS', 'IMAGE INPUT PROCESS release PASS', 'IMAGE INPUT PROCESS catalog PASS',

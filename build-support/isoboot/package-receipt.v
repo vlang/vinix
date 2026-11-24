@@ -55,10 +55,10 @@ struct Receipt {
 	publishers []Publisher
 }
 
-fn preflight(root string, arch string, config string, bundle string, declaration string) !Selection {
+fn preflight(root string, arch string, config string, bundle string, declaration string, indexes string) !Selection {
 	mut configuration := pkgcore.prepare_image_configuration(root, arch, config)!
 	defer { configuration.close() }
-	mut repositories := unsafe { &configuration }.prepare_repositories_in(bundle, root)!
+	mut repositories := unsafe { &configuration }.prepare_repositories_for_index_file(bundle, indexes, root)!
 	defer { repositories.close() }
 	report := if declaration == '' {
 		unsafe { &configuration }.check_repositories(unsafe { &repositories })!
@@ -214,7 +214,7 @@ fn check_iso(iso string, work string, expected Selection) !Receipt {
 	bundle := root + repository_path
 	actual := preflight(root, expected.architecture, '',
 		if os.is_dir(bundle) && os.ls(bundle)!.len > 0 { bundle } else { '' },
-		if os.is_file(root + declaration_path) { root + declaration_path } else { '' })!
+		if os.is_file(root + declaration_path) { root + declaration_path } else { '' }, '')!
 	if actual.configuration_sha256 != expected.configuration_sha256 {
 		return error('ISO package configuration differs from the preflight selection')
 	}
@@ -281,10 +281,11 @@ fn run() ! {
 		config := imageinputs.environment_path(env, imageinputs.configuration, arch)
 		bundle := imageinputs.environment_path(env, imageinputs.repositories, arch)
 		declaration := imageinputs.environment_path(env, imageinputs.applications, arch)
-		if config == '' && bundle == '' && declaration == '' { return }
+		indexes := imageinputs.environment_path(env, imageinputs.indexes, arch)
+		if config == '' && bundle == '' && declaration == '' && indexes == '' { return }
 		work := workspace()!
 		defer { os.rmdir_all(work) or {} }
-		println(json2.encode(preflight(work, arch, config, bundle, declaration)!))
+		println(json2.encode(preflight(work, arch, config, bundle, declaration, indexes)!))
 		return
 	}
 	if os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged']! {

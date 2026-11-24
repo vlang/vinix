@@ -239,12 +239,13 @@ fn prepare_fixture(architecture string, out string) ! {
 	mut release := pkgcore.publish_release(out + '/publisher', 'fixture', seed, 1,
 		time.now().unix() + 86_400, out + '/bundle/fixture')!
 	defer { release.close() }
+	os.write_file(out + '/indexes.txt', release.repository + ' ' + release.index_sha256 + '\n')!
 	input := out + '/config.json'
 	os.write_file(input, json2.encode(pkgcore.Config{architecture: architecture,
 		repositories: [pkgcore.Repository{id: 'fixture', public_key: key, url: 'file:///' + repositories + '/fixture'}]}))!
 	mut configuration := pkgcore.prepare_image_configuration(root, architecture, input)!
 	defer { configuration.close() }
-	mut bundle := configuration.prepare_repositories_in(out + '/bundle', out)!
+	mut bundle := configuration.prepare_repositories_for_index_file(out + '/bundle', out + '/indexes.txt', out)!
 	defer { bundle.close() }
 	mut applications := configuration.prepare_applications(&bundle, ['receipt-fixture'])!
 	defer { applications.close() }
