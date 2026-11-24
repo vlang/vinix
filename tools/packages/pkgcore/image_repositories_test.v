@@ -429,6 +429,81 @@ fn test_repository_media_import_keeps_https_identity_and_publishes_only_after_ca
 	println('REPOSITORY MEDIA keeps HTTPS identity, checks replay and objects, caches policy-allowed payloads and installs after disconnect PASS')
 }
 
+fn test_repository_media_batch_authenticates_and_acquires_before_catalog_publication() {
+	work, key := image_bundle_fixture(false)!
+	defer { os.rmdir_all(work) or {} }
+	second_key := keygen(work + '/second-seed')!
+	second_payload := work + '/second-payload'
+	os.mkdir_all(second_payload + '/share')!
+	os.cp(work + '/payload/share/data', second_payload + '/share/common')!
+	unique := second_payload + '/share/extra'
+	os.write_file(unique, 'payload held by the second publisher')!
+	os.write_file(work + '/manifest.json', json2.encode(Package{ id: 'extra', architecture: 'all',
+		version: '1.0.0', kind: 'data', name: 'Extra', license: 'MIT' }))!
+	pack(work + '/manifest.json', second_payload, work + '/second-workspace')!
+	second := work + '/bundle/organization'
+	publish_release(work + '/second-workspace', 'organization', work + '/second-seed', 2,
+		time.now().unix() + 3600, second)!
+	root := work + '/installed'
+	config_path := root + '/etc/vinix-packages/config.json'
+	os.mkdir_all(os.dir(config_path))!
+	repositories := [Repository{ id: 'native', url: 'https://packages.example.invalid/native', public_key: key },
+		Repository{ id: 'organization', url: 'https://packages.example.invalid/organization', public_key: second_key }]
+	config := json2.encode(Config{ architecture: 'aarch64', repositories: repositories }) + '\n'
+	os.write_file(config_path, config)!
+	service := Service{ root: root }
+	first := work + '/bundle/native'
+	sources := [RepositoryMediaSource{ id: 'organization', directory: second },
+		RepositoryMediaSource{ id: 'native', directory: first }]
+	if _ := service.import_repository_media_batch([sources[0], sources[0]]) { assert false }
+	else { assert err.msg().contains('duplicate offline media repository') }
+	if _ := service.import_repository_media_batch([RepositoryMediaSource{ id: 'unknown', directory: first }]) { assert false }
+	else { assert err.msg().contains('repository is not configured') }
+	if _ := service.import_repository_media('native', first) { assert false }
+	else { assert err.msg().contains('organization: no authenticated cached index') }
+
+	directory := state_directory(root)
+	objects := directory + '/objects'
+	catalog_path := directory + '/catalog.json'
+	history_path := directory + '/trust-history.json'
+	signature := second + '/index.sig'
+	signed := os.read_file(signature)!
+	os.write_file(signature, '0'.repeat(128) + '\n')!
+	if _ := service.import_repository_media_batch(sources) { assert false }
+	else { assert err.msg().contains('organization: repository signature verification failed') }
+	assert os.ls(objects)!.len == 0 && !os.exists(catalog_path) && !os.exists(history_path)
+	os.write_file(signature, signed)!
+
+	shared_hash := hash_file(second_payload + '/share/common')!
+	unique_hash := hash_file(unique)!
+	object := second + '/objects/' + unique_hash
+	bytes := os.read_file(object)!
+	os.write_file(object, 'x'.repeat(bytes.len))!
+	if _ := service.import_repository_media_batch(sources) { assert false }
+	else { assert err.msg().contains('payload checksum or size mismatch') }
+	assert os.ls(objects)! == [shared_hash]
+	assert !os.exists(catalog_path) && !os.exists(history_path)
+	assert os.read_file(config_path)! == config && service.state()!.generation == 0
+
+	os.write_file(object, bytes)!
+	mut catalog := service.import_repository_media_batch(sources)!
+	assert catalog.packages.len == 3
+	catalog.close()
+	assert os.ls(objects)!.sorted() == [shared_hash, unique_hash].sorted()
+	assert read_snapshots(directory)!.map(it.repository) == repositories
+	assert service.state()!.generation == 0
+	os.rename(work + '/bundle', work + '/disconnected')!
+	offline := Service{ root: root, offline: true }
+	mut review := offline.review('install', ['app', 'extra'])!
+	defer { review.close() }
+	mut installed := offline.transact('install', ['app', 'extra'], TransactionOptions{ expected_review: review.fingerprint })!
+	defer { installed.close() }
+	assert installed.requested == ['app', 'extra'] && installed.packages.len == 3
+	assert installed.packages.any(it.repository == 'organization' && it.public_key == second_key && it.sequence == 2)
+	assert os.read_file(config_path)! == config
+	println('REPOSITORY MEDIA batch authenticates both publishers before acquisition, retains verified objects after refusal and installs from the repaired offline cache PASS')
+}
+
 fn test_online_install_reuses_payloads_from_the_authenticated_image_bundle() {
 	for architecture in ['aarch64', 'x86_64']! {
 		work, key := image_bundle_fixture(false)!

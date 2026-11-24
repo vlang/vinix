@@ -52,8 +52,19 @@ pub fn validate_arguments(arguments []string) ! {
 		return error('administrator update takes a repository ID and optional identity fingerprint')
 	}
 	if command == 'update-media' {
-		if args.len == 3 && identifier(args[1]) && path(args[2]) { return }
-		return error('administrator update-media requires a repository ID and an absolute release directory')
+		if args.len < 3 || args.len % 2 == 0 {
+			return error('administrator update-media requires repository ID and absolute release directory pairs')
+		}
+		mut seen := map[string]bool{}
+		defer { unsafe { seen.free() } }
+		for pair := 1; pair < args.len; pair += 2 {
+			id := args[pair]
+			if !identifier(id) || !path(args[pair + 1]) || id in seen {
+				return error('administrator update-media requires distinct repository IDs and absolute release directories')
+			}
+			seen[id] = true
+		}
+		return
 	}
 	if args.len < 2 || !hex(args[1], 64) { return error('administrator package changes require their exact review fingerprint') }
 	match command {

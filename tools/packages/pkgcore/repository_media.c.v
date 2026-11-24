@@ -3,9 +3,33 @@ module pkgcore
 
 import tools.packages.pkgprotocol
 
+pub struct RepositoryMediaSource {
+pub:
+	id string
+	directory string
+}
+
 struct RepositoryMedia {
 	path string
 	fd int
+}
+
+struct RepositoryMediaBatch {
+mut:
+	sources map[string]RepositoryMedia
+}
+
+fn (mut batch RepositoryMediaBatch) close() {
+	for id, media in batch.sources {
+		C.close(media.fd)
+		unsafe { id.free(); media.path.free() }
+	}
+	unsafe { batch.sources.free() }
+}
+
+fn (batch &RepositoryMediaBatch) snapshot(repository Repository, previous []Snapshot) !Snapshot {
+	if source := batch.sources[repository.id] { return source.snapshot(repository) }
+	return clone_matching_snapshot(previous, repository)
 }
 
 fn open_repository_media(directory string) !RepositoryMedia {
@@ -50,7 +74,7 @@ struct MediaPayload {
 
 // Check space before acquisition and cache only variants this installation can
 // use under its current policy. The catalog stays complete for later reviews.
-fn (media RepositoryMedia) import_payloads(config Config, directory string, selected string, catalog Catalog,
+fn (batch &RepositoryMediaBatch) import_payloads(config Config, directory string, catalog Catalog,
 	report fn (pkgprotocol.Progress)) ! {
 	mut seen := map[string]u64{}
 	defer { unsafe { seen.free() } }
@@ -60,7 +84,7 @@ fn (media RepositoryMedia) import_payloads(config Config, directory string, sele
 	mut needed := u64(0)
 	for installed in catalog.packages {
 		p := installed.package
-		if installed.repository != selected || p.architecture !in [config.architecture, 'all']! { continue }
+		if installed.repository !in batch.sources || p.architecture !in [config.architecture, 'all']! { continue }
 		check_policy(p, config.policy) or { unsafe { err.free() }; continue }
 		for payload in p.files {
 			if payload.sha256 in seen {
@@ -76,16 +100,35 @@ fn (media RepositoryMedia) import_payloads(config Config, directory string, sele
 			unsafe { missing.push_many(&entry, 1) }
 		}
 	}
-	if missing.len == 0 { return media.check() }
-	objects := directory + '/objects'
+	if missing.len > 0 {
+		objects := directory + '/objects'
+		defer { unsafe { objects.free() } }
+		disk_check(free_bytes(objects)!, needed, config.policy.reserve_bytes)!
+	}
+	mut start := 0
+	for start < missing.len {
+		id := missing[start].installed.repository
+		mut end := start + 1
+		for end < missing.len && missing[end].installed.repository == id { end++ }
+		source := batch.sources[id] or { return error('missing offline repository media: ${id}') }
+		source.import_group(config, directory, unsafe { missing[start..end] }, report)!
+		start = end
+	}
+	for id, source in batch.sources {
+		defer { unsafe { id.free() } }
+		source.check()!
+	}
+}
+
+fn (media RepositoryMedia) import_group(config Config, directory string, missing []MediaPayload,
+	report fn (pkgprotocol.Progress)) ! {
 	media_objects := media.path + '/objects'
 	url := 'file://' + media.path
-	defer { unsafe { objects.free(); media_objects.free(); url.free() } }
-	disk_check(free_bytes(objects)!, needed, config.policy.reserve_bytes)!
+	defer { unsafe { media_objects.free(); url.free() } }
 	media.check()!
 	objects_fd := capture_prepared_root(media_objects, 'offline repository objects')!
 	defer { C.close(objects_fd) }
-	local := [Repository{ id: selected, url: url, public_key: missing[0].installed.public_key }]
+	local := [Repository{ id: missing[0].installed.repository, url: url, public_key: missing[0].installed.public_key }]
 	defer { unsafe { local.free() } }
 	local_config := Config{ ...config, policy: Policy{ ...config.policy, offline: true },
 		repositories: local }

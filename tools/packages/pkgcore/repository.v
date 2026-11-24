@@ -212,7 +212,12 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 	return refresh_progress_from(config, directory, selected, none, report)
 }
 
-fn refresh_progress_from(config Config, directory string, selected string, media ?&RepositoryMedia,
+fn clone_matching_snapshot(previous []Snapshot, repository Repository) !Snapshot {
+	cached := matching_snapshot(previous, repository)!
+	return Snapshot{ repository: repository, text: cached.text.clone(), signature: cached.signature.clone() }
+}
+
+fn refresh_progress_from(config Config, directory string, selected string, media ?&RepositoryMediaBatch,
 	report fn (pkgprotocol.Progress)) !Catalog {
 	if selected != '' && !config.repositories.any(it.id == selected) {
 		return error('${selected}: repository is not configured')
@@ -244,11 +249,10 @@ fn refresh_progress_from(config Config, directory string, selected string, media
 	}
 	mut expires := max_i64
 	for repository in config.repositories {
-		snapshot := if selected != '' && repository.id != selected {
-			cached := matching_snapshot(previous, repository)!
-			Snapshot{ repository: repository, text: cached.text.clone(), signature: cached.signature.clone() }
-		} else if source := media {
-			source.snapshot(repository)!
+		snapshot := if batch := media {
+			batch.snapshot(repository, previous)!
+		} else if selected != '' && repository.id != selected {
+			clone_matching_snapshot(previous, repository)!
 		} else {
 			fetch_snapshot(config, directory, work, repository, parent, target, report)!
 		}
@@ -271,8 +275,8 @@ fn refresh_progress_from(config Config, directory string, selected string, media
 	catalog := snapshots_catalog(config, snapshots, time.now().unix())!
 	mut published := false
 	defer { if !published { close_authenticated_catalog(catalog) } }
-	if source := media {
-		source.import_payloads(config, directory, selected, catalog, report)!
+	if batch := media {
+		batch.import_payloads(config, directory, catalog, report)!
 		if expires <= time.now().unix() { return error('repository index expired during offline media import') }
 	}
 	// Record authenticated sequence/digest floors before exposing the new cache.

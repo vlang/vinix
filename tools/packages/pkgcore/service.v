@@ -41,9 +41,26 @@ pub fn (service Service) refresh_repository(id string) !Catalog {
 // Refresh authenticated metadata and cache local objects under the currently
 // enrolled identity. The media path is used only during this call.
 pub fn (service Service) import_repository_media(id string, source string) !Catalog {
-	if !identifier(id) { return error('invalid repository ID') }
-	if !source.starts_with('/') || !printable(source, 4096) {
-		return error('offline repository media requires an absolute directory')
+	sources := [RepositoryMediaSource{ id: id, directory: source }]
+	defer { unsafe { sources.free() } }
+	return service.import_repository_media_batch(sources)
+}
+
+// Authenticate all selected publishers together before saving their shared
+// catalog and replay floors. Omitted publishers keep their current snapshots.
+pub fn (service Service) import_repository_media_batch(sources []RepositoryMediaSource) !Catalog {
+	if sources.len == 0 || sources.len > max_image_repository_indexes {
+		return error('offline media import requires at least one repository and directory pair')
+	}
+	mut selected := map[string]bool{}
+	defer { unsafe { selected.free() } }
+	for source in sources {
+		if !identifier(source.id) { return error('invalid repository ID') }
+		if !source.directory.starts_with('/') || !printable(source.directory, 4096) {
+			return error('offline repository media requires an absolute directory')
+		}
+		if source.id in selected { return error('duplicate offline media repository: ${source.id}') }
+		selected[source.id] = true
 	}
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
@@ -51,9 +68,13 @@ pub fn (service Service) import_repository_media(id string, source string) !Cata
 	defer { guard.release() }
 	config := service.configuration()!
 	defer { close_decoded_configuration(config) }
-	media := open_repository_media(source)!
-	defer { C.close(media.fd); unsafe { media.path.free() } }
-	return refresh_progress_from(config, directory, id, unsafe { &media }, service.progress)
+	for source in sources {
+		if !config.repositories.any(it.id == source.id) { return error('${source.id}: repository is not configured') }
+	}
+	mut batch := RepositoryMediaBatch{}
+	defer { batch.close() }
+	for source in sources { batch.sources[source.id] = open_repository_media(source.directory)! }
+	return refresh_progress_from(config, directory, '', unsafe { &batch }, service.progress)
 }
 
 // Refuse a different URL or key for a previously displayed repository ID.

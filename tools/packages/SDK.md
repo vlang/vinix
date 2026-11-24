@@ -820,10 +820,11 @@ reports the ISO digest named by the receipt, architecture, deployment digest,
 application IDs and repository IDs. Enrollment and deployment still require
 their own reviews on the destination system.
 
-For an already enrolled publisher, import its directory into the installed
-system's catalog and object cache. This uses the existing publisher key and
-replay history and keeps the configured URL. Other enrolled publishers need
-current cached snapshots, as with ordinary targeted `update`.
+For already enrolled publishers, import one or more repository directories
+into the installed system's catalog and object cache. This uses the existing
+publisher keys and replay history and keeps the configured URLs. Include
+every publisher that lacks a current cached snapshot. A single pair works
+like targeted `update` for the other publishers.
 
 ```sh
 vinix-package admin update-media PUBLISHER /media/usb/release-apps/PUBLISHER
@@ -831,11 +832,19 @@ vinix-package --offline deployment-add-review /media/usb/release-apps/_deploymen
 vinix-package admin --offline deployment-add-apply DEPLOYMENT_FINGERPRINT /media/usb/release-apps/_deployment.json
 ```
 
+For a release with two enrolled publishers, refresh both from media in one
+operation:
+
+```sh
+vinix-package admin update-media PUBLISHER /media/usb/release-apps/PUBLISHER SUPPORT /media/usb/release-apps/SUPPORT
+```
+
 `update-media` works offline independently of the configured URL. It caches
 the verified payloads for this architecture and architecture-independent
-packages allowed by current organization policy, then publishes the refreshed
-catalog. Use an absolute path to a controlled ordinary directory. You can
-disconnect the media after importing and copying its lock to a local filename.
+packages allowed by current organization policy. It checks space for the
+complete batch and publishes one refreshed catalog after acquisition. Use
+absolute paths to controlled ordinary directories. You can disconnect the
+media after importing and copying its lock to a local filename.
 If acquisition fails, verified cache objects remain available for retry.
 Enrollment and installed generations keep their existing state during import.
 
