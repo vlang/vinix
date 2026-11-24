@@ -16,6 +16,11 @@ struct Receipt {
 	artifact_paths map[string]string
 }
 
+const targeted_platform = 'qemu-framebuffer-production-login-targeted-refresh-installed-root-two-boots'
+const targeted_shots = ['targeted-01-repositories', 'targeted-02-selected', 'targeted-03-policy',
+	'targeted-04-offline', 'targeted-05-administrator', 'targeted-06-password-mask',
+	'targeted-07-complete', 'targeted-08-catalog']!
+
 fn digest(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
@@ -185,7 +190,8 @@ fn admit_staged_catalog(run string, receipt Receipt, mut paths map[string]string
 		return error('staged catalog does not declare the complete native SDK set')
 	}
 	config := pkgcore.load_config(run + '/rootfs')!
-	if config.repositories.len != 1 || config.repositories[0].id != 'native' {
+	if config.repositories.len != (if receipt.platform == targeted_platform { 2 } else { 1 }) ||
+		config.repositories[0].id != 'native' {
 		return error('staged catalog requires the native publisher')
 	}
 	repository := config.repositories[0]
@@ -213,6 +219,121 @@ fn admit_staged_catalog(run string, receipt Receipt, mut paths map[string]string
 	generation := admit_staged_audit(serial, receipt.architecture, lock_digest, expected)!
 	reopened := admit_staged_audit(os.read_file(run + '/serial-2.log')!, receipt.architecture, lock_digest, expected)!
 	if generation != reopened { return error('staged catalog generation changed across cold boot') }
+}
+
+fn targeted_trace(serial string, prefix string) !map[string]string {
+	lines := serial.split_into_lines().filter(it.starts_with(prefix))
+	if lines.len != 1 { return error('missing or duplicated targeted refresh observation: ' + prefix.trim_space()) }
+	observed := json2.decode[map[string]string](lines[0].all_after(prefix).trim_right('\r'))!
+	if observed.len != 10 { return error('targeted refresh observation has the wrong fields') }
+	for name in ['config', 'lock', 'state', 'catalog', 'history', 'native-index', 'native-signature',
+		'field-index', 'field-signature']! {
+		value := observed[name]!
+		if value.len != 64 || !value.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`)) {
+			return error('targeted refresh observation has an invalid digest: ' + name)
+		}
+	}
+	if (observed['current']!).len == 0 { return error('targeted refresh observation has no active generation') }
+	return observed
+}
+
+fn admit_targeted_refresh(run string, receipt Receipt, mut paths map[string]string) ! {
+	mode := '/etc/software-graphical-targeted-refresh'
+	paths['targeted-refresh-mode'] = run + '/rootfs' + mode
+	proof := json2.decode[map[string]string](os.read_file(paths['installed-declaration'])!)!
+	if os.read_file(paths['targeted-refresh-mode'])! != '1\n' ||
+		proof[mode] != receipt.artifacts['targeted-refresh-mode'] {
+		return error('targeted refresh mode differs from the admitted image')
+	}
+	config := pkgcore.load_config(run + '/rootfs')!
+	field := config.repositories[1]
+	if field.id != 'field' || field.url != 'file://' + pkgcore.image_repositories_path + '/field' {
+		return error('targeted refresh requires the enrolled local field repository')
+	}
+	serial := os.read_file(run + '/serial.log')!
+	cold := os.read_file(run + '/serial-2.log')!
+	ready := 'SOFTWARE TARGETED REFRESH isolated field release READY'
+	done := 'SOFTWARE TARGETED REFRESH single approval kept HTTPS snapshot and generation PASS'
+	retained := 'SOFTWARE TARGETED REFRESH new field catalog and trust survived cold boot PASS'
+	exact_marker(serial, ready)!
+	exact_marker(serial, done)!
+	exact_marker(cold, retained)!
+	mut previous := -1
+	for marker in ['SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved exact staged apps install PASS',
+		ready, 'SOFTWARE TARGETED BEFORE ', 'SOFTWARE TARGETED AFTER ', done, 'SOFTWARE GRAPHICAL ordinary-counter']! {
+		position := serial.index(marker) or { return error('missing targeted refresh marker: ' + marker) }
+		if position <= previous { return error('targeted refresh markers are out of order') }
+		previous = position
+	}
+	if cold.contains(ready) || cold.contains(done) || serial.contains(retained) ||
+		(cold.index(retained) or { -1 }) >= (cold.index('SOFTWARE GRAPHICAL INSTALLED BOOT 2 retained Counter reopened') or { -1 }) {
+		return error('targeted refresh repeat or cold-boot order differs')
+	}
+	before := targeted_trace(serial, 'SOFTWARE TARGETED BEFORE ')!
+	after := targeted_trace(serial, 'SOFTWARE TARGETED AFTER ')!
+	if after != targeted_trace(cold, 'SOFTWARE TARGETED REBOOT ')! {
+		return error('targeted refresh state differs after cold boot')
+	}
+	for name in ['config', 'lock', 'state', 'current', 'native-index', 'native-signature']! {
+		if before[name]! != after[name]! { return error('targeted refresh changed retained ' + name) }
+	}
+	for name in ['catalog', 'history', 'field-index', 'field-signature']! {
+		if before[name]! == after[name]! { return error('targeted refresh did not advance ' + name) }
+	}
+	if before['config']! != receipt.artifacts['config'] ||
+		before['lock']! != receipt.artifacts['release-declaration'] ||
+		before['native-index']! != receipt.artifacts['repository/index.json'] ||
+		before['native-signature']! != sha256.hexhash(os.read_file(run + '/rootfs' +
+			pkgcore.image_repositories_path + '/native/index.sig')!.trim_space()) {
+		return error('targeted refresh observation differs from enrolled HTTPS inputs')
+	}
+	for i, directory in [run + '/rootfs' + pkgcore.image_repositories_path + '/field',
+		run + '/rootfs/usr/share/native-catalog/releases/field-next']! {
+		name := if i == 0 { 'field-baseline' } else { 'field-next' }
+		paths[name + '/index.json'] = directory + '/index.json'
+		paths[name + '/index.sig'] = directory + '/index.sig'
+		text := os.read_file(paths[name + '/index.json'])!
+		signature := os.read_file(paths[name + '/index.sig'])!.trim_space()
+		index := pkgcore.verify_index(field, text, signature, 0)!
+		observation := if i == 0 { before } else { after }
+		if index.sequence != u64(i + 1) || index.packages.len != 0 ||
+			observation['field-index']! != sha256.hexhash(text) ||
+			observation['field-signature']! != sha256.hexhash(signature) {
+			return error('targeted refresh observation differs from the signed field inputs')
+		}
+	}
+}
+
+fn targeted_pixel_changes(run string, first string, second string, x int, y int, width int, height int) !int {
+	before := stbi.load(run + '/' + first + '.png', desired_channels: 3)!
+	defer { before.free() }
+	after := stbi.load(run + '/' + second + '.png', desired_channels: 3)!
+	defer { after.free() }
+	if before.width != 1024 || before.height != 768 || after.width != 1024 || after.height != 768 {
+		return error('targeted refresh framebuffer dimensions differ')
+	}
+	mut changed := 0
+	for row in y .. y + height {
+		for col in x .. x + width {
+			at := (row * 1024 + col) * 3
+			if unsafe { before.data[at] != after.data[at] || before.data[at + 1] != after.data[at + 1] ||
+				before.data[at + 2] != after.data[at + 2] } { changed++ }
+		}
+	}
+	return changed
+}
+
+fn admit_targeted_pixels(run string) ! {
+	if targeted_pixel_changes(run, targeted_shots[0], targeted_shots[1], 338, 68, 174, 28)! <= 8 ||
+		targeted_pixel_changes(run, targeted_shots[1], targeted_shots[2], 524, 68, 102, 28)! <= 8 ||
+		targeted_pixel_changes(run, targeted_shots[1], targeted_shots[3], 524, 68, 102, 28)! != 0 ||
+		targeted_pixel_changes(run, targeted_shots[3], targeted_shots[4], 14, 154, 500, 30)! <= 8 ||
+		targeted_pixel_changes(run, targeted_shots[4], targeted_shots[5], 22, 156, 350, 26)! <= 8 ||
+		targeted_pixel_changes(run, targeted_shots[1], targeted_shots[6], 338, 68, 174, 28)! != 0 ||
+		targeted_pixel_changes(run, targeted_shots[3], targeted_shots[6], 14, 644, 820, 27)! <= 8 ||
+		targeted_pixel_changes(run, targeted_shots[1], targeted_shots[7], 14, 112, 236, 88)! <= 8 {
+		return error('targeted refresh framebuffer transitions differ')
+	}
 }
 
 fn admit_production_serial(path string, boot int) ! {
@@ -425,7 +546,7 @@ fn retain() ! {
 		'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots',
 		'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots',
-		'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots',
+		'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots', targeted_platform,
 		'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'] {
 		return error('requires the selected architecture ordinary-seat receipt')
 	}
@@ -446,13 +567,18 @@ fn retain() ! {
 	}
 	installed := receipt.platform.ends_with('installed-root-two-boots')
 	release_routing := receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
-	staged := receipt.platform == 'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots'
+	targeted := receipt.platform == targeted_platform
+	staged := targeted || receipt.platform == 'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots'
 	production := staged || receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
 	refresh := production || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
 	first_run := refresh || release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 	if release_routing && digest(run + '/source/guest/release_routing.v')! !=
 		sha256.sum($embed_file('software-graphical-guest/release_routing.v').to_string().bytes()).hex() {
 		return error('qualified graphical fixture differs from the embedded source: guest/release_routing.v')
+	}
+	if targeted && digest(run + '/source/guest/targeted_refresh.v')! !=
+		sha256.sum($embed_file('software-graphical-guest/targeted_refresh.v').to_string().bytes()).hex() {
+		return error('qualified targeted refresh observer differs from the embedded source')
 	}
 	admit_serial(run + '/serial.log', installed, first_run, release_routing, refresh, staged, 1, arch)!
 	if installed {
@@ -518,11 +644,12 @@ fn retain() ! {
 		paths['first-run-refresh-mode'] = run + '/rootfs/etc/software-graphical-first-run-refresh'
 		config := pkgcore.load_config(run + '/rootfs')!
 		if os.read_file(paths['first-run-refresh-mode'])! != '1\n' || config.policy.offline ||
-			config.repositories.len != 1 || config.repositories[0].id != 'native' ||
+			config.repositories.len != (if targeted { 2 } else { 1 }) || config.repositories[0].id != 'native' ||
 			!config.repositories[0].url.starts_with('https://') {
 			return error('first-run refresh receipt lacks the HTTPS image configuration')
 		}
 	}
+	if targeted { admit_targeted_refresh(run, receipt, mut paths)! }
 	repository := run + '/rootfs/usr/share/vinix-packages/repositories/native'
 	for path in os.walk_ext(repository, '') {
 		if os.is_file(path) { paths['repository/' + path[repository.len + 1..]] = path }
@@ -549,6 +676,7 @@ fn retain() ! {
 		required_shots << ['production-01-registration', 'production-02-greeter', 'production-03-shutdown-menu',
 			'production-04-reboot-greeter', 'production-05-shutdown-menu']
 	}
+	if targeted { for name in targeted_shots { required_shots << name } }
 	if release_routing {
 		required_shots << ['release-routing-01-desktop', 'release-routing-02-extra-refused',
 			'release-routing-03-action-refused', 'release-routing-02-extra-barrier',
@@ -557,6 +685,7 @@ fn retain() ! {
 	shots.sort()
 	required_shots.sort()
 	if shots != required_shots { return error('graphical run lacks the exact required screenshot set') }
+	if targeted { admit_targeted_pixels(run)! }
 	for name, path in paths {
 		if name !in receipt.artifacts { return error('missing required artifact digest: ' + name) }
 		if os.real_path(path) != receipt.artifact_paths[name] {
@@ -589,6 +718,9 @@ fn retain() ! {
 	if first_run {
 		source_names << ['app_selection.v', 'app_selection_release.v', 'software_release.v', 'software_app.v']
 	}
+	if targeted {
+		source_names << ['software_repositories.v', 'software_package_navigation.v', 'software_admin.v', 'software_progress.v']
+	}
 	if release_routing {
 		source_names << ['app_selection_migration.v', 'session_hub.v', 'packagecore/release.c.v',
 			'session_dialog.v', 'sessiondaemon/dispatch.v', 'sessiondaemon/broker.c.v',
@@ -601,7 +733,8 @@ fn retain() ! {
 		}
 	}
 	os.mkdir_all(out)!
-	prefix := out + if staged { '/software-first-run-production-staged-' + arch
+	prefix := out + if targeted { '/software-targeted-refresh-graphical-' + arch
+	} else if staged { '/software-first-run-production-staged-' + arch
 	} else if production { '/software-first-run-production-native-' + arch
 	} else if release_routing { '/software-release-routing-native-' + arch } else if refresh {
 		'/software-first-run-refresh-native-' + arch

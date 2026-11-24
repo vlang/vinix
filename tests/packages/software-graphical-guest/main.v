@@ -308,6 +308,7 @@ fn observe_graphical_seat(seat GraphicalSeat) !int {
 		if seat.installed && seat.fresh && !acquired && os.exists('/var/lib/vinix-packages/current/state.json') &&
 			acquisition_approved(refresh) {
 			verify_graphical_install()!
+			if targeted_refresh_enabled() { observe_targeted_refresh(seat.pid, deadline)! }
 			acquired = true
 		}
 		value := os.read_file(path) or { '' }

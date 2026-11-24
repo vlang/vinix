@@ -45,7 +45,7 @@ fn check_staged_catalog_installed() ! {
 		audit.rows.any(it.status != 'match' || it.installed_version != '1.0.0') {
 		return error('installed package metadata differs from the exact staged application lock')
 	}
-	check_first_run_refresh_approvals(2)!
+	check_first_run_refresh_approvals(if targeted_refresh_enabled() { 3 } else { 2 })!
 	println('SOFTWARE FIRST RUN STAGED AUDIT ' + json2.encode(audit))
 }
 

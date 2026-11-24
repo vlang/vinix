@@ -27,6 +27,7 @@ struct Evidence {
 }
 
 const staged_catalog_platform = 'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots'
+const targeted_refresh_platform = 'qemu-framebuffer-production-login-targeted-refresh-installed-root-two-boots'
 
 fn digest(path string) !string {
 	return sha256.sum(os.read_bytes(path)!).hex()
@@ -46,7 +47,8 @@ fn call(program string, args []string) Control {
 fn copied_config(platform string) bool {
 	return platform in ['qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots',
-		'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots', staged_catalog_platform]
+		'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots',
+		staged_catalog_platform, targeted_refresh_platform]
 }
 
 fn clone_run(original string, work string, receipt Receipt) ! {
@@ -69,7 +71,8 @@ fn clone_run(original string, work string, receipt Receipt) ! {
 			os.symlink(path, target)!
 		}
 	}
-	if receipt.platform in ['qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots', staged_catalog_platform] {
+	if receipt.platform in ['qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots',
+		staged_catalog_platform, targeted_refresh_platform] {
 		for applet in ['sh', 'mkdir', 'chmod', 'rm', 'ln', 'sleep', 'kill', 'mount', 'cat', 'sync', 'zsh'] {
 			path := '/rootfs/bin/' + applet
 			os.symlink(os.readlink(original + path)!, work + path)!
@@ -149,7 +152,8 @@ fn check() ! {
 	receipt := json2.decode[Receipt](os.read_file(original + '/qualification.json')!)!
 	installed := receipt.platform.ends_with('installed-root-two-boots')
 	release_routing := receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
-	staged := receipt.platform == staged_catalog_platform
+	targeted := receipt.platform == targeted_refresh_platform
+	staged := targeted || receipt.platform == staged_catalog_platform
 	production := staged || receipt.platform == 'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'
 	refresh := production || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
 	first_run := refresh || release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
@@ -189,6 +193,10 @@ fn check() ! {
 	if staged {
 		names << ['staged-original-lock-mismatch', 'missing-staged-audit', 'staged-audit-lock-digest',
 			'staged-audit-missing-app', 'staged-audit-changed-generation', 'staged-proposal-wrong-publisher']
+	}
+	if targeted {
+		names << ['missing-targeted-password-mask', 'targeted-unmasked-frame-reused', 'targeted-missing-ready',
+			'targeted-changed-cold-cache', 'targeted-changed-https-cache', 'targeted-wrong-signed-field-index']
 	}
 	if release_routing {
 		names << ['missing-release-routing-desktop-shot', 'missing-release-routing-extra-shot',
@@ -234,6 +242,45 @@ fn check() ! {
 		args[4] = work + '/retained'
 		mut reason := ''
 		match name {
+			'missing-targeted-password-mask' {
+				os.rm(work + '/targeted-06-password-mask.png')!
+				reason = 'graphical run lacks the exact required screenshot set'
+			}
+			'targeted-unmasked-frame-reused' {
+				file := work + '/targeted-06-password-mask.png'
+				os.rm(file)!
+				os.cp(original + '/targeted-05-administrator.png', file)!
+				repin_artifact(work, receipt, 'targeted-06-password-mask')!
+				reason = 'targeted refresh framebuffer transitions differ'
+			}
+			'targeted-missing-ready' {
+				marker := 'SOFTWARE TARGETED REFRESH isolated field release READY'
+				serial := os.read_file(receipt.artifact_paths['serial'])!
+				lines := serial.split_into_lines().filter(it.trim_right('\r') != marker)
+				replace_artifact(work, receipt, 'serial', lines.join('\n') + '\n')!
+				reason = 'missing or duplicated exact marker: ' + marker
+			}
+			'targeted-changed-cold-cache', 'targeted-changed-https-cache', 'targeted-wrong-signed-field-index' {
+				cold := name == 'targeted-changed-cold-cache'
+				key := if cold { 'serial-2' } else { 'serial' }
+				prefix := if cold { 'SOFTWARE TARGETED REBOOT ' } else { 'SOFTWARE TARGETED BEFORE ' }
+				lines := os.read_file(receipt.artifact_paths[key])!.split_into_lines()
+				line := lines.filter(it.starts_with(prefix))[0]
+				mut observed := json2.decode[map[string]string](line.all_after(prefix).trim_right('\r'))!
+				field := match name {
+					'targeted-changed-cold-cache' { 'catalog' }
+					'targeted-changed-https-cache' { 'native-index' }
+					else { 'field-index' }
+				}
+				observed[field] = '0'.repeat(64)
+				changed := lines.map(if it == line { prefix + json2.encode(observed) } else { it })
+				replace_artifact(work, receipt, key, changed.join('\n') + '\n')!
+				reason = match name {
+					'targeted-changed-cold-cache' { 'targeted refresh state differs after cold boot' }
+					'targeted-changed-https-cache' { 'targeted refresh changed retained native-index' }
+					else { 'targeted refresh observation differs from the signed field inputs' }
+				}
+			}
 			'staged-original-lock-mismatch' {
 				mut artifacts := receipt.artifacts.clone()
 				artifacts['staged-lock-original'] = '0'.repeat(64)

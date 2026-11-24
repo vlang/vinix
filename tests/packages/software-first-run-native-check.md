@@ -211,3 +211,31 @@ The evidence archive is
 Its SHA-256 is `994a864004158d64d627d7263bc73533f35f5d6ae94038443640442204f664ae`.
 Independent extraction matched all 19,456 inventory entries, both staged
 locks and both decoded VJFS disk digests.
+
+## Selected repository refresh through production login
+
+Add `--targeted-refresh=true` to the staged production login command above.
+Supply the unbooted root from `native-catalog-check --software-targeted-refresh`
+and a compositor that includes **Refresh selected**. The staged root contains
+the HTTPS publisher's offline bundle and two signed sequences of the enrolled
+local `field` repository.
+
+Boot 1 installs the three native apps through the graphical first-run review.
+The installed observer moves the HTTPS bundle aside and switches the local
+fixture to sequence 2. QMP opens **Repositories**, selects **field**, changes
+access to **Use policy** mode and back to offline, then activates **Refresh
+selected**. It captures the administrator prompt, masked password, completion
+and the return to the catalog.
+
+The observer compares the cached publisher identities and signed indexes,
+configuration, application lock, trust history and active state around the
+operation. Authentication must record exactly one extra approval from the
+ordinary administrator. The observer waits for the signed pair to reach the
+cache after the authentication service starts the worker. Both guests then
+save Counter data and shut down through the desktop. Boot 2 checks the retained
+catalog, trust history and file ownership before login. It also checks the
+refresh record after reopening and saving Counter's data.
+
+The retainer checks both signed field sequences, the exact cached HTTPS input,
+the ordered serial records and framebuffer transitions. Earlier scenarios keep
+their existing input and evidence checks.

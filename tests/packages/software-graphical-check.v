@@ -331,8 +331,64 @@ fn wait_label(mut child os.Process, mut monitor qmpclient.Monitor, log string,
 	return error('Counter label did not render')
 }
 
+fn wait_graphical_change(mut child os.Process, mut monitor qmpclient.Monitor, log string, deadline u64,
+	work string, name string, before screenshotcore.Image, x int, y int, width int, height int) !screenshotcore.Image {
+	for {
+		healthy(mut child, log, deadline)!
+		image := shot(mut monitor, work, name)!
+		if region_changes(before, image, x, y, width, height) > 8 { return image }
+		time.sleep(200 * time.millisecond)
+	}
+	return error('framebuffer did not change: ' + name)
+}
+
+fn graphical_targeted_refresh(mut child os.Process, mut monitor qmpclient.Monitor, log string, deadline u64,
+	work string, catalog screenshotcore.Image) !screenshotcore.Image {
+	wait_marker(mut child, log, deadline, 'SOFTWARE TARGETED REFRESH isolated field release READY')!
+	click(mut monitor, 475, 82)!
+	point(mut monitor, 800, 500)!
+	repositories := wait_graphical_change(mut child, mut monitor, log, deadline, work,
+		'targeted-01-repositories', catalog, 14, 142, 236, 28)!
+	click(mut monitor, 135, 156)!
+	point(mut monitor, 800, 500)!
+	selected := wait_graphical_change(mut child, mut monitor, log, deadline, work,
+		'targeted-02-selected', repositories, 338, 68, 174, 28)!
+	click(mut monitor, 573, 82)!
+	point(mut monitor, 800, 500)!
+	policy := wait_graphical_change(mut child, mut monitor, log, deadline, work,
+		'targeted-03-policy', selected, 524, 68, 102, 28)!
+	click(mut monitor, 573, 82)!
+	point(mut monitor, 800, 500)!
+	offline := wait_graphical_change(mut child, mut monitor, log, deadline, work,
+		'targeted-04-offline', policy, 524, 68, 102, 28)!
+	if region_changes(selected, offline, 524, 68, 102, 28) != 0 {
+		return error('repository access toggle did not return to offline mode')
+	}
+	click(mut monitor, 420, 82)!
+	point(mut monitor, 800, 500)!
+	prompt := wait_graphical_change(mut child, mut monitor, log, deadline, work,
+		'targeted-05-administrator', offline, 14, 154, 500, 30)!
+	type_graphical_password(mut monitor)!
+	point(mut monitor, 800, 500)!
+	wait_graphical_change(mut child, mut monitor, log, deadline, work,
+		'targeted-06-password-mask', prompt, 22, 156, 350, 26)!
+	key(mut monitor, 'ret')!
+	wait_marker(mut child, log, deadline, 'SOFTWARE TARGETED REFRESH single approval kept HTTPS snapshot and generation PASS')!
+	for {
+		healthy(mut child, log, deadline)!
+		done := shot(mut monitor, work, 'targeted-07-complete')!
+		if region_changes(selected, done, 338, 68, 174, 28) == 0 &&
+			region_changes(offline, done, 14, 644, 820, 27) > 8 { break }
+		time.sleep(200 * time.millisecond)
+	}
+	click(mut monitor, 908, 44)!
+	point(mut monitor, 800, 500)!
+	return wait_graphical_change(mut child, mut monitor, log, deadline, work,
+		'targeted-08-catalog', selected, 14, 112, 236, 88)
+}
+
 fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work string, ordinary bool,
-	installed bool, first_run bool, release_routing bool, first_run_refresh bool, production bool, boot int,
+	installed bool, first_run bool, release_routing bool, first_run_refresh bool, production bool, targeted bool, boot int,
 	previous screenshotcore.Image) !screenshotcore.Image {
 	log := work + if boot == 1 { '/serial.log' } else { '/serial-2.log' }
 	mut child := os.new_process(qemu)
@@ -482,6 +538,9 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 		time.sleep(time.second)
 		point(mut monitor, 800, 500)!
 		catalog = shot(mut monitor, work, 'install-04-acquired')!
+		if targeted {
+			catalog = graphical_targeted_refresh(mut child, mut monitor, log, deadline, work, catalog)!
+		}
 		// Successful acquisition reloads the catalog and clears the selection.
 		click(mut monitor, 140, 138)!
 	}
@@ -672,6 +731,7 @@ fn check() ! {
 	first_run_refresh := options['--first-run-refresh'] or { 'false' }
 	production := '--production-root' in options
 	staged_catalog := options['--staged-catalog'] or { 'false' }
+	targeted := options['--targeted-refresh'] or { 'false' }
 	if ordinary !in ['true', 'false'] { return error('--ordinary must be true or false') }
 	if installed !in ['true', 'false'] || (installed == 'true' && ordinary != 'true') {
 		return error('--installed=true requires --ordinary=true')
@@ -693,6 +753,9 @@ fn check() ! {
 		(staged_catalog == 'true' && (!production || '--publisher' in options)) {
 		return error('--staged-catalog=true requires production init and the unmodified image bundle')
 	}
+	if targeted !in ['true', 'false'] || (targeted == 'true' && staged_catalog != 'true') {
+		return error('--targeted-refresh=true requires the staged production catalog')
+	}
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
 	root := hwhost.find_root(@FILE)!
 	host := hwhost.find_host(root, arch, '')!
@@ -711,13 +774,27 @@ fn check() ! {
 		return error('staged image must target the selected architecture and launch_user alex')
 	}
 	if first_run_refresh == 'true' &&
-		(configuration.policy.offline || configuration.repositories.len != 1 ||
+		(configuration.policy.offline || configuration.repositories.len != (if targeted == 'true' { 2 } else { 1 }) ||
 		configuration.repositories[0].id != 'native' ||
 		!configuration.repositories[0].url.starts_with('https://') ||
 		!os.is_file(input + pkgcore.image_repositories_path + '/native/index.json')) {
 		return error('first-run refresh requires a bundled HTTPS repository and an online-capable policy')
 	}
 	if staged_catalog == 'true' { admit_staged_catalog(input, arch, configuration.repositories[0])! }
+	if targeted == 'true' {
+		field := configuration.repositories[1]
+		if field.id != 'field' || field.url != 'file://' + pkgcore.image_repositories_path + '/field' {
+			return error('targeted refresh input requires the staged local field repository')
+		}
+		for position, directory in [input + pkgcore.image_repositories_path + '/field',
+			input + '/usr/share/native-catalog/releases/field-next']! {
+			index := pkgcore.verify_index(field, os.read_file(directory + '/index.json')!,
+				os.read_file(directory + '/index.sig')!, time.now().unix())!
+			if index.sequence != u64(position + 1) || index.packages.len != 0 {
+				return error('targeted refresh requires signed field sequences 1 and 2')
+			}
+		}
+	}
 	os.mkdir_all(work + '/rootfs')!
 	os.mkdir_all(work + '/source')!
 	mut artifacts := map[string]string{}
@@ -758,6 +835,19 @@ fn check() ! {
 		pin(mut artifacts, mut artifact_paths, 'source/guest/' + os.file_name(path), path)!
 	}
 	invoke('cp', ['-Rp', input + '/.', work + '/rootfs'])!
+	if targeted == 'true' {
+		path := work + '/rootfs/etc/software-graphical-targeted-refresh'
+		os.write_file(path, '1\n')!
+		pin(mut artifacts, mut artifact_paths, 'targeted-refresh-mode', path)!
+		for name, directory in {
+			'field-baseline': work + '/rootfs' + pkgcore.image_repositories_path + '/field'
+			'field-next': work + '/rootfs/usr/share/native-catalog/releases/field-next'
+		} {
+			for leaf in ['index.json', 'index.sig']! {
+				pin(mut artifacts, mut artifact_paths, name + '/' + leaf, directory + '/' + leaf)!
+			}
+		}
+	}
 	if first_run == 'true' {
 		if os.exists(work + '/rootfs/usr/bin/pkg') { return error('first-run fixture requires no legacy pkg') }
 		declaration := work + '/rootfs/usr/share/vinix-packages/applications.json'
@@ -860,6 +950,9 @@ fn check() ! {
 			if staged_catalog == 'true' {
 				proof['/etc/software-graphical-staged-catalog'] = artifacts['staged-catalog-mode']
 			}
+			if targeted == 'true' {
+				proof['/etc/software-graphical-targeted-refresh'] = artifacts['targeted-refresh-mode']
+			}
 		}
 		os.write_file(work + '/rootfs/usr/share/software-graphical-installed.json', json2.encode(proof) + '\n')!
 		os.write_file(work + '/system.vjfs', '')!
@@ -899,10 +992,11 @@ fn check() ! {
 		pin(mut artifacts, mut artifact_paths, 'qemu-arguments', work + '/qemu-arguments.json')!
 	}
 	checkpoint := graphical_boot(arch, host.qemu, arguments, qmp, work, ordinary == 'true',
-		installed == 'true', first_run == 'true', release_routing == 'true', first_run_refresh == 'true', production, 1, screenshotcore.Image{})!
+		installed == 'true', first_run == 'true', release_routing == 'true', first_run_refresh == 'true', production,
+		targeted == 'true', 1, screenshotcore.Image{})!
 	if installed == 'true' {
 		graphical_boot(arch, host.qemu, arguments, qmp, work, true, true, first_run == 'true', release_routing == 'true',
-			first_run_refresh == 'true', production, 2, checkpoint)!
+			first_run_refresh == 'true', production, targeted == 'true', 2, checkpoint)!
 		pin(mut artifacts, mut artifact_paths, 'system-disk', work + '/system.vjfs')!
 		pin(mut artifacts, mut artifact_paths, 'serial-2', work + '/serial-2.log')!
 		pin(mut artifacts, mut artifact_paths, 'shutdown-2', work + '/shutdown-2.jsonl')!
@@ -951,7 +1045,9 @@ fn check() ! {
 	}
 	os.write_file(work + '/qualification.json', json2.encode(GraphicalReceipt{
 		architecture: arch
-		platform:     if staged_catalog == 'true' {
+		platform:     if targeted == 'true' {
+			'qemu-framebuffer-production-login-targeted-refresh-installed-root-two-boots'
+		} else if staged_catalog == 'true' {
 			'qemu-framebuffer-production-login-staged-catalog-installed-root-two-boots'
 		} else if production {
 			'qemu-framebuffer-production-login-first-run-refresh-installed-root-two-boots'

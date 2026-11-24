@@ -113,7 +113,8 @@ Both production compositors linked statically. The native controller fixture
 passed on AArch64 in 56.579 seconds and x86-64 in 69.402 seconds with QEMU TCG
 and guest-initiated shutdowns. It used the actual Software element tree and
 administrator service on the staged image. Framebuffer input and presentation
-for this control remain unqualified.
+were qualified separately through production login on both architectures.
+See [selected refresh through production login](software-first-run-native-check.md#selected-repository-refresh-through-production-login).
 
 The evidence archive is
 `~/.local/state/vinix/r14-software-refresh-5Vddg5/qualification.tar.gz`.
