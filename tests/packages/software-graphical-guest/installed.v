@@ -24,6 +24,17 @@ struct InstalledObservation {
 }
 
 fn require_uninstalled() ! {
+	require_no_installation()!
+	if package_approvals().len != 0 {
+		return error('graphical acquisition requires no previous package approval audit')
+	}
+}
+
+fn package_approvals() []string {
+	return (os.read_file('/var/log/vinix/auth.log') or { '' }).split_into_lines().filter(it.contains('run packages-change'))
+}
+
+fn require_no_installation() ! {
 	base := '/var/lib/vinix-packages'
 	for name in ['state.json', 'current'] {
 		if os.exists(base + '/' + name) || os.is_link(base + '/' + name) {
@@ -32,9 +43,6 @@ fn require_uninstalled() ! {
 	}
 	if os.is_dir(base + '/generations') && os.ls(base + '/generations')!.len != 0 {
 		return error('graphical acquisition requires no existing package generations')
-	}
-	if (os.read_file('/var/log/vinix/auth.log') or { '' }).contains('run packages-change') {
-		return error('graphical acquisition requires no previous package approval audit')
 	}
 }
 
@@ -112,6 +120,10 @@ fn verify_graphical_install() ! {
 	log := os.read_file('/var/log/vinix/auth.log')!
 	if !log.contains('uid=1000 run packages-change as alex: exit 0') || log.contains('graphical acceptance password') {
 		return error('Software install did not record ordinary administrator approval safely')
+	}
+	if first_run_refresh_enabled() {
+		check_first_run_refresh_approvals(2)!
+		println('SOFTWARE FIRST RUN REFRESH separate catalog and installation approvals PASS')
 	}
 	println('SOFTWARE GRAPHICAL INSTALLED reviewed-password-approved exact Counter install PASS')
 }

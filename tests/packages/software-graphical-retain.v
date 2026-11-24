@@ -48,7 +48,7 @@ fn release_routing_markers() []string {
 		'SOFTWARE RELEASE ROUTING exact software.release-review acknowledged PASS']
 }
 
-fn admit_first_run_serial(transcript string, boot int, arch string, release_routing bool) ! {
+fn admit_first_run_serial(transcript string, boot int, arch string, release_routing bool, refresh bool) ! {
 	value := if release_routing { 'skip' } else { 'review' }
 	decision := 'SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=' + value + ' PASS'
 	exact_marker(transcript, decision)!
@@ -60,10 +60,14 @@ fn admit_first_run_serial(transcript string, boot int, arch string, release_rout
 		if release_routing && transcript.contains('SOFTWARE RELEASE ROUTING ') {
 			return error('release-routing operation repeated on boot 2')
 		}
+		if refresh && transcript.contains('SOFTWARE FIRST RUN REFRESH ') {
+			return error('first-run refresh repeated on boot 2')
+		}
 		return
 	}
 	identity := 'SOFTWARE FIRST RUN pre-ready compositor uid=1000 home=/home/alex runtime=0700 PASS'
-	unchanged := 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS'
+	unchanged := if refresh { 'SOFTWARE FIRST RUN REFRESH authenticated catalog and read-only proposal before activation PASS' }
+		else { 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS' }
 	exact_marker(transcript, identity)!
 	exact_marker(transcript, unchanged)!
 	proposals := transcript.split_into_lines().filter(it.starts_with('SOFTWARE FIRST RUN PROPOSAL '))
@@ -93,6 +97,17 @@ fn admit_first_run_serial(transcript string, boot int, arch string, release_rout
 	if before >= ready || ready >= proposal || proposal >= after || after >= approved {
 		return error('first-run identity, proposal and approval order differs')
 	}
+	if refresh {
+		cold := 'SOFTWARE FIRST RUN REFRESH no cached catalog or prior package approval PASS'
+		separate := 'SOFTWARE FIRST RUN REFRESH separate catalog and installation approvals PASS'
+		exact_marker(transcript, cold)!
+		exact_marker(transcript, separate)!
+		cold_at := transcript.index(cold) or { return error('missing first-run cold catalog marker') }
+		separate_at := transcript.index(separate) or { return error('missing separate approval marker') }
+		if cold_at <= ready || cold_at >= proposal || separate_at <= after || separate_at >= approved {
+			return error('first-run catalog refresh and installation approval order differs')
+		}
+	}
 	if release_routing {
 		mut previous := ready
 		for marker in release_routing_markers() {
@@ -106,7 +121,7 @@ fn admit_first_run_serial(transcript string, boot int, arch string, release_rout
 	}
 }
 
-fn admit_serial(path string, installed bool, first_run bool, release_routing bool, boot int, arch string) ! {
+fn admit_serial(path string, installed bool, first_run bool, release_routing bool, refresh bool, boot int, arch string) ! {
 	transcript := os.read_file(path)!
 	mut forbidden := ['SOFTWARE GRAPHICAL FAIL', 'KERNEL PANIC', 'V panic:', 'FATAL EXCEPTION']
 	if installed { forbidden << ['sysdisk: running from memory', 'sysdisk: updating the system on'] }
@@ -114,7 +129,7 @@ fn admit_serial(path string, installed bool, first_run bool, release_routing boo
 		if transcript.contains(marker) { return error('forbidden serial marker: ' + marker) }
 	}
 	exact_marker(transcript, 'SOFTWARE GRAPHICAL ordinary-compositor uid=1000 home=/home/alex PASS')!
-	if first_run { admit_first_run_serial(transcript, boot, arch, release_routing)! }
+	if first_run { admit_first_run_serial(transcript, boot, arch, release_routing, refresh)! }
 	if installed { exact_marker(transcript, 'SOFTWARE GRAPHICAL native Counter launch child closed PASS')! }
 	if installed && arch == 'aarch64' { exact_marker(transcript, 'syspower: power off: stopping devices')! }
 	if boot == 1 {
@@ -278,6 +293,7 @@ fn retain() ! {
 	if receipt.architecture != arch || receipt.platform !in ['qemu-framebuffer-ordinary-seat',
 		'qemu-framebuffer-ordinary-seat-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots',
+		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots',
 		'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'] {
 		return error('requires the selected architecture ordinary-seat receipt')
 	}
@@ -298,14 +314,15 @@ fn retain() ! {
 	}
 	installed := receipt.platform.ends_with('installed-root-two-boots')
 	release_routing := receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
-	first_run := release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
+	refresh := receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
+	first_run := refresh || release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 	if release_routing && digest(run + '/source/guest/release_routing.v')! !=
 		sha256.sum($embed_file('software-graphical-guest/release_routing.v').to_string().bytes()).hex() {
 		return error('qualified graphical fixture differs from the embedded source: guest/release_routing.v')
 	}
-	admit_serial(run + '/serial.log', installed, first_run, release_routing, 1, arch)!
+	admit_serial(run + '/serial.log', installed, first_run, release_routing, refresh, 1, arch)!
 	if installed {
-		admit_serial(run + '/serial-2.log', true, first_run, release_routing, 2, arch)!
+		admit_serial(run + '/serial-2.log', true, first_run, release_routing, refresh, 2, arch)!
 		admit_shutdown(run + '/shutdown-1.jsonl', 1)!
 		admit_shutdown(run + '/shutdown-2.jsonl', 2)!
 	}
@@ -352,6 +369,15 @@ fn retain() ! {
 		}
 	}
 	if release_routing { paths['release-routing-controls'] = run + '/release-routing-controls.json' }
+	if refresh {
+		paths['first-run-refresh-mode'] = run + '/rootfs/etc/software-graphical-first-run-refresh'
+		config := pkgcore.load_config(run + '/rootfs')!
+		if os.read_file(paths['first-run-refresh-mode'])! != '1\n' || config.policy.offline ||
+			config.repositories.len != 1 || config.repositories[0].id != 'native' ||
+			!config.repositories[0].url.starts_with('https://') {
+			return error('first-run refresh receipt lacks the HTTPS image configuration')
+		}
+	}
 	repository := run + '/rootfs/usr/share/vinix-packages/repositories/native'
 	for path in os.walk_ext(repository, '') {
 		if os.is_file(path) { paths['repository/' + path[repository.len + 1..]] = path }
@@ -371,6 +397,9 @@ fn retain() ! {
 			'install-03-password-mask', 'install-04-acquired']
 	}
 	if first_run { required_shots << ['first-run-01-card', 'first-run-02-proposal', 'first-run-03-reboot-desktop'] }
+	if refresh {
+		required_shots << ['first-run-refresh-01-catalog', 'first-run-refresh-02-administrator', 'first-run-refresh-03-password-mask']
+	}
 	if release_routing {
 		required_shots << ['release-routing-01-desktop', 'release-routing-02-extra-refused',
 			'release-routing-03-action-refused', 'release-routing-02-extra-barrier',
@@ -423,7 +452,9 @@ fn retain() ! {
 		}
 	}
 	os.mkdir_all(out)!
-	prefix := out + if release_routing { '/software-release-routing-native-' + arch } else if first_run {
+	prefix := out + if release_routing { '/software-release-routing-native-' + arch } else if refresh {
+		'/software-first-run-refresh-native-' + arch
+	} else if first_run {
 		'/software-first-run-native-' + arch
 	} else { '/software-graphical-' + arch }
 	for name, suffix in {

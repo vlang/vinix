@@ -41,6 +41,11 @@ fn call(program string, args []string) Control {
 	return Control{ code: child.code, output: output }
 }
 
+fn copied_config(platform string) bool {
+	return platform in ['qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots',
+		'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots']
+}
+
 fn clone_run(original string, work string, receipt Receipt) ! {
 	os.mkdir_all(work)!
 	mut paths := receipt.artifact_paths.clone()
@@ -51,7 +56,7 @@ fn clone_run(original string, work string, receipt Receipt) ! {
 		target := work + '/' + name
 		if os.is_link(target) || os.exists(target) { continue }
 		os.mkdir_all(os.dir(target))!
-		if receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots' &&
+		if copied_config(receipt.platform) &&
 			name == 'rootfs/etc/vinix-packages/config.json' {
 			// The signed repository checker correctly rejects linked metadata.
 			// Preserve that rule in controls with a byte-identical regular copy.
@@ -61,7 +66,7 @@ fn clone_run(original string, work string, receipt Receipt) ! {
 			os.symlink(path, target)!
 		}
 	}
-	if receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots' {
+	if copied_config(receipt.platform) {
 		save_receipt(work, receipt, receipt.artifacts, paths)!
 	} else {
 		os.cp(original + '/qualification.json', work + '/qualification.json')!
@@ -71,7 +76,7 @@ fn clone_run(original string, work string, receipt Receipt) ! {
 fn save_receipt(work string, receipt Receipt, artifacts map[string]string,
 	paths map[string]string) ! {
 	mut saved_paths := paths.clone()
-	if receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots' {
+	if copied_config(receipt.platform) {
 		for key, path in paths {
 			if path.ends_with('/rootfs/etc/vinix-packages/config.json') {
 				saved_paths[key] = os.real_path(work + '/rootfs/etc/vinix-packages/config.json')
@@ -135,7 +140,8 @@ fn check() ! {
 	receipt := json2.decode[Receipt](os.read_file(original + '/qualification.json')!)!
 	installed := receipt.platform.ends_with('installed-root-two-boots')
 	release_routing := receipt.platform == 'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
-	first_run := release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
+	refresh := receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
+	first_run := refresh || release_routing || receipt.platform == 'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 	base := [original, build, os.abs_path(os.args[4]), os.abs_path(os.args[5]), proof + '/baseline',
 		os.args[7]]
 	baseline := call(program, base)
@@ -160,6 +166,10 @@ fn check() ! {
 			'missing-private-decision', 'invalid-private-decision', 'first-run-order',
 			'missing-reboot-no-repeat', 'missing-reboot-private-decision', 'reboot-repeated-prompt',
 			'reboot-repeated-proposal']
+	}
+	if refresh {
+		names << ['missing-refresh-screen', 'missing-refresh-cold-marker', 'missing-refresh-approval',
+			'refresh-approval-order', 'reboot-repeated-refresh']
 	}
 	if release_routing {
 		names << ['missing-release-routing-desktop-shot', 'missing-release-routing-extra-shot',
@@ -205,6 +215,29 @@ fn check() ! {
 		args[4] = work + '/retained'
 		mut reason := ''
 		match name {
+			'missing-refresh-screen' {
+				os.rm(work + '/first-run-refresh-01-catalog.png')!
+				reason = 'exact required screenshot set'
+			}
+			'missing-refresh-cold-marker', 'missing-refresh-approval', 'refresh-approval-order', 'reboot-repeated-refresh' {
+				key := if name == 'reboot-repeated-refresh' { 'serial-2' } else { 'serial' }
+				cold := 'SOFTWARE FIRST RUN REFRESH no cached catalog or prior package approval PASS'
+				approval := 'SOFTWARE FIRST RUN REFRESH separate catalog and installation approvals PASS'
+				mut lines := os.read_file(receipt.artifact_paths[key])!.split_into_lines()
+				reason = 'missing or duplicated exact marker'
+				if name == 'missing-refresh-cold-marker' { lines = lines.filter(it.trim_right('\r') != cold) }
+				else if name == 'reboot-repeated-refresh' {
+					lines << cold
+					reason = 'first-run refresh repeated on boot 2'
+				} else {
+					lines = lines.filter(it.trim_right('\r') != approval)
+					if name == 'refresh-approval-order' {
+						lines << approval
+						reason = 'first-run catalog refresh and installation approval order differs'
+					}
+				}
+				replace_artifact(work, receipt, key, lines.join('\n') + '\n')!
+			}
 			'missing-release-routing-desktop-shot', 'missing-release-routing-extra-shot',
 			'missing-release-routing-action-shot', 'missing-release-routing-extra-barrier-shot',
 			'missing-release-routing-action-barrier-shot' {
@@ -381,7 +414,8 @@ fn check() ! {
 				key := if name.contains('reboot-') { 'serial-2' } else { 'serial' }
 				prefix := 'SOFTWARE FIRST RUN PROPOSAL '
 				pre_ready := 'SOFTWARE FIRST RUN pre-ready compositor uid=1000 home=/home/alex runtime=0700 PASS'
-				unchanged := 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS'
+				unchanged := if refresh { 'SOFTWARE FIRST RUN REFRESH authenticated catalog and read-only proposal before activation PASS' }
+					else { 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS' }
 				value := if release_routing { 'skip' } else { 'review' }
 				decision := 'SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=' + value + ' PASS'
 				no_repeat := 'SOFTWARE FIRST RUN BOOT 2 retained ' + value + ' decision no repeated prompt PASS'

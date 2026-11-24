@@ -6,6 +6,18 @@ import os
 
 const release_declaration = '/usr/share/vinix-packages/applications.json'
 const release_decision = '/home/alex/.vinix-first-run-release'
+const release_catalog_cache = '/var/lib/vinix-packages/catalog.json'
+
+fn first_run_refresh_enabled() bool {
+	return os.exists('/etc/software-graphical-first-run-refresh')
+}
+
+fn check_first_run_refresh_approvals(count int) ! {
+	approvals := package_approvals()
+	if approvals.len != count || approvals.any(!it.contains('uid=1000 run packages-change as alex: exit 0')) {
+		return error('unexpected first-run package approval audit')
+	}
+}
 
 fn check_first_run_inputs(fresh bool) ! {
 	info := os.lstat(release_declaration)!
@@ -43,12 +55,17 @@ fn check_first_run_decision() ! {
 
 fn first_run_proposal() ! {
 	check_first_run_decision()!
-	require_uninstalled()!
+	refresh := first_run_refresh_enabled()
+	if refresh {
+		require_no_installation()!
+		check_first_run_refresh_approvals(1)!
+	} else { require_uninstalled()! }
 	// An independent read-only oracle records the complete signed proposal.
 	// The host separately captures Software's real proposal before Confirm.
 	mut child := os.new_process('/usr/bin/vinix-package')
 	defer { child.close() }
-	child.set_args(['deployment-review', release_declaration])
+	child.set_args(if refresh { ['--offline', 'deployment-review', release_declaration] }
+		else { ['deployment-review', release_declaration] })
 	child.set_redirect_stdio()
 	child.run()
 	C.close(child.stdio_fd[0])
@@ -77,7 +94,10 @@ fn first_run_proposal() ! {
 		row['requested']! != json2.Any(true) || row['action']!.str() != 'install' {
 		return error('first-run proposal has incomplete publisher, permission or install details')
 	}
-	require_uninstalled()!
+	if refresh {
+		require_no_installation()!
+		check_first_run_refresh_approvals(1)!
+	} else { require_uninstalled()! }
 	println('SOFTWARE FIRST RUN PROPOSAL ' + json2.encode(review))
 	choice := if release_routing_enabled() { 'skip' } else { 'review' }
 	println('SOFTWARE FIRST RUN private decision owner=1000 mode=0600 value=' + choice + ' PASS')

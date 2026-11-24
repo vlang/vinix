@@ -101,3 +101,19 @@ single declared native application. [Host qualification](software-first-run-rele
 separately covers durable Skip, failed-save retry and handoff cancellation.
 Native Skip, graphical login, foreign/default application catalogs, physical
 hardware and the whole roadmap 14 release gate remain separate work.
+
+## First-run review with an empty catalog
+
+Add `--first-run-refresh=true` to the installed first-run Review recipe. Use a
+fresh root and matching fixture publisher from
+`native-catalog-check --software-bundled-https`. The image enrolls its HTTPS
+publisher with an online-capable policy and a signed local bundle. The desktop
+builder accepts `--musl-cc=x86_64-linux-musl-gcc` when using a standalone
+musl cross compiler. It stages the selected V compiler's runtime for each link.
+
+The guest checks for an empty catalog and approval history after first login.
+The controller clicks **Refresh offline**, captures its administrator prompt
+and password mask, and waits for the signed catalog and read-only proposal.
+It approves installation in a second prompt and reopens the saved Counter
+after a cold boot. Retention requires the refresh screenshots, separate
+approvals in order, and a cold boot without a repeated prompt or refresh.

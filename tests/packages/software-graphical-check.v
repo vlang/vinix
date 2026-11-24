@@ -23,7 +23,11 @@ import tools.packages.pkgcore
 #include <errno.h>
 
 struct C.pollfd { pub mut: fd i32 events i16 revents i16 }
-fn C.poll(&C.pollfd, usize, i32) i32
+$if macos || ios || freebsd || openbsd || dragonfly || android || termux {
+	fn C.poll(&C.pollfd, u32, i32) i32
+} $else {
+	fn C.poll(&C.pollfd, uint, i32) i32
+}
 
 fn shutdown_line(mut connection unix.StreamConn, deadline u64) !string {
 	mut line := []u8{}
@@ -60,7 +64,7 @@ fn shutdown_connect(path string, mut transcript os.File, deadline u64, boot int)
 	greeting := shutdown_record(mut connection, mut transcript, deadline)!
 	if 'QMP' !in greeting { return error('invalid shutdown QMP greeting') }
 	request := '{"execute":"qmp_capabilities"}\n'
-	if C.send(connection.sock.handle, request.str, usize(request.len), 0) != request.len {
+	if C.send(connection.sock.handle, request.str, uint(request.len), 0) != request.len {
 		return error('could not enable shutdown QMP events')
 	}
 	reply := shutdown_record(mut connection, mut transcript, deadline)!
@@ -299,7 +303,8 @@ fn wait_label(mut child os.Process, mut monitor qmpclient.Monitor, log string,
 }
 
 fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work string, ordinary bool,
-	installed bool, first_run bool, release_routing bool, boot int, previous screenshotcore.Image) !screenshotcore.Image {
+	installed bool, first_run bool, release_routing bool, first_run_refresh bool, boot int,
+	previous screenshotcore.Image) !screenshotcore.Image {
 	log := work + if boot == 1 { '/serial.log' } else { '/serial-2.log' }
 	mut child := os.new_process(qemu)
 	defer {
@@ -401,6 +406,21 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 	shot(mut monitor, work, if boot == 1 { '01-catalog' } else { '09-reboot-catalog' })!
 	click(mut monitor, if ordinary { 984 } else { 975 }, if ordinary { 57 } else { 49 })!
 	time.sleep(time.second)
+	if first_run_refresh && boot == 1 {
+		wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN REFRESH no cached catalog or prior package approval PASS')!
+		before := shot(mut monitor, work, 'first-run-refresh-01-catalog')!
+		// The maximized Software content starts below its title bar.
+		click(mut monitor, 110, 150)!
+		point(mut monitor, 800, 700)!
+		prompt := shot(mut monitor, work, 'first-run-refresh-02-administrator')!
+		if region_changes(before, prompt, 15, 90, 445, 165) < 100 {
+			return error('offline refresh did not open the graphical administrator prompt')
+		}
+		type_graphical_password(mut monitor)!
+		shot(mut monitor, work, 'first-run-refresh-03-password-mask')!
+		key(mut monitor, 'ret')!
+		wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN REFRESH authenticated catalog and read-only proposal before activation PASS')!
+	}
 	mut catalog := screenshotcore.Image{}
 	if boot == 1 { catalog = shot(mut monitor, work, '02-maximized')! }
 	if !first_run || boot == 2 { click(mut monitor, 140, 138)! }
@@ -408,7 +428,9 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 		// The fixed 1024x768 layout exposes Install, then the frozen review's
 		// Confirm action. Real key events enter this account's password.
 		if first_run {
-			wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS')!
+			if !first_run_refresh {
+				wait_marker(mut child, log, deadline, 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS')!
+			}
 			shot(mut monitor, work, 'first-run-02-proposal')!
 		} else { click(mut monitor, 350, 562)! }
 		time.sleep(2 * time.second)
@@ -416,10 +438,7 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 		click(mut monitor, 340, 600)!
 		time.sleep(time.second)
 		shot(mut monitor, work, 'install-02-administrator')!
-		click(mut monitor, 100, 166)!
-		for byte in 'graphical acceptance password'.bytes() {
-			key(mut monitor, if byte == ` ` { 'spc' } else { byte.ascii_str() })!
-		}
+		type_graphical_password(mut monitor)!
 		time.sleep(300 * time.millisecond)
 		shot(mut monitor, work, 'install-03-password-mask')!
 		key(mut monitor, 'ret')!
@@ -492,6 +511,13 @@ fn graphical_boot(arch string, qemu string, arguments []string, qmp string, work
 	return previous
 }
 
+fn type_graphical_password(mut monitor qmpclient.Monitor) ! {
+	click(mut monitor, 100, 166)!
+	for byte in 'graphical acceptance password'.bytes() {
+		key(mut monitor, if byte == ` ` { 'spc' } else { byte.ascii_str() })!
+	}
+}
+
 fn wait_poweroff(mut child os.Process, log string, deadline u64, boot int, kernel_serial bool) ! {
 	for child.is_alive() {
 		transcript := os.read_file(log) or { '' }
@@ -531,6 +557,7 @@ fn check() ! {
 	installed := options['--installed'] or { 'false' }
 	first_run := options['--first-run'] or { 'false' }
 	release_routing := options['--release-routing'] or { 'false' }
+	first_run_refresh := options['--first-run-refresh'] or { 'false' }
 	if ordinary !in ['true', 'false'] { return error('--ordinary must be true or false') }
 	if installed !in ['true', 'false'] || (installed == 'true' && ordinary != 'true') {
 		return error('--installed=true requires --ordinary=true')
@@ -540,6 +567,10 @@ fn check() ! {
 	}
 	if release_routing !in ['true', 'false'] || (release_routing == 'true' && first_run != 'true') {
 		return error('--release-routing=true requires --first-run=true')
+	}
+	if first_run_refresh !in ['true', 'false'] ||
+		(first_run_refresh == 'true' && (first_run != 'true' || release_routing == 'true')) {
+		return error('--first-run-refresh=true requires first-run Review mode')
 	}
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
 	root := hwhost.find_root(@FILE)!
@@ -557,6 +588,13 @@ fn check() ! {
 	configuration := pkgcore.load_config(input)!
 	if configuration.launch_user != 'alex' || configuration.architecture != arch {
 		return error('staged image must target the selected architecture and launch_user alex')
+	}
+	if first_run_refresh == 'true' &&
+		(configuration.policy.offline || configuration.repositories.len != 1 ||
+		configuration.repositories[0].id != 'native' ||
+		!configuration.repositories[0].url.starts_with('https://') ||
+		!os.is_file(input + pkgcore.image_repositories_path + '/native/index.json')) {
+		return error('first-run refresh requires a bundled HTTPS repository and an online-capable policy')
 	}
 	os.mkdir_all(work + '/rootfs')!
 	os.mkdir_all(work + '/source')!
@@ -602,6 +640,11 @@ fn check() ! {
 			'architecture': json2.Any(arch), 'packages': json2.Any([json2.Any('org.vinix.counter')])}) + '\n')!
 		os.chmod(declaration, 0o644)!
 		os.write_file(work + '/rootfs/etc/software-graphical-first-run', '1\n')!
+		if first_run_refresh == 'true' {
+			path := work + '/rootfs/etc/software-graphical-first-run-refresh'
+			os.write_file(path, '1\n')!
+			pin(mut artifacts, mut artifact_paths, 'first-run-refresh-mode', path)!
+		}
 	}
 	os.write_file(work + '/rootfs/etc/software-graphical-mode', if ordinary == 'true' {
 		'ordinary\n'
@@ -672,6 +715,9 @@ fn check() ! {
 		}
 		if first_run == 'true' {
 			proof['/usr/share/vinix-packages/applications.json'] = artifacts['release-declaration']
+			if first_run_refresh == 'true' {
+				proof['/etc/software-graphical-first-run-refresh'] = artifacts['first-run-refresh-mode']
+			}
 		}
 		os.write_file(work + '/rootfs/usr/share/software-graphical-installed.json', json2.encode(proof) + '\n')!
 		os.write_file(work + '/system.vjfs', '')!
@@ -707,9 +753,10 @@ fn check() ! {
 		} else { ['-drive', 'if=ide,format=raw,cache=writeback,file=' + work + '/system.vjfs'] }
 	}
 	checkpoint := graphical_boot(arch, host.qemu, arguments, qmp, work, ordinary == 'true',
-		installed == 'true', first_run == 'true', release_routing == 'true', 1, screenshotcore.Image{})!
+		installed == 'true', first_run == 'true', release_routing == 'true', first_run_refresh == 'true', 1, screenshotcore.Image{})!
 	if installed == 'true' {
-		graphical_boot(arch, host.qemu, arguments, qmp, work, true, true, first_run == 'true', release_routing == 'true', 2, checkpoint)!
+		graphical_boot(arch, host.qemu, arguments, qmp, work, true, true, first_run == 'true', release_routing == 'true',
+			first_run_refresh == 'true', 2, checkpoint)!
 		pin(mut artifacts, mut artifact_paths, 'system-disk', work + '/system.vjfs')!
 		pin(mut artifacts, mut artifact_paths, 'serial-2', work + '/serial-2.log')!
 		pin(mut artifacts, mut artifact_paths, 'shutdown-2', work + '/shutdown-2.jsonl')!
@@ -760,6 +807,8 @@ fn check() ! {
 		architecture: arch
 		platform:     if release_routing == 'true' {
 			'qemu-framebuffer-ordinary-seat-release-routing-installed-root-two-boots'
+		} else if first_run_refresh == 'true' {
+			'qemu-framebuffer-ordinary-seat-first-run-refresh-installed-root-two-boots'
 		} else if first_run == 'true' {
 			'qemu-framebuffer-ordinary-seat-first-run-installed-root-two-boots'
 		} else if installed == 'true' {

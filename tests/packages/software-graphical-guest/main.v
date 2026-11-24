@@ -146,6 +146,7 @@ fn run() ! {
 	os.setenv('VINIX_SYSTEM_SESSION', '1', true)
 	installed := os.exists('/etc/software-graphical-installed')
 	first_run := os.exists('/etc/software-graphical-first-run')
+	refresh := first_run_refresh_enabled()
 	fresh := if installed { installed_root()! } else { true }
 	if first_run { check_first_run_inputs(fresh)! }
 	if fresh {
@@ -154,7 +155,7 @@ fn run() ! {
 		command(['/usr/sbin/vinix-account', 'init'], '')!
 		command(['/usr/sbin/vinix-account', 'add', 'alex', 'Alex Example', 'admin'], 'graphical acceptance password\n')!
 		println('SOFTWARE GRAPHICAL ordinary administrator account prepared')
-		command(['/usr/bin/vinix-package', 'update'], '')!
+		if !refresh { command(['/usr/bin/vinix-package', 'update'], '')! }
 		if !installed {
 			command(['/usr/bin/vinix-package', 'install', 'org.vinix.counter', 'org.vinix.memo'], '')!
 		} else { require_uninstalled()! }
@@ -220,7 +221,10 @@ fn run() ! {
 	mut acquired := false
 	mut before_choice := !first_run || !fresh
 	mut reviewed := !first_run || !fresh
+	mut waiting_for_refresh := refresh && fresh
 	mut ready_at := i64(0)
+	mut refreshed_at := i64(0)
+	review_delay := if release_routing_enabled() { 8 * time.second } else { 3 * time.second }
 	for {
 		if !desktop.is_alive() { return error('compositor exited') }
 		if time.sys_mono_now() >= deadline {
@@ -250,11 +254,28 @@ fn run() ! {
 			ready = true
 			ready_at = time.sys_mono_now()
 		}
-		if ready && !reviewed && time.sys_mono_now() - ready_at >=
-			if release_routing_enabled() { 8 * time.second } else { 3 * time.second } {
+		if ready && waiting_for_refresh {
+			require_uninstalled()!
+			for catalog_path in [release_catalog_cache, '/var/lib/vinix-packages/trust-history.json']! {
+				if os.exists(catalog_path) || os.is_link(catalog_path) {
+					return error('first-run catalog was already seeded: ' + catalog_path)
+				}
+			}
+			println('SOFTWARE FIRST RUN REFRESH no cached catalog or prior package approval PASS')
+			waiting_for_refresh = false
+		}
+		if ready && refresh && !reviewed && refreshed_at == 0 &&
+			os.is_file(release_catalog_cache) && package_approvals().len > 0 {
+			// Let Software reload and spawn its review before the independent
+			// oracle writes the complete proposal to the shared serial console.
+			refreshed_at = time.sys_mono_now()
+		}
+		review_start := if refresh { refreshed_at } else { ready_at }
+		if ready && !reviewed && review_start != 0 && time.sys_mono_now() - review_start >= review_delay {
 			if release_routing_enabled() { release_routing_request()! }
 			first_run_proposal()!
-			println('SOFTWARE FIRST RUN review handed to Software without activation or approval PASS')
+			println(if refresh { 'SOFTWARE FIRST RUN REFRESH authenticated catalog and read-only proposal before activation PASS' }
+				else { 'SOFTWARE FIRST RUN review handed to Software without activation or approval PASS' })
 			reviewed = true
 		}
 		if installed && fresh && !acquired && os.exists('/var/lib/vinix-packages/current/state.json') &&
