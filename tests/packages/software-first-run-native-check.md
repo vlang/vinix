@@ -239,3 +239,26 @@ refresh record after reopening and saving Counter's data.
 The retainer checks both signed field sequences, the exact cached HTTPS input,
 the ordered serial records and framebuffer transitions. Earlier scenarios keep
 their existing input and evidence checks.
+
+At `a178b187072a6c9980c532d8362af4de52e77ac3`, both installed QEMU guests passed
+two production-login boots and two guest-initiated shutdowns. The runs reused
+the compositor builds from the selected-refresh host qualification and the
+retained kernels. AArch64 used HVF and x86-64 used TCG. Both ran at 1024×768
+with QEMU networking disabled.
+
+The retainer verified 95 artifact digests on AArch64 and 102 on x86-64.
+Each run retained 34 screenshots, including eight for the selected refresh,
+and refused 67 altered proofs. The six new controls cover a missing or reused
+password-mask frame, missing readiness, a changed cold cache, a changed HTTPS
+index and a field index that differs from its signed input.
+
+The archive retains the earlier observer failures. The authorization action
+can return before its detached refresh worker publishes the catalog. The
+accepted runs wait for the new signed snapshot and check the visible completion
+before returning to the main catalog.
+
+The evidence archive is
+`~/.local/state/vinix/r14-targeted-framebuffer-fhnXK9/qualification.tar.gz`.
+Its SHA-256 is `15613d611dbd1b70fa02d8e418ed87378bb402031134b3dc5144ce7157dd4649`.
+Independent extraction matched all 8,905 inventory entries and both decoded
+VJFS disk digests.
