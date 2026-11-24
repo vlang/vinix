@@ -64,6 +64,109 @@ fn test_enrollment_authenticates_before_trusting_and_preserves_policy() {
 	assert load_catalog(result, state_directory(root))!.packages.len == 0
 }
 
+fn test_enrollment_preserves_unadmitted_workspace_and_retries_reviewed_apply() {
+	root := administration_root('workspace')!
+	defer { os.rmdir_all(root) or {} }
+	key, secret := ed25519.generate_key()!
+	repository := Repository{ id: 'fixture', url: 'file://' + root + '/repo', public_key: key.hex() }
+	expires := time.now().unix() + 3600
+	administration_index(root + '/repo', secret, 1, expires, '')!
+	initial := enroll_repository(root, repository, true)!
+	directory := state_directory(root)
+	refresh(initial, directory)!
+	configuration := root + '/etc/vinix-packages/config.json'
+	history := directory + '/trust-history.json'
+	catalog := directory + '/catalog.json'
+	before := [os.read_file(configuration)!, os.read_file(history)!, os.read_file(catalog)!]
+
+	administration_index(root + '/repo', secret, 2, expires, '')!
+	mut review := review_repository(root, 'enroll', repository, true)!
+	defer { review.close() }
+	work := directory + '/enrollment'
+	sibling := root + '/sibling'
+	os.mkdir(sibling)!
+	os.write_file(sibling + '/keep', 'outside workspace')!
+	for target in [sibling, root + '/absent'] {
+		os.symlink(target, work)!
+		if _ := enroll_repository_reviewed(root, repository, true, review.fingerprint) {
+			assert false, 'enrollment accepted a workspace alias'
+		} else {
+			assert err.msg().contains('unsafe enrollment workspace')
+		}
+		assert os.readlink(work)! == target
+		assert [os.read_file(configuration)!, os.read_file(history)!, os.read_file(catalog)!] == before
+		os.rm(work)!
+	}
+	os.write_file(work, 'unexpected ordinary file')!
+	if _ := enroll_repository_reviewed(root, repository, true, review.fingerprint) {
+		assert false, 'enrollment accepted a workspace file'
+	} else {
+		assert err.msg().contains('unsafe enrollment workspace')
+	}
+	assert os.read_file(work)! == 'unexpected ordinary file'
+	assert [os.read_file(configuration)!, os.read_file(history)!, os.read_file(catalog)!] == before
+	os.rm(work)!
+	os.mkdir_all(work + '/nested')!
+	os.write_file(work + '/nested/keep', 'interrupted work')!
+	os.symlink(sibling, work + '/nested/alias')!
+	os.chmod(work, 0o777)!
+	if _ := enroll_repository_reviewed(root, repository, true, review.fingerprint) {
+		assert false, 'enrollment accepted a shared writable workspace'
+	} else {
+		assert err.msg().contains('unsafe enrollment workspace')
+	}
+	assert os.read_file(work + '/nested/keep')! == 'interrupted work'
+	assert [os.read_file(configuration)!, os.read_file(history)!, os.read_file(catalog)!] == before
+	os.chmod(work, 0o700)!
+	enroll_repository_reviewed(root, repository, true, review.fingerprint)!
+	assert !os.exists(work)
+	assert os.read_file(sibling + '/keep')! == 'outside workspace'
+	assert os.read_file(catalog)! == before[2]
+	assert read_history(directory)!.repositories[0].sequence == 2
+}
+
+fn test_enrollment_workspace_checks_preserve_replacements_at_both_levels() {
+	root := administration_root('workspace-identity')!
+	defer { os.rmdir_all(root) or {} }
+	directory := state_directory(root)
+	guard := acquire(directory)!
+	defer { guard.release() }
+	parent := repository_workspace_parent(directory, 'enrollment')!
+	defer { C.close(parent) }
+	target := create_enrollment_workspace(parent)!
+	work := directory + '/enrollment'
+	moved := directory + '/moved'
+	os.rename(work, moved)!
+	os.mkdir(work)!
+	os.write_file(work + '/keep', 'replacement workspace')!
+	if _ := check_enrollment_workspace(directory, parent, target) {
+		assert false, 'workspace replacement passed identity check'
+	} else {
+		assert err.msg().contains('enrollment workspace identity changed')
+	}
+	if _ := retire_stage(parent, target) {
+		assert false, 'retirement accepted a replacement workspace'
+	}
+	assert os.read_file(work + '/keep')! == 'replacement workspace'
+	os.rm(work + '/keep')!
+	os.rmdir(work)!
+	os.rename(moved, work)!
+
+	saved_parent := directory + '-saved'
+	os.rename(directory, saved_parent)!
+	os.mkdir(directory)!
+	os.mkdir(work)!
+	os.write_file(work + '/keep', 'replacement parent')!
+	if _ := check_enrollment_workspace(directory, parent, target) {
+		assert false, 'state parent replacement passed identity check'
+	} else {
+		assert err.msg().contains('enrollment workspace parent changed')
+	}
+	retire_stage(parent, target)!
+	assert !os.exists(saved_parent + '/enrollment')
+	assert os.read_file(work + '/keep')! == 'replacement parent'
+}
+
 fn test_rejected_enrollment_keeps_configuration_and_history_unchanged() {
 	root := administration_root('refusal')!
 	defer { os.rmdir_all(root) or {} }

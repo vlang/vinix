@@ -94,10 +94,12 @@ pub fn enroll_repository(root string, repository Repository, offline bool) !Conf
 
 pub fn enroll_repository_reviewed(root string, repository Repository, offline bool, expected string) !Config {
 	directory := state_directory(root)
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
 	current := load_config(root)!
 	path := writable_configuration(root)!
+	defer { unsafe { path.free() } }
 	next := enrollment_configuration(current, repository)!
 	// A reviewed replacement disables the old ID/key. Recovery uses that exact
 	// proposed configuration in both review and apply, before publishing trust.
@@ -106,11 +108,20 @@ pub fn enroll_repository_reviewed(root string, repository Repository, offline bo
 	mut history := history_with_snapshots(next, directory, snapshots)!
 	defer { close_decoded_history(history) }
 	work := directory + '/enrollment'
-	if os.exists(work) { os.rmdir_all(work)! }
-	owned_directory(work, 0o700)!
-	defer { os.rmdir_all(work) or {} }
+	defer { unsafe { work.free() } }
+	parent := repository_workspace_parent(directory, 'enrollment')!
+	defer { C.close(parent) }
+	target := create_enrollment_workspace(parent)!
+	defer {
+		retire_stage(parent, target) or {
+			message := err.msg()
+			unsafe { message.free(); err.free() }
+		}
+	}
+	check_enrollment_workspace(directory, parent, target)!
 	snapshot, index := enrollment_snapshot(current, repository, offline, work)!
 	defer { close_decoded_index(index); unsafe { snapshot.text.free(); snapshot.signature.free() } }
+	check_enrollment_workspace(directory, parent, target)!
 	digest := index_digest(snapshot.text)
 	actual := repository_fingerprint(current, history, 'enroll', repository, digest)
 	defer { unsafe { digest.free(); actual.free() } }

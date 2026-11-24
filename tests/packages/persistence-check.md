@@ -161,3 +161,19 @@ verified all 94 sealed file payloads and the gzip stream. Archive SHA-256
 These runs qualify the reviewed enrollment sequence on disposable QEMU ext2
 disks. Production publisher enrollment and physical storage crash testing
 remain separate release requirements.
+
+### Enrollment workspace recovery
+
+Enrollment captures the package state directory before creating or retiring
+its `enrollment` workspace. A retry can remove interrupted work from an
+ordinary administrator-owned directory on the same filesystem. An alias,
+unexpected file or shared writable root causes enrollment to refuse and
+preserve the entry. Restore an ordinary private workspace, or move the
+unexpected entry aside, before retrying.
+
+Enrollment rechecks the captured state and workspace identities before and
+after fetching signed metadata. Cleanup uses the captured directory and leaves
+a replacement workspace untouched. Tests cover a replaced workspace or state
+path, nested interrupted work, a child symlink, and successful use of the same
+approval after a workspace refusal leaves configuration and replay history
+intact.

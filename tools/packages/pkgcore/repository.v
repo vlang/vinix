@@ -212,12 +212,12 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 	defer { unsafe { encoding.free() } }
 	work := directory + '/refresh'
 	defer { unsafe { work.free() } }
-	parent := refresh_parent(directory)!
+	parent := repository_workspace_parent(directory, 'refresh')!
 	defer { C.close(parent) }
-	found, abandoned := capture_refresh_work(parent)!
+	found, abandoned := capture_repository_workspace(parent, 'refresh')!
 	if found { retire_stage(parent, abandoned)! }
 	owned_directory(work, 0o700)!
-	present, target := capture_refresh_work(parent)!
+	present, target := capture_repository_workspace(parent, 'refresh')!
 	if !present { return error('cannot capture refresh workspace') }
 	defer {
 		retire_stage(parent, target) or {
