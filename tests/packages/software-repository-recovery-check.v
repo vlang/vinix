@@ -143,6 +143,7 @@ fn qualify() ! {
 			'REPOSITORY RECOVERY nine compact/tiny canvases, lifecycle guards and nonoverlapping geometry PASS',
 			'REPOSITORY REFRESH selected enrolled source, literal arguments, approval, cancellation and guarded failure PASS',
 			'REPOSITORY ENROLLMENT separate approval refreshes the reviewed source and retains trust after cancellation or failure PASS',
+			'REPOSITORY BROWSER compact catalog opens repository list PASS',
 			'REPOSITORY BROWSER compact exact identity, bounded paging, preserved draft and approved or cancelled refresh PASS',
 			'REPOSITORY RECOVERY explicit production-safe checks PASS']! {
 			require(text.split_into_lines().filter(it == marker).len == 1, 'missing/duplicate focused PASS marker')!

@@ -224,8 +224,13 @@ fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
 			children << a.offline_button(width - 14 - half_width, next_y, half_width)
 		}
 		next_y += 38
-		if launchable {
-			children << software_button('software.run-options', 'Launch options', 14, next_y, button_width)
+		if compact_controls {
+			if launchable {
+				children << software_button('software.run-options', if width < 220 { 'Run options' } else { 'Launch options' },
+					14, next_y, half_width)
+			}
+			children << software_button('software.repositories', if width < 220 { 'Sources' } else { 'Repositories' },
+				if launchable { width - 14 - half_width } else { 14 }, next_y, half_width)
 			next_y += 38
 		}
 	}

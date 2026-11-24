@@ -377,7 +377,7 @@ fn image_run() ! {
 		image_enroll_and_refresh(mut app, password)!
 	} else if phase == 'targeted-refresh' {
 		compact := ui2.rect(0, 0, 320, 240)
-		image_control(mut app, 'software.repositories')!
+		image_control_at(mut app, 'software.repositories', compact)!
 		image_wait(mut app)!
 		assert app.repository_status.repositories.len == 2
 		image_control_at(mut app, 'software.offline', compact)!

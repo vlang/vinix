@@ -644,7 +644,9 @@ configured indexes.
 
 **Browse repositories** opens a paged view of the exact ID, source URL and
 publisher key for each configured source. At 180×220 and larger, Software can
-display the source and accept administrator approval for its **Refresh** action.
+open **Repositories** from the compact catalog, display the source and accept
+administrator approval for its **Refresh** action. The narrow catalog labels
+the entry **Sources**.
 At widths of 320 pixels or more the compact repository list also offers
 **Go offline**. Browse and refresh retain the repository form's entered values.
 

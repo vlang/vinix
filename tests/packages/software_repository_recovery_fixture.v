@@ -453,9 +453,27 @@ fn repository_browse_cycle(mut app SoftwareApp) ! {
 
 fn repository_browse_refresh() ! {
 	defer { os.unsetenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY') }
-	mut app := SoftwareApp{ service_path: os.executable(), repository_mode: true,
+	mut app := SoftwareApp{ service_path: os.executable(),
 		administration_required: true, offline_requested: true, output: []u8{cap: 8192} }
 	defer { app.close_app() }
+	for size in [ui2.rect(0, 0, 180, 219), ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240)]! {
+		tree := app.build(size)!
+		defer { free_window_tree(tree) }
+		repository_recovery_check_frames(tree, size)!
+		repository_recovery_require(tree.children.any(it.id == 'software.repositories') == (size.height >= 220),
+			'compact catalog has the wrong repositories entry availability')!
+	}
+	os.setenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY', 'success', true)
+	app.offline_requested = false
+	repository_recovery_activate(mut app, 'software.repositories', 320, 240)!
+	repository_recovery_require(app.repository_mode && app.worker.args == ['--json', 'repo-config'],
+		'compact catalog did not request the configured repository list')!
+	repository_recovery_wait(mut app, 0)!
+	repository_recovery_require(app.repository_status.repositories.len == 1
+		&& app.repository_status.repositories[0].id == 'replacement',
+		'compact catalog did not load the configured repository list')!
+	println('REPOSITORY BROWSER compact catalog opens repository list PASS')
+	app.offline_requested = true
 	app.initialize_repository_fields()
 	software_repository_text(mut app.repository_id, 'draft')
 	software_repository_text(mut app.repository_url, repository_recovery_url)
@@ -469,6 +487,7 @@ fn repository_browse_refresh() ! {
 	configuration := repository_recovery_configuration('field')
 	text := json2.encode(pkgprotocol.RepositoryConfiguration{ ...configuration, repositories: [remote, ...configuration.repositories] })
 	defer { unsafe { text.free() } }
+	app.repository_status.close()
 	app.repository_status = pkgprotocol.decode_repository_configuration(text)!
 
 	repository_recovery_activate(mut app, 'software.repository.browse', 320, 240)!
