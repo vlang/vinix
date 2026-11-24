@@ -34,3 +34,30 @@ The independent archive checker verified all 2,466 sealed files and links.
 The archive SHA-256 is
 `191f89094c7a8471a5a61cc7e2da9a81ffc735902a475ff7207d99be50aaf90a`.
 [Qualification archive](/Users/alex/.local/state/vinix/r14-offline-verify-Np8JCZ/qualification.tar.gz)
+
+## Verification at the archived release time
+
+Source revision `1578b2cd37a57575ee9abe4d2bd95775fe61acb6` adds the optional
+`RELEASE_UNIX_TIME` operand to `verify-offline` and includes `release_time`
+in the historical report. Both retained expired media copies passed with
+their recorded release time, an empty tool search path and unavailable
+scratch storage. Current-time verification and media export refused both
+expired inputs. [Command contract](../../tools/packages/SDK.md#check-release-image-package-inputs)
+
+All 136 production host scenarios and both 35-case HTTPS matrices under
+ASan/UBSan passed. The sanitizer receipts for the retained expired copies
+matched the production receipts byte for byte. Leak detection was disabled.
+The local and hosted release checks and hosted index-pin checks also passed.
+
+Both full QEMU image-export suites passed with retained kernels and rebuilt
+fixtures, then shut down cleanly. AArch64 completed in 124.8 seconds and x86-64
+in 133.7 seconds. The native check used a two-publisher bundle and verified
+the boundary at exact expiry, the receipt's index digest, invalid release
+times, signature corruption and an exact restored retry.
+
+The complete evidence tar is stored as a Zstandard delta against the preceding
+offline media guest archive. Restoring it from the persistent delta reproduced
+the tar byte for byte and passed independent verification of 2,631 sealed
+files and links. The delta SHA-256 is
+`541b0e401e14db632e8ba56229212893c43a613255934ab679d57c747bddea0d`.
+[Restore instructions](/Users/alex/.local/state/vinix/r14-archive-media-mQstkM/RESTORE.md)
