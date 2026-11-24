@@ -112,3 +112,30 @@ full graphical presentation acceptance remain separate gates.
 - [x86_64 Software guest](results/2026-10-16/image-catalog-software-x86_64.json)
 - [initial attempts](results/2026-10-16/image-catalog-attempts.txt)
 - [source/toolchain/artifact ledger](results/2026-10-16/image-catalog-toolchain.json)
+
+## Captured declaration and repository directories
+
+At `34140239ddc725c03d292ce6521391355dc3bfc0`, normal declaration publication
+keeps the destination parent and the published bundle directory open during
+verification. It checks both identities before writing the declaration or
+returning a preservation result. The fixture replaces each directory after
+verification, checks the original and replacement contents, then restores the
+original and verifies exact publication and preservation.
+
+Host application, image input, configuration, repository and atomic-write
+checks passed. The application fixture also passed under ASan/UBSan with
+leak detection disabled and under a separate 32-descriptor limit.
+Normal staging on fresh roots for both target architectures wrote declarations
+matching their preflight locks byte for byte. A second normal stage preserved
+each declaration's inode, mode, modification time and bytes. The consumer
+state directory was empty after each stage.
+
+Both TCG guests passed all nine test programs and initiated shutdown. AArch64
+completed in 133.6 seconds and x86-64 in 130.5 seconds with a 360-second
+deadline. All 13 receipt artifact sizes and digests matched per architecture.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-image-catalog-parent-UnkBYC/qualification.tar.gz)
+contains the source snapshot, host checks, signed staging inputs and outputs,
+guest builds and receipts. The independent checker verified all 230 sealed
+files. Archive SHA-256 is
+`f3cce51fbb528d63ff1149df19ea4dff52bc0d874d1648ef9d345c10632af636`.
