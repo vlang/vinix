@@ -14,8 +14,8 @@ fn deployment_form_geometry(tree ui2.Element, width f64, height f64) {
 
 fn deployment_form_select(mut app SoftwareApp, id string) ! {
 	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
-	for _ in 0 .. 8 { app.handle('software.deployment.action.previous')! }
-	for _ in 0 .. 8 {
+	for _ in 0 .. software_deployment_form_actions.len { app.handle('software.deployment.action.previous')! }
+	for _ in 0 .. software_deployment_form_actions.len {
 		tree := app.build(ui2.rect(0, 0, 320, 240))!
 		found := tree.children.any(it.id == id)
 		free_window_tree(tree)
@@ -61,7 +61,7 @@ fn check_software_deployment_form() ! {
 	assert !app.mirror_mode && app.selected == 0 && app.query.bytestr() == 'kept search' && app.filter == 1
 	app.handle('software.deployment')!
 	for size in [ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 639, 609), ui2.rect(0, 0, 640, 240), ui2.rect(0, 0, 320, 610)]! {
-		for index in 0 .. 8 {
+		for index in 0 .. software_deployment_form_actions.len {
 			app.deployment_action = index
 			tree := app.build(size)!
 			assert app.deployment_form_compact && tree.children.any(it.id == software_deployment_form_actions[index])
@@ -154,7 +154,8 @@ fn check_software_deployment_form_memory() ! {
 		for warmup in 0 .. 2 {
 			if warmup == 1 { C.vinix_heap_begin() }
 			for _ in 0 .. 1000 {
-				for index in 0 .. 7 {
+				for index in 0 .. software_deployment_form_actions.len {
+					if !app.deployment_form_action_available(index) { continue }
 					app.deployment_action = index
 					free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 					app.key_input('\x1b[C'); app.key_input('\x1b[D')
@@ -168,6 +169,6 @@ fn check_software_deployment_form_memory() ! {
 		}
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'compact deployment form retained ${kept} bytes'
-		println('Software compact deployment: 1000 seven-action render/edit/rejected-paste/keyboard/full/compact/tiny/retirement cycles retain zero tracked bytes PASS')
+		println('Software compact deployment: 1000 render/edit/rejected-paste/keyboard/full/compact/tiny/retirement cycles retain zero tracked bytes PASS')
 	}
 }

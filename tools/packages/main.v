@@ -13,7 +13,7 @@ import tools.packages.audiopcm
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  capabilities (read-only JSON supported interface versions)\n' +
 	'  update [REPOSITORY_ID [IDENTITY_SHA256]] | search [QUERY] | info ID | list | status | updates | view\n' +
-	'  admin [--progress] [--offline] update|apply|cleanup-apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
+	'  admin [--progress] [--offline] update|apply|cleanup-apply|repo-apply|deployment-apply|deployment-add-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
 	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify | health\n' +
 	'  cleanup-review | cleanup-apply REVIEW_FINGERPRINT (obsolete generations only)\n' +
 	'  plan install|remove|upgrade|repair|deploy [ID...] | deploy MANIFEST.json\n' +
@@ -27,6 +27,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  deployment-snapshot-save NEW_FILE [INSTALLED_ID...]\n' +
 	'  deployment-audit FILE (read-only metadata drift; exit 0 match, 3 drift)\n' +
 	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
+	'  deployment-add-review LOCK.json | deployment-add-apply REVIEW_FINGERPRINT LOCK.json\n' +
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  wine-prefix-review ID PRIVATE_DATA (JSON review; may create coordination files)\n' +
 	'  wine-prefix-additions ID PRIVATE_DATA [--generation N] (create missing builtin links; never retarget)\n' +
@@ -104,8 +105,8 @@ fn checked(arguments []string) !int {
 		return 2
 	}
 	command := args[0]
-	if progress && ((as_json && command != 'health') || command !in ['update', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'rollback', 'verify', 'health', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
-		return error('--progress supports update, install/remove/upgrade/repair, apply, deploy/deployment-apply, rollback, verify, health and mirror/mirror-apply/mirror-deployment-apply; only health also supports --json')
+	if progress && ((as_json && command != 'health') || command !in ['update', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'deployment-add-apply', 'rollback', 'verify', 'health', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
+		return error('--progress supports update, install/remove/upgrade/repair, apply, deploy/deployment-apply/deployment-add-apply, rollback, verify, health and mirror/mirror-apply/mirror-deployment-apply; only health also supports --json')
 	}
 	names := args[1..].clone()
 	mut audio_portal := audiopcm.Portal{}
@@ -366,8 +367,10 @@ fn checked(arguments []string) !int {
 			}
 			return if report.matches { 0 } else { 3 }
 		}
-		'deployment-lock', 'deployment-snapshot', 'deployment-review' {
-			if command == 'deployment-review' && names.len != 1 { return error('deployment-review requires a deployment document') }
+		'deployment-lock', 'deployment-snapshot', 'deployment-review', 'deployment-add-review' {
+			if command in ['deployment-review', 'deployment-add-review']! && names.len != 1 {
+				return error('${command} requires a deployment document')
+			}
 			text := if command == 'deployment-lock' {
 				json2.encode(service.lock_deployment(names)!)
 			} else if command == 'deployment-snapshot' {
@@ -376,7 +379,11 @@ fn checked(arguments []string) !int {
 				document.close()
 				encoded
 			} else {
-				mut review := service.review_deployment(names[0])!
+				mut review := if command == 'deployment-add-review' {
+					service.review_deployment_additions(names[0])!
+				} else {
+					service.review_deployment(names[0])!
+				}
 				encoded := json2.encode(review)
 				review.close()
 				encoded
@@ -385,9 +392,13 @@ fn checked(arguments []string) !int {
 			if text.len > pkgcore.max_metadata { return error('deployment document/review exceeds metadata limit') }
 			println(text)
 		}
-		'deployment-apply' {
-			if names.len != 2 { return error('deployment-apply requires a review fingerprint and deployment document') }
-			mut state := service.apply_deployment(names[1], names[0])!
+		'deployment-apply', 'deployment-add-apply' {
+			if names.len != 2 { return error('${command} requires a review fingerprint and deployment document') }
+			mut state := if command == 'deployment-add-apply' {
+				service.apply_deployment_additions(names[1], names[0])!
+			} else {
+				service.apply_deployment(names[1], names[0])!
+			}
 			state.close()
 		}
 		'policy' {

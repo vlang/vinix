@@ -45,6 +45,7 @@ fn software_failure_operation(arguments []string) string {
 			'repo-list', 'repo-review', 'repo-apply', 'repo-enroll', 'repo-revoke' { 'Repository administration' }
 			'policy', 'policy-review', 'policy-apply' { 'Organization policy' }
 			'deploy', 'deployment-review', 'deployment-apply' { 'Organization deployment' }
+			'deployment-add-review', 'deployment-add-apply' { 'Add release apps' }
 			'deployment-audit' { 'Check installed deployment' }
 			'deployment-snapshot-save' { 'Save installed deployment' }
 			'mirror', 'mirror-review', 'mirror-apply', 'mirror-deployment-review', 'mirror-deployment-apply' { 'Offline repository export' }

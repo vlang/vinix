@@ -102,11 +102,11 @@ fn review_action_valid(row &ReviewPackage, operation string) bool {
 }
 
 pub fn (review &Review) validate() ! {
-	if review.format !in [1, 2]! || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'repair', 'rollback', 'mirror']
+	if review.format !in [1, 2]! || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'deploy-add', 'repair', 'rollback', 'mirror']
 		|| review.architecture !in ['aarch64', 'x86_64'] || !digest(review.fingerprint)
 		|| review.rows.len > 8192 || review.names.len > 4096 || review.requested.len > 4096
 		|| review.names.any(!identifier(it)) || review.requested.any(!identifier(it))
-		|| (review.operation in ['install', 'remove', 'mirror'] && review.names.len == 0)
+		|| (review.operation in ['install', 'remove', 'deploy-add', 'mirror'] && review.names.len == 0)
 		|| (review.operation in ['upgrade', 'repair', 'rollback'] && review.names.len != 0)
 		|| (review.operation == 'rollback' && review.target_generation == 0)
 		|| (review.operation != 'rollback' && review.target_generation != 0) {

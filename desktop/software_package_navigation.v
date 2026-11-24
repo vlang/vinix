@@ -215,7 +215,7 @@ fn (a &SoftwareApp) package_review_running() bool {
 fn (a &SoftwareApp) package_review_readable() bool {
 	return a.worker == unsafe { nil } && a.review_ready
 		&& ((a.package_screen_active() && a.review in ['install', 'remove', 'upgrade', 'repair', 'rollback']!)
-			|| (a.deployment_mode && a.review == 'deploy' && a.deployment_pending != ''))
+			|| (a.deployment_mode && a.review in ['deploy', 'deploy-add']! && a.deployment_pending != ''))
 }
 
 fn (a &SoftwareApp) package_plan_values(mut values []string) {
@@ -240,6 +240,7 @@ fn (a &SoftwareApp) package_plan_values(mut values []string) {
 	}
 	values << match a.review {
 		'deploy' { 'Deployment replaces the installed application set with the reviewed roots and dependencies, including listed removals.'.clone() }
+		'deploy-add' { 'Add release apps keeps existing application selections and adds the signed release roots. Review changes to the shared dependencies.'.clone() }
 		'rollback' { 'Rollback restores the previous package set in a new generation and retains the current set so it can be restored again.'.clone() }
 		'repair' { 'Repair preserves installed versions, permissions and application roots. Packages marked repair are rebuilt from authenticated payloads.'.clone() }
 		'remove' { 'Uninstall removes the reviewed applications and unused dependencies.'.clone() }

@@ -16,7 +16,9 @@ fn main() {
 				'REVIEW CONSTRUCTION both hosts preserve changed/no-op proposals, reject space/validation/generation failures and retire 128 repeated calls per case PASS',
 				'REVIEW CONSTRUCTION ordinary/deployment identities retain exact prior JSON digests, repair domains and 1000 repeated hash retirements PASS',
 				'REVIEW CONSTRUCTION independently owned fingerprints, rows and prior declarations survive input retirement on both hosts PASS',
-				'REVIEW PERMISSIONS both hosts retain installed declarations across new installs, updates, unchanged dependencies, empty sets, repair, rollback and revoked removal PASS'],
+				'REVIEW PERMISSIONS both hosts retain installed declarations across new installs, updates, unchanged dependencies, empty sets, repair, rollback and revoked removal PASS',
+				'DEPLOYMENT ADDITIONS signed pin, exact unrelated version, mode separation, stale fingerprint and no-op PASS',
+				'DEPLOYMENT ADDITIONS incompatible installed root, missing pins and invalid lock formats refused unchanged PASS'],
 			forbidden: ['V panic:', 'HWTEST FAIL', 'Out of memory']}]}
 	exit(hwhost.run_suite(definition, os.args[1..], @FILE))
 }

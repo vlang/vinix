@@ -178,10 +178,11 @@ after the reply is retired, including service-provided refusal text. See
 [administrator client checks](../../tests/packages/admin-client-check.md).
 
 Allowed operations are `update`, reviewed `apply` for install/remove/upgrade/
-repair/rollback, `repo-apply`, `deployment-apply`, `policy-apply`, `mirror-apply` and
-`mirror-deployment-apply`. Every operation except refresh requires its exact
-64-digit review fingerprint; normal service validation repeats under the writer
-lock. IDs and absolute file/destination paths are checked before authorization.
+repair/rollback, `repo-apply`, `deployment-apply`, `deployment-add-apply`,
+`policy-apply`, `mirror-apply` and `mirror-deployment-apply`. Every operation
+except refresh requires its exact 64-digit review fingerprint. The service
+validates it again under the writer lock. IDs and absolute file/destination
+paths are checked before authorization.
 Raw install/remove/upgrade/repair/rollback, alternate roots, arbitrary executables,
 publisher tooling, application launches and nested administration are refused.
 Read-only review/status commands remain available directly to ordinary users.
@@ -1071,6 +1072,27 @@ prompt returning after reboot. Review hands the exact complete set to Software
 after its initial catalog read; it cannot apply changes or request approval
 until the user confirms the resulting proposal. Images without the declaration
 retain the legacy first-run picker.
+
+On an existing installation, **Deployment → Add release apps** uses the same
+signed release declaration and keeps all currently selected application roots.
+Review the release versions, shared dependencies and any unused dependencies
+the transaction would remove. Applications and dependencies outside the lock
+retain their installed versions and publisher provenance when still required.
+If the combined set conflicts, or a required retained version is unavailable
+from the authenticated catalog, the review refuses.
+
+Use a nonempty format-2 lock for the equivalent CLI operation.
+
+```sh
+vinix-package deployment-add-review /usr/share/vinix-packages/applications.json
+vinix-package admin deployment-add-apply REVIEW_FINGERPRINT /usr/share/vinix-packages/applications.json
+```
+
+The additive review binds approval to the installed state, authenticated plan
+and lock. If those inputs change, review again. Use the matching additive
+fingerprint when applying. **Review release apps** remains the full-set
+deployment workflow for an administrator who intends to replace the installed
+set.
 
 The [native first-run check](../../tests/packages/software-first-run-native-check.md)
 drives this flow on both installed target systems without legacy registration
@@ -4215,8 +4237,8 @@ The package service remains authoritative for complete state, trust, policy and
 launch admission. See [registration qualification](../../tests/packages/registration-check.md).
 
 For live operation progress, pass `--progress` to `update`, `install`, `remove`,
-`upgrade`, `repair`, `apply`, `deploy`, `deployment-apply`, `rollback`, `verify`,
-`mirror` or `mirror-apply`. Health supports a separate stderr channel described
+`upgrade`, `repair`, `apply`, `deploy`, `deployment-apply`, `deployment-add-apply`,
+`rollback`, `verify`, `mirror` or `mirror-apply`. Health supports a separate stderr channel described
 below. Other progress commands refuse `--json`. Ordinary human output/diagnostics are retained;
 presentation records occupy complete stdout lines prefixed by
 `VINIX-PACKAGE-PROGRESS ` followed by a format-1 JSON object. The producer flushes

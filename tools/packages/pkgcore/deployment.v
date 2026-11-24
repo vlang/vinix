@@ -33,6 +33,11 @@ struct DeploymentIdentity {
 	repairs  []string @[omitempty]
 }
 
+enum DeploymentMode {
+	exact
+	additions
+}
+
 // Digest every manifest field, including payload hashes, permissions, license,
 // runtime entrypoint and launch arguments. Index sequence/expiry are independent.
 pub fn package_metadata_digest(p Package) !string {
@@ -104,10 +109,13 @@ fn decode_deployment(text string, architecture string) !DeploymentLock {
 fn deployment_plan(config Config, directory string, current State, document DeploymentLock) !Plan {
 	// Legacy internal callers retain this borrowed plan's preparation. Public
 	// requests keep its owner explicitly until their independent reply is built.
-	return prepare_deployment_plan(config, directory, current, document)!.plan
+	return prepare_deployment_plan(config, directory, current, document, .exact)!.plan
 }
 
-fn prepare_deployment_plan(config Config, directory string, current State, document DeploymentLock) !PreparedOperationPlan {
+fn prepare_deployment_plan(config Config, directory string, current State, document DeploymentLock, mode DeploymentMode) !PreparedOperationPlan {
+	if mode == .additions && (document.format != 2 || document.packages.len == 0) {
+		return error('adding deployment apps requires a nonempty format-2 deployment lock')
+	}
 	if document.format == 1 { return prepare_operation_plan(config, directory, current, 'deploy', document.packages) }
 	if document.packages.len == 0 {
 		if document.locked.len != 0 {
@@ -119,7 +127,11 @@ fn prepare_deployment_plan(config Config, directory string, current State, docum
 	mut prepared := PreparedOperationPlan{catalog: catalog, owns_catalog: true}
 	mut accepted := false
 	defer { if !accepted { prepared.close() } }
-	prepared.plan = resolve_locked_deployment(config, catalog, current, document)!
+	prepared.plan = if mode == .additions {
+		resolve_deployment_additions(config, catalog, current, document)!
+	} else {
+		resolve_locked_deployment(config, catalog, current, document)!
+	}
 	prepared.owns_buffers = true
 	accepted = true
 	return prepared
@@ -140,11 +152,13 @@ fn resolve_locked_deployment(config Config, catalog Catalog, current State, docu
 	return plan
 }
 
-fn deployment_fingerprint(config Config, current State, document DeploymentLock, plan Plan, repairs []string) string {
+fn deployment_fingerprint(config Config, current State, document DeploymentLock, plan Plan, repairs []string, mode DeploymentMode) string {
 	mut bytes := []u8{cap: 2048}
 	unsafe { bytes.flags |= .noslices }
 	defer { unsafe { bytes.free() } }
-	json2.encode_append(DeploymentIdentity{ config: config, current: current, document: document, plan: plan, repairs: repairs }, mut bytes)
+	domain := if mode == .additions { 'vinix-deployment-add-review-1' } else { 'vinix-deployment-review-1' }
+	json2.encode_append(DeploymentIdentity{ domain: domain, config: config, current: current,
+		document: document, plan: plan, repairs: repairs }, mut bytes)
 	return review_identity_digest(bytes)
 }
 
@@ -168,6 +182,14 @@ pub fn (service Service) lock_deployment(names []string) !DeploymentLock {
 }
 
 pub fn (service Service) review_deployment(path string) !pkgprotocol.Review {
+	return service.review_deployment_mode(path, .exact)
+}
+
+pub fn (service Service) review_deployment_additions(path string) !pkgprotocol.Review {
+	return service.review_deployment_mode(path, .additions)
+}
+
+fn (service Service) review_deployment_mode(path string, mode DeploymentMode) !pkgprotocol.Review {
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
 	guard := acquire_reader(directory)!
@@ -178,17 +200,18 @@ pub fn (service Service) review_deployment(path string) !pkgprotocol.Review {
 	defer { if current.generation != 0 { close_decoded_state(current) } }
 	mut document := read_deployment(path, config.architecture)!
 	defer { document.close() }
-	mut prepared := prepare_deployment_plan(config, directory, current, document)!
+	mut prepared := prepare_deployment_plan(config, directory, current, document, mode)!
 	defer { prepared.close() }
 	plan := prepared.plan
 	repairs := transaction_repairs(directory, current, plan, 'deploy')
 	defer { close_transaction_repairs(repairs) }
-	fingerprint := deployment_fingerprint(config, current, document, plan, repairs)
+	fingerprint := deployment_fingerprint(config, current, document, plan, repairs, mode)
 	defer { unsafe { fingerprint.free() } }
-	return review_plan(config, directory, current, 'deploy', document.packages, plan, 0, repairs, fingerprint)
+	operation := if mode == .additions { 'deploy-add' } else { 'deploy' }
+	return review_plan(config, directory, current, operation, document.packages, plan, 0, repairs, fingerprint)
 }
 
-fn (service Service) deploy_document(path string, expected string) !State {
+fn (service Service) deploy_document(path string, expected string, mode DeploymentMode) !State {
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
@@ -199,12 +222,12 @@ fn (service Service) deploy_document(path string, expected string) !State {
 	defer { if current.generation != 0 { close_decoded_state(current) } }
 	mut document := read_deployment(path, config.architecture)!
 	defer { document.close() }
-	mut prepared := prepare_deployment_plan(config, directory, current, document)!
+	mut prepared := prepare_deployment_plan(config, directory, current, document, mode)!
 	defer { prepared.close() }
 	plan := prepared.plan
 	repairs := transaction_repairs(directory, current, plan, 'deploy')
 	defer { close_transaction_repairs(repairs) }
-	fingerprint := deployment_fingerprint(config, current, document, plan, repairs)
+	fingerprint := deployment_fingerprint(config, current, document, plan, repairs, mode)
 	defer { unsafe { fingerprint.free() } }
 	check_review(expected, fingerprint)!
 	service.progress(pkgprotocol.Progress{ phase: 'resolve' })
@@ -213,10 +236,15 @@ fn (service Service) deploy_document(path string, expected string) !State {
 }
 
 pub fn (service Service) deploy(path string) !State {
-	return service.deploy_document(path, '')
+	return service.deploy_document(path, '', .exact)
 }
 
 pub fn (service Service) apply_deployment(path string, expected string) !State {
 	if !digest_valid(expected) { return error('deployment apply requires a review fingerprint') }
-	return service.deploy_document(path, expected)
+	return service.deploy_document(path, expected, .exact)
+}
+
+pub fn (service Service) apply_deployment_additions(path string, expected string) !State {
+	if !digest_valid(expected) { return error('adding deployment apps requires a review fingerprint') }
+	return service.deploy_document(path, expected, .additions)
 }

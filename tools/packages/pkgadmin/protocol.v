@@ -62,7 +62,7 @@ pub fn validate_arguments(arguments []string) ! {
 			if args.len == 4 && args[2] == 'revoke' && identifier(args[3]) { return }
 			if args.len == 6 && args[2] == 'enroll' && identifier(args[3]) && printable(args[4]) && hex(args[5], 64) { return }
 		}
-		'deployment-apply', 'policy-apply' { if args.len == 3 && path(args[2]) { return } }
+		'deployment-apply', 'deployment-add-apply', 'policy-apply' { if args.len == 3 && path(args[2]) { return } }
 		'mirror-apply' { if args.len >= 4 && path(args[2]) && args[3..].all(identifier(it)) { return } }
 		'mirror-deployment-apply' { if args.len == 4 && path(args[2]) && path(args[3]) { return } }
 		else {}
@@ -71,7 +71,7 @@ pub fn validate_arguments(arguments []string) ! {
 }
 
 pub fn administrative(arguments []string) bool {
-	return arguments.len > 0 && arguments[0] in ['update', 'apply', 'cleanup-apply', 'repo-apply', 'deployment-apply', 'policy-apply', 'mirror-apply', 'mirror-deployment-apply']
+	return arguments.len > 0 && arguments[0] in ['update', 'apply', 'cleanup-apply', 'repo-apply', 'deployment-apply', 'deployment-add-apply', 'policy-apply', 'mirror-apply', 'mirror-deployment-apply']
 }
 
 pub fn (request &Request) encode() !string {

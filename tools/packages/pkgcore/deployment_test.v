@@ -45,6 +45,96 @@ fn write_deployment(work string, document DeploymentLock) !string {
 	return path
 }
 
+fn deployment_addition_keeper(work string, version string, dependencies []Dependency) ! {
+	os.write_file(work + '/manifest.json', json2.encode(Package{ id: 'keeper', version: version,
+		architecture: 'aarch64', name: 'Existing app', license: 'MIT', kind: 'native',
+		entrypoint: 'bin/runner', dependencies: dependencies }))!
+	pack(work + '/manifest.json', work + '/source', work + '/repository')!
+}
+
+fn test_additive_deployment_keeps_current_roots_and_binds_approval_to_current_state() {
+	work, service, _ := deployment_fixture('additions')!
+	defer { os.rmdir_all(work) or {} }
+	deployment_addition_keeper(work, '1.0.0', [])!
+	publish(work + '/repository', 'fixture', work + '/seed', 2, time.now().unix() + 3600)!
+	service.refresh()!
+	locked := service.lock_deployment(['app'])!
+	path := write_deployment(work, locked)!
+	mut exact := service.review_deployment(path)!
+	defer { exact.close() }
+	mut initial := service.review_deployment_additions(path)!
+	defer { initial.close() }
+	assert initial.operation == 'deploy-add' && initial.requested == exact.requested
+	assert initial.fingerprint != exact.fingerprint
+	mut refused := false
+	service.apply_deployment_additions(path, exact.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && service.state()!.generation == 0
+	refused = false
+	service.apply_deployment(path, initial.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && service.state()!.generation == 0
+
+	service.transact('install', ['keeper'], TransactionOptions{})!
+	deployment_addition_keeper(work, '2.0.0', [])!
+	deployment_version(work, '2.0.0')!
+	publish(work + '/repository', 'fixture', work + '/seed', 3, time.now().unix() + 3600)!
+	service.refresh()!
+	mut stale := service.review_deployment_additions(path)!
+	defer { stale.close() }
+	assert stale.names == ['app'] && stale.requested == ['app', 'keeper']
+	assert stale.rows.all(it.version == '1.0.0')
+	assert stale.rows.filter(it.action == 'keep').map(it.id) == ['keeper']
+	mut replacing := service.review_deployment(path)!
+	defer { replacing.close() }
+	assert replacing.rows.filter(it.action == 'remove').map(it.id) == ['keeper']
+
+	service.transact('install', ['unused'], TransactionOptions{})!
+	before := service.state()!
+	refused = false
+	service.apply_deployment_additions(path, stale.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && service.state()! == before
+	mut review := service.review_deployment_additions(path)!
+	defer { review.close() }
+	assert review.requested == ['app', 'keeper', 'unused'] && review.rows.all(it.action != 'remove')
+	assert service.state()! == before
+	mut saved := service.apply_deployment_additions(path, review.fingerprint)!
+	defer { saved.close() }
+	assert saved.requested == review.requested && saved.packages.len == 4
+	assert saved.packages.all(it.package.version == '1.0.0')
+	mut repeated := service.review_deployment_additions(path)!
+	defer { repeated.close() }
+	assert repeated.rows.all(it.action == 'keep')
+	assert service.apply_deployment_additions(path, repeated.fingerprint)!.generation == saved.generation
+	println('DEPLOYMENT ADDITIONS signed pin, exact unrelated version, mode separation, stale fingerprint and no-op PASS')
+}
+
+fn test_additive_deployment_refuses_conflicting_roots_and_incomplete_pins() {
+	work, service, _ := deployment_fixture('additions-conflict')!
+	defer { os.rmdir_all(work) or {} }
+	deployment_addition_keeper(work, '1.0.0', [Dependency{ id: 'runtime', before: '2.0.0' }])!
+	deployment_version(work, '2.0.0')!
+	publish(work + '/repository', 'fixture', work + '/seed', 2, time.now().unix() + 3600)!
+	service.refresh()!
+	service.transact('install', ['keeper'], TransactionOptions{})!
+	before := service.state()!
+	document := service.lock_deployment(['app'])!
+	assert document.locked.all(it.version == '2.0.0')
+	for invalid in [
+		DeploymentLock{ format: 1, architecture: 'aarch64', packages: ['app'] },
+		DeploymentLock{ architecture: 'aarch64' },
+		DeploymentLock{ ...document, locked: document.locked.filter(it.id == 'app') },
+		document,
+	] {
+		path := write_deployment(work, invalid)!
+		mut refused := false
+		service.review_deployment_additions(path) or { refused = true }
+		assert refused && service.state()! == before
+	}
+	mut exact := service.review_deployment(write_deployment(work, document)!)!
+	defer { exact.close() }
+	assert exact.rows.filter(it.action == 'remove').map(it.id) == ['keeper']
+	println('DEPLOYMENT ADDITIONS incompatible installed root, missing pins and invalid lock formats refused unchanged PASS')
+}
+
 fn test_deployment_mirror_exports_pinned_older_application_and_runtime_and_lock_atomically() {
 	work, service, config := deployment_fixture('mirror-pins')!
 	defer { os.rmdir_all(work) or {} }

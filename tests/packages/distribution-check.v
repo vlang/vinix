@@ -367,6 +367,7 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_repositories.v', work + '/software/software_repositories.v')!
 	os.cp(repository + '/desktop/software_repository_navigation.v', work + '/software/software_repository_navigation.v')!
 	os.cp(repository + '/tests/packages/software_repository_navigation_fixture.v', work + '/software/repository_navigation_fixture.v')!
+	os.cp(repository + '/tests/packages/software_repository_recovery_fixture.v', work + '/software/repository_recovery_fixture.v')!
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
 	os.cp(repository + '/tests/packages/software_progress_memory_fixture.v', work + '/software/progress_memory_fixture.v')!
 	os.cp(repository + '/desktop/software_failure.v', work + '/software/software_failure.v')!

@@ -176,6 +176,7 @@ mut:
 	release_deployment_available bool
 	release_review_requested bool
 	release_catalog_mode bool
+	release_catalog_additions bool
 	mirror_mode bool
 	mirror_path []u8
 	mirror_all bool
@@ -548,7 +549,12 @@ fn (mut a SoftwareApp) load_review() {
 			'Review the destination, deployment source and digest, then every application and dependency. Export preserves the exact locked versions and bundles _deployment.json.'
 		} else { 'Review the destination and every application and dependency. Export uses the authenticated catalog versions; it preserves the installed application set.' })
 	} else if a.deployment_pending != '' {
-		message := 'Deployment file: ' + a.deployment_pending + '\nReview all dependencies and removals. This replaces the installed application set; personal data stays on disk.'
+		scope := if a.review == 'deploy-add' {
+			'Existing application selections are kept. Review the signed versions, shared dependency changes and any dependencies no longer needed.'
+		} else {
+			'Review all dependencies and removals. This replaces the installed application set; personal data stays on disk.'
+		}
+		message := 'Deployment file: ' + a.deployment_pending + '\n' + scope
 		a.set_status(message)
 		unsafe { message.free() }
 	} else if a.review == 'repair' {
@@ -761,7 +767,9 @@ fn (mut a SoftwareApp) poll() bool {
 	} else if view {
 		if !a.worker_failed && a.load_view() && a.release_catalog_mode && a.catalog_error == '' {
 			a.release_catalog_mode = false
-			a.open_release_deployment_review()
+			additions := a.release_catalog_additions
+			a.release_catalog_additions = false
+			a.open_release_deployment_review_mode(additions)
 		}
 	} else if reviewing {
 		if a.worker_failed { a.clear_review() } else { a.load_review() }
@@ -1133,7 +1141,8 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 				} else if mirroring {
 					['mirror-apply', a.review_snapshot.fingerprint, a.mirror_pending, ...a.review_snapshot.names]
 				} else if a.deployment_pending != '' {
-					['deployment-apply', a.review_snapshot.fingerprint, a.deployment_pending]
+					[if a.review == 'deploy-add' { 'deployment-add-apply' } else { 'deployment-apply' },
+						a.review_snapshot.fingerprint, a.deployment_pending]
 				} else {
 					['apply', a.review_snapshot.fingerprint, a.review_snapshot.operation,
 						...a.review_snapshot.names]
@@ -1380,7 +1389,8 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	reviewing := a.review.len > 0
 	children << software_label('Software', 14, 8, 150, 28, false)
 	if reviewing {
-		children << software_label(if a.deployment_pending != '' { 'Review deployment'.clone() } else {
+		children << software_label(if a.review == 'deploy-add' { 'Review release additions'.clone() }
+		else if a.deployment_pending != '' { 'Review deployment'.clone() } else {
 			'Review ${a.review}'
 		}, 170, 8, if a.mirror_pending != '' { width - 340 } else { width - 188 }, 28, true)
 		children << software_label(a.review_summary, 14, 40, width - 28, 44, false)

@@ -5,7 +5,7 @@ import ui2
 
 fn (a &SoftwareApp) deployment_review_running() bool {
 	return a.deployment_mode && a.worker != unsafe { nil } && a.worker_review
-		&& a.review == 'deploy' && a.deployment_pending != ''
+		&& a.review in ['deploy', 'deploy-add']! && a.deployment_pending != ''
 }
 
 fn (mut a SoftwareApp) stop_deployment_review() {

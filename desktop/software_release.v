@@ -34,17 +34,22 @@ fn (mut a SoftwareApp) take_first_run_release_review() {
 }
 
 fn (mut a SoftwareApp) open_release_deployment_review() {
+	a.open_release_deployment_review_mode(false)
+}
+
+fn (mut a SoftwareApp) open_release_deployment_review_mode(additions bool) {
 	if !a.check_release_deployment() { return }
 	if a.catalog_error != '' {
 		a.focus = false
 		a.select_all = false
 		a.release_catalog_mode = true
+		a.release_catalog_additions = additions
 		a.set_status(a.catalog_error)
 		return
 	}
 	a.deployment_mode = true
 	a.load_release_deployment_path()
-	a.begin_deployment_review()
+	a.begin_deployment_review_mode(additions)
 }
 
 fn (mut a SoftwareApp) handle_release_catalog(action string) {
@@ -52,6 +57,7 @@ fn (mut a SoftwareApp) handle_release_catalog(action string) {
 	match action {
 		'software.release.catalog.back' {
 			a.release_catalog_mode = false
+			a.release_catalog_additions = false
 			a.set_status(a.catalog_error)
 		}
 		'software.release.catalog.refresh', 'software.release.catalog.offline' {

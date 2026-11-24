@@ -8,7 +8,8 @@ fn test_reviewed_admin_requests_and_bound_completion() {
 		['--progress', '--offline', 'apply', fingerprint, 'install', 'org.vinix.memo'],
 		['apply', fingerprint, 'upgrade'], ['apply', fingerprint, 'repair'], ['apply', fingerprint, 'rollback'], ['cleanup-apply', fingerprint], ['repo-apply', fingerprint, 'revoke', 'publisher'],
 		['repo-apply', fingerprint, 'enroll', 'publisher', 'file:///media/with spaces; $literal', fingerprint],
-		['deployment-apply', fingerprint, '/etc/company/approved apps.json'], ['policy-apply', fingerprint, '/etc/company/policy.json'],
+		['deployment-apply', fingerprint, '/etc/company/approved apps.json'],
+		['deployment-add-apply', fingerprint, '/etc/company/approved apps.json'], ['policy-apply', fingerprint, '/etc/company/policy.json'],
 		['mirror-apply', fingerprint, '/media/offline', 'org.vinix.memo'], ['mirror-deployment-apply', fingerprint, '/media/offline', '/etc/company/lock.json']] {
 		request := Request{ nonce: 'b'.repeat(32), arguments: arguments }
 		text := request.encode()!
@@ -32,6 +33,8 @@ fn test_admin_transport_refuses_launches_alternate_roots_and_unreviewed_changes(
 		['apply', fingerprint, 'install', '--root'], ['apply', fingerprint, 'install', 'bad; id'],
 		['apply', fingerprint, 'upgrade', 'extra'], ['apply', fingerprint, 'repair', 'app'], ['repo-apply', fingerprint, 'revoke', 'publisher', 'extra'],
 		['policy-apply', fingerprint, 'relative.json'], ['apply', fingerprint, 'deploy', 'app'],
+		['deployment-add-review', '/release.json'], ['deployment-add-apply', fingerprint, 'relative.json'],
+		['deployment-add-apply', 'bad-fingerprint', '/release.json'],
 		['update', 'field', 'extra'], ['update', '--offline'], ['update', '/tmp/field'],
 		['update', 'field', 'A'.repeat(64)], ['update', 'field', fingerprint, 'extra'],
 		['update', '/field', fingerprint], ['update', 'field', ''],
@@ -46,6 +49,8 @@ fn test_admin_transport_refuses_launches_alternate_roots_and_unreviewed_changes(
 		assert refused
 	}
 	assert administrative(['cleanup-apply', fingerprint]) && !administrative(['cleanup-review']) && !administrative(['gc'])
+	assert administrative(['deployment-add-apply', fingerprint, '/release.json'])
+	assert !administrative(['deployment-add-review', '/release.json'])
 	request := Request{ nonce: 'b'.repeat(32), arguments: ['apply', fingerprint, 'install', 'app'] }
 	text := request.encode()!
 	for invalid in [text + '{}', text + ' ', text.replace('"format":1', '"format":1,"format":1'),

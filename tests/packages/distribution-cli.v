@@ -594,9 +594,28 @@ fn qualify_install_preference(binary string, directory string) ! {
 		success(binary, ['--root', root, 'rollback'])!
 		assert pkgcore.read_state(store, architecture)!.packages.len == 21
 		success(binary, ['--root', root, 'verify'])!
+		addition_path := root + '/add apps; $literal.json'
+		os.write_file(addition_path, success(binary, ['--root', root, 'deployment-lock', 'zz-addon'])!)!
+		before_addition := os.readlink(store + '/current')!
+		mut addition := pkgprotocol.decode_review(success(binary,
+			['--root', root, 'deployment-add-review', addition_path])!)!
+		defer { addition.close() }
+		assert addition.operation == 'deploy-add' && addition.names == ['zz-addon']
+		assert addition.requested.len == 22 && addition.rows.all(it.action != 'remove')
+		assert addition.rows.any(it.id == 'base' && it.version == '2.0.0')
+		assert addition.rows.any(it.id == 'node-0' && it.version == '1.0.0')
+		wrong_mode := command(binary, ['--root', root, 'deployment-apply', addition.fingerprint, addition_path])!
+		assert wrong_mode.code == 1 && wrong_mode.text.contains('stale')
+		assert os.readlink(store + '/current')! == before_addition
+		added := success(binary, ['--root', root, '--progress', 'deployment-add-apply',
+			addition.fingerprint, addition_path])!
+		assert added.contains(pkgprotocol.progress_prefix) && added.contains('"phase":"complete"')
+		assert pkgcore.read_state(store, architecture)!.requested == addition.requested
+		success(binary, ['--root', root, 'verify'])!
 	}
 	println('Package CLI: signed offline install backtracks past 20 unrelated installed identities; exact installed preference, missing-requirement refusal, reviewed activation and rollback pass on both targets PASS')
 	println('Package CLI: exact older deployment pins survive newer catalog variants; sequence/digest/version/architecture/repository/key refusals preserve state and reviewed activation/rollback pass on both targets PASS')
+	println('Package CLI: signed additive review preserves 21 prior roots, keeps unrelated versions, applies the pinned dependency update and rejects exact-mode replay on both targets PASS')
 }
 
 fn qualify_removal_guidance(binary string, directory string) ! {

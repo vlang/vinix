@@ -29,6 +29,10 @@ fn (mut a SoftwareApp) initialize_deployment_field() {
 }
 
 fn (mut a SoftwareApp) begin_deployment_review() {
+	a.begin_deployment_review_mode(false)
+}
+
+fn (mut a SoftwareApp) begin_deployment_review_mode(additions bool) {
 	a.initialize_deployment_field()
 	a.clear_review()
 	path := editor_bytes_text(a.deployment_path)
@@ -36,11 +40,12 @@ fn (mut a SoftwareApp) begin_deployment_review() {
 		a.set_status('Enter an absolute deployment file path without control characters (at most 4096 bytes).')
 		return
 	}
-	a.review = 'deploy'.clone()
+	a.review = if additions { 'deploy-add'.clone() } else { 'deploy'.clone() }
 	a.deployment_pending = path.clone()
 	a.focus = false
 	a.select_all = false
-	a.start(['deployment-review', a.deployment_pending], false)
+	a.start([if additions { 'deployment-add-review' } else { 'deployment-review' },
+		a.deployment_pending], false)
 	if a.worker != unsafe { nil } {
 		a.worker_review = true
 		a.set_status('Checking the deployment file, trusted publishers, dependencies, policy and disk space…')
@@ -55,6 +60,7 @@ fn (mut a SoftwareApp) handle_deployment(event_id string) {
 		'software.deployment.action.next' { a.navigate_deployment_form(1) }
 		'software.deployment.choose' { a.choose_deployment_file() }
 		'software.deployment.release' { a.open_release_deployment_review() }
+		'software.deployment.release-add' { a.open_release_deployment_review_mode(true) }
 		'software.deployment.release-audit' { a.audit_release_deployment() }
 		'software.deployment.path' {
 			a.focus = true
@@ -152,6 +158,7 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 		if a.release_deployment_available {
 			children << software_button('software.deployment.release', 'Review release apps', 14, 374, 180)
 			children << software_button('software.deployment.release-audit', 'Check release apps', 210, 374, 160)
+			children << software_button('software.deployment.release-add', 'Add release apps', 14, 418, 180)
 		}
 	} else if a.deployment_review_running() {
 		children << software_button('software.deployment.stop', 'Stop review', 14, 286, 160)

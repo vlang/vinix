@@ -26,14 +26,26 @@ fn software_first_run_release_service_fixture(args []string) !bool {
 			}
 			println(json2.encode(SoftwareView{ format: 1, architecture: 'aarch64', offline: offline,
 				catalog_error: if log.contains('update\n') { '' } else { 'No authenticated cached index.' } }))
-		} else if command == ['deployment-review', path] {
+		} else if command in [['deployment-review', path], ['deployment-add-review', path]] {
 			assert log.contains(prefix + 'update\n')
-			os.write_file(receipt, log + prefix + 'deployment-review\n')!
-			println(json2.encode(fixture_review('deploy', ['editor'])))
+			os.write_file(receipt, log + prefix + command[0] + '\n')!
+			operation := if command[0] == 'deployment-add-review' { 'deploy-add' } else { 'deploy' }
+			println(json2.encode(fixture_review(operation, ['editor'])))
 		} else {
 			assert args[1] == 'admin'
 			pkgadmin.validate_arguments(args[2..])!
 			use_offline := args[3] == '--offline'
+			addition := if use_offline {
+				['--progress', '--offline', 'deployment-add-apply', 'c'.repeat(64), path]
+			} else {
+				['--progress', 'deployment-add-apply', 'c'.repeat(64), path]
+			}
+			if args[2..] == addition {
+				mut byte := u8(0)
+				assert C.read(0, &byte, 1) == 1
+				os.write_file(receipt, 'unexpected additive credential submission')!
+				return true
+			}
 			assert args[2..] == if use_offline { ['--progress', '--offline', 'update'] } else { ['--progress', 'update'] }
 			mut input := [2]u8{}
 			for i in 0 .. input.len { assert C.read(0, &input[i], 1) == 1 }
@@ -69,7 +81,7 @@ fn software_first_run_release_service_fixture(args []string) !bool {
 	panic('unexpected first-run package command: ' + args[1])
 }
 
-fn check_release_catalog_refresh(path string, receipt string, manual bool) ! {
+fn check_release_catalog_refresh(path string, receipt string, manual bool, additions bool) ! {
 	os.setenv('VINIX_SOFTWARE_FIRST_RUN_REFRESH', '1', true)
 	defer {
 		os.unsetenv('VINIX_SOFTWARE_FIRST_RUN_REFRESH')
@@ -88,7 +100,7 @@ fn check_release_catalog_refresh(path string, receipt string, manual bool) ! {
 			software_repository_text(mut app.deployment_path, '/kept manual draft.json')
 			app.deployment_choice_pending = true
 			app.deployment_choice_current = true
-			review_action = 'software.deployment.release'
+			review_action = if additions { 'software.deployment.release-add' } else { 'software.deployment.release' }
 		}
 		app.handle(review_action)!
 		if !manual { wait_for_software(mut app) }
@@ -136,8 +148,24 @@ fn check_release_catalog_refresh(path string, receipt string, manual bool) ! {
 		approve_release_catalog_refresh(mut app, action, '!')!
 		assert !app.release_catalog_mode && app.review_ready && !app.admin_prompt
 		assert app.deployment_pending == path && app.offline_requested == offline
+		operation := if additions { 'deploy-add' } else { 'deploy' }
+		command := if additions { 'deployment-add-review' } else { 'deployment-review' }
+		assert app.review_snapshot.operation == operation
 		prefix := if refused_reload { 'view\noffline update\noffline view\n' } else { 'view\n' }
-		assert os.read_file(receipt)! == prefix + if offline { 'offline update\noffline view\noffline deployment-review\n' } else { 'update\nview\ndeployment-review\n' }
+		resumed := if offline { 'offline update\noffline view\noffline ' } else { 'update\nview\n' }
+		assert os.read_file(receipt)! == prefix + resumed + command + '\n'
+		if additions {
+			app.handle('software.confirm')!
+			assert app.admin_prompt
+			assert app.worker.args == if offline {
+				['admin', '--progress', '--offline', 'deployment-add-apply', 'c'.repeat(64), path]
+			} else {
+				['admin', '--progress', 'deployment-add-apply', 'c'.repeat(64), path]
+			}
+			app.handle('software.admin.cancel')!
+			assert app.worker == unsafe { nil } && !app.admin_prompt
+			assert os.read_file(receipt)! == prefix + resumed + command + '\n'
+		}
 	}
 }
 
@@ -209,10 +237,12 @@ fn check_software_first_run_release() ! {
 	assert !interrupted.release_review_requested && interrupted.focus && interrupted.review == ''
 	assert os.read_file(receipt)! == 'view\n'
 	interrupted.close_app()
-	check_release_catalog_refresh(path, receipt, false)!
+	check_release_catalog_refresh(path, receipt, false, false)!
 	println('Software first-run release: real queued view to literal full-set review, catalog failure recovery, duplicate delivery, no autoapply, cancel and separate administrator approval PASS')
-	check_release_catalog_refresh(path, receipt, true)!
+	check_release_catalog_refresh(path, receipt, true, false)!
 	println('Software manual release review: both refresh choices, Back preserves the draft, refused and malformed refresh retries, exact read-only resume PASS')
+	check_release_catalog_refresh(path, receipt, true, true)!
+	println('Software additive release review: offline and policy refresh preserve the additive mode and literal release path PASS')
 }
 
 fn check_software_release() ! {
@@ -239,6 +269,7 @@ fn check_software_release() ! {
 	tree = app.build(ui2.rect(0, 0, 640, 610))!
 	assert tree.children.any(it.id == 'software.deployment.release' && it.text == 'Review release apps')
 	assert tree.children.any(it.id == 'software.deployment.release-audit' && it.text == 'Check release apps')
+	assert tree.children.any(it.id == 'software.deployment.release-add' && it.text == 'Add release apps')
 	assert !tree.children.any(it.id == 'software.confirm')
 	free_window_tree(tree)
 	// The old picker cannot redirect the new read-only proposal.
@@ -308,6 +339,7 @@ fn check_software_release_memory() ! {
 				app.handle('software.deployment.back')!
 				app.handle('software.deployment')!
 				app.handle('software.deployment.release')!
+				app.handle('software.deployment.release-add')!
 				app.handle('software.deployment.release-audit')!
 				app.release_deployment_available = true
 			}
