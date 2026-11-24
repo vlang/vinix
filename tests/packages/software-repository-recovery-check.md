@@ -280,3 +280,23 @@ contains the source snapshot, generated decoder code, baseline and fixed host
 logs, and guest receipts. The independent archive checker verified all 2,385
 sealed files and symlinks. Archive SHA-256 is
 `1e4488b2137f07779906835c0fbee24202a0bbdec9f020de1150fc7e934f0c0d`.
+
+### Full Software fixture follow-up
+
+At `977165c121b4e38506be28d1ea63a5ac0a346cae`, the full fixture checks that
+the enrollment report describes separate refresh approval and that the refresh
+child receives the exact repository ID and identity fingerprint. The complete
+normal Software fixture passed, including the protected apply and refresh
+lifecycle and offline export flows.
+
+The compact mirror driver passed all five focused host modes, Linux arm64 and
+amd64 production C generation, and the supplementary full normal fixture. The
+driver used the prior headless UI2 snapshot with the three Linux helpers from
+UI2 revision `2a8ca1e7ab13a44d35967c18d4536d134444e7b9` staged as external
+inputs. The target checks generated C for the headless fixture.
+
+The [follow-up archive](/Users/alex/.local/state/vinix/r14-review-envelopes-zfhC8s/fixture-qualification.tar.gz)
+contains both host runs, the source and UI2 inventories, and generated C.
+The independent archive checker verified all 682 sealed files. Archive
+SHA-256 is
+`131126ac9e01aef1f10614b559b7b81211e2df4ee5e945f80f16cb03395cf562`.
