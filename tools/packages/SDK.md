@@ -592,8 +592,9 @@ For desktop and ISO builds, set `VINIX_PACKAGE_IMAGE_INDEXES` to an absolute
 pin file path. `VINIX_PACKAGE_IMAGE_INDEXES_AARCH64` and
 `VINIX_PACKAGE_IMAGE_INDEXES_X86_64` override the generic file for their
 respective targets. Write one repository ID and its lowercase SHA-256 digest
-per line, separated by a single space. The file supports 1–4096 distinct IDs
-and LF or CRLF line endings. A final newline is optional.
+per line. Hosted pins include the reviewed HTTPS base URL as a third field.
+Separate fields with a single space. The file supports 1–4096 distinct IDs,
+up to 8 MiB total, and LF or CRLF line endings. A final newline is optional.
 
 Use `vinix-package write-release-index-pins` to produce this file from the
 [signed release exports](#write-image-index-pins-from-signed-exports).
@@ -1299,12 +1300,14 @@ vinix-package write-hosted-release-index-pins /release/reviewed-indexes.txt \
 ```
 
 Each origin must pass the same complete readback as `check-release-origin`.
-The command writes the same sorted index pins as `write-release-index-pins`
-only after every origin passes. A readback refusal leaves the new destination
-absent, and a directory flush failure after publication reports the saved file.
-Use the verified URLs in the reviewed image configuration and use the pin file
-as `VINIX_PACKAGE_IMAGE_INDEXES`. The pins bind index bytes. Each HTTPS check
-verifies the bytes served during that run.
+The command writes sorted rows with the repository ID, index digest and exact
+HTTPS URL only after every origin passes. A readback refusal leaves the new
+destination absent, and a directory flush failure after publication reports
+the saved file. Set `VINIX_PACKAGE_IMAGE_INDEXES` to the pin file. Preflight
+and staging require each URL to match the effective image configuration
+exactly, including the path and trailing slash. Previously saved two-field
+rows still pin the index digest. Each HTTPS check verifies the bytes served
+during that run.
 
 #### Publication and recovery
 

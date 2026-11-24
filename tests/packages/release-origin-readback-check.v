@@ -227,7 +227,7 @@ fn check_hosted_index_pins(fixture Fixture, served string, secondary_key string,
 	secondary_original := inventory(secondary)!
 	history := work + '/workspace/.publisher/history.json'
 	floor := pkgcore.hash_file(history)!
-	expected := os.read_file(work + '/image-indexes.txt')!
+	expected := '${fixture.id} ${original['index.json']} ${first[3]}\nsecondary ${secondary_original['index.json']} ${second[3]}\n'
 	pins := work + '/hosted-indexes.txt'
 	failed := work + '/hosted-refusal.txt'
 	fixture.check_hosted_pins('hosted-pins-batch', pins, [], [...second, ...first], 0, '', all_reads)!
@@ -255,7 +255,7 @@ fn check_hosted_index_pins(fixture Fixture, served string, secondary_key string,
 	}
 	fixture.check_hosted_pins('hosted-pins-retry', failed, [], [...first, ...second], 0, '', all_reads)!
 	if os.read_file(failed)! != expected { return error('restored HTTPS inputs produced different pins') }
-	println('RELEASE INDEX PINS hosted batch and retry match canonical offline bytes; twelve refusals preserve destinations PASS')
+	println('RELEASE INDEX PINS hosted batch and retry retain exact HTTPS origins and digests; twelve refusals preserve destinations PASS')
 }
 
 fn check() ! {
@@ -375,7 +375,7 @@ fn check() ! {
 		pins := work + '/mixed-hosted-indexes.txt'
 		mixed_fixture.check_hosted_pins('mixed-hosted-pins', pins, [], [mixed, index.repository, os.args[5],
 			url + '/ranges/mixed'], 0, '', [...metadata, ...paths, ...metadata].map('ranges mixed/' + it))!
-		if os.read_file(pins)! != index.repository + ' ' + mixed_export.index_sha256 + '\n' {
+		if os.read_file(pins)! != index.repository + ' ' + mixed_export.index_sha256 + ' ' + url + '/ranges/mixed\n' {
 			return error('hosted mixed catalog pin differs from the reviewed index')
 		}
 		println('RELEASE INDEX PINS mixed hosted catalog verified all ${paths.len} objects PASS')

@@ -33,6 +33,8 @@ fn image_input_suite() hwhost.Suite {
 				'IMAGE INPUT CHECK CLI flag placement, literal paths, environment/explicit selection and reproducible compiler-free reports; normal staging and invalid-input refusals PASS',
 				'IMAGE INPUT CHECK both-host exact reviewed index pins, signed replacement refusal and unchanged target retry PASS',
 				'IMAGE INPUT CHECK generic and per-target index files, strict admission and explicit precedence PASS',
+				'IMAGE INPUT CHECK hosted pins bind the exact configured HTTPS origin on both targets; legacy rows and restored retry PASS',
+				'IMAGE INPUT CHECK oversized hosted pin output refuses before accessing signed exports or HTTPS origins PASS',
 				'IMAGE INPUT CHECK publish/preserve/none decisions, occupied configuration, aliased/special/shared-write/damaged bundles refuse without overwriting destinations PASS',
 				'PACKAGE IMAGE CONFIG directory replacements and late consumer state refuse before writing and restoration permits retry PASS',
 				'IMAGE BUNDLE ancestor replacement during budgeting and identical bundle replacement during verification refuse; restoration permits publication and preservation PASS',

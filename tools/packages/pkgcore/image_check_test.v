@@ -298,6 +298,83 @@ fn test_image_input_cli_pins_reviewed_repository_indexes_before_staging() {
 	println('IMAGE INPUT CHECK generic and per-target index files, strict admission and explicit precedence PASS')
 }
 
+fn test_image_input_cli_requires_the_exact_reviewed_https_origin() {
+	binary := os.getenv('VINIX_PACKAGE_STAGE_CHECK_CLI')
+	if binary == '' { return }
+	work, key := image_check_fixture(false)!
+	defer { os.rmdir_all(work) or {} }
+	bundle := work + '/bundle'
+	original_url := 'file://' + image_repositories_path + '/native'
+	origin := 'https://packages.example.invalid/vinix/'
+	digest := hash_file(bundle + '/native/index.json')!
+	local_row := 'organization ' + hash_file(bundle + '/organization/index.json')!
+	pins := work + '/hosted-pins.txt'
+	row := 'native ${digest} ${origin}'
+
+	for architecture in ['aarch64', 'x86_64']! {
+		root := work + '/' + architecture
+		os.mkdir(root)!
+		source := image_check_source(work, architecture, key, false)!
+		file_config := os.read_file(source)!
+		https_config := file_config.replace(original_url, origin)
+		os.write_file(source, https_config)!
+		variable := 'VINIX_PACKAGE_IMAGE_INDEXES_' + architecture.to_upper()
+		os.setenv(variable, pins, true)
+		defer { os.unsetenv(variable) }
+		stage := [binary, '--arch', architecture, '--staging', root, '--config', source,
+			'--repositories', bundle, '--cc', work + '/missing-compiler']
+		os.write_file(pins, 'native ${digest}\n${local_row}\n')!
+		digest_only := run_image_index_stage([...stage, '--check'])
+		assert digest_only.exit_code == 0, digest_only.output
+		os.write_file(pins, row + '\r\n' + local_row)!
+		hosted := run_image_index_stage([...stage, '--check'])
+		assert hosted.exit_code == 0 && hosted.output == digest_only.output, hosted.output
+		normal := run_image_index_stage(stage)
+		assert normal.exit_code != 0 && normal.output.contains('target compiler is missing'), normal.output
+
+		for different in ['https://another.example.invalid/vinix/', 'https://packages.example.invalid/vinix', original_url] {
+			os.write_file(source, https_config.replace(origin, different))!
+			for command in [stage, [...stage, '--check']] {
+				refused := run_image_index_stage(command)
+				assert refused.exit_code == 1 && refused.output.contains('differs from the reviewed HTTPS origin: native'), refused.output
+				assert os.ls(root)!.len == 0
+			}
+		}
+		os.write_file(source, https_config)!
+		for suffix in ['', 'http://packages.example.invalid/vinix/', origin + ' extra', origin + '?extra=1'] {
+			os.write_file(pins, 'native ${digest} ${suffix}\n')!
+			refused := run_image_index_stage([...stage, '--check'])
+			assert refused.exit_code == 1 && refused.output.contains('valid HTTPS origin'), refused.output
+		}
+		os.write_file(pins, row + '\n' + local_row + '\n')!
+		retry := run_image_index_stage([...stage, '--check'])
+		assert retry.exit_code == 0 && retry.output == hosted.output && os.ls(root)!.len == 0, retry.output
+
+		// The check uses the configuration the stager would actually preserve.
+		dir := root + '/etc/vinix-packages'
+		os.mkdir_all(dir)!
+		os.write_file(dir + '/config.json', file_config)!
+		retained := run_image_index_stage([...stage, '--check'])
+		assert retained.exit_code == 1 && retained.output.contains('differs from the reviewed HTTPS origin: native'), retained.output
+		assert os.read_file(dir + '/config.json')! == file_config && os.ls(root)! == ['etc']
+	}
+	println('IMAGE INPUT CHECK hosted pins bind the exact configured HTTPS origin on both targets; legacy rows and restored retry PASS')
+}
+
+fn test_release_index_writer_refuses_pins_exceeding_the_image_metadata_limit() {
+	work := image_check_work()!
+	defer { os.rmdir_all(work) or {} }
+	prefix := 'https://packages.example.invalid/'
+	origin := prefix + 'x'.repeat(4096 - prefix.len)
+	mut sources := []ReleaseIndexSource{cap: 2048}
+	for i in 0 .. 2048 { sources << ReleaseIndexSource{ id: 'repo-${i}', origin: origin } }
+	mut diagnostic := ''
+	write_release_index_pins(work + '/indexes.txt', sources) or { diagnostic = err.msg() }
+	assert diagnostic.contains('exceed the image metadata limit'), diagnostic
+	assert os.ls(work)!.len == 0
+	println('IMAGE INPUT CHECK oversized hosted pin output refuses before accessing signed exports or HTTPS origins PASS')
+}
+
 fn test_image_input_check_distinguishes_preserved_bundles_and_refuses_unsafe_or_changed_destinations() {
 	work, key := image_check_fixture(false)!; defer { os.rmdir_all(work) or {} }
 	root := work + '/image'; os.mkdir(root)!

@@ -19,6 +19,7 @@ pub struct ImageRepositoryIndex {
 pub:
 	id string
 	index_sha256 string
+	origin string // When supplied, require this exact reviewed HTTPS URL.
 }
 
 // Owns a private, authenticated capture, independent of later source edits.
@@ -155,8 +156,8 @@ pub fn (configuration &ImageConfiguration) prepare_repositories_for_indexes(sour
 	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{ required_indexes: required })
 }
 
-// A reviewed file names one repository ID and index digest per line. The
-// temporary index pins borrow the captured file bytes during preparation.
+// A reviewed file names one repository ID and index digest per line, followed
+// by the HTTPS URL for hosted pins. Entries borrow the captured file bytes.
 pub fn (configuration &ImageConfiguration) prepare_repositories_for_index_file(source string,
 	index_file string, scratch string) !ImageRepositories {
 	if index_file == '' { return configuration.prepare_repositories_in(source, scratch) }
@@ -173,11 +174,18 @@ pub fn (configuration &ImageConfiguration) prepare_repositories_for_index_file(s
 		line := unsafe { tos(text.str + start, length) }
 		separator := line.index(' ') or { -1 }
 		if separator < 1 || required.len == max_image_repository_indexes {
-			return error('image repository index file requires one repository ID and lowercase SHA-256 digest per line, up to 4096 indexes')
+			return error('image repository index file requires an ID and lowercase SHA-256 digest with an optional HTTPS origin per line, up to 4096 indexes')
+		}
+		digest_end := line.index_after(' ', separator + 1) or { line.len }
+		if digest_end == line.len - 1 {
+			return error('image repository index file requires a valid HTTPS origin after the digest')
 		}
 		required << ImageRepositoryIndex{
 			id: unsafe { tos(line.str, separator) }
-			index_sha256: unsafe { tos(line.str + separator + 1, line.len - separator - 1) }
+			index_sha256: unsafe { tos(line.str + separator + 1, digest_end - separator - 1) }
+			origin: if digest_end < line.len {
+				unsafe { tos(line.str + digest_end + 1, line.len - digest_end - 1) }
+			} else { '' }
 		}
 		start = end + 1
 	}
@@ -232,20 +240,27 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 		}
 	}
 	if expected.len == 0 { return error('image repository bundle needs configured HTTPS or image file repositories') }
-	mut reviewed := map[string]string{}
+	mut reviewed := map[string]ImageRepositoryIndex{}
 	defer { unsafe { reviewed.free() } }
 	for required in options.required_indexes {
 		if !identifier(required.id) || !digest_valid(required.index_sha256) {
 			return error('required image repository index needs a repository ID and lowercase SHA-256 digest')
 		}
+		if required.origin != '' && !valid_release_origin(required.origin) {
+			return error('required image repository index needs a valid HTTPS origin: ${required.id}')
+		}
 		if required.id in reviewed { return error('duplicate required image repository index: ${required.id}') }
 		if required.id !in expected { return error('required image repository is not bundled: ${required.id}') }
-		reviewed[required.id] = required.index_sha256
+		reviewed[required.id] = required
 	}
 	export_stage_directory(physical, expected, 0)!
 	mut needed := u64(4 * 1024 * 1024)
 	for repository in config.repositories {
 		if repository.id !in expected { continue }
+		required := reviewed[repository.id]
+		if required.origin != '' && required.origin != repository.url {
+			return error('bundled image repository URL differs from the reviewed HTTPS origin: ${repository.id}')
+		}
 		path := physical + '/' + repository.id
 		defer { unsafe { path.free() } }
 		index_path := path + '/index.json'
@@ -260,10 +275,10 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 		item = ImageRepository{ ...item, signature: signature.trim_space() }
 		index := verify_index(repository, item.text, item.signature, time.now().unix())!
 		item = ImageRepository{ ...item, index: index }
-		if wanted := reviewed[repository.id] {
+		if required.index_sha256 != '' {
 			actual := index_digest(item.text)
 			defer { unsafe { actual.free() } }
-			if actual != wanted { return error('bundled image repository index differs from the reviewed digest: ${repository.id}') }
+			if actual != required.index_sha256 { return error('bundled image repository index differs from the reviewed digest: ${repository.id}') }
 		}
 		release_closures(index, repository.public_key)!
 		for p in index.packages { check_policy(p, config.policy)! }
