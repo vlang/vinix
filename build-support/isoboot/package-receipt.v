@@ -339,6 +339,28 @@ fn receipt_image(source string, work string, staged bool) !string {
 	return image
 }
 
+fn plan_selection(env map[string]string, arch string) !Selection {
+	config := imageinputs.environment_path(env, imageinputs.configuration, arch)
+	bundle := imageinputs.environment_path(env, imageinputs.repositories, arch)
+	declaration := imageinputs.environment_path(env, imageinputs.applications, arch)
+	indexes := imageinputs.environment_path(env, imageinputs.indexes, arch)
+	if config == '' && bundle == '' && declaration == '' && indexes == '' {
+		return Selection{}
+	}
+	work := workspace()!
+	defer { os.rmdir_all(work) or {} }
+	input := preflight(work, arch, config, bundle, declaration, indexes)!
+	return package_selection(input, arch, map[string]string{})
+}
+
+fn required_application_plan(env map[string]string, arch string) !Selection {
+	selection := plan_selection(env, arch) or { return error('${arch} package preflight: ${err}') }
+	if selection.applications.len == 0 {
+		return error('${arch} requires an advertised application set for paired review')
+	}
+	return selection
+}
+
 fn run() ! {
 	if os.args.len == 3 && os.args[1] == 'checksums' {
 		return print_checksums(os.args[2])
@@ -349,21 +371,23 @@ fn run() ! {
 	if os.args.len == 3 && os.args[1] == 'plan' {
 		arch := os.args[2]
 		if arch !in ['aarch64', 'x86_64']! { return error('unsupported package architecture: ' + arch) }
-		env := os.environ()
-		config := imageinputs.environment_path(env, imageinputs.configuration, arch)
-		bundle := imageinputs.environment_path(env, imageinputs.repositories, arch)
-		declaration := imageinputs.environment_path(env, imageinputs.applications, arch)
-		indexes := imageinputs.environment_path(env, imageinputs.indexes, arch)
-		if config == '' && bundle == '' && declaration == '' && indexes == '' { return }
-		work := workspace()!
-		defer { os.rmdir_all(work) or {} }
-		input := preflight(work, arch, config, bundle, declaration, indexes)!
-		println(json2.encode(package_selection(input, arch, map[string]string{})!))
+		selection := plan_selection(os.environ(), arch)!
+		if selection.architecture != '' { println(json2.encode(selection)) }
 		return
+	}
+	if os.args.len == 3 && os.args[1] == 'plan-pair' {
+		env := os.environ()
+		amd64 := required_application_plan(env, 'x86_64')!
+		arm64 := required_application_plan(env, 'aarch64')!
+		if amd64.applications != arm64.applications {
+			return error('paired review requires the same advertised application IDs on x86_64 and aarch64')
+		}
+		return pkgcore.write_iso_package_review_pair(os.args[2], json2.encode(amd64) + '\n',
+			json2.encode(arm64) + '\n')
 	}
 	archive := os.args.len == 5 && os.args[1] == 'verify-archive'
 	if !archive && (os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']!) {
-		return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | checksums RECEIPT.json | origins RECEIPT.json SHA256')
+		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }

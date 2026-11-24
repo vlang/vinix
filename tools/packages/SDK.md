@@ -751,8 +751,22 @@ The result records that time alongside the verified receipt. Use trusted
 release checksums and a trusted timestamp. Normal image staging, receipt
 verification and package operations evaluate expiry at the current time.
 
-To require an independently reviewed selection, generate one plan per target
-with the candidate package input environment.
+For a release that advertises the same catalog on both architectures, generate
+both plans with the candidate package input environment:
+
+```sh
+/tmp/vinix-package-receipt plan-pair reviewed-package-plans
+```
+
+Select an application requirements file or deployment lock for each target.
+The command checks both signed bundles and requires the same nonempty set of
+application IDs on both targets. It writes `amd64.json` and `arm64.json` into
+a new directory as one atomic publication. Each file has the same bytes as
+its standalone `plan` output, with its own target-specific configuration,
+publisher and dependency resolution. Existing destinations are preserved.
+
+For a single target, a catalog that varies by target, or a review without
+application requirements, generate one plan per target:
 
 ```sh
 mkdir reviewed-package-plans

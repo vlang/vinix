@@ -66,3 +66,22 @@ also accepts independently prepared roots and composes with the Linux catalog
 profiles. [Qualification](../../tests/packages/native-catalog-check.md) records
 the boundaries exercised. These examples do not complete public publisher
 enrollment, migration of the Alpine catalog or full graphical login acceptance.
+
+## Review the mixed release catalog
+
+The [mixed release qualification](../../tests/packages/signed-legacy-routing-check.md#mixed-signed-release-approval)
+uses the three native apps alongside Neovim, SQLite CLI, FFmpeg and FFprobe.
+It records the profile composition and tests all seven apps through Software
+from one signed bundle. With a reviewed configuration, signed mixed bundle
+and reviewed index pins selected, use the example requirements files and
+generate both release plans together:
+
+```sh
+export VINIX_PACKAGE_IMAGE_APPLICATIONS_AARCH64="$PWD/examples/package-catalog/mixed-arm64.json"
+export VINIX_PACKAGE_IMAGE_APPLICATIONS_X86_64="$PWD/examples/package-catalog/mixed-amd64.json"
+/tmp/vinix-package-receipt plan-pair reviewed-mixed-plans
+```
+
+Review both plans before passing `--package-review=reviewed-mixed-plans` to
+the release driver. The [release contract](../../tools/packages/SDK.md#application-requirements-files-in-desktop-builds)
+describes the other inputs and the checks performed before each build.
