@@ -385,12 +385,18 @@ fn checked(arguments []string) !int {
 				url: if operation == 'enroll' { names[offset + 2] } else { '' },
 				public_key: if operation == 'enroll' { names[offset + 3] } else { '' } }
 			if !applying {
-				println(json2.encode(pkgcore.review_repository(root, operation, repository, offline)!))
+				mut review := pkgcore.review_repository(root, operation, repository, offline)!
+				defer { review.close() }
+				text := json2.encode(review)
+				defer { unsafe { text.free() } }
+				println(text)
 			} else if operation == 'enroll' {
-				pkgcore.enroll_repository_reviewed(root, repository, offline, names[0])!
+				mut configuration := pkgcore.enroll_repository_reviewed(root, repository, offline, names[0])!
+				configuration.close()
 				println('Repository enrolled. Refresh repositories to load its authenticated catalog.')
 			} else {
-				pkgcore.revoke_repository_reviewed(root, repository.id, names[0])!
+				mut configuration := pkgcore.revoke_repository_reviewed(root, repository.id, names[0])!
+				configuration.close()
 				println('Repository revoked; installed payloads, personal data and trust history were retained.')
 			}
 		}
@@ -428,12 +434,14 @@ fn checked(arguments []string) !int {
 		}
 		'repo-enroll' {
 			if names.len != 3 { return error('repo-enroll requires ID, URL and an independently authenticated publisher key') }
-			pkgcore.enroll_repository(root, pkgcore.Repository{ id: names[0], url: names[1], public_key: names[2] }, offline)!
+			mut configuration := pkgcore.enroll_repository(root, pkgcore.Repository{ id: names[0], url: names[1], public_key: names[2] }, offline)!
+			configuration.close()
 			println('Enrolled repository ${names[0]}. Run update to load its verified catalog. A replaced key revokes launches and rollback of payloads signed with the old key.')
 		}
 		'repo-revoke' {
 			if names.len != 1 { return error('repo-revoke requires one repository ID') }
-			pkgcore.revoke_repository(root, names[0])!
+			mut configuration := pkgcore.revoke_repository(root, names[0])!
+			configuration.close()
 			println('Revoked repository ${names[0]}; installed payloads and personal data were retained for inspection/removal. Trust history was retained.')
 		}
 		'update' {

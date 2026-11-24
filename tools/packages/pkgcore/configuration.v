@@ -38,9 +38,16 @@ fn close_decoded_configuration(config Config) {
 	unsafe {
 		config.architecture.free(); config.launch_user.free()
 		for repository in config.repositories {
-			repository.id.free(); repository.url.free(); repository.public_key.free()
+			close_stored_repository(repository)
 		}
 		(&array(&config.repositories)).free()
 	}
 	close_owned_policy(config.policy)
+}
+
+// Configurations returned by load_config and repository administration own
+// their fields. Caller-built configurations can borrow fields.
+pub fn (mut config Config) close() {
+	close_decoded_configuration(config)
+	config = Config{ policy: Policy{ permissions: []string{} } }
 }

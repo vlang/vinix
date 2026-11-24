@@ -3689,6 +3689,12 @@ offline enrollment. `repo-revoke ID` disables that publisher without fetching
 metadata or deleting installed payloads/personal data; uninstall remains available.
 Key replacement also revokes launch/rollback trust for old-key installations.
 
+V callers own the configuration returned by `pkgcore.load_config()`,
+`enroll_repository()`, `revoke_repository()` and the reviewed apply variants.
+Call `Config.close()` when finished. It releases the returned identities and
+policy fields. Caller-assembled configurations still follow the lifetimes of
+their source fields.
+
 `--json repo-list` emits `{format:1,architecture,repositories,history}`.
 Repositories contain `{id,url,public_key}`; history contains
 `{id,public_key,sequence,index_sha256}` for enrolled, revoked and replaced keys.

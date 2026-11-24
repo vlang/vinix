@@ -86,6 +86,22 @@ fn save_configuration(path string, config Config) ! {
 	write_administration_document(path, config, 'package administration metadata exceeds its size limit')!
 }
 
+// After publication the result owns the unchanged fields and publisher
+// identities. The previous list and the removed or replaced row can retire.
+fn retire_previous_repository_configuration(current Config, id string, transferred bool) {
+	if !transferred {
+		close_decoded_configuration(current)
+		return
+	}
+	for repository in current.repositories {
+		if repository.id == id {
+			close_stored_repository(repository)
+			break
+		}
+	}
+	unsafe { (&array(&current.repositories)).free() }
+}
+
 // The administrator supplies the key through an authenticated external channel.
 // Proving possession by a live signed index never learns or substitutes a key.
 pub fn enroll_repository(root string, repository Repository, offline bool) !Config {
@@ -98,9 +114,12 @@ pub fn enroll_repository_reviewed(root string, repository Repository, offline bo
 	guard := acquire(directory)!
 	defer { guard.release() }
 	current := load_config(root)!
+	mut transferred := false
+	defer { retire_previous_repository_configuration(current, repository.id, transferred) }
 	path := writable_configuration(root)!
 	defer { unsafe { path.free() } }
 	next := enrollment_configuration(current, repository)!
+	defer { if !transferred { close_enrollment_configuration(next, repository.id) } }
 	// A reviewed replacement disables the old ID/key. Recovery uses that exact
 	// proposed configuration in both review and apply, before publishing trust.
 	snapshots := read_snapshots(directory)!
@@ -139,6 +158,7 @@ pub fn enroll_repository_reviewed(root string, repository Repository, offline bo
 	$if package_enrollment_crash_fixture ? {
 		repository_cut_checkpoint('enrollment', 'configuration')
 	}
+	transferred = true
 	return next
 }
 
@@ -151,16 +171,28 @@ pub fn revoke_repository(root string, id string) !Config {
 pub fn revoke_repository_reviewed(root string, id string, expected string) !Config {
 	if !identifier(id) { return error('invalid repository ID') }
 	directory := state_directory(root)
+	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
 	current := load_config(root)!
+	mut transferred := false
+	defer { retire_previous_repository_configuration(current, id, transferred) }
 	path := writable_configuration(root)!
-	matches := current.repositories.filter(it.id == id)
-	if matches.len != 1 { return error('repository is not enrolled: ${id}') }
-	actual := repository_fingerprint(current, TrustHistory{}, 'revoke', matches[0], '')
+	defer { unsafe { path.free() } }
+	mut selected := Repository{}
+	for repository in current.repositories {
+		if repository.id == id {
+			selected = repository
+			break
+		}
+	}
+	if selected.id == '' { return error('repository is not enrolled: ${id}') }
+	actual := repository_fingerprint(current, TrustHistory{}, 'revoke', selected, '')
 	defer { unsafe { actual.free() } }
 	check_repository_review(expected, actual)!
-	next := Config{ ...current, repositories: current.repositories.filter(it.id != id) }
+	repositories := current.repositories.filter(it.id != id)
+	defer { if !transferred { unsafe { repositories.free() } } }
+	next := Config{ ...current, repositories: repositories }
 	next.validate()!
 	$if package_revocation_crash_fixture ? {
 		repository_cut_checkpoint('revocation', 'reviewed')
@@ -169,5 +201,6 @@ pub fn revoke_repository_reviewed(root string, id string, expected string) !Conf
 	$if package_revocation_crash_fixture ? {
 		repository_cut_checkpoint('revocation', 'configuration')
 	}
+	transferred = true
 	return next
 }
