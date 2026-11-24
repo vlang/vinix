@@ -38,6 +38,21 @@ fn image_configuration_parents(root string) ! {
 	}
 }
 
+fn open_image_configuration_directory(parent int, name string, create bool) !int {
+	if create && C.mkdirat(parent, name.str, 0o755) != 0 && C.errno != C.EEXIST {
+		return error('cannot create image package configuration directory: ' + name)
+	}
+	fd := C.openat(parent, name.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	if fd < 0 { return error('cannot open ordinary image package configuration directory: ' + name) }
+	mut info := C.stat{}
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o022 != 0
+		|| (info.st_uid != 0 && info.st_uid != u32(os.geteuid())) {
+		C.close(fd)
+		return error('image package configuration parents must be ordinary controlled directories without shared write access')
+	}
+	return fd
+}
+
 fn image_configuration_exists(path string) !bool {
 	mut info := C.stat{}
 	if C.lstat(path.str, unsafe { &info }) == 0 { return true }
@@ -123,6 +138,9 @@ pub fn prepare_image_configuration(root string, architecture string, source stri
 	defer { if !accepted { unsafe { physical.free() } } }
 	if physical == '/' { return error('image package staging cannot target the running system root') }
 	check_export_parent(physical, 'package image')!
+	if !image_configuration_root_matches(physical, u64(info.st_dev), u64(info.st_ino)) {
+		return error('package image root changed during configuration preparation')
+	}
 	image_configuration_parents(physical)!
 	target := physical + '/etc/vinix-packages/config.json'
 	defer { if !accepted { unsafe { target.free() } } }
@@ -138,21 +156,42 @@ pub fn prepare_image_configuration(root string, architecture string, source stri
 // Return true only for a newly published file. Existing configuration is
 // validated and retained byte-for-byte, including when --config is supplied.
 pub fn (plan &ImageConfiguration) publish() !bool {
+	return plan.publish_configuration_with(AtomicWriteOptions{})
+}
+
+fn (plan &ImageConfiguration) publish_configuration_with(options AtomicWriteOptions) !bool {
 	if plan.root == '' || !image_configuration_root_matches(plan.root, plan.device, plan.inode) {
 		return error('package image root changed after preparation; restore the staging directory and retry')
 	}
 	image_configuration_parents(plan.root)!
+	if !plan.existing { image_configuration_fresh_state(plan.root)! }
+	root := capture_prepared_root(plan.root, 'package image configuration')!
+	defer { C.close(root) }
+	mut info := C.stat{}
+	if C.fstat(root, unsafe { &info }) != 0 || u64(info.st_dev) != plan.device || u64(info.st_ino) != plan.inode {
+		return error('package image root changed before configuration publication')
+	}
+	etc := open_image_configuration_directory(root, 'etc', !plan.existing)!
+	defer { C.close(etc) }
+	directory := open_image_configuration_directory(etc, 'vinix-packages', !plan.existing)!
+	defer { C.close(directory) }
+	etc_path := plan.root + '/etc'
+	defer { unsafe { etc_path.free() } }
+	parent, name := atomic_file_path(plan.path)!
+	defer { unsafe { parent.free(); name.free() } }
+	options.checkpoint('prepared', plan.path)!
+	image_configuration_parents(plan.root)!
 	if plan.existing {
 		image_configuration_architecture(plan.root, plan.architecture)!
-		return false
+	} else {
+		image_configuration_fresh_state(plan.root)!
 	}
-	image_configuration_fresh_state(plan.root)!
-	parent := os.dir(plan.path)
-	defer { unsafe { parent.free() } }
-	make_package_directories(parent, 0o755)!
-	image_configuration_parents(plan.root)!
 	if !image_configuration_root_matches(plan.root, plan.device, plan.inode) { return error('package image root changed before configuration publication') }
-	atomic_write_new(plan.path, plan.text)!
+	if !atomic_captured_parent_matches(etc_path, etc) || !atomic_captured_parent_matches(parent, directory) {
+		return error('image package configuration directory changed before publication')
+	}
+	if plan.existing { return false }
+	atomic_write_at(parent, name, plan.text, AtomicWriteOptions{ ...options, exclusive: true, parent_fd: directory })!
 	return true
 }
 

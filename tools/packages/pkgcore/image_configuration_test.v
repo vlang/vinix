@@ -166,6 +166,77 @@ fn test_image_configuration_never_reinitializes_missing_trust_over_package_state
 	if _ := unsafe { &plan }.publish() { assert false } else {}
 }
 
+fn replace_image_configuration_directory(phase string, path string) ! {
+	if phase != 'prepared' { return }
+	parent := os.dir(path)
+	etc := os.dir(parent)
+	root := os.dir(etc)
+	kind := os.getenv('VINIX_IMAGE_CONFIG_TEST_CHANGE')
+	if kind == 'state' {
+		store := state_directory(root)
+		os.mkdir_all(store)!
+		os.write_file(store + '/trust-history.json', 'late publisher history')!
+		return
+	}
+	replaced := match kind {
+		'root' { root }
+		'etc' { etc }
+		else { parent }
+	}
+	os.rename(replaced, replaced + '.moved')!
+	os.mkdir(replaced)!
+	os.write_file(replaced + '/sentinel', 'replacement contents')!
+	if kind == 'preserve' {
+		os.cp(replaced + '.moved/config.json', path)!
+	}
+}
+
+fn test_image_configuration_publication_refuses_directory_or_state_changes_after_capture() {
+	work := image_configuration_fixture()!
+	defer { os.rmdir_all(work) or {}; os.unsetenv('VINIX_IMAGE_CONFIG_TEST_CHANGE') }
+	options := AtomicWriteOptions{ checkpoint: replace_image_configuration_directory }
+	for kind in ['root', 'etc', 'parent', 'preserve', 'state']! {
+		root := work + '/' + kind
+		os.mkdir(root)!
+		if kind == 'preserve' {
+			mut initial := prepare_image_configuration(root, 'aarch64', '')!
+			assert unsafe { &initial }.publish()!
+			initial.close()
+		}
+		mut plan := prepare_image_configuration(root, 'aarch64', '')!
+		defer { plan.close() }
+		path := root + '/etc/vinix-packages/config.json'
+		os.setenv('VINIX_IMAGE_CONFIG_TEST_CHANGE', kind, true)
+		mut diagnostic := ''
+		unsafe { &plan }.publish_configuration_with(options) or { diagnostic = err.msg() }
+		if kind == 'state' {
+			history := state_directory(root) + '/trust-history.json'
+			assert diagnostic.contains('package state already exists without configuration')
+			assert !os.exists(path) && os.read_file(history)! == 'late publisher history'
+			os.rm(history)!
+		} else {
+			expected := if kind == 'root' { 'image root changed' } else { 'configuration directory changed' }
+			assert diagnostic.contains(expected), diagnostic
+			replaced := match kind {
+				'root' { root }
+				'etc' { root + '/etc' }
+				else { os.dir(path) }
+			}
+			expected_entries := if kind == 'preserve' { ['config.json', 'sentinel'] } else { ['sentinel'] }
+			assert os.ls(replaced)!.sorted() == expected_entries
+			assert os.read_file(replaced + '/sentinel')! == 'replacement contents'
+			saved_path := replaced + '.moved' + path[replaced.len..]
+			assert os.exists(saved_path) == plan.existing
+			os.rename(replaced, replaced + '.replacement')!
+			os.rename(replaced + '.moved', replaced)!
+		}
+		assert unsafe { &plan }.publish()! == !plan.existing
+		if !plan.existing { assert os.read_file(path)! == plan.text }
+		assert os.ls(os.dir(path))! == ['config.json']
+	}
+	println('PACKAGE IMAGE CONFIG directory replacements and late consumer state refuse before writing and restoration permits retry PASS')
+}
+
 fn test_seeded_image_acquires_and_maintains_signed_catalog_without_configuration_edits() {
 	work := image_configuration_fixture()!; defer { os.rmdir_all(work) or {} }
 	key := keygen(work + '/seed')!

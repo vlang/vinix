@@ -58,11 +58,6 @@ pub fn (plan &ImageApplications) publish(repositories &ImageRepositories) !bool 
 	return plan.publish_with(repositories, AtomicWriteOptions{})
 }
 
-fn image_catalog_directory_matches(path string, fd int) bool {
-	mut info := C.stat{}
-	return C.fstat(fd, unsafe { &info }) == 0 && atomic_parent_matches(path, u64(info.st_dev), u64(info.st_ino))
-}
-
 fn (plan &ImageApplications) publish_with(repositories &ImageRepositories, options AtomicWriteOptions) !bool {
 	if plan.root == '' { return false } // no requirements were selected
 	if repositories.root != plan.root || repositories.architecture != plan.architecture
@@ -92,10 +87,10 @@ fn (plan &ImageApplications) publish_with(repositories &ImageRepositories, optio
 	repositories.current()!
 	preserve := image_applications_action(plan.root, plan.text)! == 'preserve'
 	if !preserve { disk_check(free_bytes(parent)!, u64(plan.text.len), 64 * 1024 * 1024)! }
-	if !image_catalog_directory_matches(parent, directory) {
+	if !atomic_captured_parent_matches(parent, directory) {
 		return error('image application deployment parent changed during verification')
 	}
-	if !image_catalog_directory_matches(bundle, bundle_directory) {
+	if !atomic_captured_parent_matches(bundle, bundle_directory) {
 		return error('published image repository directory changed during verification')
 	}
 	if preserve { return false }

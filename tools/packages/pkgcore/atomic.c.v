@@ -53,6 +53,11 @@ fn atomic_parent_matches(path string, device u64, inode u64) bool {
 		&& named.st_mode & 0o170000 == 0o040000 && u64(named.st_dev) == device && u64(named.st_ino) == inode
 }
 
+fn atomic_captured_parent_matches(path string, fd int) bool {
+	mut info := C.stat{}
+	return C.fstat(fd, unsafe { &info }) == 0 && atomic_parent_matches(path, u64(info.st_dev), u64(info.st_ino))
+}
+
 pub fn atomic_write(path string, text string) ! {
 	atomic_write_with(path, text, AtomicWriteOptions{})!
 }

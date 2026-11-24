@@ -250,9 +250,12 @@ image's account setup before application launch.
 Staging captures one bounded regular input before compilation and holds its
 validated canonical bytes until publication. Changed/deleted input cannot alter
 that prepared configuration. The target architecture must match. Image roots and
-configuration parents must be ordinary controlled directories; links and shared
-write access refuse. Publication uses a flushed private temporary and exclusive
-atomic rename to a 0644 new file. Concurrently created configuration is preserved.
+configuration parents must be ordinary controlled directories. Publication opens
+each configuration directory relative to the captured image root and refuses
+aliases, shared write access or a replaced directory. It rechecks for retained
+package state before creating trust. A flushed private temporary is published
+with an exclusive atomic rename to a 0644 new file. Concurrently created
+configuration is preserved.
 
 Existing valid configuration is retained byte-for-byte and the release input is
 ignored, including when that input is absent. Invalid or wrong-architecture
