@@ -187,3 +187,23 @@ The request log requires a fresh request for the corrupt local object, a
 range request at byte 1536 for the partial, and zero requests for the exact
 image object. All three cache objects must match their signed digests before
 the upgrade qualifies.
+
+At `dbaf9d4392d24d8af9d8d9a4931d7aa155772fc0`, the previous implementation
+failed the new host regression by attempting HTTPS for an object already
+present in the image. The fixed image repository, download recovery, cache
+promotion and service suites passed. The image repository suite also passed
+under ASan/UBSan with leak detection disabled. File-to-HTTPS origin migration
+passed for both target catalogs with the same request checks as before.
+
+The installed reuse runs passed in 151.899 seconds on aarch64 and 312.537
+seconds on x86-64. Each made nine HTTPS requests, including exactly three
+object requests. The exact bundled object caused zero network requests.
+The corrupt object was fetched in full, and the retained prefix resumed at
+byte 1536. The remaining object request acquired the updated SQLite runtime.
+The tests used retained kernels, real target curl and a loopback TLS publisher.
+
+The evidence archive is
+`~/.local/state/vinix/r14-online-bundle-reuse-IUmGTZ/qualification.tar.gz`.
+Its SHA-256 is `22c60d01db901ddd5683cb50a614628732637493648c80aa04704820a167621e`.
+Independent extraction matched all 8,814 inventory entries and both decoded
+VJFS disk digests.
