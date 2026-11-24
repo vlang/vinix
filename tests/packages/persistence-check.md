@@ -135,6 +135,24 @@ fetching the signature into that directory. Additional cases replace the
 workspace or its parent at verification and check both metadata files before
 retrying the original signed update.
 
+On 2026-11-24, revision `889981df0dd0a3dc8cdf06262a2d7918e38b046b`
+passed the workspace replacement, selected refresh, administration and
+trust-recovery host checks. The replacement cases also passed under ASan/UBSan
+with leak detection disabled. All three refresh cuts passed on AArch64 (HVF)
+and x86_64 (TCG), with guest shutdown after each recovery.
+
+With V `2655544`, the existing tracked history-publication refusal test
+recorded 126,976 retained bytes across 64 calls on both the baseline
+`4931136dc` and the tested revision. Both runs failed the zero-retention
+assertion.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-refresh-workspace-SeRxp9/qualification.tar.gz)
+contains the tested source, matched tracking inputs and logs, initial disks,
+and 11 verified receipt entries per target. The QEMU runs used
+`--failures-only`. The independent archive checker verified all 111 sealed
+files. Archive SHA-256
+`048fb49a88ad55f08b886934ee64123c00c65ba2fce1eccdee1b04bc0ecd5869`.
+
 ## Reviewed publisher enrollment cuts
 
 Add `--enrollment` to the persistence command and use a fresh state directory.
