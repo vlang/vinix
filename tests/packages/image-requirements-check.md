@@ -68,9 +68,14 @@ including the per-target CLI verdict, all eight processes and guest-initiated
 QMP shutdown. Each receipt pins the kernel, PID 1, nine fixture binaries and raw
 serial output.
 
+The host driver records the sanitizer compiler path in its receipt.
+`VINIX_PACKAGE_SANITIZER_CC` selects the Clang used with ASan/UBSan and
+defaults to `clang` on `PATH`. On the affected macOS toolchain, use LLVM Clang.
+
 ```sh
 v -o /tmp/image-requirements-check tests/packages/image-requirements-check.v
-V=/path/to/reviewed/v /tmp/image-requirements-check /build/new-image-requirements-host
+V=/path/to/reviewed/v VINIX_PACKAGE_SANITIZER_CC=/path/to/llvm/bin/clang \
+  /tmp/image-requirements-check /build/new-image-requirements-host
 
 v -path '@vlib|@vmodules|.|tests/hardware-platform' \
   -o /tmp/image-requirements-runtime-check tests/packages/image-requirements-runtime-check.v

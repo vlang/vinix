@@ -77,9 +77,14 @@ pins the kernel, PID 1, staged programs and raw serial output. The fixtures
 install and verify structural native and foreign payloads without executing
 them. [Guest controller](image-export-runtime-check.v)
 
+The host driver records the sanitizer compiler path in its receipt.
+`VINIX_PACKAGE_SANITIZER_CC` selects the Clang used with ASan/UBSan and
+defaults to `clang` on `PATH`. On the affected macOS toolchain, use LLVM Clang.
+
 ```sh
 v -o /tmp/image-export-check tests/packages/image-export-check.v
-V=/path/to/reviewed/v /tmp/image-export-check /build/new-image-export-host
+V=/path/to/reviewed/v VINIX_PACKAGE_SANITIZER_CC=/path/to/llvm/bin/clang \
+  /tmp/image-export-check /build/new-image-export-host
 
 v -path '@vlib|@vmodules|.|tests/hardware-platform' \
   -o /tmp/image-export-runtime-check tests/packages/image-export-runtime-check.v

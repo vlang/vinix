@@ -67,9 +67,14 @@ stager and eight assertion programs. All ten report markers, eight successful
 processes and guest-initiated poweroff are required. Each receipt pins twelve
 artifacts: kernel, PID 1, nine programs and raw serial output.
 
+The host driver records the sanitizer compiler path in its receipt.
+`VINIX_PACKAGE_SANITIZER_CC` selects the Clang used with ASan/UBSan and
+defaults to `clang` on `PATH`. On the affected macOS toolchain, use LLVM Clang.
+
 ```sh
 v -o /tmp/image-applications-check tests/packages/image-applications-check.v
-V=/path/to/reviewed/v /tmp/image-applications-check /build/new-image-applications-host
+V=/path/to/reviewed/v VINIX_PACKAGE_SANITIZER_CC=/path/to/llvm/bin/clang \
+  /tmp/image-applications-check /build/new-image-applications-host
 
 v -path '@vlib|@vmodules|.|tests/hardware-platform' \
   -o /tmp/image-applications-runtime-check tests/packages/image-applications-runtime-check.v
