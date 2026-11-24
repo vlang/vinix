@@ -81,6 +81,10 @@ mut:
 	snapshot_media_source string
 	snapshot_receipt bool
 	snapshot_receipt_path []u8
+	snapshot_import_result pkgprotocol.MediaImportResult
+	snapshot_import_result_invalid bool
+	snapshot_import_source string
+	snapshot_import_sha256 string
 	snapshot_media_sha256 []u8
 	snapshot_sha256_focus bool
 	snapshot_pending_sha256 string
@@ -287,6 +291,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.output_truncated = false
 	a.failure_mode = false
 	a.clear_progress()
+	a.clear_media_import_result()
 	a.worker_failed = false
 	a.worker_view = view
 	a.worker_review = false
@@ -698,11 +703,7 @@ fn (mut a SoftwareApp) poll() bool {
 		a.worker_failed = true
 	}
 	if a.repository_worker == .media_import {
-		a.restore_media_import_fields(a.worker.args)
-		if code == 0 && (!a.progress_seen || a.progress_snapshot.phase != 'complete') {
-			a.operation_line('The media import ended without a complete result. Check the catalog before retrying.')
-			a.worker_failed = true
-		}
+		a.finish_media_import(code)
 	}
 	if code != 0 || a.worker_failed { a.capture_failure(a.worker.args, code) }
 	view := a.worker_view

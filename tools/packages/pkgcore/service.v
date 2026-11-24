@@ -76,6 +76,13 @@ pub fn (service Service) import_repository_media_bundle(source string) !Catalog 
 
 // Import exactly the media named by an independently verified ISO receipt.
 pub fn (service Service) import_repository_media_bundle_with_receipt(source string, path string, expected_sha256 string) !Catalog {
+	catalog, mut result := service.import_repository_media_bundle_result(source, path, expected_sha256)!
+	result.close()
+	return catalog
+}
+
+// Return the verified digests from the same receipt used to publish the catalog.
+pub fn (service Service) import_repository_media_bundle_result(source string, path string, expected_sha256 string) !(Catalog, pkgprotocol.MediaImportResult) {
 	if !source.starts_with('/') || !printable(source, 4096) || !path.starts_with('/')
 		|| !printable(path, 4096) || !digest_valid(expected_sha256) {
 		return error('offline media receipt import requires absolute media and receipt paths and a SHA-256 digest')
@@ -92,7 +99,11 @@ pub fn (service Service) import_repository_media_bundle_with_receipt(source stri
 		|| receipt.publishers.len == 0 || receipt.publishers.len > max_image_repository_indexes {
 		return error('offline media import requires an ISO package receipt with applications and bundled publishers')
 	}
-	return service.import_repository_media_sources([], source, receipt)
+	catalog := service.import_repository_media_sources([], source, receipt)!
+	return catalog, pkgprotocol.MediaImportResult{
+		receipt_sha256: digest.clone()
+		deployment_sha256: receipt.deployment_sha256.clone()
+	}
 }
 
 fn (service Service) import_repository_media_sources(sources []RepositoryMediaSource, bundle string, receipt ?IsoPackageReceipt) !Catalog {

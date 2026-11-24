@@ -72,8 +72,16 @@ fn software_media_import_service_fixture() !bool {
 			phase: 'verify', repository: 'trusted', path: 'index.json' }))
 		if mode == 'incomplete' { return true }
 		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
+		if mode.starts_with('receipt-') && mode != 'receipt-missing' {
+			result := pkgprotocol.media_import_result_prefix + json2.encode(pkgprotocol.MediaImportResult{
+				receipt_sha256: if mode == 'receipt-mismatched' { 'b'.repeat(64) } else { 'a'.repeat(64) }
+				deployment_sha256: 'c'.repeat(64)
+			})
+			println(result)
+			if mode == 'receipt-duplicate' { println(result) }
+		}
 		flush_stdout()
-		if mode == 'late' { eprintln('Fixture refused publication after the progress frame.'); exit(23) }
+		if mode in ['late', 'receipt-late']! { eprintln('Fixture refused publication after the progress frame.'); exit(23) }
 		if mode in ['hold', 'receipt-hold']! {
 			for _ in 0 .. 5000 {
 				if os.exists(work + '/release') { return true }
@@ -93,6 +101,13 @@ fn software_media_import_service_fixture() !bool {
 	}
 	if args == ['--offline', '--json', 'deployment-media-save', software_media_fixture_source, software_import_fixture_lock] {
 		println(json2.encode(software_media_save_fixture_receipt(software_import_fixture_lock)))
+		return true
+	}
+	if args == ['--offline', '--json', 'deployment-media-save', software_media_fixture_source, software_import_fixture_lock, 'c'.repeat(64)] {
+		receipt := software_media_save_fixture_receipt(software_import_fixture_lock)
+		println(json2.encode(pkgprotocol.DeploymentMediaSaved{ ...receipt,
+			sha256: if mode == 'receipt-wrong-save' { 'b'.repeat(64) } else { receipt.sha256 }
+		}))
 		return true
 	}
 	if args == ['--offline', 'deployment-add-review', software_import_fixture_lock, 'c'.repeat(64)] {
@@ -248,6 +263,13 @@ fn check_software_media_receipt_import(mut app SoftwareApp, work string) ! {
 	assert editor_bytes_text(app.deployment_path) == software_media_fixture_source
 	assert editor_bytes_text(app.snapshot_receipt_path) == software_import_fixture_receipt
 	assert editor_bytes_text(app.snapshot_media_sha256) == digest && !os.exists(work + '/catalog-read')
+	for mode in ['receipt-missing', 'receipt-mismatched', 'receipt-duplicate', 'receipt-late']! {
+		os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', mode, true)
+		app.handle('software.snapshot.import')!; app.key_input('!'); app.handle('software.admin.approve')!
+		wait_for_software(mut app)
+		assert app.snapshot_receipt && app.snapshot_import_sha256 == '' && !os.exists(work + '/catalog-read')
+		assert app.status.contains(if mode == 'receipt-late' { 'refused publication' } else { 'no matching deployment digest' })
+	}
 	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'receipt-hold', true)
 	app.handle('software.snapshot.import')!; app.key_input('!'); app.handle('software.admin.approve')!
 	for _ in 0 .. 5000 {
@@ -256,6 +278,7 @@ fn check_software_media_receipt_import(mut app SoftwareApp, work string) ! {
 		time.sleep(time.millisecond)
 	}
 	assert app.worker != unsafe { nil } && app.progress_snapshot.phase == 'complete'
+	assert app.snapshot_import_sha256 == ''
 	busy := app.build(ui2.rect(0, 0, 320, 240))!
 	deployment_form_geometry(busy, 320, 240)
 	assert busy.children.any(it.id == 'software.progress') && !busy.children.any(it.id == 'software.snapshot.back')
@@ -269,7 +292,29 @@ fn check_software_media_receipt_import(mut app SoftwareApp, work string) ! {
 	assert editor_bytes_text(app.deployment_path) == software_media_fixture_source
 	app.handle('software.snapshot.save')!
 	assert app.snapshot_media_source == software_media_fixture_source && app.snapshot_media_sha256.len == 0
-	println('Software receipt import: compact fields, literal authorization arguments, cancellation, refusal and exact offline handoff PASS')
+	assert app.pinned_media_lock_digest() == 'c'.repeat(64)
+	save := app.build(ui2.rect(0, 0, 320, 240))!
+	deployment_form_geometry(save, 320, 240)
+	assert !save.children.any(it.id == 'software.snapshot.sha256')
+	assert save.children.any(it.text == 'Using the verified deployment SHA-256.')
+	free_window_tree(save)
+	app.paste_input(software_import_fixture_lock)
+	app.handle('software.snapshot.sha256')!
+	assert !app.snapshot_sha256_focus && editor_bytes_text(app.deployment_path) == software_import_fixture_lock
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'receipt-wrong-save', true)
+	app.handle('software.snapshot.save')!
+	assert app.worker.args == ['--offline', '--json', 'deployment-media-save', software_media_fixture_source, software_import_fixture_lock, 'c'.repeat(64)]
+	wait_for_software(mut app)
+	assert !app.snapshot_ready && app.status.contains('different SHA-256')
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'receipt-hold', true)
+	app.handle('software.snapshot.save')!
+	wait_for_software(mut app)
+	assert app.snapshot_ready && app.snapshot_media_saved.sha256 == 'c'.repeat(64)
+	app.handle('software.snapshot.review')!
+	assert app.worker.args == ['--offline', 'deployment-add-review', software_import_fixture_lock, 'c'.repeat(64)]
+	wait_for_software(mut app)
+	assert app.review_ready
+	println('Software receipt import: compact fields, literal authorization, result validation and verified SHA-256 through save and review PASS')
 }
 
 fn software_media_save_service_fixture(args []string) bool {

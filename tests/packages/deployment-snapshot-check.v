@@ -209,7 +209,17 @@ fn import_pinned_media(binary string, work string, root string, media string, re
 	os.rename(publisher, work + '/other-publisher')!
 	os.rename(saved, publisher)!
 	command(binary, root, args)!
-	command(binary, root, args)!
+	output := command(binary, root, ['--progress', ...args])!
+	mut results := 0
+	for line in output.split_into_lines() {
+		if line.starts_with(pkgprotocol.media_import_result_prefix) {
+			mut reply := pkgprotocol.decode_media_import_result(line[pkgprotocol.media_import_result_prefix.len..])!
+			assert reply.receipt_sha256 == digest && reply.deployment_sha256 == receipt.deployment_sha256
+			reply.close()
+			results++
+		}
+	}
+	assert results == 1
 	println('DEPLOYMENT MEDIA CLI exact receipt, deployment lock and signed index gate import before acquisition PASS')
 }
 

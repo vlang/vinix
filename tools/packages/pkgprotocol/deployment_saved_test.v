@@ -7,6 +7,36 @@ $if track_heap ? {
 	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
 }
 
+fn test_media_import_result_requires_both_exact_digests() {
+	receipt := 'a'.repeat(64)
+	deployment := 'b'.repeat(64)
+	text := json2.encode(MediaImportResult{ receipt_sha256: receipt, deployment_sha256: deployment })
+	mut result := decode_media_import_result(text)!
+	assert result.receipt_sha256 == receipt && result.deployment_sha256 == deployment
+	result.close(); result.close()
+	for invalid in [text.replace(',"deployment_sha256":"${deployment}"', ''),
+		text.replace(receipt, 'A'.repeat(64)), text.replace(deployment, ''),
+		text.replace('"format":1', '"format":1,"receipt_sha256":"${receipt}"'),
+		text.replace('"format":1', '"format":2'), text + '{}', ' '.repeat(513)] {
+		mut refused := false
+		decode_media_import_result(invalid) or { refused = true; unsafe { err.free() } }
+		assert refused, invalid
+	}
+	$if track_heap ? {
+		bad_digest := text.replace(deployment, '')
+		C.vinix_heap_begin()
+		for _ in 0 .. 256 {
+			mut decoded := decode_media_import_result(text)!
+			decoded.close()
+			decode_media_import_result(bad_digest) or { unsafe { err.free() }; continue }
+			assert false, 'missing deployment digest was admitted'
+		}
+		assert C.vinix_heap_end() == 0
+		println('MEDIA IMPORT RESULT PROTOCOL 256 valid and 256 invalid decodes retain zero tracked bytes PASS')
+	}
+	println('MEDIA IMPORT RESULT PROTOCOL both exact digests, complete typed fields and bounded decoding PASS')
+}
+
 fn test_saved_media_receipts_require_nonempty_typed_counts_and_no_generation() {
 	text := json2.encode(DeploymentMediaSaved{ architecture: 'x86_64', destination: '/部署/media; $literal.json',
 		sha256: 'c'.repeat(64), roots: 2, packages: 7 })

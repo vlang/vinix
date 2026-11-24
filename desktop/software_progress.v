@@ -37,6 +37,13 @@ fn software_progress_text(event pkgprotocol.Progress) string {
 }
 
 fn (mut a SoftwareApp) operation_line(line string) {
+	if line.starts_with(pkgprotocol.media_import_result_prefix) {
+		if a.repository_worker == .media_import && a.snapshot_receipt {
+			a.read_media_import_result(unsafe { tos(line.str + pkgprotocol.media_import_result_prefix.len,
+				line.len - pkgprotocol.media_import_result_prefix.len) })
+		}
+		return
+	}
 	if line.starts_with(pkgprotocol.progress_prefix) {
 		mut event := pkgprotocol.decode_progress(unsafe { tos(line.str + pkgprotocol.progress_prefix.len, line.len - pkgprotocol.progress_prefix.len) }) or {
 			unsafe { err.free() }
@@ -80,6 +87,10 @@ fn (mut a SoftwareApp) operation_output(bytes string) {
 			a.progress_skip = false
 		} else if !a.progress_skip {
 			if a.progress_pending.len >= pkgprotocol.progress_limit {
+				if a.repository_worker == .media_import && a.snapshot_receipt
+					&& editor_bytes_text(a.progress_pending).starts_with(pkgprotocol.media_import_result_prefix) {
+					a.snapshot_import_result_invalid = true
+				}
 				a.progress_pending.clear()
 				a.progress_skip = true
 				a.output_truncated = true

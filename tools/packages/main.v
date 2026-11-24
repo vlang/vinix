@@ -535,8 +535,15 @@ fn checked(arguments []string) !int {
 				return 0
 			}
 			if names.len == 3 {
-				mut catalog := service.import_repository_media_bundle_with_receipt(names[0], names[1], names[2])!
+				mut catalog, mut result := service.import_repository_media_bundle_result(names[0], names[1], names[2])!
 				catalog.close()
+				if progress {
+					text := json2.encode(result)
+					print(pkgprotocol.media_import_result_prefix)
+					println(text)
+					unsafe { text.free() }
+				}
+				result.close()
 				return 0
 			}
 			if names.len == 0 || names.len % 2 != 0 {

@@ -856,6 +856,11 @@ and reviewing its deployment on the installed system.
 vinix-package admin update-media /media/usb/release-apps /review/vinix-packages-arm64.json RECEIPT_SHA256
 ```
 
+With `--progress`, a receipt-bound import also emits a
+`VINIX-PACKAGE-MEDIA-RESULT` line followed by a format-1 JSON object with
+`receipt_sha256` and `deployment_sha256`. Use the result after the command
+exits successfully.
+
 `deployment-media-save MEDIA_DIRECTORY NEW_FILE [EXPECTED_SHA256]` checks the
 bundle's nonempty format-2 lock against the current authenticated catalog,
 policy and installed state. It saves the exact bytes to a new file outside the
@@ -870,11 +875,13 @@ release. Enter the absolute receipt path and **Receipt SHA-256** from the
 trusted release checksums, then approve **Import media**. After a successful
 import, Software reloads its catalog in offline mode. If the bundle includes a
 deployment lock, choose **Save media lock** and enter a new local filename.
-To require the exact lock, paste the trusted release
-receipt's `deployment_sha256` into **Expected SHA-256**. The save receipt shows
-the digest of the local file. **Check coverage** and **Review additions** use
-that digest. Applying the review uses the same digest and requires separate
-approval.
+After a receipt-bound import, Software requires the verified deployment
+SHA-256 when saving from the approved directory in the same **Offline media**
+view. To supply the digest manually, enter `deployment_sha256` from the
+trusted release receipt into **Expected SHA-256**. The save receipt shows
+the saved digest.
+**Check coverage**, **Review additions**, and the separately approved apply
+carry that digest forward.
 
 The equivalent CLI commands `deployment-add-audit FILE`, `deployment-add-review
 FILE` and `deployment-add-apply REVIEW_FINGERPRINT FILE` each accept an optional
