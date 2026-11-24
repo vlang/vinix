@@ -91,22 +91,36 @@ fn test_release_routing_refuses_missing_invalid_and_incompletely_locked_declarat
 		path := root + '/usr/share/vinix-packages/applications.json'
 		if os.exists(path) { os.rm(path)! }
 		routing_check(!first_run_release_review_requested(message, route)!, 'missing declaration is not a release route')
+		routing_check(first_run_release_setup(root, 1000, route)! == .legacy, 'missing declaration keeps legacy setup')
 		text := routing_document(architecture, ['org.neovim.editor'], [routing_pin('org.neovim.editor', architecture)])
 		other := if architecture == 'aarch64' { 'x86_64' } else { 'aarch64' }
+		routing_write(root, routing_document(architecture, [], []))
+		routing_check(first_run_release_setup(root, 1000, route)! == .legacy, 'empty deployment advertises no applications')
+		routing_check(!first_run_release_review_requested(message, route)!, 'empty deployment is not a release route')
+		routing_check(desktop_mark_app_selection_pending(root), 'legacy setup is pending')
+		routing_write(root, '{"format":1,"architecture":"${architecture}","packages":["org.neovim.editor"]}')
+		routing_check(first_run_release_setup(root, 1000, route)! == .prompt, 'older unlocked declaration can be reviewed at first login')
+		routing_check(routing_refused(route), 'older unlocked declaration cannot authorize the broker route')
 		for invalid in ['', '{}', '{"format":2', text.replace('"format":2', '"format":1'),
-			routing_document(architecture, [], []), text.replace(architecture, other),
+			text.replace(architecture, other),
 			routing_document(architecture, ['bad/id'], [routing_pin('bad/id', architecture)]),
 			routing_document(architecture, ['org.neovim.editor', 'org.neovim.editor'], [routing_pin('org.neovim.editor', architecture)]),
 			routing_document(architecture, ['org.neovim.editor', 'org.vinix.counter'], [routing_pin('org.neovim.editor', architecture)]),
 			routing_document(architecture, ['org.neovim.editor'], [routing_pin('other', architecture)])] {
 			routing_write(root, invalid)
 			routing_check(routing_refused(route), 'invalid or missing root pin refuses on ' + architecture)
+			if setup := first_run_release_setup(root, 1000, route) {
+				panic('invalid release declaration routed first login to ' + setup.str())
+			}
+			routing_check(desktop_app_selection_pending(root) && !first_run_release_decided(root), 'refusal preserves pending setup')
 			routing_check(os.read_file(path)! == invalid, 'refusal preserves declaration')
 		}
 		routing_write(root, text)
 		routing_check(routing_refused(FirstRunReleaseRoute{...route, architecture: 'other'}), 'unsupported target refuses')
 		routing_check(routing_refused(FirstRunReleaseRoute{...route, owner: route.owner + 1}), 'unexpected owner refuses')
 		routing_check(first_run_release_review_requested(message, route)!, 'valid replacement recovers')
+		routing_check(first_run_release_setup(root, 1000, route)! == .prompt, 'valid replacement offers review')
+		routing_check(desktop_app_selection_pending(root) && !first_run_release_decided(root), 'review prompt requires a choice')
 	}
 }
 
@@ -136,19 +150,25 @@ fn test_release_routing_rejects_writable_components_and_file_or_directory_aliase
 	for target in [path, root + '/usr/share/vinix-packages', root + '/usr/share', root + '/usr', root] {
 		os.chmod(target, 0o777)!
 		routing_check(routing_refused(route), 'writable component refuses: ' + target)
+		if setup := first_run_release_setup(root, 1000, route) {
+			panic('writable component routed first login to ' + setup.str())
+		}
 		os.chmod(target, if target == path { 0o644 } else { 0o755 })!
 	}
 	os.rename(path, path + '.real')!
 	os.symlink(path + '.real', path)!
 	routing_check(routing_refused(route), 'file symlink refuses')
+	if setup := first_run_release_setup(root, 1000, route) { panic('file alias routed first login to ' + setup.str()) }
 	os.rm(path)!
 	os.rename(path + '.real', path)!
 	os.rename(root + '/usr/share/vinix-packages', root + '/usr/share/real')!
 	os.symlink('real', root + '/usr/share/vinix-packages')!
 	routing_check(routing_refused(route), 'directory symlink refuses')
+	if setup := first_run_release_setup(root, 1000, route) { panic('directory alias routed first login to ' + setup.str()) }
 	os.rm(root + '/usr/share/vinix-packages')!
 	os.rename(root + '/usr/share/real', root + '/usr/share/vinix-packages')!
 	routing_check(first_run_release_review_requested(routing_message(), route)!, 'safe components recover')
+	routing_check(first_run_release_setup(root, 1000, route)! == .prompt, 'restored components offer review')
 	routing_check(os.read_file(path)! == text, 'path refusals preserve declaration')
 }
 

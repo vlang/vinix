@@ -3,6 +3,7 @@ module main
 
 import math
 import ui2
+import desktop.packagecore
 
 const first_run_release_decision_name = '.vinix-first-run-release'
 const action_first_run_release_review = 'apps.release.review'
@@ -20,16 +21,17 @@ enum FirstRunReleaseChoice {
 	skip
 }
 
+enum FirstRunReleaseSetup {
+	legacy
+	prompt
+	settled
+}
+
 struct FirstRunReleaseState {
 mut:
 	choice FirstRunReleaseChoice
 	focus int
 	save_failed bool
-}
-
-fn first_run_release_available(path string) bool {
-	mut info := C.stat{}
-	return C.lstat(path.str, unsafe { &info }) == 0 && info.st_mode & 0o170000 == 0o100000
 }
 
 fn first_run_release_decided(home string) bool {
@@ -51,9 +53,12 @@ fn first_run_release_decided(home string) bool {
 
 // Native account setup bypasses legacy registration. Its first release choice
 // is therefore independent of the old pending marker, and survives Skip/reboot.
-fn first_run_release_pending(home string, uid u32, declaration string) bool {
-	return first_run_release_available(declaration) && !first_run_release_decided(home)
-		&& (uid != 0 || desktop_app_selection_pending(home))
+fn first_run_release_setup(home string, uid u32, route FirstRunReleaseRoute) !FirstRunReleaseSetup {
+	if !packagecore.first_run_release_at(route.root, route.owner, route.target_architecture())! { return .legacy }
+	if (uid != 0 || desktop_app_selection_pending(home)) && !first_run_release_decided(home) {
+		return .prompt
+	}
+	return .settled
 }
 
 fn first_run_release_save(home string, choice FirstRunReleaseChoice) bool {

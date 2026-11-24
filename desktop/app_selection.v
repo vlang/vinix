@@ -12,7 +12,6 @@ module main
 import math
 import os
 import ui2
-import tools.packages.pkgprotocol
 
 // Registration leaves this marker in the persistent home before saving the
 // user, so a restart between creating the user and choosing apps still shows
@@ -851,10 +850,15 @@ fn first_run_install_command(request string) string {
 // hand off to Software's read-only review; older images retain the pkg picker.
 fn (mut d Desktop) choose_first_run_apps(mut fb Framebuffer, mut pointer PointerDevice,
 	mut keyboard Keyboard, frame_interval i64, idle_interval i64) FirstRunAppsAction {
-	if first_run_release_pending(desktop_home, desktop_identity.uid, pkgprotocol.image_applications_path) {
+	setup := first_run_release_setup(desktop_home, desktop_identity.uid, FirstRunReleaseRoute{}) or {
+		eprintln('vinix-desktop: release application setup unavailable: ${err}')
+		unsafe { err.free() }
+		return .none
+	}
+	if setup == .prompt {
 		return d.choose_first_run_release(mut fb, mut pointer, mut keyboard, frame_interval, idle_interval)
 	}
-	if first_run_release_available(pkgprotocol.image_applications_path) && first_run_release_decided(desktop_home) {
+	if setup == .settled {
 		if desktop_app_selection_pending(desktop_home) { desktop_finish_app_selection(desktop_home) }
 		return .none
 	}

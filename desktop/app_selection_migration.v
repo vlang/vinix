@@ -12,6 +12,10 @@ struct FirstRunReleaseRoute {
 	enqueue fn () ! = first_run_enqueue_release_review
 }
 
+fn (route FirstRunReleaseRoute) target_architecture() string {
+	return if route.architecture != '' { route.architecture } else { $if arm64 { 'aarch64' } $else { 'x86_64' } }
+}
+
 fn first_run_enqueue_release_review() ! {
 	reply := session_call('action', [first_run_release_review_action])!
 	defer { unsafe { reply.free() } }
@@ -20,15 +24,14 @@ fn first_run_enqueue_release_review() ! {
 
 fn first_run_release_review_requested(message SessionMessage, route FirstRunReleaseRoute) !bool {
 	if message.count != 1 || message.fields[0].str() != first_run_release_review_action { return false }
-	architecture := if route.architecture != '' { route.architecture } else { $if arm64 { 'aarch64' } $else { 'x86_64' } }
-	return packagecore.release_review_at(route.root, route.owner, architecture)
+	return packagecore.release_review_at(route.root, route.owner, route.target_architecture())
 }
 
 fn first_run_signed_release_required(name string, route FirstRunReleaseRoute) !bool {
-	architecture := if route.architecture != '' { route.architecture } else { $if arm64 { 'aarch64' } $else { 'x86_64' } }
 	for app in first_run_apps {
 		if app.package_name == name && app.signed_package_id != '' {
-			return packagecore.release_requirement_at(route.root, route.owner, architecture, app.signed_package_id)
+			return packagecore.release_requirement_at(route.root, route.owner, route.target_architecture(),
+				app.signed_package_id)
 		}
 	}
 	return false

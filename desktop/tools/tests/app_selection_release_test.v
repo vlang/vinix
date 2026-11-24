@@ -10,6 +10,16 @@ fn release_choice_test_home(name string) string {
 	return path
 }
 
+fn release_choice_test_route(home string) (FirstRunReleaseRoute, string) {
+	root := os.real_path(home)
+	parent := root + '/usr/share/vinix-packages'
+	os.mkdir_all(parent) or { panic(err) }
+	return FirstRunReleaseRoute{root: root, owner: u32(os.geteuid()), architecture: 'aarch64'},
+		parent + '/applications.json'
+}
+
+const release_choice_test_declaration = '{"format":1,"architecture":"aarch64","packages":["editor"]}'
+
 fn test_release_choice_translations_include_every_prompt_key() {
 	for language in desktop_languages {
 		for suffix in ['heading', 'intro', 'removals', 'confirm', 'review', 'skip', 'save_failed']! {
@@ -22,39 +32,33 @@ fn test_release_choice_translations_include_every_prompt_key() {
 fn test_release_choice_reaches_new_native_accounts_without_registration_or_pkg() {
 	home := release_choice_test_home('account')
 	defer { os.rmdir_all(home) or {} }
-	declaration := home + '/applications.json'
-	assert !first_run_release_pending(home, 1000, declaration)
-	os.write_file(declaration, '{"format":1,"architecture":"aarch64","packages":["editor"]}\n')!
+	route, declaration := release_choice_test_route(home)
+	assert first_run_release_setup(home, 1000, route)! == .legacy
+	os.write_file(declaration, release_choice_test_declaration)!
 	assert !desktop_app_selection_pending(home)
 	marker := home + '/' + first_run_release_decision_name
 	for invalid in ['', 'review', 'skip\nextra', 'x'.repeat(1024)] {
 		os.write_file(marker, invalid)!
 		assert !first_run_release_decided(home)
-		assert first_run_release_pending(home, 1000, declaration)
+		assert first_run_release_setup(home, 1000, route)! == .prompt
 	}
 	os.rm(marker)!
 	os.symlink(declaration, marker)!
 	assert !first_run_release_decided(home)
 	os.rm(marker)!
-	assert first_run_release_pending(home, 1000, declaration)
-	assert first_run_release_pending(home, 1001, declaration)
-	assert !first_run_release_pending(home, 0, declaration)
+	assert first_run_release_setup(home, 1000, route)! == .prompt
+	assert first_run_release_setup(home, 1001, route)! == .prompt
+	assert first_run_release_setup(home, 0, route)! == .settled
 	assert desktop_mark_app_selection_pending(home)
-	assert first_run_release_pending(home, 0, declaration)
-	os.rename(declaration, declaration + '.real')!
-	os.symlink(declaration + '.real', declaration)!
-	assert !first_run_release_pending(home, 1000, declaration)
-	os.rm(declaration)!
-	os.mkdir(declaration)!
-	assert !first_run_release_pending(home, 1000, declaration)
+	assert first_run_release_setup(home, 0, route)! == .prompt
 }
 
 fn test_release_choice_skip_is_durable_and_save_failure_keeps_choice_open() {
 	home := release_choice_test_home('save')
 	defer { os.rmdir_all(home) or {} }
-	declaration := home + '/applications.json'
+	route, declaration := release_choice_test_route(home)
 	marker := home + '/' + first_run_release_decision_name
-	os.write_file(declaration, '{}')!
+	os.write_file(declaration, release_choice_test_declaration)!
 	os.write_file(home + '/unchanged', 'personal file')!
 	assert desktop_mark_app_selection_pending(home)
 	// Crash leftovers, including the previous fixed-name link, cannot block or
@@ -74,8 +78,8 @@ fn test_release_choice_skip_is_durable_and_save_failure_keeps_choice_open() {
 	assert os.read_file(marker + '.new.OLD123')! == 'interrupted write'
 	assert os.read_file(home + '/unchanged')! == 'personal file'
 	assert !desktop_app_selection_pending(home)
-	assert !first_run_release_pending(home, 1000, declaration)
-	assert os.read_file(declaration)! == '{}'
+	assert first_run_release_setup(home, 1000, route)! == .settled
+	assert os.read_file(declaration)! == release_choice_test_declaration
 	state.handle_action(action_first_run_release_review, home)
 	assert os.read_file(marker)! == 'skip\n'
 }

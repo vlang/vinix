@@ -133,13 +133,17 @@ existing identical declarations. Check reports expose its path, action, byte
 count and digest. See [the contract](../tools/packages/SDK.md#declare-release-applications-in-an-image)
 and [qualification](../tests/packages/image-catalog-check.md).
 
-When that declaration is present, an ordinary account's first desktop start
+When a protected declaration specifies a nonempty application set for the
+running architecture, an ordinary account's first desktop start
 offers **Review release applications** or **Skip for now**, including images
 without the legacy `pkg` tool. Review opens Software's read-only proposal for
 the complete declared set, which can include removals. Applying it still needs
 confirmation and administrator approval. The choice is saved in that account's
-home; skipping does not return the prompt after reboot. Images without a native
-declaration keep the legacy app picker.
+home. The choice persists across reboot. Images with a missing or empty
+declaration keep the legacy app picker. Malformed or unreadable declarations
+leave setup pending and the desktop logs the reason. A corrected declaration
+can be reviewed on the next login. The first-login prompt supports both the
+locked declaration and the older format that lists application IDs.
 
 The [native first-run check](../tests/packages/software-first-run-native-check.md)
 boots both targets without legacy registration or `pkg`, drives the real

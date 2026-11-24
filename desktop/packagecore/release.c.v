@@ -30,17 +30,23 @@ fn release_trusted(fd int, owner u32, directory bool) !C.stat {
 // refused by the existing service review, never retried as a legacy install.
 pub fn release_requirement_at(root string, owner u32, architecture string, id string) !bool {
 	if !identifier(id) { return error('invalid release route') }
-	return release_route_at(root, owner, architecture, id)
+	return release_route_at(root, owner, architecture, id, false)
 }
 
 // Review routing concerns the complete advertised set, independent of legacy
 // picker mappings. Empty deployments remain available through Software's normal
 // deployment form; they do not advertise applications for this acquisition route.
 pub fn release_review_at(root string, owner u32, architecture string) !bool {
-	return release_route_at(root, owner, architecture, '')
+	return release_route_at(root, owner, architecture, '', false)
 }
 
-fn release_route_at(root string, owner u32, architecture string, id string) !bool {
+// Older images advertise an unlocked deployment. First login can still offer
+// its ordinary read-only review through Software's deployment service.
+pub fn first_run_release_at(root string, owner u32, architecture string) !bool {
+	return release_route_at(root, owner, architecture, '', true)
+}
+
+fn release_route_at(root string, owner u32, architecture string, id string, allow_unlocked bool) !bool {
 	if architecture !in ['aarch64', 'x86_64'] { return error('invalid release route') }
 	mut directory := C.open(&char(root.str), C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC, 0)
 	if directory < 0 { return error('release root unavailable') }
@@ -81,13 +87,14 @@ fn release_route_at(root string, owner u32, architecture string, id string) !boo
 		|| before.st_mtime != after.st_mtime || before.st_ctime != after.st_ctime {
 		return error('release declaration changed while reading')
 	}
-	return release_requirement(unsafe { tos(bytes.data, bytes.len) }, architecture, id)
+	return release_requirement(unsafe { tos(bytes.data, bytes.len) }, architecture, id, allow_unlocked)
 }
 
-fn release_requirement(text string, architecture string, id string) !bool {
+fn release_requirement(text string, architecture string, id string, allow_unlocked bool) !bool {
 	mut document := pkgprotocol.decode_deployment_document(text)!
 	defer { document.close() }
-	if document.format != 2 || document.architecture != architecture {
+	if document.architecture != architecture { return error('release declaration architecture mismatch') }
+	if document.format != 2 && !allow_unlocked {
 		return error('release declaration must lock this architecture')
 	}
 	// Only explicit roots replace a legacy acquisition. A dependency with the
@@ -96,6 +103,7 @@ fn release_requirement(text string, architecture string, id string) !bool {
 		if !identifier(root) { return error('invalid release roots') }
 		for j in 0 .. i { if document.packages[j] == root { return error('duplicate release root') } }
 	}
+	if document.format == 1 { return document.packages.len > 0 }
 	if id != '' && id !in document.packages { return false }
 	for root in document.packages {
 		if id != '' && root != id { continue }
