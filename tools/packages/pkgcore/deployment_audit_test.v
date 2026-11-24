@@ -116,3 +116,57 @@ fn test_audit_refuses_bad_inputs_excludes_writers_and_observes_empty_state_witho
 	assert !os.exists(work + '/var')
 	println('DEPLOYMENT AUDIT writer exclusion, malformed/roots-only/mismatched/aliased inputs and corrupt state refusal; empty read without initialization PASS')
 }
+
+fn test_release_coverage_requires_locked_pins_and_explicit_roots_while_allowing_additions() {
+	for architecture in ['aarch64', 'x86_64']! {
+		work, state := audit_fixture(architecture)!
+		defer { os.rmdir_all(work) or {} }
+		service := Service{ root: work }
+		directory := state_directory(work)
+		state_path := directory + '/current/state.json'
+		mut document := service.snapshot_deployment(['viewer'])!
+		defer { document.close() }
+		path := work + '/release.json'
+		text := json2.encode(document) + '\n'
+		os.write_file(path, text)!
+		// An installed dependency can also be a user's explicit selection.
+		promoted := DeploymentLock{ ...document, packages: ['viewer', 'runtime'] }
+		with_runtime := encode_generation_state(State{ ...state, requested: [...state.requested, 'runtime'] })!
+		os.write_file(state_path, with_runtime)!
+		mut exact := service.audit_deployment(path)!
+		defer { exact.close() }
+		assert !exact.matches && exact.rows.filter(it.status == 'unexpected').map(it.id) == ['editor', 'extra']
+		assert exact.rows.filter(it.status == 'changed')[0].differences == ['requested']
+		mut covered := service.audit_deployment_additions(path)!
+		defer { covered.close() }
+		assert covered.matches && covered.rows.map(it.id) == ['assets', 'runtime', 'viewer']
+		assert covered.generation == 7 && covered.deployment_sha256 == sha256.sum(text.bytes()).hex()
+		assert os.read_file(state_path)! == with_runtime
+
+		unpromoted := encode_generation_state(state)!
+		os.write_file(state_path, unpromoted)!
+		stricter := DeploymentLock{ ...promoted, locked: promoted.locked.map(
+			DeploymentPackage{ ...it, minimum_sequence: 18 }) }
+		os.write_file(path, json2.encode(stricter))!
+		mut drift := service.audit_deployment_additions(path)!
+		defer { drift.close() }
+		assert !drift.matches && drift.rows.len == 3
+		assert drift.rows[0].differences == ['sequence'] && drift.rows[1].differences == ['requested', 'sequence']
+		assert drift.rows[2].differences == ['sequence']
+		assert os.read_file(state_path)! == unpromoted
+		assert os.read_file(directory + '/catalog.json')! == 'unavailable catalog'
+		assert os.read_file(directory + '/trust-history.json')! == 'unavailable history'
+
+		os.write_file(path, json2.encode(DeploymentLock{ architecture: architecture }))!
+		mut refused := false
+		service.audit_deployment_additions(path) or { refused = err.msg().contains('at least one application root') }
+		assert refused
+		os.rmdir_all(work + '/var')!
+		os.write_file(path, text)!
+		mut missing := service.audit_deployment_additions(path)!
+		defer { missing.close() }
+		assert !missing.matches && missing.generation == 0 && missing.rows.len == 3
+		assert missing.rows.all(it.status == 'missing') && !os.exists(work + '/var')
+	}
+	println('DEPLOYMENT COVERAGE pinned release rows and requested roots with unrelated apps and promoted dependencies PASS')
+}

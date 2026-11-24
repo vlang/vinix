@@ -22,13 +22,16 @@ fn software_audit_fixture_report(matches bool, count int) pkgprotocol.Deployment
 }
 
 fn software_audit_service_fixture(args []string) bool {
-	if args.len < 3 || args[1] != '--json' || args[2] != 'deployment-audit' { return false }
+	if args.len < 3 || args[1] != '--json' || args[2] !in ['deployment-audit', 'deployment-add-audit']! { return false }
 	assert args.len == 4 && os.args[1] == '--json'
 	path := args[3]
 	if path == '/error-audit.json' { eprintln('fixture: deployment file is unreadable'); exit(1) }
 	if path == '/huge-audit.json' { print('x'.repeat(software_output_limit + 32)); return true }
 	matches := path in ['/match-audit.json', '/empty-audit.json']
-	text := json2.encode(software_audit_fixture_report(matches, if path == '/empty-audit.json' { 0 } else { 31 }))
+	report := software_audit_fixture_report(matches, if path == '/empty-audit.json' { 0 } else { 31 })
+	text := json2.encode(if args[2] == 'deployment-add-audit' {
+		pkgprotocol.DeploymentAudit{ ...report, rows: report.rows.filter(it.status != 'unexpected') }
+	} else { report })
 	if path == '/bad-audit.json' { print(text.replace('"format":1', '"format":2')); exit(3) }
 	if path == '/partial-audit.json' { print(text[..text.len / 2]); exit(3) }
 	if path == '/wrong-exit-audit.json' { print(text); return true }

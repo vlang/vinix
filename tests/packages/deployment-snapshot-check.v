@@ -56,6 +56,7 @@ fn ordinary_audit(binary string, root string, path string, expected string) ! {
 	if child == 0 {
 		assert C.setgroups(0, unsafe { nil }) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0
 		assert audit_command(binary, root, path, true)! == expected
+		assert command(binary, root, ['--offline', '--json', 'deployment-add-audit', path])! == expected
 		C._exit(0)
 	}
 	mut status := i32(0)
@@ -184,14 +185,30 @@ fn check() ! {
 	assert command(binary, consumer, ['deployment-snapshot'])!.contains('"minimum_sequence":3')
 	mut restored := pkgprotocol.decode_deployment_audit(audit_command(binary, consumer, path, true)!)!; defer { restored.close() }
 	assert restored.matches && restored.rows.len == 3 && restored.rows.all(it.status == 'match')
-	// An exact subset is not the desired complete organization application set.
+	command(binary, consumer, ['install', 'assets'])!
+	mut extra := pkgprotocol.decode_deployment_audit(audit_command(binary, consumer, path, false)!)!
+	defer { extra.close() }
+	assert extra.rows.filter(it.status == 'changed')[0].differences == ['requested']
+	mut coverage := pkgprotocol.decode_deployment_audit(command(binary, consumer, ['--json', 'deployment-add-audit', path])!)!
+	defer { coverage.close() }
+	assert coverage.matches && coverage.rows.len == 3
+	subset_path := work + '/assets-only.json'
+	os.write_file(subset_path, command(binary, consumer, ['deployment-snapshot', 'assets'])!)!
+	mut subset := pkgprotocol.decode_deployment_audit(command(binary, consumer, ['--json', 'deployment-add-audit', subset_path])!)!
+	defer { subset.close() }
+	assert subset.matches && subset.rows.map(it.id) == ['assets']
+	assert command_status(binary, consumer, ['--offline', '--json', 'deployment-add-audit', newer_path], 3)!.contains('"matches":false')
 	command(binary, consumer, ['remove', 'app'])!
+	command(binary, consumer, ['remove', 'assets'])!
 	mut removed := pkgprotocol.decode_deployment_audit(audit_command(binary, consumer, path, false)!)!; defer { removed.close() }
 	assert removed.rows.all(it.status == 'missing')
 	refused = false; pkgadmin.validate_arguments(['deployment-snapshot']) or { refused = true }; assert refused
 	assert !pkgadmin.administrative(['deployment-snapshot'])
 	refused = false; pkgadmin.validate_arguments(['deployment-audit', path]) or { refused = true }; assert refused
 	assert !pkgadmin.administrative(['deployment-audit', path])
+	refused = false; pkgadmin.validate_arguments(['deployment-add-audit', path]) or { refused = true }; assert refused
+	assert !pkgadmin.administrative(['deployment-add-audit', path])
+	assert command_status(binary, root, ['deployment-add-audit', path, path], 1)!.contains('requires one exact deployment lock')
 	refused = false; pkgadmin.validate_arguments(['deployment-snapshot-save', path]) or { refused = true }; assert refused
 	assert !pkgadmin.administrative(['deployment-snapshot-save', path])
 	assert command_status(binary, root, ['deployment-snapshot-save'], 1)!.contains('requires a new destination')
@@ -206,6 +223,7 @@ fn check() ! {
 	assert command_status(binary, root, ['--json', 'deployment-audit', bad_path], 1)!.contains('requires an exact format-2 lock')
 	println('DEPLOYMENT SAVE CLI new-file durable export, exact receipt and withdrawn/offline/revoked metadata, existing-file preservation and authenticated reproduction PASS')
 	println('DEPLOYMENT AUDIT CLI exact offline metadata and sequence-floor matches, missing/changed drift exit 3, no fresh-state initialization and authenticated reproduction PASS')
+	println('DEPLOYMENT COVERAGE CLI read-only status, pinned roots, extra installed packages and explicit dependency selections PASS')
 	println('DEPLOYMENT SNAPSHOT CLI preserves withdrawn installed app/runtime/all-data pins offline with revoked policy, refuses missing roots and unauthenticated apply, and reproduces exact versions from newly authenticated media PASS')
 }
 

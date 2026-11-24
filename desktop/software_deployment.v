@@ -61,7 +61,8 @@ fn (mut a SoftwareApp) handle_deployment(event_id string) {
 		'software.deployment.choose' { a.choose_deployment_file() }
 		'software.deployment.release' { a.open_release_deployment_review() }
 		'software.deployment.release-add' { a.open_release_deployment_review_mode(true) }
-		'software.deployment.release-audit' { a.audit_release_deployment() }
+		'software.deployment.release-audit' { a.audit_release_deployment(false) }
+		'software.deployment.release-coverage' { a.audit_release_deployment(true) }
 		'software.deployment.path' {
 			a.focus = true
 			a.select_all = false
@@ -159,6 +160,7 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 			children << software_button('software.deployment.release', 'Review release apps', 14, 374, 180)
 			children << software_button('software.deployment.release-audit', 'Check release apps', 210, 374, 160)
 			children << software_button('software.deployment.release-add', 'Add release apps', 14, 418, 180)
+			children << software_button('software.deployment.release-coverage', 'Check release coverage', 210, 418, 160)
 		}
 	} else if a.deployment_review_running() {
 		children << software_button('software.deployment.stop', 'Stop review', 14, 286, 160)

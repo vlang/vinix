@@ -1094,6 +1094,22 @@ fingerprint when applying. **Review release apps** remains the full-set
 deployment workflow for an administrator who intends to replace the installed
 set.
 
+**Deployment → Check release coverage** compares the pinned release records
+with the active generation. Every release root must still be explicitly
+requested. Installed dependencies may also be explicit selections, and apps
+outside the lock are allowed. Choose **Review release additions** from the
+report to open a fresh additive review with separate confirmation and approval.
+
+```sh
+vinix-package --json deployment-add-audit /usr/share/vinix-packages/applications.json
+```
+
+The command accepts a nonempty format-2 lock and returns the deployment audit
+JSON schema. Rows cover the supplied pins. Exit status 0 means coverage,
+3 means missing or changed records, and 1 means the request failed. The
+comparison reads recorded installed metadata as an ordinary user. Payload
+health, current publisher trust and permission to install have their own checks.
+
 The [native first-run check](../../tests/packages/software-first-run-native-check.md)
 drives this flow on both installed target systems without legacy registration
 or `pkg`. It checks the real proposal plus an independent production CLI review,

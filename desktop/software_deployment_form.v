@@ -6,10 +6,10 @@ import ui2
 const software_deployment_form_actions = ['software.deployment.choose', 'software.deployment.review',
 	'software.deployment.audit', 'software.deployment.snapshot', 'software.policy',
 	'software.deployment.release', 'software.deployment.release-audit', 'software.failure',
-	'software.deployment.release-add']
+	'software.deployment.release-add', 'software.deployment.release-coverage']
 const software_deployment_form_titles = ['Choose file…', 'Review deployment', 'Check installed',
 	'Save installed…', 'Organization policy', 'Review release apps', 'Check release apps', 'Failure details',
-	'Add release apps']
+	'Add release apps', 'Check release coverage']
 const software_deployment_form_help = [
 	'Choose a file. Selection fills the path; it starts no package changes.',
 	'Review the full app set and removals. Applying it needs separate approval.',
@@ -20,6 +20,7 @@ const software_deployment_form_help = [
 	'Compare the release baseline with installed metadata. Trust and health are separate.',
 	'Read the complete failure report. This starts no package changes.',
 	'Review release apps alongside your installed applications. Applying it needs separate approval.',
+	'Check the pinned release apps and dependencies. Other installed apps are allowed.',
 ]
 
 fn (a &SoftwareApp) deployment_form_idle() bool {
@@ -29,7 +30,7 @@ fn (a &SoftwareApp) deployment_form_idle() bool {
 
 fn (a &SoftwareApp) deployment_form_action_available(index int) bool {
 	if index < 0 || index >= software_deployment_form_actions.len { return false }
-	if index in [5, 6, 8]! { return a.release_deployment_available }
+	if index in [5, 6, 8, 9]! { return a.release_deployment_available }
 	if index == 7 { return a.failure_pages.len > 0 }
 	return true
 }

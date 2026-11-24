@@ -26,6 +26,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  deployment-lock [ID...] | deployment-snapshot [INSTALLED_ID...]\n' +
 	'  deployment-snapshot-save NEW_FILE [INSTALLED_ID...]\n' +
 	'  deployment-audit FILE (read-only metadata drift; exit 0 match, 3 drift)\n' +
+	'  deployment-add-audit FILE (read-only release coverage; extra installed apps allowed)\n' +
 	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  deployment-add-review LOCK.json | deployment-add-apply REVIEW_FINGERPRINT LOCK.json\n' +
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
@@ -352,13 +353,16 @@ fn checked(arguments []string) !int {
 			if as_json { println(json2.encode(saved)) }
 			else { println('Installed deployment snapshot saved: ${saved.destination}\nGeneration: ${saved.generation}; application roots: ${saved.roots}; packages: ${saved.packages}\nSHA-256: ${saved.sha256}') }
 		}
-		'deployment-audit' {
-			if names.len != 1 { return error('deployment-audit requires one exact deployment lock') }
-			mut report := service.audit_deployment(names[0])!
+		'deployment-audit', 'deployment-add-audit' {
+			if names.len != 1 { return error('${command} requires one exact deployment lock') }
+			additions := command == 'deployment-add-audit'
+			mut report := if additions { service.audit_deployment_additions(names[0])! }
+				else { service.audit_deployment(names[0])! }
 			defer { report.close() }
 			if as_json { println(json2.encode(report)) }
 			else {
-				println('Deployment metadata audit for generation ${report.generation}: ${if report.matches { 'match' } else { 'drift' }}')
+				scope := if additions { 'Deployment coverage' } else { 'Deployment metadata audit' }
+				println('${scope} for generation ${report.generation}: ${if report.matches { 'match' } else { 'drift' }}')
 				println('Captured lock SHA-256: ${report.deployment_sha256}')
 				for row in report.rows {
 					println('${row.id}: ${row.status}; expected ${if row.expected_version == '' { '(absent)' } else { row.expected_version }}, installed ${if row.installed_version == '' { '(absent)' } else { row.installed_version }}${if row.differences.len == 0 { '' } else { '; differences: ' + row.differences.join(', ') }}')

@@ -1123,11 +1123,11 @@ fn check_software_launch_options() ! {
 const deployment_fixture_path = '/private/tmp/deployment with spaces; \$literal.json'
 
 fn software_deployment_service_fixture(args []string) !bool {
-	if args[1] == 'deployment-review' {
+	if args[1] in ['deployment-review', 'deployment-add-review']! {
 		assert args.len == 3
 		path := args[2]
 		if path == '/missing.json' { eprintln('fixture: deployment file unavailable'); exit(18) }
-		review := fixture_review('deploy', ['editor'])
+		review := fixture_review(if args[1] == 'deployment-add-review' { 'deploy-add' } else { 'deploy' }, ['editor'])
 		println(json2.encode(if path == '/wrong-format.json' {
 			pkgprotocol.Review{ ...review, format: 3 }
 		} else if path == '/wrong-operation.json' {

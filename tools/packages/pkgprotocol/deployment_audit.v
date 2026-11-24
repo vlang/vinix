@@ -21,7 +21,7 @@ pub:
 	architecture string
 	deployment_sha256 string // exact captured input bytes, including whitespace
 	matches bool
-	rows []DeploymentAuditRow // sorted union of target and installed package IDs
+	rows []DeploymentAuditRow // sorted package IDs in the requested comparison scope
 }
 
 pub fn (report &DeploymentAudit) validate() ! {

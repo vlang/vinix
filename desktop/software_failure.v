@@ -47,6 +47,7 @@ fn software_failure_operation(arguments []string) string {
 			'deploy', 'deployment-review', 'deployment-apply' { 'Organization deployment' }
 			'deployment-add-review', 'deployment-add-apply' { 'Add release apps' }
 			'deployment-audit' { 'Check installed deployment' }
+			'deployment-add-audit' { 'Check release coverage' }
 			'deployment-snapshot-save' { 'Save installed deployment' }
 			'mirror', 'mirror-review', 'mirror-apply', 'mirror-deployment-review', 'mirror-deployment-apply' { 'Offline repository export' }
 			'run', 'run-args' { 'Launch application' }

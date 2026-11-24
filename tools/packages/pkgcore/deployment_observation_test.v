@@ -41,7 +41,7 @@ fn test_deployment_observations_retire_owned_documents_and_audit_scratch() {
 		owned_bytes := C.vinix_heap_end()
 		C.vinix_heap_begin()
 		for _ in 0 .. 1000 {
-			mut audit := compare_deployment(expected, expected, 7, digest)!
+			mut audit := compare_deployment(expected, expected, 7, digest, .exact)!
 			audit.close()
 		}
 		audit_bytes := C.vinix_heap_end()
@@ -93,7 +93,7 @@ fn test_deployment_observation_limits_preserve_complete_owned_records_and_union(
 		roots << id
 		pins << DeploymentPackage{ ...pin, id: id }
 	}
-	mut audit := compare_deployment(document, DeploymentLock{ architecture: 'x86_64', packages: roots, locked: pins }, 9, 'd'.repeat(64))!
+	mut audit := compare_deployment(document, DeploymentLock{ architecture: 'x86_64', packages: roots, locked: pins }, 9, 'd'.repeat(64), .exact)!
 	defer { audit.close() }
 	assert audit.rows.len == 8192 && !audit.matches
 	assert audit.rows.filter(it.status == 'missing').len == 4096 && audit.rows.filter(it.status == 'unexpected').len == 4096

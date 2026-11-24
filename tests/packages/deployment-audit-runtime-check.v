@@ -43,6 +43,8 @@ fn suite() hwhost.Suite {
 				'DEPLOYMENT AUDIT PROTOCOL 1000 complete and partial-invalid decode/close cycles retain zero tracked bytes PASS',
 				'DEPLOYMENT AUDIT ordinary UID 1000 reads exact root-owned comparison without administrator authorization PASS',
 				'DEPLOYMENT AUDIT CLI exact offline metadata and sequence-floor matches, missing/changed drift exit 3, no fresh-state initialization and authenticated reproduction PASS',
+				'DEPLOYMENT COVERAGE pinned release rows and requested roots with unrelated apps and promoted dependencies PASS',
+				'DEPLOYMENT COVERAGE CLI read-only status, pinned roots, extra installed packages and explicit dependency selections PASS',
 				'Deployment observation: exact SDK JSON and optional LF; inclusive metadata bound and overflow refusal release growth buffers PASS',
 				'Deployment observation: complete 4096-root/record snapshots and 8192-row disjoint audit union PASS',
 				'Deployment observation: public owned snapshots, durable saved receipts, exact offline audits and existing-file refusals preserve store PASS',

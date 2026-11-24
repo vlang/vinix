@@ -270,6 +270,7 @@ fn check_software_release() ! {
 	assert tree.children.any(it.id == 'software.deployment.release' && it.text == 'Review release apps')
 	assert tree.children.any(it.id == 'software.deployment.release-audit' && it.text == 'Check release apps')
 	assert tree.children.any(it.id == 'software.deployment.release-add' && it.text == 'Add release apps')
+	assert tree.children.any(it.id == 'software.deployment.release-coverage' && it.text == 'Check release coverage')
 	assert !tree.children.any(it.id == 'software.confirm')
 	free_window_tree(tree)
 	// The old picker cannot redirect the new read-only proposal.
@@ -309,11 +310,35 @@ fn check_software_release() ! {
 	assert app.audit_ready && app.audit_path == path
 	app.handle('software.audit.back')!
 	assert app.deployment_mode && !app.audit_mode
+	app.handle('software.deployment.release-coverage')!
+	assert app.audit_mode && app.audit_additions && app.worker_audit && !app.admin_prompt
+	assert app.worker.args == ['--json', 'deployment-add-audit', path]
+	wait_for_software(mut app)
+	assert app.audit_ready && app.status.contains('Release coverage differs') && app.failure_pages.len == 0
+	assert app.audit_snapshot.rows.filter(it.status == 'unexpected').len == 0
+	tree = app.build(ui2.rect(0, 0, 320, 240))!
+	assert tree.children.any(it.text == 'Release coverage')
+	free_window_tree(tree)
+	software_repository_text(mut app.deployment_path, '/unrelated edit.json')
+	app.handle('software.audit.reload')!
+	assert app.worker.args == ['--json', 'deployment-add-audit', path]
+	wait_for_software(mut app)
+	tree = app.build(ui2.rect(0, 0, 640, 610))!
+	assert tree.children.any(it.id == 'software.audit.review' && it.text == 'Review release additions')
+	free_window_tree(tree)
+	app.handle('software.audit.review')!
+	assert !app.audit_mode && !app.audit_additions && app.worker_review && !app.admin_prompt
+	assert app.worker.args == ['deployment-add-review', path]
+	wait_for_software(mut app)
+	assert app.review_ready && app.review_snapshot.operation == 'deploy-add'
+	app.handle('software.cancel')!
 	os.rm(path)!
 	software_repository_text(mut app.deployment_path, '/kept draft.json')
 	app.handle('software.deployment.release')!
 	assert !app.release_deployment_available && app.worker == unsafe { nil } && editor_bytes_text(app.deployment_path) == '/kept draft.json'
 	app.handle('software.deployment.release-audit')!
+	assert !app.audit_mode && app.worker == unsafe { nil } && editor_bytes_text(app.deployment_path) == '/kept draft.json'
+	app.handle('software.deployment.release-coverage')!
 	assert !app.audit_mode && app.worker == unsafe { nil } && editor_bytes_text(app.deployment_path) == '/kept draft.json'
 	os.write_file(base + '/other.json', '{}')!; os.symlink(base + '/other.json', path)!
 	app.handle('software.deployment.back')!; app.handle('software.deployment')!
@@ -323,6 +348,7 @@ fn check_software_release() ! {
 	assert SoftwareApp{}.release_deployment_path == pkgprotocol.image_applications_path
 	println('Software release catalog: optional ordinary-file discovery, explicit full-closure review, frozen literal path, separate confirmation, stale-picker retirement, missing/link refusal and retained drafts PASS')
 	println('Software release audit: visible ordinary read, frozen literal path, stale-picker retirement, reload, drift, separate review and missing/link refusal PASS')
+	println('Software release coverage: read-only check, frozen reload and separate additive review PASS')
 }
 
 fn check_software_release_memory() ! {
@@ -341,6 +367,7 @@ fn check_software_release_memory() ! {
 				app.handle('software.deployment.release')!
 				app.handle('software.deployment.release-add')!
 				app.handle('software.deployment.release-audit')!
+				app.handle('software.deployment.release-coverage')!
 				app.release_deployment_available = true
 			}
 		}

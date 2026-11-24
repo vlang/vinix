@@ -77,6 +77,7 @@ mut:
 	snapshot_pending string
 	snapshot_saved pkgprotocol.DeploymentSnapshotSaved
 	audit_mode bool
+	audit_additions bool
 	audit_ready bool
 	audit_snapshot pkgprotocol.DeploymentAudit
 	audit_path string

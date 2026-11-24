@@ -114,8 +114,8 @@ fn (mut a SoftwareApp) load_release_deployment_path() {
 	software_repository_text(mut a.deployment_path, a.release_deployment_path)
 }
 
-fn (mut a SoftwareApp) audit_release_deployment() {
+fn (mut a SoftwareApp) audit_release_deployment(additions bool) {
 	if !a.deployment_mode || !a.check_release_deployment() { return }
 	a.load_release_deployment_path()
-	a.begin_deployment_audit()
+	a.begin_deployment_audit_mode(additions)
 }

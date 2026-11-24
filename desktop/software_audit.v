@@ -17,13 +17,13 @@ fn (mut a SoftwareApp) clear_deployment_audit() {
 	a.clear_deployment_audit_report()
 	unsafe { a.audit_path.free(); a.audit_query.free() }
 	a.audit_query = []u8{}; a.audit_differences_only = false
-	a.audit_path = ''; a.audit_mode = false
+	a.audit_path = ''; a.audit_mode = false; a.audit_additions = false
 }
 
 fn (mut a SoftwareApp) read_deployment_audit() {
 	a.clear_deployment_audit_report()
 	a.focus = false; a.select_all = false
-	mut args := ['--json', 'deployment-audit', a.audit_path]
+	mut args := ['--json', if a.audit_additions { 'deployment-add-audit' } else { 'deployment-audit' }, a.audit_path]
 	a.start(args, true)
 	unsafe { (&array(&args)).free() }
 	if a.worker != unsafe { nil } {
@@ -33,6 +33,10 @@ fn (mut a SoftwareApp) read_deployment_audit() {
 }
 
 fn (mut a SoftwareApp) begin_deployment_audit() {
+	a.begin_deployment_audit_mode(false)
+}
+
+fn (mut a SoftwareApp) begin_deployment_audit_mode(additions bool) {
 	path := editor_bytes_text(a.deployment_path)
 	if !software_deployment_path_valid(path) {
 		a.set_status('Enter an absolute deployment file path without control characters (at most 4096 bytes).')
@@ -42,6 +46,7 @@ fn (mut a SoftwareApp) begin_deployment_audit() {
 	a.clear_deployment_audit()
 	a.audit_path = path.clone()
 	a.audit_mode = true
+	a.audit_additions = additions
 	a.read_deployment_audit()
 }
 
@@ -88,6 +93,11 @@ fn (mut a SoftwareApp) load_deployment_audit(code int) bool {
 		a.set_status('Deployment audit exit status disagrees with its result. Reload the report.')
 		return false
 	}
+	if a.audit_additions && report.rows.any(it.status == 'unexpected') {
+		report.close()
+		a.set_status('Invalid release coverage response. Reload the report.')
+		return false
+	}
 	a.audit_snapshot = report
 	a.audit_ready = true
 	mut differences := 0
@@ -100,7 +110,10 @@ fn (mut a SoftwareApp) load_deployment_audit(code int) bool {
 	a.audit_summary = 'Generation ' + generation + ' · ' + count + ' packages · ' + changed + ' differences'
 	unsafe { count.free(); changed.free(); generation.free() }
 	a.filter_deployment_audit()
-	a.set_status(if report.matches { 'Installed metadata matches the deployment lock. Health and current trust are separate checks.' }
+	a.set_status(if a.audit_additions {
+		if report.matches { 'Installed metadata covers the release lock. Health and current trust are separate checks.' }
+		else { 'Release coverage differs. Inspect the rows and review release additions to reconcile the pinned apps.' }
+	} else if report.matches { 'Installed metadata matches the deployment lock. Health and current trust are separate checks.' }
 		else { 'Installed metadata differs. Inspect the rows, then request a fresh deployment review to reconcile the complete application set.' })
 	return true
 }
@@ -152,8 +165,9 @@ fn (mut a SoftwareApp) handle_deployment_audit(event_id string) {
 			// reads it anew and binds a fresh authenticated deployment proposal.
 			a.deployment_path.clear()
 			for byte in a.audit_path { a.deployment_path << byte }
+			additions := a.audit_additions
 			a.clear_deployment_audit()
-			a.begin_deployment_review()
+			a.begin_deployment_review_mode(additions)
 		}
 		'software.audit.previous' { if a.details_page > 0 { a.details_page-- } }
 		'software.audit.next' { if a.details_page + 1 < a.details_pages.len { a.details_page++ } }
@@ -185,7 +199,7 @@ fn (mut a SoftwareApp) build_deployment_audit_compact(width int, height int) ui2
 		if height > 112 { children << software_label(a.status, 14, 84, width - 28, height - 92, false) }
 		return ui2.screen(app_surface, children)
 	}
-	children << software_label('Installed deployment check', 14, 8, width - 28, 28, false)
+	children << software_label(if a.audit_additions { 'Release coverage' } else { 'Installed deployment check' }, 14, 8, width - 28, 28, false)
 	children << software_button(if a.worker == unsafe { nil } { 'software.audit.back' } else { 'software.audit.stop' },
 		if idle { 'Back to deployment' } else { 'Stop check' }, 14, 46, 140)
 	if idle { children << software_button('software.audit.reload', 'Reload check', width - 154, 46, 140) }
@@ -207,7 +221,7 @@ fn (mut a SoftwareApp) build_deployment_audit(width int, height int) ui2.Element
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.page_rows != previous_size { a.keep_audit_selection_visible() }
 	mut children := frame_elements(56)
-	children << software_label('Installed deployment check', 14, 8, width - 202, 28, false)
+	children << software_label(if a.audit_additions { 'Release coverage' } else { 'Installed deployment check' }, 14, 8, width - 202, 28, false)
 	children << software_button(if a.worker == unsafe { nil } { 'software.audit.back' } else { 'software.audit.stop' },
 		if a.worker == unsafe { nil } { 'Back to deployment' } else { 'Stop check' }, width - 188, 8, 174)
 	children << software_label(a.audit_summary, 14, 46, width - 28, 36, false)
@@ -242,7 +256,8 @@ fn (mut a SoftwareApp) build_deployment_audit(width int, height int) ui2.Element
 		children << software_button('software.audit.next', 'Next detail', 428, height - 168, 142)
 		children << software_button('software.audit.up', 'Previous packages', 14, height - 168, 110)
 		children << software_button('software.audit.down', 'Next packages', 136, height - 168, 110)
-		children << software_button('software.audit.review', 'Review deployment', 396, height - 130, 174)
+		children << software_button('software.audit.review', if a.audit_additions { 'Review release additions' }
+			else { 'Review deployment' }, 396, height - 130, 174)
 	}
 	if a.worker == unsafe { nil } { children << software_button('software.audit.reload', 'Reload check', 14, height - 130, 160) }
 	a.add_status_footer(mut children, width, height, false)
