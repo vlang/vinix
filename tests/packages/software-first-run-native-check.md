@@ -189,3 +189,25 @@ The login workflow reviews all three apps before installation. On each boot
 the observer runs a read-only deployment audit after Counter has closed.
 The evidence check requires all three installed entries to match the
 staged lock digest and the same active generation across both boots.
+
+At `333d8b702f7671035b989b3ee89057f976b54e6d`, the aarch64 and x86-64
+QEMU runs each installed all three locked 1.0.0 packages through Software.
+Each recorded separate refresh and installation approvals, reopened Counter
+at 3 and saved 4. The complete deployment audit matched generation 1 before
+both shutdowns per target. The runs reused the previous production
+compositor and kernel builds and booted with networking disabled.
+
+Independent retention checked 81 artifact digests on aarch64 and 88 on
+x86-64, including 26 screenshots on each. Both rejected 61 alterations,
+including a different staged lock, a missing audit or package, a changed
+generation and a proposal from the wrong publisher. The aarch64 direct-seat
+regression also passed. Earlier runs exposed an interleaved startup marker
+and an observer that could start verification before the deployment writer
+exited. The corrected runner uses the verified manager marker and waits for
+the successful installation approval. The archive includes the early logs.
+
+The evidence archive is
+`~/.local/state/vinix/r14-staged-production-catalog-gGFsJq/qualification.tar.gz`.
+Its SHA-256 is `994a864004158d64d627d7263bc73533f35f5d6ae94038443640442204f664ae`.
+Independent extraction matched all 19,456 inventory entries, both staged
+locks and both decoded VJFS disk digests.
