@@ -36,14 +36,12 @@ fn (mut r MetadataReader) deployment_pins() ![]DeploymentPin {
 	mut pins := []DeploymentPin{cap: 16}
 	unsafe { pins.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { mut discarded := DeploymentDocument{ locked: pins }; discarded.close() } }
+	defer { if !accepted { close_deployment_pins(pins) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if pins.len == 4096 { return error('deployment exceeds its supported package limits') }
-		pin := r.deployment_pin()!
-		pointer := unsafe { &pin }
-		unsafe { pins.push_many(pointer, 1) }
+		pins << r.deployment_pin()!
 	}
 	accepted = true
 	return pins
@@ -60,7 +58,7 @@ pub fn decode_deployment_document(text string) !DeploymentDocument {
 	reader.expect(`{`)!
 	mut document := DeploymentDocument{}
 	mut accepted := false
-	defer { if !accepted { document.close() } }
+	defer { if !accepted { close_deployment_document(document) } }
 	mut seen := u16(0)
 	mut first := true
 	for reader.next(first, `}`)! {

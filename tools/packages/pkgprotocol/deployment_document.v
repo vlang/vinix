@@ -30,14 +30,22 @@ fn close_deployment_pin(pin DeploymentPin) {
 	}
 }
 
-// Only independently decoded documents own their fields. close is repeatable.
-pub fn (mut document DeploymentDocument) close() {
+fn close_deployment_pins(pins []DeploymentPin) {
+	for pin in pins { close_deployment_pin(pin) }
+	unsafe { pins.free() }
+}
+
+fn close_deployment_document(document DeploymentDocument) {
 	unsafe {
 		document.architecture.free()
 		for id in document.packages { id.free() }
 		(&array(&document.packages)).free()
-		for pin in document.locked { close_deployment_pin(pin) }
-		(&array(&document.locked)).free()
 	}
+	close_deployment_pins(document.locked)
+}
+
+// Only independently decoded documents own their fields. close is repeatable.
+pub fn (mut document DeploymentDocument) close() {
+	close_deployment_document(document)
 	document = DeploymentDocument{}
 }

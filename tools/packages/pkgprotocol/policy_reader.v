@@ -11,7 +11,7 @@ fn (mut r MetadataReader) policy_pin() !PolicyPin {
 	r.expect(`{`)!
 	mut pin := PolicyPin{}
 	mut accepted := false
-	defer { if !accepted { unsafe { pin.id.free(); pin.minimum.free(); pin.before.free() } } }
+	defer { if !accepted { close_policy_pin(pin) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -35,18 +35,12 @@ fn (mut r MetadataReader) policy_pins() ![]PolicyPin {
 	mut values := []PolicyPin{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
-	defer {
-		if !accepted {
-			mut discarded := PolicySettings{ pins: values }; discarded.close()
-		}
-	}
+	defer { if !accepted { close_policy_pins(values) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == 4096 { return error('policy pins exceed their entry limit') }
-		pin := r.policy_pin()!
-		pointer := unsafe { &pin }
-		unsafe { values.push_many(pointer, 1) }
+		values << r.policy_pin()!
 	}
 	accepted = true
 	return values
@@ -56,7 +50,7 @@ fn (mut r MetadataReader) policy_settings() !PolicySettings {
 	r.expect(`{`)!
 	mut policy := PolicySettings{}
 	mut accepted := false
-	defer { if !accepted { policy.close() } }
+	defer { if !accepted { close_policy_settings(policy) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -75,7 +69,7 @@ fn (mut r MetadataReader) policy_settings() !PolicySettings {
 		}
 	}
 	if seen != 127 { return error('missing policy settings field') }
-	policy.validate()!
+	validate_policy_settings(policy)!
 	accepted = true
 	return policy
 }
@@ -84,14 +78,7 @@ fn (mut r MetadataReader) policy_impact() !PolicyImpact {
 	r.expect(`{`)!
 	mut row := PolicyImpact{}
 	mut accepted := false
-	defer {
-		if !accepted {
-			unsafe {
-				row.id.free(); row.name.free(); row.version.free(); row.kind.free(); row.license.free()
-				row.repository.free(); row.public_key.free(); row.diagnostic_before.free(); row.diagnostic_after.free()
-			}
-		}
-	}
+	defer { if !accepted { close_policy_impact(row) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -129,9 +116,7 @@ fn (mut r MetadataReader) policy_impacts() ![]PolicyImpact {
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == 4096 { return error('policy impacts exceed their entry limit') }
-		row := r.policy_impact()!
-		pointer := unsafe { &row }
-		unsafe { values.push_many(pointer, 1) }
+		values << r.policy_impact()!
 	}
 	accepted = true
 	return values
@@ -144,7 +129,7 @@ pub fn decode_policy_document(text string) !PolicyDocument {
 	reader.expect(`{`)!
 	mut document := PolicyDocument{}
 	mut accepted := false
-	defer { if !accepted { document.close() } }
+	defer { if !accepted { close_policy_document(document) } }
 	mut seen := u16(0)
 	mut first := true
 	for reader.next(first, `}`)! {
@@ -160,7 +145,7 @@ pub fn decode_policy_document(text string) !PolicyDocument {
 	}
 	reader.spaces()
 	if seen != 7 || reader.position != text.len { return error('incomplete or trailing policy document') }
-	document.validate()!
+	validate_policy_document(document)!
 	accepted = true
 	return document
 }
@@ -172,7 +157,7 @@ pub fn decode_policy_review(text string) !PolicyReview {
 	reader.expect(`{`)!
 	mut review := PolicyReview{}
 	mut accepted := false
-	defer { if !accepted { review.close() } }
+	defer { if !accepted { close_policy_review(review) } }
 	mut seen := u16(0)
 	mut first := true
 	for reader.next(first, `}`)! {
@@ -192,7 +177,7 @@ pub fn decode_policy_review(text string) !PolicyReview {
 	}
 	reader.spaces()
 	if seen != 127 || reader.position != text.len { return error('incomplete or trailing policy review') }
-	review.validate()!
+	validate_policy_review(review)!
 	accepted = true
 	return review
 }

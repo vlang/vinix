@@ -89,6 +89,10 @@ fn policy_range_valid(minimum string, before string) bool {
 }
 
 pub fn (policy &PolicySettings) validate() ! {
+	validate_policy_settings(policy)!
+}
+
+fn validate_policy_settings(policy PolicySettings) ! {
 	if policy.allowed.len > 4096 || policy.pins.len > 4096 || policy.licenses.len > 4096
 		|| policy.permissions.len > 5 || policy.reserve_bytes > u64(1) << 40 {
 		return error('policy presentation exceeds supported bounds')
@@ -106,15 +110,23 @@ pub fn (policy &PolicySettings) validate() ! {
 }
 
 pub fn (document &PolicyDocument) validate() ! {
+	validate_policy_document(document)!
+}
+
+fn validate_policy_document(document PolicyDocument) ! {
 	if document.format != 1 || document.architecture !in ['aarch64', 'x86_64']! { return error('unsupported policy document') }
-	document.policy.validate()!
+	validate_policy_settings(document.policy)!
 }
 
 pub fn (review &PolicyReview) validate() ! {
+	validate_policy_review(review)!
+}
+
+fn validate_policy_review(review PolicyReview) ! {
 	if review.format != 1 || review.architecture !in ['aarch64', 'x86_64']! || !digest(review.fingerprint)
 		|| review.rows.len > 4096 || (review.generation == 0 && review.rows.len != 0) { return error('unsupported policy review') }
-	review.previous.validate()!
-	review.proposed.validate()!
+	validate_policy_settings(review.previous)!
+	validate_policy_settings(review.proposed)!
 	mut previous := ''
 	for row in review.rows {
 		if !identifier(row.id) || row.id <= previous || row.name == '' || !printable(row.name, 256)
@@ -127,36 +139,59 @@ pub fn (review &PolicyReview) validate() ! {
 	}
 }
 
-pub fn (mut policy PolicySettings) close() {
+fn close_policy_pin(pin PolicyPin) {
+	unsafe { pin.id.free(); pin.minimum.free(); pin.before.free() }
+}
+
+fn close_policy_pins(pins []PolicyPin) {
+	for pin in pins { close_policy_pin(pin) }
+	unsafe { pins.free() }
+}
+
+fn close_policy_settings(policy PolicySettings) {
 	unsafe {
 		for value in policy.allowed { value.free() }; (&array(&policy.allowed)).free()
 		for value in policy.permissions { value.free() }; (&array(&policy.permissions)).free()
 		for value in policy.licenses { value.free() }; (&array(&policy.licenses)).free()
-		for pin in policy.pins { pin.id.free(); pin.minimum.free(); pin.before.free() }
-		(&array(&policy.pins)).free()
 	}
+	close_policy_pins(policy.pins)
+}
+
+pub fn (mut policy PolicySettings) close() {
+	close_policy_settings(policy)
 	policy = PolicySettings{}
 }
 
-pub fn (mut document PolicyDocument) close() {
+fn close_policy_document(document PolicyDocument) {
 	unsafe { document.architecture.free() }
-	document.policy.close()
+	close_policy_settings(document.policy)
+}
+
+pub fn (mut document PolicyDocument) close() {
+	close_policy_document(document)
 	document = PolicyDocument{}
 }
 
-fn close_policy_impacts(rows []PolicyImpact) {
+fn close_policy_impact(row PolicyImpact) {
 	unsafe {
-		for row in rows {
-			row.id.free(); row.name.free(); row.version.free(); row.kind.free(); row.license.free()
-			row.repository.free(); row.public_key.free(); row.diagnostic_before.free(); row.diagnostic_after.free()
-		}
-		(&array(&rows)).free()
+		row.id.free(); row.name.free(); row.version.free(); row.kind.free(); row.license.free()
+		row.repository.free(); row.public_key.free(); row.diagnostic_before.free(); row.diagnostic_after.free()
 	}
 }
 
-pub fn (mut review PolicyReview) close() {
+fn close_policy_impacts(rows []PolicyImpact) {
+	for row in rows { close_policy_impact(row) }
+	unsafe { rows.free() }
+}
+
+fn close_policy_review(review PolicyReview) {
 	unsafe { review.architecture.free(); review.fingerprint.free() }
-	review.previous.close(); review.proposed.close()
+	close_policy_settings(review.previous)
+	close_policy_settings(review.proposed)
 	close_policy_impacts(review.rows)
+}
+
+pub fn (mut review PolicyReview) close() {
+	close_policy_review(review)
 	review = PolicyReview{}
 }

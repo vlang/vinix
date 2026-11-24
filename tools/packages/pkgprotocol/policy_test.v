@@ -3,6 +3,13 @@ module pkgprotocol
 
 import json2
 
+$if track_heap ? {
+	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
+}
+fn C.vinix_heap_begin()
+fn C.vinix_heap_end() u64
+fn C.vinix_heap_count() u32
+
 fn protocol_policy() PolicySettings {
 	return PolicySettings{ offline: true, allowed: ['app', 'runtime'], pins: [PolicyPin{ id: 'runtime', minimum: '1.0.0', before: '2.0.0' }],
 		permissions: ['display', 'files'], licenses: ['Vendor «license» {"pins":"text"}'], allow_firmware: true, reserve_bytes: 65536 }
@@ -13,6 +20,36 @@ fn protocol_policy_review() PolicyReview {
 		previous: protocol_policy(), proposed: PolicySettings{}, rows: [
 		PolicyImpact{ id: 'app', name: 'Editor', version: '1.0.0', kind: 'native', license: 'MIT', repository: 'fixture', public_key: 'b'.repeat(64), requested: true, diagnostic_after: 'runtime: permissions blocked by organization policy' },
 		PolicyImpact{ id: 'runtime', name: 'Shared Runtime', version: '1.0.0', kind: 'runtime', license: 'Vendor', proprietary: true, firmware: true, repository: 'fixture', public_key: 'b'.repeat(64), diagnostic_after: 'runtime: permissions blocked by organization policy' }] }
+}
+
+fn test_policy_decoding_retires_owned_metadata_on_success_and_refusal() {
+	document := json2.encode(PolicyDocument{ format: 1, architecture: 'aarch64', policy: protocol_policy() })
+	review := json2.encode(protocol_policy_review())
+	documents := [document, document.replace('"before":"2.0.0"', '"before":false'),
+		document.replace('"before":"2.0.0"', '"before":"1.0.0"'), document + ' trailing']!
+	reviews := [review, review.replace('"name":"Shared Runtime"', '"name":false'),
+		review.replace('"generation":2', '"generation":0'), review + ' trailing']!
+	for invalid in documents[1..] { assert invalid != document }
+	for invalid in reviews[1..] { assert invalid != review }
+	$if track_heap ? { C.vinix_heap_begin() }
+	for _ in 0 .. 64 {
+		for index, input in documents {
+			mut decoded := decode_policy_document(input) or { unsafe { err.free() }; assert index != 0; continue }
+			assert index == 0
+			decoded.close()
+		}
+		for index, input in reviews {
+			mut decoded := decode_policy_review(input) or { unsafe { err.free() }; assert index != 0; continue }
+			assert index == 0
+			decoded.close()
+		}
+	}
+	$if track_heap ? {
+		kept := C.vinix_heap_end()
+		count := C.vinix_heap_count()
+		println('POLICY DECODERS retained ${kept} bytes / ${count} allocations across 512 attempts')
+		assert kept == 0 && count == 0
+	}
 }
 
 fn test_policy_document_and_review_are_complete_owned_canonical_presentations() {
