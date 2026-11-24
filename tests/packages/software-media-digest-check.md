@@ -32,3 +32,37 @@ failure from freeing a borrowed path and the passing runs after the correction.
 The independent checker verified all 1,027 sealed files and links. The archive
 SHA-256 is `b72edb65726384605668868e8ac17568da2f0acbac06bd6c25ae2e55b0ac51c0`.
 [Qualification archive](/Users/alex/.local/state/vinix/r14-software-media-digest-RirCtw/qualification.tar.gz)
+
+## Verified digest from a receipt-bound import
+
+Source revision `d5ea7ef09f6e6937b35b03341b9396c17c07e19b` was qualified on
+2026-11-25. The package CLI reports the verified receipt and deployment
+digests after publishing the offline catalog. Software waits for successful
+worker exit and a single result matching the approved receipt. It uses that
+deployment SHA-256 automatically when saving a lock from the approved directory
+in the same Offline media view. The save reply must report the same digest,
+which then carries into coverage checks, review and separately approved apply.
+[Offline workflow](../../tools/packages/SDK.md#offline-repository-bundles-in-release-images)
+
+The host fixture and both native guests checked both result digests from the
+real CLI. AArch64 completed in 131.0 seconds and x86-64 in 129.8 seconds.
+QMP recorded guest-initiated shutdown on both targets. The Software fixture
+exercised an active worker and refused absent, mismatched and duplicate results,
+a late worker failure and a mismatched saved digest.
+[Signed CLI fixture](deployment-snapshot-check.v) · [Software fixture](software_snapshot_fixture.v)
+
+The Linux desktop typechecks, headless Software suite and LLVM AddressSanitizer
+and UndefinedBehaviorSanitizer runs passed. A host suite run with the default
+compiler stopped when the session broker crashed, and the rerun with LLVM Clang
+passed. Sanitizer leak detection was disabled. After correcting decoder
+ownership, 256 valid and 256 invalid decodes retained zero tracked bytes. The
+tracked save-screen check retained zero bytes across 1,000 media and 1,000
+installed-deployment cycles.
+
+The independent checker verified all 1,456 sealed files and links in the gzip
+archive and again after reconstructing the tar from its delta. The gzip
+SHA-256 is `05af70ec52eb7d3ab4d6bdaca7381564184717ef2b7a47d6fddbf5ba7b2b38a2`.
+The full bundle remains on the RAM volume because the internal disk refused
+the 52 MiB copy. The logs, seal, checksums and restore instructions are on disk.
+[Verified RAM archive](/Volumes/VinixMediaDigestEvidence/qualification.tar.gz) ·
+[Retained records and restore instructions](/Users/alex/.local/state/vinix/r14-media-digest-handoff-k943lK/RESTORE.md)
