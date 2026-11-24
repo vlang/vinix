@@ -46,3 +46,28 @@ builds are archived in
 `~/.local/state/vinix/r14-origin-readback-JnPfFi/qualification.tar.gz`.
 Its SHA-256 is `75196b4cffe966b7cd29fa6b4bb38cd647943f17ff2354f702802a3c9e751d11`.
 All 4,507 entries in `bundle.sha256` matched after independent extraction.
+
+## Local export verification
+
+At `1787f067b81754688165a23b5ad7a69e18e77b84`, the same signed fixture
+exercises `check-release-export` before starting the TLS server. The command
+matched the publication receipt and succeeded with an empty tool search path.
+Ten controls covered publisher ID and key, argument count, an alternate
+installation root, a publisher workspace, a symlinked release directory,
+object mode, same-length payload corruption, a missing object and an extra
+file. Restoring the export returned the identical receipt. The export bytes
+and publisher sequence history matched their originals.
+
+The normal, production and ASan/UBSan host runs passed the small export and
+hosted readback cases. Process leak detection was disabled for the sanitizer
+run. The production run also matched the local and hosted receipts for all
+2,158 objects across 20 mixed-catalog variants. Release and image repository
+unit suites passed. Both target CLIs linked statically. The target build logs
+retain GCC diagnostics from the generated V runtime code, including the
+`waitpid` status pointer warning. Execution checks ran on the host.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-release-export-check-WkJkTU/qualification.tar.gz)
+contains the signed fixture exports, source revision, host and target builds,
+and command and request logs. The independent checker verified all 4,631
+sealed files. Archive SHA-256 is
+`17c893716b72158e20f988b5bd50ea84ccdb5e6d04b22e45e71496b574b86a16`.
