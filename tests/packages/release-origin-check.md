@@ -44,8 +44,8 @@ v -path '@vlib|@vmodules|.|tools/accounts' -enable-globals -prod \
 The runner records argv, command results, complete staged and maintained
 roots, and HTTPS requests. It stops and reaps the fixture server on exit.
 The recorded qualification uses real signed target payloads with host CLI
-execution and a disposable publisher. Native installed-system HTTPS and
-production publisher enrollment remain release gates.
+execution and a disposable publisher. The clean-disk follow-up below runs
+the maintenance workflow inside Vinix guests.
 
 ## Qualification
 
@@ -68,3 +68,36 @@ The archive SHA-256 is `a7492c9f44f459abda345ebc080c4c5ed4c12704ede6fe08bded1b93
 The `bundle.sha256` manifest has 65,225 file and symlink entries and SHA-256
 `fd6a219803875951f30f565ae1ab3844340bbdaab3f5a97f3ece09b4cdba1491`.
 All entries matched after extraction into an independent directory.
+
+## Clean installed guests
+
+The [installed runner](release-origin-runtime-check.v) builds the target
+package CLI and [guest init](release-origin-guest/main.v), stages the same
+signed baseline, and starts QEMU with a fresh 4 GiB disk. Use a target network
+tools root containing `/usr/bin/curl`, its musl loader and OpenSSL dependencies.
+The runner copies that executable and its shared-library closure and gives curl
+a CA for the local fixture endpoint only.
+
+```sh
+v -prod -enable-globals -path '@vlib|@vmodules|.|tools/accounts|tests/hardware-platform' \
+  -o /tmp/release-origin-runtime-check tests/packages/release-origin-runtime-check.v
+/tmp/release-origin-runtime-check ARCH KERNEL CURL_ROOT BASELINE_BUNDLE \
+  UPDATE_BUNDLE CONFIG NEW_WORK
+```
+
+Run once with each target's reviewed configuration, kernel and curl root.
+Use the hardware harness's target compilers and firmware settings. The x86-64
+run uses the plain UEFI fixture builder and its `VINIX_PLAIN_ISO_LIMINE` input.
+
+On the first boot the real installer formats the fresh disk. The fixture checks
+the mounted disk root and image ID, then installs the seven locked applications
+from the bundled repository. On the second boot it checks retained bytes,
+reviews and approves the same-key HTTPS origin, refreshes separately, upgrades
+only the SQLite runtime and rolls back to the original lock. Both the second
+and third boots refuse the older signed index. The third boot also checks the
+retained configuration, cache, trust history and verified package generation.
+
+All three boots use test media to load the kernel and require guest-originated
+QMP shutdowns. The loopback server log must contain the exact metadata requests
+and only the newly needed runtime objects. Production publisher enrollment and
+public HTTPS repository acceptance remain separate release gates.
