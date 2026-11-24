@@ -217,3 +217,30 @@ contains the final source snapshot, host checks, compositor builds and native
 receipts. The independent checker verified all 9,789 sealed files and
 symlinks. Archive SHA-256 is
 `2d65394ecb21e592a85e9d1e576a9878f90a99271d34ab74ed76628c5841dbf9`.
+
+## Package review decoder retention
+
+An allocation trace of one navigation cycle at `6c5f35869` found five retained
+264-byte review temporaries and ten retained 408-byte package rows. Both
+allocations came from generated code that moved local records to the heap.
+Each cycle kept 5,400 bytes across five review decodes.
+
+At `c7b731c0d7dda96bddeb8e3017f492cfb2a6bc3a`, the parser cleans up partially
+decoded reviews by value and appends rows by value. Each successfully decoded
+review owns its strings and arrays until `Review.close()`. A failed row read
+retires the prior rows and list. The original 1,000-cycle package navigation
+and plan reader fixture retained zero tracked bytes.
+
+All 27 protocol suites and five focused repository UI modes passed on
+2026-11-24. Tracked decoder checks covered both review formats, partial rows
+and trailing-data refusals. ASan/UBSan passed with process leak detection
+disabled. Compact repository refresh passed in headless QEMU on AArch64 and
+x86_64. Both guests initiated shutdown and all 66 receipt entries matched
+on each target. The generated guest code also keeps the review temporary
+on the stack.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-package-navigation-retention-vl9zFD/qualification.tar.gz)
+contains the baseline trace, fixed source snapshot, host checks and guest
+receipts. The independent checker verified all 1,232 sealed files and
+symlinks. Archive SHA-256 is
+`362f1193381a05e3ae1142eabf3113b9228180ac51c6aae79e22b0c2757a0d62`.
