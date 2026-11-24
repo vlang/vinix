@@ -151,3 +151,35 @@ contains the committed sources, signed inputs, staged roots, host checks,
 and guest builds and logs. The independent archive checker verified all
 230 sealed entries. Archive SHA-256 is
 `7131bc001ce7383f3f62d2f10d1b32d69b7bdcf3f4e1259f84d02734178257f4`.
+
+## Index files in desktop and ISO builds
+
+At `b826b19c8120793c280eefa5d4d36060990a362a`, desktop staging and ISO planning
+resolve `VINIX_PACKAGE_IMAGE_INDEXES` and its per-target overrides. The
+previous stager admitted a bundle with a mismatched file digest in the
+environment. The current stager refuses it on both target declarations.
+The production and ASan/UBSan host fixtures also checked malformed, empty,
+duplicate and symlinked files, along with explicit CLI precedence. Process
+leak detection was disabled.
+
+The cache suite checked effective target selection, opposite-target
+isolation, and same-size content edits with restored timestamps. Both
+production staging runs used a target-specific pin file, built the native
+tools, and published exact signed index and application lock bytes.
+
+ISO preflight refused a mismatched digest and a pin file supplied without
+a bundle. Correct pins returned the original plan bytes. All 33 ISO receipt
+cases passed for each target with the saved plan, including readback after
+selecting a different pin file in the environment. The release script passed
+syntax checks and its package-input selector passed the isolated pin-only
+controls. ISO readback used fixture images.
+
+Both guest preflight suites exercised the new file controls and recorded
+guest-initiated shutdown, completing in 102.3 and 105.3 seconds for AArch64
+and x86_64 respectively.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-index-file-handoff-NakJsn/qualification.tar.gz)
+contains the signed fixtures, source revision, generated code, host and
+guest results, and ISO controls. The independent checker verified all 779
+sealed entries. Archive SHA-256 is
+`1246330a99b163ca1b1d0456c0ac2755afa568b30029fb16aa2763c4f67534c5`.
