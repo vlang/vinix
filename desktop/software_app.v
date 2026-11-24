@@ -54,6 +54,7 @@ mut:
 	details_mode    bool
 	catalog_browser_mode bool
 	catalog_browser_notice bool
+	maintenance_mode bool
 	report_reader_mode bool
 	details_review  bool
 	details_pages   []SoftwareDetailsPage
@@ -406,6 +407,7 @@ fn (mut a SoftwareApp) filter_rows() {
 
 fn (mut a SoftwareApp) load_view() bool {
 	a.catalog_browser_mode = false
+	a.maintenance_mode = false
 	a.clear_details()
 	a.clear_launch_options()
 	a.clear_review()
@@ -857,8 +859,10 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	if a.policy_mode && a.policy_reader_mode { a.handle_policy_reader(event_id); return }
 	if a.report_reader_mode { a.handle_report_reader(event_id); return }
 	if a.status_reader.mode { a.status_reader.handle(event_id); return }
+	if a.maintenance_mode { a.handle_maintenance(event_id)!; return }
 	if event_id == 'software.status' { a.open_status_reader(); return }
 	if a.catalog_browser_mode { a.handle_catalog_browser(event_id); return }
+	if event_id == 'software.maintenance' { a.open_maintenance(); return }
 	if event_id == 'software.catalog.browse' { a.open_catalog_browser(); return }
 	if event_id == 'software.report.read' { a.open_report_reader(); return }
 	if event_id == 'software.failure' {
@@ -1165,6 +1169,10 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.snapshot_mode { a.snapshot_key_input(input); return }
 	if a.audit_mode { a.audit_key_input(input); return }
 	if a.details_mode { a.details_key_input(input); return }
+	if a.maintenance_mode {
+		if input == '\x1b' { a.maintenance_mode = false }
+		return
+	}
 	if a.catalog_browser_mode {
 		if input == '\x1b' { a.close_catalog_browser(); return }
 		if !a.focus {
@@ -1215,6 +1223,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.failure_mode { return }
 	if a.status_reader.mode { return }
+	if a.maintenance_mode { return }
 	if a.release_catalog_mode { return }
 	if a.report_reader_mode { return }
 	if a.snapshot_mode { a.snapshot_paste_input(input); return }
@@ -1331,6 +1340,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.policy_mode && a.policy_reader_mode { return a.build_policy_reader(width, height) }
 	if a.report_reader_mode { return a.build_report_reader(width, height) }
 	if a.catalog_browser_mode { return a.build_catalog_browser(width, height) }
+	if a.maintenance_mode { return a.build_maintenance(width, height) }
 	if a.snapshot_mode { return a.build_deployment_snapshot(width, height) }
 	if a.mirror_mode && (width < 640 || height < 610) { return a.build_mirror_compact(width, height) }
 	if a.audit_mode && (width < 640 || height < 610) { return a.build_deployment_audit_compact(width, height) }

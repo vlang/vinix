@@ -257,7 +257,84 @@ fn check_health_filters(mut app SoftwareApp) ! {
 	assert app.query == 'catalog-search'.bytes() && app.selected == 0 && app.filter == 1
 }
 
+fn check_software_compact_maintenance() ! {
+	compact := ui2.rect(0, 0, 320, 240)
+	actions := ['software.health', 'software.verify', 'software.upgrade', 'software.rollback',
+		'software.repair', 'software.cleanup', 'software.data']!
+	arguments := [
+		['--json', '--progress', 'health'], ['--progress', 'verify'],
+		['review', 'upgrade'], ['review', 'rollback'], ['review', 'repair'],
+		['cleanup-review'], ['--json', 'data-list'],
+	]
+	for index, action in actions {
+		mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
+			query: 'catalog-search'.bytes(), output: []u8{cap: 8192}, matching: [0], selected: 0, filter: 1,
+			rows: [SoftwareRow{ id: 'editor', name: 'Editor', installed_version: '1.0.0' }] }
+		defer { app.close_app() }
+		if index == 0 {
+			app.set_status('Catalog status.')
+			app.capture_failure(['view'], 23)
+			for size in [ui2.rect(0, 0, 319, 240), ui2.rect(0, 0, 320, 239), compact]! {
+				tree := app.build(size)!
+				assert tree.children.any(it.id == 'software.maintenance') == (size.width >= 320 && size.height >= 240)
+				assert tree.children.any(it.id == 'software.status' && it.text == 'Read status')
+				assert tree.children.any(it.id == 'software.failure')
+				repository_recovery_check_frames(tree, size)!
+				free_window_tree(tree)
+			}
+		}
+		app.handle('software.maintenance')!
+		menu := app.build(compact)!
+		assert menu.children.any(it.id == action)
+		assert !menu.children.any(it.id == 'software.confirm')
+		repository_recovery_check_frames(menu, compact)!
+		free_window_tree(menu)
+		if index == 0 {
+			small_size := ui2.rect(0, 0, 160, 96)
+			small := app.build(small_size)!
+			assert small.children.any(it.id == 'software.maintenance.back')
+			assert !small.children.any(it.id == 'software.health')
+			repository_recovery_check_frames(small, small_size)!
+			free_window_tree(small)
+			for ignored in ['software.install', 'software.confirm', 'software.search', 'software.repositories']! {
+				app.handle(ignored)!
+			}
+			app.paste_input('ignored search')
+			app.key_input('ignored search')
+			assert app.worker == unsafe { nil } && app.query.bytestr() == 'catalog-search'
+			app.key_input('\x1b')
+			returned := app.build(compact)!
+			assert returned.children.any(it.id == 'software.maintenance')
+			free_window_tree(returned)
+			app.handle('software.maintenance')!
+		}
+		app.handle(action)!
+		assert app.worker != unsafe { nil } && app.worker.args == arguments[index] && !app.admin_prompt
+		app.handle('software.maintenance')!
+		busy := app.build(compact)!
+		assert !busy.children.any(it.id == 'software.maintenance.back' || it.id == 'software.maintenance')
+		free_window_tree(busy)
+		wait_for_software(mut app)
+		assert app.worker == unsafe { nil } && !app.worker_failed && !app.admin_prompt
+		assert app.selected == 0 && app.filter == 1 && app.query.bytestr() == 'catalog-search'
+	}
+	mut empty := SoftwareApp{ service_path: os.executable() }
+	defer { empty.close_app() }
+	empty.handle('software.maintenance')!
+	menu := empty.build(compact)!
+	assert !menu.children.any(it.id == 'software.repair')
+	free_window_tree(menu)
+	empty.handle('software.repair')!
+	assert empty.worker == unsafe { nil } && empty.review == ''
+	empty.handle('software.maintenance.back')!
+	returned := empty.build(compact)!
+	assert returned.children.any(it.id == 'software.maintenance')
+	free_window_tree(returned)
+	println('Software compact maintenance: seven existing workflows, bounded controls, resize, modal guards and catalog return PASS')
+}
+
 fn check_software_health() ! {
+	check_software_compact_maintenance()!
 	check_software_health_navigation()!
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
 		query: 'catalog-search'.bytes(), output: []u8{cap: 8192}, matching: [0], selected: 0, filter: 1,
@@ -443,10 +520,17 @@ fn check_software_health_memory() ! {
 				app.handle_health('software.health.issues')
 				free_window_tree(app.build_health_compact(320, 240))
 				app.clear_health()
+				app.handle('software.maintenance')!
+				menu := app.build(ui2.rect(0, 0, 320, 240))!
+				assert menu.children.any(it.id == 'software.maintenance.back')
+				free_window_tree(menu)
+				free_window_tree(app.build(ui2.rect(0, 0, 160, 96))!)
+				app.handle('software.maintenance.back')!
 			}
 		}
 		app.set_status('')
 		kept := C.vinix_heap_end(); assert kept == 0, 'health views retained ${kept} bytes'
 		println('Software health: 1000 decode/order/page/render/select/search/filter/empty/compact/retire cycles retain zero tracked bytes PASS')
+		println('Software compact maintenance: 1000 open/render/resize/Back cycles retain zero tracked bytes PASS')
 	}
 }

@@ -3,8 +3,69 @@ module main
 
 import ui2
 
+struct SoftwareMaintenanceAction {
+	id string
+	title string
+}
+
+const software_maintenance_actions = [
+	SoftwareMaintenanceAction{id: 'software.health', title: 'Health report'},
+	SoftwareMaintenanceAction{id: 'software.verify', title: 'Verify installed'},
+	SoftwareMaintenanceAction{id: 'software.upgrade', title: 'Update all'},
+	SoftwareMaintenanceAction{id: 'software.rollback', title: 'Rollback'},
+	SoftwareMaintenanceAction{id: 'software.repair', title: 'Review repairs'},
+	SoftwareMaintenanceAction{id: 'software.cleanup', title: 'Clean up versions'},
+	SoftwareMaintenanceAction{id: 'software.data', title: 'Personal data'},
+]!
+
 fn (a &SoftwareApp) catalog_browsable() bool {
 	return a.package_screen_active() && a.worker == unsafe { nil } && a.review == '' && a.launch_request == ''
+}
+
+fn (mut a SoftwareApp) open_maintenance() {
+	if !a.catalog_browsable() { return }
+	a.maintenance_mode = true
+	a.focus = false
+	a.select_all = false
+}
+
+fn (a &SoftwareApp) maintenance_action_available(id string) bool {
+	return id != 'software.repair' || a.rows.any(it.installed_version != '')
+}
+
+fn (mut a SoftwareApp) handle_maintenance(id string) ! {
+	if id == 'software.maintenance.back' {
+		a.maintenance_mode = false
+		return
+	}
+	if !a.catalog_browsable() || !a.maintenance_action_available(id) { return }
+	for action in software_maintenance_actions {
+		if id == action.id {
+			a.maintenance_mode = false
+			a.handle(id)!
+			return
+		}
+	}
+}
+
+fn (a &SoftwareApp) build_maintenance(width int, height int) ui2.Element {
+	mut children := frame_elements(9)
+	content := width - 28
+	children << software_button('software.maintenance.back', 'Back', 14, 8, if width >= 180 { 74 } else { content })
+	if width < 320 || height < 240 {
+		if height >= 82 { children << software_label('Enlarge for maintenance controls.', 14, 46, content, 36, false) }
+		return ui2.screen(app_surface, children)
+	}
+	children << software_label('Maintenance', 100, 8, width - 114, 28, false)
+	button_width := (width - 40) / 2
+	mut position := 0
+	for action in software_maintenance_actions {
+		if !a.maintenance_action_available(action.id) { continue }
+		x := if position % 2 == 0 { 14 } else { width - 14 - button_width }
+		children << software_button(action.id, action.title, x, 46 + position / 2 * 38, button_width)
+		position++
+	}
+	return ui2.screen(app_surface, children)
 }
 
 fn (a &SoftwareApp) offline_button(x int, y int, width int) ui2.Element {
@@ -223,14 +284,17 @@ fn (mut a SoftwareApp) stop_package_review() {
 }
 
 fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(12)
+	mut children := frame_elements(13)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
 	readable := a.package_review_readable() && !a.details_mode
 	browsable := a.catalog_browsable() && !a.details_mode
 	compact_controls := browsable && width >= 180 && height >= 220
 	launchable := browsable && a.launch_options_available() && width >= 180 && height >= 220
-	children << software_label('Software', 14, 8, if a.status_readable() && width >= 180 { 60 } else { width - 28 }, 28, false)
-	if a.status_readable() && width >= 180 { children << software_button('software.status', 'Read status', width - 104, 8, 90) }
+	maintenance := compact_controls && width >= 320 && height >= 240
+	show_status := a.status_readable() && width >= 180
+	children << software_label('Software', 14, 8, if show_status || maintenance { 60 } else { width - 28 }, 28, false)
+	if maintenance { children << software_button('software.maintenance', 'Maintenance', 82, 8, 112) }
+	if show_status { children << software_button('software.status', 'Read status', width - 104, 8, 90) }
 	button_width := if width > 202 { 174 } else { width - 28 }
 	half_width := (width - 40) / 2
 	if a.details_mode {

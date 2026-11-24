@@ -1723,6 +1723,12 @@ Export offline opens the destination and scope form. Back retains the catalog
 query, filter and selected package. Each operation still requires its own
 review before approval.
 
+**Maintenance** opens Health report, Verify installed, Update all, Rollback,
+Review repairs, Clean up versions and Personal data from the same compact
+catalog. Review repairs appears when a package is installed. Back returns
+to the catalog, and the actions use the same review and approval flows as
+their full-size controls.
+
 **Read status** opens the current status or local validation diagnostic in a
 separate read-only pager. It is available from idle full-screen footers, compact
 catalog screens and catalog browser notices. Long paths, Unicode and invalid
