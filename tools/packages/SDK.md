@@ -177,7 +177,7 @@ an owned frame that wipes and frees it. Approval errors own their diagnostic
 after the reply is retired, including service-provided refusal text. See
 [administrator client checks](../../tests/packages/admin-client-check.md).
 
-Allowed operations are `update`, reviewed `apply` for install/remove/upgrade/
+Allowed operations are `update`, `update-media`, reviewed `apply` for install/remove/upgrade/
 repair/rollback, `repo-apply`, `deployment-apply`, `deployment-add-apply`,
 `policy-apply`, `mirror-apply` and `mirror-deployment-apply`. Every operation
 except refresh requires its exact 64-digit review fingerprint. The service
@@ -820,8 +820,28 @@ reports the ISO digest named by the receipt, architecture, deployment digest,
 application IDs and repository IDs. Enrollment and deployment still require
 their own reviews on the destination system.
 
+For an already enrolled publisher, import its directory into the installed
+system's catalog and object cache. This uses the existing publisher key and
+replay history and keeps the configured URL. Other enrolled publishers need
+current cached snapshots, as with ordinary targeted `update`.
+
+```sh
+vinix-package admin update-media PUBLISHER /media/usb/release-apps/PUBLISHER
+vinix-package --offline deployment-add-review /media/usb/release-apps/_deployment.json
+vinix-package admin --offline deployment-add-apply DEPLOYMENT_FINGERPRINT /media/usb/release-apps/_deployment.json
+```
+
+`update-media` works offline independently of the configured URL. It caches
+the verified payloads for this architecture and architecture-independent
+packages allowed by current organization policy, then publishes the refreshed
+catalog. Use an absolute path to a controlled ordinary directory. You can
+disconnect the media after importing and copying its lock to a local filename.
+If acquisition fails, verified cache objects remain available for retry.
+Enrollment and installed generations keep their existing state during import.
+
 On the destination system, use the verified publisher ID and independently
-trusted public key to review each required repository at its local media URL.
+trusted public key to review any publisher that still needs enrollment at its
+local media URL.
 Apply the reviewed repository changes, refresh offline and review the copied
 lock. For example, with one publisher:
 
@@ -833,10 +853,9 @@ vinix-package --offline deployment-add-review /media/usb/release-apps/_deploymen
 vinix-package admin --offline deployment-add-apply DEPLOYMENT_FINGERPRINT /media/usb/release-apps/_deployment.json
 ```
 
-Review the URL change if the publisher is already enrolled. The destination
-enforces its current trust, replay history and organization policy. An older
-ISO can be audited or used to export its lock at the trusted release time.
-Offline acquisition requires currently valid signed indexes.
+The destination enforces its current trust, replay history and organization
+policy. An older ISO can be audited or used to export its lock at the trusted
+release time. Offline acquisition requires currently valid signed indexes.
 
 For a release that advertises the same catalog on both architectures, generate
 both plans with the candidate package input environment:
@@ -4338,7 +4357,7 @@ positive u64 activation target and matching snapshot generation/architecture.
 The package service remains authoritative for complete state, trust, policy and
 launch admission. See [registration qualification](../../tests/packages/registration-check.md).
 
-For live operation progress, pass `--progress` to `update`, `install`, `remove`,
+For live operation progress, pass `--progress` to `update`, `update-media`, `install`, `remove`,
 `upgrade`, `repair`, `apply`, `deploy`, `deployment-apply`, `deployment-add-apply`,
 `rollback`, `verify`, `mirror` or `mirror-apply`. Health supports a separate stderr channel described
 below. Other progress commands refuse `--json`. Ordinary human output/diagnostics are retained;

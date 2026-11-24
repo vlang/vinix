@@ -38,6 +38,24 @@ pub fn (service Service) refresh_repository(id string) !Catalog {
 	return service.refresh_selected(id, '')
 }
 
+// Refresh authenticated metadata and cache local objects under the currently
+// enrolled identity. The media path is used only during this call.
+pub fn (service Service) import_repository_media(id string, source string) !Catalog {
+	if !identifier(id) { return error('invalid repository ID') }
+	if !source.starts_with('/') || !printable(source, 4096) {
+		return error('offline repository media requires an absolute directory')
+	}
+	directory := service.directory()!
+	defer { unsafe { directory.free() } }
+	guard := acquire(directory)!
+	defer { guard.release() }
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	media := open_repository_media(source)!
+	defer { C.close(media.fd); unsafe { media.path.free() } }
+	return refresh_progress_from(config, directory, id, unsafe { &media }, service.progress)
+}
+
 // Refuse a different URL or key for a previously displayed repository ID.
 pub fn (service Service) refresh_repository_with_identity(id string, fingerprint string) !Catalog {
 	if !identifier(id) { return error('invalid repository ID') }

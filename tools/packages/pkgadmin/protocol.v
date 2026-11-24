@@ -51,6 +51,10 @@ pub fn validate_arguments(arguments []string) ! {
 		if args.len == 3 && identifier(args[1]) && hex(args[2], 64) { return }
 		return error('administrator update takes a repository ID and optional identity fingerprint')
 	}
+	if command == 'update-media' {
+		if args.len == 3 && identifier(args[1]) && path(args[2]) { return }
+		return error('administrator update-media requires a repository ID and an absolute release directory')
+	}
 	if args.len < 2 || !hex(args[1], 64) { return error('administrator package changes require their exact review fingerprint') }
 	match command {
 		'cleanup-apply' { if args.len == 2 { return } }
@@ -71,7 +75,7 @@ pub fn validate_arguments(arguments []string) ! {
 }
 
 pub fn administrative(arguments []string) bool {
-	return arguments.len > 0 && arguments[0] in ['update', 'apply', 'cleanup-apply', 'repo-apply', 'deployment-apply', 'deployment-add-apply', 'policy-apply', 'mirror-apply', 'mirror-deployment-apply']
+	return arguments.len > 0 && arguments[0] in ['update', 'update-media', 'apply', 'cleanup-apply', 'repo-apply', 'deployment-apply', 'deployment-add-apply', 'policy-apply', 'mirror-apply', 'mirror-deployment-apply']
 }
 
 pub fn (request &Request) encode() !string {

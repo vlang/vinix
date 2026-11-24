@@ -13,7 +13,8 @@ import tools.packages.audiopcm
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  capabilities (read-only JSON supported interface versions)\n' +
 	'  update [REPOSITORY_ID [IDENTITY_SHA256]] | search [QUERY] | info ID | list | status | updates | view\n' +
-	'  admin [--progress] [--offline] update|apply|cleanup-apply|repo-apply|deployment-apply|deployment-add-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
+	'  update-media REPOSITORY_ID RELEASE_DIRECTORY\n' +
+	'  admin [--progress] [--offline] update|update-media|apply|cleanup-apply|repo-apply|deployment-apply|deployment-add-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
 	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify | health\n' +
 	'  cleanup-review | cleanup-apply REVIEW_FINGERPRINT (obsolete generations only)\n' +
 	'  plan install|remove|upgrade|repair|deploy [ID...] | deploy MANIFEST.json\n' +
@@ -106,8 +107,8 @@ fn checked(arguments []string) !int {
 		return 2
 	}
 	command := args[0]
-	if progress && ((as_json && command != 'health') || command !in ['update', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'deployment-add-apply', 'rollback', 'verify', 'health', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
-		return error('--progress supports update, install/remove/upgrade/repair, apply, deploy/deployment-apply/deployment-add-apply, rollback, verify, health and mirror/mirror-apply/mirror-deployment-apply; only health also supports --json')
+	if progress && ((as_json && command != 'health') || command !in ['update', 'update-media', 'install', 'remove', 'upgrade', 'repair', 'apply', 'deploy', 'deployment-apply', 'deployment-add-apply', 'rollback', 'verify', 'health', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
+		return error('--progress supports update/update-media, install/remove/upgrade/repair, apply, deploy/deployment-apply/deployment-add-apply, rollback, verify, health and mirror/mirror-apply/mirror-deployment-apply; only health also supports --json')
 	}
 	names := args[1..].clone()
 	mut audio_portal := audiopcm.Portal{}
@@ -501,6 +502,11 @@ fn checked(arguments []string) !int {
 				2 { service.refresh_repository_with_identity(names[0], names[1])! }
 				else { return error('update takes a repository ID and optional identity fingerprint') }
 			}
+			catalog.close()
+		}
+		'update-media' {
+			if names.len != 2 { return error('update-media requires a repository ID and an absolute release directory') }
+			mut catalog := service.import_repository_media(names[0], names[1])!
 			catalog.close()
 		}
 		'view', 'search', 'info', 'updates' {

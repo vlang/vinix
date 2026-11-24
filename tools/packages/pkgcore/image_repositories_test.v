@@ -359,6 +359,76 @@ fn test_image_bundle_bootstraps_a_configured_https_publisher_offline() {
 	println('PACKAGE IMAGE BUNDLE HTTPS publisher installs offline without trust changes and refuses replay on both targets PASS')
 }
 
+fn test_repository_media_import_keeps_https_identity_and_publishes_only_after_cache_verification() {
+	work, key := image_bundle_fixture(false)!
+	defer { os.rmdir_all(work) or {} }
+	root := work + '/installed'
+	config_path := root + '/etc/vinix-packages/config.json'
+	os.mkdir_all(os.dir(config_path))!
+	repo := Repository{ id: 'native', url: 'https://packages.example.invalid/release', public_key: key }
+	config := Config{ architecture: 'aarch64', repositories: [repo], policy: Policy{ allowed: ['app', 'support'] } }
+	configuration := json2.encode(config) + '\n'
+	os.write_file(config_path, configuration)!
+	service := Service{ root: root }
+	first := work + '/bundle/native'
+	mut catalog := service.import_repository_media('native', first)!
+	assert catalog.packages.len == 2
+	catalog.close()
+	directory := state_directory(root)
+	assert read_snapshots(directory)![0].repository == repo
+	assert service.state()!.generation == 0
+	old_catalog := os.read_file(directory + '/catalog.json')!
+	old_history := os.read_file(directory + '/trust-history.json')!
+
+	mut hashes := map[string]string{}
+	for id in ['app', 'restricted']! {
+		path := work + '/payload/share/data'
+		os.write_file(path, 'second signed release ' + id)!
+		hashes[id] = hash_file(path)!
+		os.write_file(work + '/manifest.json', json2.encode(Package{ id: id, architecture: 'all',
+			version: '2.0.0', kind: 'data', name: id, license: 'MIT',
+			dependencies: if id == 'app' { [Dependency{ id: 'support' }] } else { []Dependency{} } }))!
+		pack(work + '/manifest.json', work + '/payload', work + '/workspace')!
+	}
+	second := work + '/second release'
+	publish_release(work + '/workspace', 'native', work + '/seed', 2, time.now().unix() + 3600, second)!
+	object := second + '/objects/' + hashes['app']!
+	bytes := os.read_file(object)!
+	os.write_file(object, 'x'.repeat(bytes.len))!
+	if _ := service.import_repository_media('native', second) { assert false }
+	else { assert err.msg().contains('payload checksum or size mismatch') }
+	assert os.read_file(directory + '/catalog.json')! == old_catalog
+	assert os.read_file(directory + '/trust-history.json')! == old_history
+	assert !os.exists(directory + '/objects/' + hashes['app']!)
+	assert os.read_file(config_path)! == configuration
+	assert service.state()!.generation == 0
+
+	os.write_file(object, bytes)!
+	mut updated := service.import_repository_media('native', second)!
+	assert updated.packages.any(it.package.id == 'restricted')
+	updated.close()
+	assert os.is_file(directory + '/objects/' + hashes['app']!)
+	assert !os.exists(directory + '/objects/' + hashes['restricted']!)
+	assert read_snapshots(directory)![0].repository == repo
+	new_catalog := os.read_file(directory + '/catalog.json')!
+	new_history := os.read_file(directory + '/trust-history.json')!
+	if _ := service.import_repository_media('native', first) { assert false }
+	else { assert err.msg().contains('retained trust history') }
+	assert os.read_file(directory + '/catalog.json')! == new_catalog
+	assert os.read_file(directory + '/trust-history.json')! == new_history
+
+	// Disconnect the media before reviewing and installing its cached objects.
+	os.rename(second, work + '/disconnected')!
+	offline := Service{ root: root, offline: true }
+	mut review := offline.review('install', ['app'])!
+	defer { review.close() }
+	mut installed := offline.transact('install', ['app'], TransactionOptions{ expected_review: review.fingerprint })!
+	defer { installed.close() }
+	assert installed.packages.any(it.package.id == 'app' && it.package.version == '2.0.0' && it.sequence == 2)
+	assert os.read_file(config_path)! == configuration
+	println('REPOSITORY MEDIA keeps HTTPS identity, checks replay and objects, caches policy-allowed payloads and installs after disconnect PASS')
+}
+
 fn test_online_install_reuses_payloads_from_the_authenticated_image_bundle() {
 	for architecture in ['aarch64', 'x86_64']! {
 		work, key := image_bundle_fixture(false)!

@@ -209,6 +209,11 @@ fn fetch_snapshot(config Config, directory string, work string, repository Repos
 }
 
 fn refresh_progress(config Config, directory string, selected string, report fn (pkgprotocol.Progress)) !Catalog {
+	return refresh_progress_from(config, directory, selected, none, report)
+}
+
+fn refresh_progress_from(config Config, directory string, selected string, media ?&RepositoryMedia,
+	report fn (pkgprotocol.Progress)) !Catalog {
 	if selected != '' && !config.repositories.any(it.id == selected) {
 		return error('${selected}: repository is not configured')
 	}
@@ -237,10 +242,13 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 			message := err.msg(); unsafe { message.free(); err.free() }
 		}
 	}
+	mut expires := max_i64
 	for repository in config.repositories {
 		snapshot := if selected != '' && repository.id != selected {
 			cached := matching_snapshot(previous, repository)!
 			Snapshot{ repository: repository, text: cached.text.clone(), signature: cached.signature.clone() }
+		} else if source := media {
+			source.snapshot(repository)!
 		} else {
 			fetch_snapshot(config, directory, work, repository, parent, target, report)!
 		}
@@ -250,6 +258,7 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 		check_repository_workspace(directory, parent, target)!
 		index := verify_index(repository, snapshot.text, snapshot.signature, time.now().unix())!
 		defer { close_decoded_index(index) }
+		if index.expires < expires { expires = index.expires }
 		next := remember_index(history, repository, index, snapshot.text)!
 		close_decoded_history(history)
 		history = next
@@ -262,6 +271,10 @@ fn refresh_progress(config Config, directory string, selected string, report fn 
 	catalog := snapshots_catalog(config, snapshots, time.now().unix())!
 	mut published := false
 	defer { if !published { close_authenticated_catalog(catalog) } }
+	if source := media {
+		source.import_payloads(config, directory, selected, catalog, report)!
+		if expires <= time.now().unix() { return error('repository index expired during offline media import') }
+	}
 	// Record authenticated sequence/digest floors before exposing the new cache.
 	// Revocation and empty refreshes never discard identities from this history.
 	check_repository_workspace(directory, parent, target)!

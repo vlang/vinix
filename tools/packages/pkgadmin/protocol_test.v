@@ -5,6 +5,7 @@ fn test_reviewed_admin_requests_and_bound_completion() {
 	fingerprint := 'a'.repeat(64)
 	for arguments in [['update'], ['--progress', 'update'], ['--progress', '--offline', 'update', 'field.local'],
 		['--progress', '--offline', 'update', 'field.local', fingerprint],
+		['--progress', 'update-media', 'field.local', '/media/with spaces/field.local'],
 		['--progress', '--offline', 'apply', fingerprint, 'install', 'org.vinix.memo'],
 		['apply', fingerprint, 'upgrade'], ['apply', fingerprint, 'repair'], ['apply', fingerprint, 'rollback'], ['cleanup-apply', fingerprint], ['repo-apply', fingerprint, 'revoke', 'publisher'],
 		['repo-apply', fingerprint, 'enroll', 'publisher', 'file:///media/with spaces; $literal', fingerprint],
@@ -38,6 +39,8 @@ fn test_admin_transport_refuses_launches_alternate_roots_and_unreviewed_changes(
 		['update', 'field', 'extra'], ['update', '--offline'], ['update', '/tmp/field'],
 		['update', 'field', 'A'.repeat(64)], ['update', 'field', fingerprint, 'extra'],
 		['update', '/field', fingerprint], ['update', 'field', ''],
+		['update-media', 'field'], ['update-media', 'field', 'relative'], ['update-media', '/field', '/media'],
+		['update-media', 'field', '/media', 'extra'],
 		['update', ''], ['--offline', '--progress', 'update']] {
 		mut refused := false
 		validate_arguments(arguments) or { refused = true; unsafe { err.free() } }
@@ -50,6 +53,7 @@ fn test_admin_transport_refuses_launches_alternate_roots_and_unreviewed_changes(
 	}
 	assert administrative(['cleanup-apply', fingerprint]) && !administrative(['cleanup-review']) && !administrative(['gc'])
 	assert administrative(['deployment-add-apply', fingerprint, '/release.json'])
+	assert administrative(['update-media', 'field', '/media/field'])
 	assert !administrative(['deployment-add-review', '/release.json'])
 	request := Request{ nonce: 'b'.repeat(32), arguments: ['apply', fingerprint, 'install', 'app'] }
 	text := request.encode()!
