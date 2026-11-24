@@ -4,6 +4,10 @@ The newer [installed-release audit check](release-audit-check.md) also pins the
 staged release declaration on disk, installs it through one approved Software
 review and checks baseline drift as ordinary users through all four boots.
 
+The installed additive release check verifies that an approved release addition
+keeps unrelated installed roots and their private data.
+[Additive release qualification](deployment-additions-check.md#installed-system-qualification)
+
 `native-catalog-check.v --installed` starts with a blank 4 GiB disk and the
 production-staged native application image. The kernel's normal `vinix.disk=auto`
 path formats that disk as Vinix's journaled primary filesystem (VJFS), installs
@@ -95,6 +99,9 @@ VINIX_HWTEST_TCG=1 V=/path/to/reviewed/v VFLAGS=-nocache \
 ```
 
 Repeat for x86_64 with its matching kernel/sandbox and a new short state path.
+The x86-64 installed check uses the shared raw-initramfs UEFI fixture builder.
+Set `VINIX_PLAIN_ISO_LIMINE` to the directory containing `BOOTX64.EFI` and
+`limine-uefi-cd.bin` when using a retained loader.
 No host `mke2fs` is used in this mode. The controller requires a new state
 directory and an explicit QEMU TCG opt-in; it creates only its own blank test
 disk. The existing default, `--image`, `--software` and `--persistent` modes

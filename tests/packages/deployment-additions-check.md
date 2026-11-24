@@ -45,3 +45,40 @@ The independent archive checker verified 112 sealed entries, including both
 guest run trees, target binaries, host checks and the source patch. Its
 SHA-256 is `c7eb26cbb3d184e1517bfe083ba59d33aa739d4822e697becf6fb5873430a14e`.
 [Qualification archive](/Users/alex/.local/state/vinix/r14-release-additions-rq05oh/qualification.tar.gz)
+
+## Installed system qualification
+
+Revision `02baa639306d217039e351a7cbd1adbb663fab76` extends the four-boot VJFS
+fixture. The production stager exports a separate Counter-only format-2 lock
+using the same signed repository as the full release declaration. Across all
+four boots the guest verifies both
+documents against the staged hashes and checks their disk identity, root
+ownership, mode and link count.
+
+After the initial three-app installation, the ordinary administrator removes
+Counter and selects **Add release apps** through Software's compact Deployment
+view. The review installs Counter and keeps Memo and Hello. The first review
+is cancelled at the administrator prompt, preserving the generation, trust and
+catalog. The second carries its exact additive fingerprint and literal lock
+path to the real administrator service. The audit records exactly the initial
+removal and the approved addition. Counter and Memo reopen with their saved
+data, and the existing upgrade, rollback, removal, cached reinstall and
+cold-reopen checks pass.
+
+AArch64 completed four boots in 321.7 seconds. The first x86-64 run stalled
+after guest startup with the release ISO builder. The rerun with the shared
+raw-initramfs UEFI fixture completed all four boots in 133.0 seconds. The runs
+use retained kernels, locally signed repositories and headless Software
+controllers. All eight boots requested shutdown from the guest.
+[Installed-system driver](native-catalog-check.v)
+
+On the host, all 43 protocol, SDK and client test files passed. The parallel
+package-core sweep passed 162 files. The two FFmpeg fixtures passed on replay
+with the retained, SHA-256-verified 8.0.1 source archive. The signed CLI
+lifecycle also passed.
+
+The independent archive checker verified 286 sealed entries. The compressed
+initial and final disk images also matched the SHA-256 digests in the
+qualification receipts when decoded. The archive SHA-256 is
+`7b4fe007a8bbb20308d2d68c49c40bf665a247ccfef19c6356539bac4914e2e0`.
+[Installed-system archive](/Users/alex/.local/state/vinix/r14-distribution-sweep-NmmWfI/installed.tar.gz)
