@@ -265,14 +265,15 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string,
 
 fn check() !int {
 	profiles := '--profiles' in os.args
-	bundled_https := '--software-bundled-https' in os.args
+	manual_refresh := '--software-manual-release-refresh' in os.args
+	bundled_https := '--software-bundled-https' in os.args || manual_refresh
 	installed := '--installed' in os.args
 	persistent := '--persistent' in os.args || installed
 	software := '--software' in os.args || bundled_https || persistent
 	image := '--image' in os.args || software || profiles
-	arguments := os.args[1..].filter(it !in ['--image', '--software', '--software-bundled-https', '--persistent', '--installed', '--profiles'])
+	arguments := os.args[1..].filter(it !in ['--image', '--software', '--software-bundled-https', '--software-manual-release-refresh', '--persistent', '--installed', '--profiles'])
 	if profiles && software { return error('--profiles selects the native image scenario; run Software scenarios separately') }
-	if bundled_https && persistent { return error('--software-bundled-https selects the single-boot Software scenario') }
+	if bundled_https && persistent { return error('Bundled HTTPS Software checks require a single boot') }
 	options := hwhost.parse_options(arguments)!
 	if options.help || options.list { return hwhost.run_suite(if installed { installed_software_suite('', '') }
 		else if persistent { persistent_software_suite('', '') } else { native_suite('', image, software) }, arguments, @FILE) }
@@ -330,6 +331,11 @@ fn check() !int {
 		os.write_file(root + '/etc/hwtest-echo', '')!
 		artifacts << native_artifact('image/' + marker, root + '/' + marker)!
 	}
+	if manual_refresh {
+		marker := 'usr/share/package-fixtures/manual-release-refresh'
+		os.write_file(root + '/' + marker, '')!
+		artifacts << native_artifact('image/' + marker, root + '/' + marker)!
+	}
 	if software {
 		artifacts << stage_software_image(host, root, work)!
 		artifacts << native_artifact('image/usr/sbin/vinix-authd', root + '/usr/sbin/vinix-authd')!
@@ -342,7 +348,8 @@ fn check() !int {
 		else if persistent { persistent_software_suite(sandbox, disk).scenarios[0] } else if bundled_https {
 			hwhost.Scenario{ ...selection.run[0], required: [...selection.run[0].required,
 				'SOFTWARE IMAGE selected offline mode and installed the bundled HTTPS catalog with separate approval PASS',
-				'SOFTWARE IMAGE first-run offline refresh resumed exact release review before activation PASS'] }
+				if manual_refresh { 'SOFTWARE IMAGE manual offline refresh resumed exact release review before activation PASS' }
+				else { 'SOFTWARE IMAGE first-run offline refresh resumed exact release review before activation PASS' }] }
 		} else { selection.run[0] }
 	outcome := hwhost.run_scenario(host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
 		state: work + '/native', timeout: if options.timeout > scenario.timeout { options.timeout } else { scenario.timeout }, keep: true })

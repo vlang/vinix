@@ -23,6 +23,10 @@ available. Successful refresh reloads the authenticated catalog and resumes
 the read-only release review. The install still requires **Confirm** and
 separate administrator approval.
 
+**Review release apps** in Software's deployment form offers the same recovery,
+including after **Skip for now**. Back returns to the form with its draft path.
+An unreadable catalog response keeps the refresh controls available for retry.
+
 A successful choice writes the private per-home `.vinix-first-run-release` record
 as exactly `review\n` or `skip\n`, then consumes any legacy pending marker. Both
 choices are durable and do not repeat at the next login. Failure to save leaves

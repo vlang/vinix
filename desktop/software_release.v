@@ -30,16 +30,20 @@ fn (mut a SoftwareApp) take_first_run_release_review() {
 	// A reader opened while the initial catalog loaded belongs to the user.
 	// Retire the one-shot handoff rather than replace that intervening view.
 	if !a.can_review_first_run_release() { return }
-	a.focus = false
-	a.select_all = false
-	a.deployment_mode = true
-	if !a.select_release_deployment() { return }
+	a.open_release_deployment_review()
+}
+
+fn (mut a SoftwareApp) open_release_deployment_review() {
+	if !a.check_release_deployment() { return }
 	if a.catalog_error != '' {
-		a.deployment_mode = false
+		a.focus = false
+		a.select_all = false
 		a.release_catalog_mode = true
 		a.set_status(a.catalog_error)
 		return
 	}
+	a.deployment_mode = true
+	a.load_release_deployment_path()
 	a.begin_deployment_review()
 }
 
@@ -89,22 +93,23 @@ fn (mut a SoftwareApp) find_release_deployment() {
 		&& info.st_mode & 0o170000 == 0o100000
 }
 
-fn (mut a SoftwareApp) select_release_deployment() bool {
-	if a.worker != unsafe { nil } || a.review != '' || !a.deployment_mode { return false }
+fn (mut a SoftwareApp) check_release_deployment() bool {
+	if a.worker != unsafe { nil } || a.review != '' { return false }
 	a.find_release_deployment()
 	if !a.release_deployment_available {
 		a.set_status('The release application file is unavailable. Choose a deployment file or enter its absolute path.')
 		return false
 	}
-	a.initialize_deployment_field()
-	software_repository_text(mut a.deployment_path, a.release_deployment_path)
 	return true
 }
 
-fn (mut a SoftwareApp) review_release_deployment() {
-	if a.select_release_deployment() { a.begin_deployment_review() }
+fn (mut a SoftwareApp) load_release_deployment_path() {
+	a.initialize_deployment_field()
+	software_repository_text(mut a.deployment_path, a.release_deployment_path)
 }
 
 fn (mut a SoftwareApp) audit_release_deployment() {
-	if a.select_release_deployment() { a.begin_deployment_audit() }
+	if !a.deployment_mode || !a.check_release_deployment() { return }
+	a.load_release_deployment_path()
+	a.begin_deployment_audit()
 }

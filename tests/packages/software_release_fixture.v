@@ -20,6 +20,10 @@ fn software_first_run_release_service_fixture(args []string) !bool {
 		prefix := if offline { 'offline ' } else { '' }
 		if command == ['view'] {
 			os.write_file(receipt, log + prefix + 'view\n')!
+			if log.contains('update\n') && os.getenv('VINIX_SOFTWARE_REFRESH_INVALID_VIEW') == '1' {
+				println('invalid catalog response')
+				return true
+			}
 			println(json2.encode(SoftwareView{ format: 1, architecture: 'aarch64', offline: offline,
 				catalog_error: if log.contains('update\n') { '' } else { 'No authenticated cached index.' } }))
 		} else if command == ['deployment-review', path] {
@@ -65,18 +69,34 @@ fn software_first_run_release_service_fixture(args []string) !bool {
 	panic('unexpected first-run package command: ' + args[1])
 }
 
-fn check_first_run_catalog_refresh(path string, receipt string) ! {
+fn check_release_catalog_refresh(path string, receipt string, manual bool) ! {
 	os.setenv('VINIX_SOFTWARE_FIRST_RUN_REFRESH', '1', true)
-	defer { os.unsetenv('VINIX_SOFTWARE_FIRST_RUN_REFRESH') }
+	defer {
+		os.unsetenv('VINIX_SOFTWARE_FIRST_RUN_REFRESH')
+		os.unsetenv('VINIX_SOFTWARE_REFRESH_INVALID_VIEW')
+	}
 	for offline in [false, true]! {
 		os.write_file(receipt, '')!
 		mut app := SoftwareApp{ service_path: os.executable(), release_deployment_path: path.clone(),
 			administration_required: true, output: []u8{cap: 8192} }
 		defer { app.close_app() }
 		app.start(['view'], true)
-		app.handle(software_first_run_release_action)!
-		wait_for_software(mut app)
+		mut review_action := software_first_run_release_action
+		if manual {
+			wait_for_software(mut app)
+			app.handle('software.deployment')!
+			software_repository_text(mut app.deployment_path, '/kept manual draft.json')
+			app.deployment_choice_pending = true
+			app.deployment_choice_current = true
+			review_action = 'software.deployment.release'
+		}
+		app.handle(review_action)!
+		if !manual { wait_for_software(mut app) }
 		assert app.release_catalog_mode && !app.admin_prompt && app.review == ''
+		if manual {
+			assert app.finish_deployment_choice('/late choice.json')
+			assert editor_bytes_text(app.deployment_path) == '/kept manual draft.json'
+		}
 		assert os.read_file(receipt)! == 'view\n'
 		for size in [ui2.rect(0, 0, 640, 610), ui2.rect(0, 0, 180, 220)]! {
 			tree := app.build(size)!
@@ -88,7 +108,9 @@ fn check_first_run_catalog_refresh(path string, receipt string) ! {
 		}
 		app.key_input('\x1b')
 		assert !app.release_catalog_mode && app.worker == unsafe { nil }
-		app.handle(software_first_run_release_action)!
+		assert app.deployment_mode == manual
+		if manual { assert editor_bytes_text(app.deployment_path) == '/kept manual draft.json' }
+		app.handle(review_action)!
 		assert app.release_catalog_mode
 		app.handle('software.confirm')!
 		assert app.worker == unsafe { nil }
@@ -98,21 +120,32 @@ fn check_first_run_catalog_refresh(path string, receipt string) ! {
 		assert app.worker.args == if offline { ['admin', '--progress', '--offline', 'update'] } else { ['admin', '--progress', 'update'] }
 		app.handle('software.admin.cancel')!
 		assert app.release_catalog_mode && app.worker == unsafe { nil } && !app.release_review_requested
-		for password in ['?', '!']! {
-			app.handle(action)!
-			app.admin_paste_input(password)
-			app.handle('software.admin.approve')!
-			wait_for_software(mut app)
-			if password == '?' {
-				assert app.release_catalog_mode && app.failure_pages.len > 0
-				assert !app.release_review_requested && os.read_file(receipt)! == 'view\n'
-			}
+		approve_release_catalog_refresh(mut app, action, '?')!
+		assert app.release_catalog_mode && app.failure_pages.len > 0
+		assert !app.release_review_requested && os.read_file(receipt)! == 'view\n'
+		refused_reload := manual && offline
+		if refused_reload {
+			os.setenv('VINIX_SOFTWARE_REFRESH_INVALID_VIEW', '1', true)
+			approve_release_catalog_refresh(mut app, action, '!')!
+			assert app.release_catalog_mode && app.deployment_mode && app.review == ''
+			assert app.status.contains('Invalid response')
+			assert editor_bytes_text(app.deployment_path) == '/kept manual draft.json'
+			assert os.read_file(receipt)! == 'view\noffline update\noffline view\n'
+			os.unsetenv('VINIX_SOFTWARE_REFRESH_INVALID_VIEW')
 		}
+		approve_release_catalog_refresh(mut app, action, '!')!
 		assert !app.release_catalog_mode && app.review_ready && !app.admin_prompt
 		assert app.deployment_pending == path && app.offline_requested == offline
-		assert os.read_file(receipt)! == if offline { 'view\noffline update\noffline view\noffline deployment-review\n' } else { 'view\nupdate\nview\ndeployment-review\n' }
+		prefix := if refused_reload { 'view\noffline update\noffline view\n' } else { 'view\n' }
+		assert os.read_file(receipt)! == prefix + if offline { 'offline update\noffline view\noffline deployment-review\n' } else { 'update\nview\ndeployment-review\n' }
 	}
-	println('Software first-run release: explicit catalog refresh, cancellation and refusal, read-only review resume under both transport choices PASS')
+}
+
+fn approve_release_catalog_refresh(mut app SoftwareApp, action string, password string) ! {
+	app.handle(action)!
+	app.admin_paste_input(password)
+	app.handle('software.admin.approve')!
+	wait_for_software(mut app)
 }
 
 fn check_software_first_run_release() ! {
@@ -176,8 +209,10 @@ fn check_software_first_run_release() ! {
 	assert !interrupted.release_review_requested && interrupted.focus && interrupted.review == ''
 	assert os.read_file(receipt)! == 'view\n'
 	interrupted.close_app()
-	check_first_run_catalog_refresh(path, receipt)!
+	check_release_catalog_refresh(path, receipt, false)!
 	println('Software first-run release: real queued view to literal full-set review, catalog failure recovery, duplicate delivery, no autoapply, cancel and separate administrator approval PASS')
+	check_release_catalog_refresh(path, receipt, true)!
+	println('Software manual release review: both refresh choices, Back preserves the draft, refused and malformed refresh retries, exact read-only resume PASS')
 }
 
 fn check_software_release() ! {

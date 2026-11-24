@@ -265,6 +265,7 @@ fn image_run() ! {
 	assert app.launch_label == 'Launch' // the root image's launch_user cannot change this identity
 	phase := os.args[1]
 	bundled_https := os.exists('/usr/share/package-fixtures/bundled-https')
+	manual_refresh := os.exists('/usr/share/package-fixtures/manual-release-refresh')
 	if bundled_https && phase != 'install' {
 		assert !app.offline && !app.offline_requested
 		compact := ui2.rect(0, 0, 320, 240)
@@ -275,7 +276,16 @@ fn image_run() ! {
 		image_cold_maintenance(mut app, phase, password)!
 	} else if phase == 'install' {
 		refresh := if bundled_https { 'software.release.catalog.offline' } else { 'software.refresh' }
-		if bundled_https {
+		if manual_refresh {
+			assert bundled_https
+			image_control(mut app, 'software.deployment')!
+			image_compact_deployment_action(mut app, 'software.deployment.release')!
+			assert app.release_catalog_mode && app.deployment_mode
+			image_control(mut app, 'software.release.catalog.back')!
+			assert app.deployment_mode && !app.release_catalog_mode && app.worker == unsafe { nil }
+			image_compact_deployment_action(mut app, 'software.deployment.release')!
+			assert app.release_catalog_mode && !app.admin_prompt && app.worker == unsafe { nil }
+		} else if bundled_https {
 			app.handle(software_first_run_release_action)!
 			assert app.release_catalog_mode && !app.admin_prompt && app.worker == unsafe { nil }
 		}
@@ -291,7 +301,8 @@ fn image_run() ! {
 		if bundled_https {
 			assert app.review_ready && app.deployment_pending == pkgprotocol.image_applications_path && !app.admin_prompt
 			assert !os.exists('/var/lib/vinix-packages/current')
-			println('SOFTWARE IMAGE first-run offline refresh resumed exact release review before activation PASS')
+			println(if manual_refresh { 'SOFTWARE IMAGE manual offline refresh resumed exact release review before activation PASS' }
+				else { 'SOFTWARE IMAGE first-run offline refresh resumed exact release review before activation PASS' })
 			image_control(mut app, 'software.cancel')!
 			image_control(mut app, 'software.deployment.back')!
 		}

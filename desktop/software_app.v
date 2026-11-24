@@ -403,19 +403,20 @@ fn (mut a SoftwareApp) filter_rows() {
 	if a.catalog_browser_mode { a.catalog_browser_notice = false; a.select_catalog_package(0) }
 }
 
-fn (mut a SoftwareApp) load_view() {
+fn (mut a SoftwareApp) load_view() bool {
 	a.catalog_browser_mode = false
 	a.clear_details()
 	a.clear_launch_options()
 	a.clear_review()
-	a.deployment_mode = false
+	// Keep the deployment form beneath release refresh for Back and retry.
+	if !a.release_catalog_mode { a.deployment_mode = false }
 	a.mirror_mode = false
 	text := editor_bytes_text(a.output)
 	view := pkgprotocol.decode_software_view(text) or {
 		message := 'Invalid response from the package service: ' + err.msg() + '. Reload the catalog or check its configuration.'
 		a.set_status(message)
 		unsafe { message.free(); err.free() }
-		return
+		return false
 	}
 	for row in a.rows { software_free_row(row) }
 	a.rows.clear()
@@ -447,6 +448,7 @@ fn (mut a SoftwareApp) load_view() {
 			'Select an application to review its publisher, license and permissions.'
 		})
 	}
+	return true
 }
 
 fn (mut a SoftwareApp) clear_review() {
@@ -749,7 +751,10 @@ fn (mut a SoftwareApp) poll() bool {
 		} else { 'Repository trusted and authenticated catalogs refreshed.'.clone() }
 		a.read_repositories()
 	} else if view {
-		if !a.worker_failed { a.load_view() }
+		if !a.worker_failed && a.load_view() && a.release_catalog_mode && a.catalog_error == '' {
+			a.release_catalog_mode = false
+			a.open_release_deployment_review()
+		}
 	} else if reviewing {
 		if a.worker_failed { a.clear_review() } else { a.load_review() }
 	} else if running {
@@ -762,12 +767,6 @@ fn (mut a SoftwareApp) poll() bool {
 		unsafe { tail.free() }
 	} else if verifying {
 		a.set_status('Installed files and launchers verified. Trust and organization policy still apply at launch.')
-	} else if a.release_catalog_mode {
-		a.start(['view'], true)
-		if a.worker != unsafe { nil } {
-			a.release_catalog_mode = false
-			a.release_review_requested = true
-		}
 	} else {
 		a.start(['view'], true)
 	}

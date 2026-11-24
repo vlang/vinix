@@ -54,7 +54,7 @@ fn (mut a SoftwareApp) handle_deployment(event_id string) {
 		'software.deployment.action.previous' { a.navigate_deployment_form(-1) }
 		'software.deployment.action.next' { a.navigate_deployment_form(1) }
 		'software.deployment.choose' { a.choose_deployment_file() }
-		'software.deployment.release' { a.review_release_deployment() }
+		'software.deployment.release' { a.open_release_deployment_review() }
 		'software.deployment.release-audit' { a.audit_release_deployment() }
 		'software.deployment.path' {
 			a.focus = true
