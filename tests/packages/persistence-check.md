@@ -177,3 +177,15 @@ a replacement workspace untouched. Tests cover a replaced workspace or state
 path, nested interrupted work, a child symlink, and successful use of the same
 approval after a workspace refusal leaves configuration and replay history
 intact.
+
+On 2026-11-24, revision `9aed436f8236d92b5eb15de66043657bf3ca2cf1`
+passed the host administration, enrollment ownership and trust-recovery
+suites and the focused refresh checks. The administration suite also passed
+under ASan/UBSan with leak detection disabled. Both enrollment cuts passed on
+AArch64 (HVF) and x86_64 (TCG), with guest shutdown after each recovery.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-enrollment-workspace-iCrtBS/qualification.tar.gz)
+contains the source snapshot, nine verified receipt entries per target, the
+initial disks and logs. The runs used `--failures-only`. The independent
+archive check verified all 90 sealed files. Archive SHA-256
+`aec5383cd8610bea8412938a0a0ef5a425f72230fcf9d860cb5d3289e196b25b`.
