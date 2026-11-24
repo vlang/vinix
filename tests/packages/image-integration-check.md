@@ -153,3 +153,35 @@ For this disclosed historical replay only, append
 `--replay /Users/alex/code/vinix 539b659b61296e93b974c8360b83cca2fb24bb86`.
 That mode also checks original-ledger refusal and reproduces the old build-mode
 defect in an isolated directory. It never changes or executes native artifacts.
+
+## Final identity checks for published and preserved entries
+
+At `773a0d60c694ab5fb7f6e3cbba34d663b70ef04c`, integration checks each
+published or preserved entry against its recorded device and inode before
+returning success. Existing overrides may still be regular files, directories
+or aliases. A change in identity returns the incomplete-image diagnostic and
+leaves already published entries available for inspection.
+
+Three regressions remove an override before publication, replace an override
+with a byte-identical copy after the last publication, and replace a published
+license notice with a byte-identical copy at that same point. Each case refuses,
+preserves the original bytes and succeeds after restoration with stable file
+descriptor counts. The added fixture reproduced false success for the removed
+override on the prior implementation.
+
+All 18 host checks passed, including both CLI suites and ASan/UBSan with leak
+detection disabled. The native fixture uses the current V integer types for
+its bounded link reads.
+
+Under QEMU TCG, AArch64 passed in 21.419 seconds and x86-64 passed in 30.239
+seconds. Both guests passed the original 82-case fixture and all three new
+regressions, checked the production-staged notices and links, confirmed an
+empty package store, ran all three staged tools and initiated shutdown.
+All 16 receipt artifact digests matched for each guest. These results cover
+image integration in initramfs guests using retained kernels.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-image-integration-entries-TfDK3r/qualification.tar.gz)
+contains the source snapshot, host fixtures, native builds and receipts.
+The independent checker verified all 140 sealed file and link entries.
+Archive SHA-256 is
+`28a29401b3a8248737b3c0aff189e53db5ad3be20167244321624d7895090258`.
