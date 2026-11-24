@@ -92,3 +92,30 @@ Final product and fixture sources remained unchanged through successful runs.
 - [x86-64 receipt](results/2026-10-17/deployment-form-x86_64.json), [serial](results/2026-10-17/deployment-form-x86_64.serial.txt), [QMP](results/2026-10-17/deployment-form-x86_64.qmp.txt)
 - [Initial attempt](results/2026-10-17/deployment-form-attempts.txt), [compiler/source/artifact ledger](results/2026-10-17/deployment-form-toolchain.json)
 - [V guest invocation](results/2026-10-17/deployment-form-guest.v), [focused host runner](results/2026-10-17/deployment-form-checks.v), [evidence verifier](results/2026-10-17/deployment-form-retain.v)
+
+## Open forms from the compact catalog
+
+At `da132071056307f41f3636d7656d8dd9abd8f05c`, the idle catalog can open
+Deployment and Export offline at 320×240. The host regression checks both
+size cutoffs, control bounds, access to status and failure details, and return
+to the same catalog query, filter and selection. The same regression failed
+at `979c7be98` because the compact catalog omitted Deployment.
+
+On 2026-11-24, the full Software fixture and all five focused modes for
+repository recovery and compact mirror passed. The compact mirror driver
+generated Linux arm64 and amd64 production C using the pinned headless UI2
+snapshot with its upstream Linux helper updates. ASan/UBSan ran with process
+leak detection disabled.
+
+Both staged Software guests used their real controller at 320×240. Each
+target opened Export offline and returned to the catalog with no worker
+started. Each entered Deployment from the catalog and proceeded through
+signed release review, separate administrator approval and offline
+installation. Both guests initiated shutdown. The check matched all 66
+receipt entries per target. The guest checks drove headless element trees.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-compact-deployment-entry-H0jcyG/qualification.tar.gz)
+contains the baseline, committed source snapshot, generated target code and
+complete guest receipts. The independent checker verified all 2,387 sealed
+files and symlinks. Archive SHA-256 is
+`4de32e0cc442ad3c7e24d4515ad9a54df25f099b6acd85c0bcdf8cebeb97a718`.
