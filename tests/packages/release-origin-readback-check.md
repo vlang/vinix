@@ -71,3 +71,28 @@ contains the signed fixture exports, source revision, host and target builds,
 and command and request logs. The independent checker verified all 4,631
 sealed files. Archive SHA-256 is
 `17c893716b72158e20f988b5bd50ea84ccdb5e6d04b22e45e71496b574b86a16`.
+
+## Image index pins from signed release exports
+
+At `bc66e8fa078f27abf6b9f12e2e6415bc69252923`, the runner signs exports under
+two independent keys. The pin command produces the same sorted file in both
+argument orders and produces the matching single row with `--offline` and an
+empty tool search path. Nine controls cover duplicate IDs, a wrong key, a
+damaged export, invalid operands and options, existing destinations and an
+aliased destination inside an export. A late failure leaves the destination
+absent. Restoring the damaged object returns the exact original pins and
+preserves the publisher history.
+
+Normal, production and ASan/UBSan host runs passed, with process leak detection
+disabled for the sanitizer run. The production command also generated pins for
+the mixed catalog after verifying its 20 variants and 2,158 distinct objects.
+Release, image repositories and both atomic-write unit suites passed. Both
+target CLIs linked statically. The host exercised a generated pin file through
+image staging and ISO preflight for each target and reproduced the previous
+reviewed ISO plan. CLI execution checks ran on the host.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-publish-index-pins-wHPfiB/qualification.tar.gz)
+contains the source, signed inputs, target builds, host checks and both preflight
+receipts. The independent checker verified all 2,553 sealed files. Archive
+SHA-256 is
+`1c718c196a159755ce3cddfc85efaabb611cf2303e00d216005ca24a08e9dfe2`.
