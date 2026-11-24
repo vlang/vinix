@@ -283,3 +283,23 @@ The cut worker pauses with the writer lock held. The controller kills QEMU
 without a guest sync or shutdown and reboots the same ext2 disk. Preparation
 and recovery use the regular package CLI. This test exercises completed
 checkpoints around policy publication on QEMU ext2 storage.
+
+On 2026-11-24, revision `30e28582d68dda93880f6bf5f3a14f064e28379c`
+passed both cuts on AArch64 (HVF) and x86-64 (TCG). The controller
+required SIGKILL at each cut and guest-originated shutdown after recovery.
+All nine receipt sizes and digests matched per target, and the two boots
+in each case used the same disk. The checkpoint symbol was present only
+in the cut CLI on each target.
+
+The policy, policy lifecycle, administration and hardware controller host
+suites passed. The policy suite also passed under ASan/UBSan with leak
+detection disabled. The first AArch64 run exposed a fixture assertion that
+compared the original permission order with the service's canonical saved
+order. The completed runs compare against canonical policy and still verify
+the exact pre-save configuration bytes.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-policy-crash-XMUsMS/qualification.tar.gz)
+contains the source snapshot, both target builds, initial ext2 images and the
+serial and QMP logs. The independent archive checker verified all 122 sealed
+files. Archive SHA-256 is
+`3ea6c52145a8fe5f03480db6252c42fd5b7f0350d06d8b94dd1baa4d10621f58`.
