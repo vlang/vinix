@@ -2,7 +2,6 @@
 module pkgcore
 
 import os
-import time
 import tools.packages.pkgprotocol
 
 pub struct ReleaseOriginInfo {
@@ -22,7 +21,7 @@ pub fn (mut info ReleaseOriginInfo) close() {
 // Verify the publisher's complete local export without contacting its origin.
 pub fn check_release_export(directory string, id string, public_key string) !ReleaseInfo {
 	if !identifier(id) { return error('invalid release repository ID') }
-	return check_signed_release(directory, id, public_key, '', -1, none)
+	return check_signed_release(directory, id, public_key, SignedReleaseCheck{})
 }
 
 fn valid_release_origin(url string) bool {
@@ -36,11 +35,18 @@ pub fn check_release_origin(directory string, id string, public_key string, url 
 	if !valid_release_origin(url) {
 		return error('release origin requires a valid HTTPS repository URL')
 	}
-	release := check_signed_release(directory, id, public_key, url, -1, none)!
+	release := check_signed_release(directory, id, public_key, SignedReleaseCheck{ origin: url })!
 	return ReleaseOriginInfo{ url: url.clone(), release: release }
 }
 
-fn check_signed_release(directory string, id string, public_key string, url string, pin_parent_fd int, media_pin ?&IsoOfflinePublisher) !ReleaseInfo {
+struct SignedReleaseCheck {
+	origin string
+	pin_parent_fd int = -1
+	media_pin ?&IsoOfflinePublisher
+	archived_at i64
+}
+
+fn check_signed_release(directory string, id string, public_key string, options SignedReleaseCheck) !ReleaseInfo {
 	path := publisher_path(directory)!
 	defer { unsafe { path.free() } }
 	fd := capture_prepared_root(path, 'signed release export')!
@@ -52,8 +58,8 @@ fn check_signed_release(directory string, id string, public_key string, url stri
 		return error('signed release export changed during admission')
 	}
 	check_export_parent(release, 'signed release export')!
-	if pin_parent_fd >= 0 {
-		publisher_outside_directory(fd, pin_parent_fd) or {
+	if options.pin_parent_fd >= 0 {
+		publisher_outside_directory(fd, options.pin_parent_fd) or {
 			unsafe { err.free() }
 			return error('release index pins must be saved outside each signed release export in an accessible directory')
 		}
@@ -73,13 +79,13 @@ fn check_signed_release(directory string, id string, public_key string, url stri
 	defer { if !accepted { unsafe { digest.free() } } }
 	signature := read_metadata(signature_path)!
 	defer { unsafe { signature.free() } }
-	index := verify_index(Repository{ id: id, public_key: public_key }, text, signature, time.now().unix())!
+	index := verify_index(Repository{ id: id, public_key: public_key }, text, signature, release_index_time(options.archived_at))!
 	defer { close_decoded_index(index) }
 	trimmed := signature.trim_space()
 	defer { unsafe { trimmed.free() } }
 	objects := signed_release_objects(index, 0)!
 	defer { unsafe { objects.free() } }
-	if pin := media_pin {
+	if pin := options.media_pin {
 		if digest != pin.index_sha256 || index.sequence != pin.sequence {
 			return error('offline repository index differs from the ISO package receipt: ${id}')
 		}
@@ -94,8 +100,8 @@ fn check_signed_release(directory string, id string, public_key string, url stri
 	}
 	release_closures(index, public_key)!
 	verify_release_stage(release, text, trimmed, objects, true)!
-	if url != '' {
-		check_hosted_release(fd, url, text, signature, objects)!
+	if options.origin != '' {
+		check_hosted_release(fd, options.origin, text, signature, objects)!
 		if !atomic_parent_matches(release, u64(info.st_dev), u64(info.st_ino)) {
 			return error('signed release export changed during origin check')
 		}
@@ -106,7 +112,7 @@ fn check_signed_release(directory string, id string, public_key string, url stri
 		return error('signed release export changed during verification')
 	}
 	check_export_parent(release, 'signed release export')!
-	if index.expires <= time.now().unix() {
+	if index.expires <= release_index_time(options.archived_at) {
 		return error('signed release expired during verification')
 	}
 	accepted = true

@@ -6,6 +6,7 @@ import os
 import time
 import tools.packages.imageinputs
 import tools.packages.pkgprotocol
+import tools.packages.signing
 
 $if macos || ios {
 	fn C.mkfifo(&char, u16) int
@@ -120,8 +121,52 @@ fn test_iso_offline_media_exclusive_publication_retires_stages_and_preserves_out
 	assert refused
 	assert os.ls(root)!.len == 0
 	check_saved_media_deployment(work, destination, deployment, key)!
+	check_archived_media(work, destination, report.image_application_deployment_sha256, pins)!
 	println('ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS')
 	println('ISO OFFLINE MEDIA verification checks both signed publishers and rejects duplicate receipt pins PASS')
+}
+
+fn check_archived_media(work string, source string, digest string, pins []IsoOfflinePublisher) ! {
+	archive := work + '/archived-media'
+	os.cp_all(source, archive, true)!
+	directory := archive + '/native'
+	index_path := directory + '/index.json'
+	signature_path := directory + '/index.sig'
+	index := json2.decode[Index](os.read_file(index_path)!)!
+	expires := time.now().unix() - 60
+	text := canonical_index(Index{ ...index, expires: expires })!
+	seed := read_signing_seed(work + '/seed', SigningSeedOptions{})!
+	defer { seed.close() }
+	mut private := signing.new_key_from_seed(seed.bytes)
+	defer { retire_signing_bytes(mut private) }
+	signature := signing.sign(private, text.bytes())!.hex() + '\n'
+	os.write_file(index_path, text)!
+	os.write_file(signature_path, signature)!
+	archived_pins := pins.map(if it.id == 'native' {
+		IsoOfflinePublisher{ ...it, index_sha256: index_digest(text) }
+	} else { it })
+	apps := ['editor', 'modern']
+	if _ := verify_iso_offline_media(archive, 'aarch64', apps, digest, archived_pins) { assert false }
+	else { assert err.msg().contains('expired') }
+	if _ := check_release_export(directory, 'native', archived_pins.filter(it.id == 'native')[0].public_key) { assert false }
+	else { assert err.msg().contains('expired') }
+	for invalid in [i64(0), -1, time.now().unix() + 3600] {
+		if _ := verify_archived_iso_offline_media(archive, 'aarch64', apps, digest, archived_pins, invalid) { assert false }
+		else { assert err.msg().contains('valid past Unix release time') }
+	}
+	if _ := verify_archived_iso_offline_media(archive, 'aarch64', apps, digest, archived_pins, expires) { assert false }
+	else { assert err.msg().contains('expired') }
+	release_time := expires - 1
+	verify_archived_iso_offline_media(archive, 'aarch64', apps, digest, archived_pins, release_time)!
+	if _ := verify_archived_iso_offline_media(archive, 'aarch64', apps, digest, pins, release_time) { assert false }
+	else { assert err.msg().contains('index differs') }
+	os.write_file(signature_path, '0'.repeat(128))!
+	if _ := verify_archived_iso_offline_media(archive, 'aarch64', apps, digest, archived_pins, release_time) { assert false }
+	else { assert err.msg().contains('signature') }
+	os.write_file(signature_path, signature)!
+	verify_archived_iso_offline_media(archive, 'aarch64', apps, digest, archived_pins, release_time)!
+	assert os.read_file(index_path)! == text && os.read_file(signature_path)! == signature
+	println('ISO OFFLINE MEDIA archived verification checks signed bytes and exact expiry while current verification refuses PASS')
 }
 
 fn check_saved_media_deployment(work string, exported string, deployment string, key string) ! {

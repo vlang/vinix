@@ -582,6 +582,15 @@ fn check_verified_media(tool string, media string, receipt string, work string, 
 	}
 	assert printed['applications']!.as_array().map(it.str()) == expected['applications']!.as_array().map(it.str())
 	assert printed['repositories']!.as_array().map(it.str()) == [publisher]
+	assert 'release_time' !in printed
+	release_time := time.now().unix() - 1
+	archived, archived_output := command([...args, release_time.str()])
+	assert archived == 0 && archived_output == output.trim_string_right('}\n') + ',"release_time":${release_time}}\n'
+	os.write_file(work + '/offline-media-archive-verification.json', archived_output)!
+	for invalid in ['0', '-1', 'yesterday', '9'.repeat(24), (release_time + 3600).str()] {
+		refused, failure := command([...args, invalid])
+		assert refused == 1 && failure.contains('valid past Unix release time'), failure
+	}
 
 	deployment := copy + '/' + pkgprotocol.deployment_mirror_filename
 	text := os.read_file(deployment)!

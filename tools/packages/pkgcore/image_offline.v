@@ -19,6 +19,19 @@ pub:
 // receipt's application and publisher pins. This does not need an ISO copy,
 // package state, private scratch storage, or the repository origin.
 pub fn verify_iso_offline_media(directory string, architecture string, applications []string, deployment_sha256 string, publishers []IsoOfflinePublisher) ! {
+	verify_iso_offline_media_at(directory, architecture, applications, deployment_sha256, publishers, 0)!
+}
+
+// Audit a retained media copy at the release time independently established by
+// the caller. This only verifies the copy and cannot activate its repositories.
+pub fn verify_archived_iso_offline_media(directory string, architecture string, applications []string, deployment_sha256 string, publishers []IsoOfflinePublisher, release_time i64) ! {
+	if release_time <= 0 || release_time > time.now().unix() {
+		return error('offline media archive verification requires a valid past Unix release time')
+	}
+	verify_iso_offline_media_at(directory, architecture, applications, deployment_sha256, publishers, release_time)!
+}
+
+fn verify_iso_offline_media_at(directory string, architecture string, applications []string, deployment_sha256 string, publishers []IsoOfflinePublisher, release_time i64) ! {
 	if publishers.len == 0 || publishers.len > max_image_repository_indexes {
 		return error('offline media verification requires bundled publishers in the ISO package receipt')
 	}
@@ -53,14 +66,14 @@ pub fn verify_iso_offline_media(directory string, architecture string, applicati
 		if !atomic_captured_parent_matches(root, fd) { return error('ISO offline media root changed during verification') }
 		repository := os.join_path(root, publisher.id)
 		defer { unsafe { repository.free() } }
-		mut checked := check_signed_release(repository, publisher.id, publisher.public_key, '', -1,
-			unsafe { &publisher })!
+		mut checked := check_signed_release(repository, publisher.id, publisher.public_key,
+			SignedReleaseCheck{ media_pin: unsafe { &publisher }, archived_at: release_time })!
 		defer { checked.close() }
 		if checked.expires < expires { expires = checked.expires }
 	}
 	export_stage_metadata(lock_path, deployment)!
 	check_offline_media_root(root, fd, entries)!
-	if expires <= time.now().unix() { return error('offline media repository expired during verification') }
+	if expires <= release_index_time(release_time) { return error('offline media repository expired during verification') }
 }
 
 fn check_offline_media_root(root string, fd int, entries map[string]u64) ! {

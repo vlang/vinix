@@ -57,7 +57,8 @@ pub fn write_release_index_pins(destination string, sources []ReleaseIndexSource
 	defer { unsafe { pins.free() } }
 	mut first_expiry := i64(0)
 	for source in sorted {
-		mut release := check_signed_release(source.directory, source.id, source.public_key, source.origin, directory, none)!
+		mut release := check_signed_release(source.directory, source.id, source.public_key,
+			SignedReleaseCheck{ origin: source.origin, pin_parent_fd: directory })!
 		defer { release.close() }
 		pins.write_string(release.repository)
 		pins.write_u8(` `)

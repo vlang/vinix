@@ -136,7 +136,7 @@ fn (plan &ImageRepositories) verify(directory string, mode u32) ! {
 	plan.verify_at(directory, mode, 0)!
 }
 
-fn image_index_time(archived_at i64) i64 {
+fn release_index_time(archived_at i64) i64 {
 	return if archived_at == 0 { time.now().unix() } else { archived_at }
 }
 
@@ -147,7 +147,7 @@ fn (plan &ImageRepositories) verify_at(directory string, mode u32, archived_at i
 	for repository in plan.repositories { entries[repository.id] = 0 }
 	export_stage_directory(directory, entries, mode)!
 	for repository in plan.repositories {
-		if repository.index.expires <= image_index_time(archived_at) { return error('image repository expired after preparation; obtain a current signed release') }
+		if repository.index.expires <= release_index_time(archived_at) { return error('image repository expired after preparation; obtain a current signed release') }
 		path := directory + '/' + repository.id
 		defer { unsafe { path.free() } }
 		objects := image_repository_objects(repository.index)!
@@ -285,7 +285,7 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 		signature := read_metadata(signature_path)!
 		defer { unsafe { signature.free() } }
 		item = ImageRepository{ ...item, signature: signature.trim_space() }
-		index := verify_index(repository, item.text, item.signature, image_index_time(options.archived_at))!
+		index := verify_index(repository, item.text, item.signature, release_index_time(options.archived_at))!
 		item = ImageRepository{ ...item, index: index }
 		if required.index_sha256 != '' {
 			actual := index_digest(item.text)

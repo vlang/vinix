@@ -87,6 +87,7 @@ struct OfflineMediaVerification {
 	deployment_sha256 string
 	applications []string
 	repositories []string
+	release_time i64 @[omitempty]
 }
 
 fn check_inputs(configuration &pkgcore.ImageConfiguration, repositories &pkgcore.ImageRepositories, declaration string) !Preflight {
@@ -414,7 +415,9 @@ fn archived_release_time(value string) !i64 {
 	if value == '' || !value.bytes().all(it >= `0` && it <= `9`) {
 		return error('archive verification requires a valid past Unix release time')
 	}
-	release_time := strconv.parse_int(value, 10, 64)!
+	release_time := strconv.parse_int(value, 10, 64) or {
+		return error('archive verification requires a valid past Unix release time')
+	}
 	if release_time <= 0 || release_time > time.now().unix() {
 		return error('archive verification requires a valid past Unix release time')
 	}
@@ -480,16 +483,22 @@ fn export_offline(arguments []string) ! {
 }
 
 fn verify_offline(arguments []string) ! {
-	if arguments.len != 2 {
-		return error('usage: package-receipt verify-offline MEDIA_DIRECTORY RECEIPT.json')
+	if arguments.len !in [2, 3]! {
+		return error('usage: package-receipt verify-offline MEDIA_DIRECTORY RECEIPT.json [RELEASE_UNIX_TIME]')
 	}
+	release_time := if arguments.len == 3 { archived_release_time(arguments[2])! } else { i64(0) }
 	directory := arguments[0]
 	receipt := read_application_receipt(arguments[1])!
-	pkgcore.verify_iso_offline_media(directory, receipt.architecture, receipt.applications,
-		receipt.deployment_sha256, receipt.publishers)!
+	if release_time == 0 {
+		pkgcore.verify_iso_offline_media(directory, receipt.architecture, receipt.applications,
+			receipt.deployment_sha256, receipt.publishers)!
+	} else {
+		pkgcore.verify_archived_iso_offline_media(directory, receipt.architecture, receipt.applications,
+			receipt.deployment_sha256, receipt.publishers, release_time)!
+	}
 	println(json2.encode(OfflineMediaVerification{ directory: directory, iso_sha256: receipt.iso_sha256,
 		architecture: receipt.architecture, deployment_sha256: receipt.deployment_sha256,
-		applications: receipt.applications, repositories: receipt.publishers.map(it.id) }))
+		applications: receipt.applications, repositories: receipt.publishers.map(it.id), release_time: release_time }))
 }
 
 fn verify_installed(arguments []string) !int {
@@ -552,7 +561,7 @@ fn run() ! {
 	}
 	archive := os.args.len == 5 && os.args[1] == 'verify-archive'
 	if !archive && (os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']!) {
-		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | export-deployment ISO RECEIPT.json NEW_FILE [RELEASE_UNIX_TIME] | export-offline ISO RECEIPT.json NEW_DIRECTORY | verify-offline MEDIA_DIRECTORY RECEIPT.json | checksums RECEIPT.json | origins RECEIPT.json SHA256')
+		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | export-deployment ISO RECEIPT.json NEW_FILE [RELEASE_UNIX_TIME] | export-offline ISO RECEIPT.json NEW_DIRECTORY | verify-offline MEDIA_DIRECTORY RECEIPT.json [RELEASE_UNIX_TIME] | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }

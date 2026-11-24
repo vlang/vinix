@@ -820,6 +820,15 @@ reports the ISO digest named by the receipt, architecture, deployment digest,
 application IDs and repository IDs. Enrollment and deployment still require
 their own reviews on the destination system.
 
+For a retained copy whose indexes have expired, pass the independently
+established Unix release timestamp as the last operand. The checker verifies
+the copy at that time and adds `release_time` to the report. Release export,
+media import, and consumer refresh still require current signed indexes.
+
+```sh
+/tmp/vinix-package-receipt verify-offline /archive/release-apps vinix-packages-arm64.json RELEASE_UNIX_TIME
+```
+
 For already enrolled publishers, import an entire exported directory into the
 installed system's catalog and object cache. Its publisher subdirectories
 must match the enrolled IDs. A bundle may also contain `_deployment.json`.
