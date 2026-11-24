@@ -96,3 +96,30 @@ contains the source, signed inputs, target builds, host checks and both prefligh
 receipts. The independent checker verified all 2,553 sealed files. Archive
 SHA-256 is
 `1c718c196a159755ce3cddfc85efaabb611cf2303e00d216005ca24a08e9dfe2`.
+
+### Captured pin destination
+
+At `49efa08a1a76e2ed020d2962c3ce3ef3fe12a5e0`, the pin writer keeps its
+output directory descriptor open during signed release verification. The
+containment walk and atomic publication use that descriptor. The write
+refuses a change in the destination path's directory identity before
+creating a temporary file.
+
+The host replacement test compares both directories after refusal and
+then restores the original for an exact successful retry with the same
+descriptor. The containment test moves the captured directory inside
+the source while placing a replacement at the old name. That test passed
+in the AArch64 and x86-64 publisher workspace guests, both with guest
+shutdowns. The containment and filesystem helper matrix retained zero
+tracked allocations across all 17 modes.
+
+Production and ASan/UBSan host CLI checks passed with process leak detection
+disabled for the sanitizer run. The mixed 2,158-object export readback also
+passed. Both target CLIs linked statically. Generated pins reproduced the
+reviewed image-staging and ISO preflight results for both architectures.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-pin-parent-capture-UXZPqA/qualification.tar.gz)
+contains the source, test logs, signed inputs, target builds and both guest
+receipts. The independent checker verified all 2,512 sealed files. Archive
+SHA-256 is
+`b1c4729b4f3024adcca0053014a7eb93dd141349ab239eb71f46e4b46efd7f2e`.
