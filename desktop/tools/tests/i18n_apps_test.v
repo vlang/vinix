@@ -275,12 +275,12 @@ fn test_registration_in_russian() {
 	assert state.error == 'Пароли не совпадают.'
 	begin_frame_elements()
 	root := state.element(&desktop)
-	defer { free_tree(root) }
 	assert i18n_apps_has_text(root, 'Создайте пользователя')
 	assert i18n_apps_has_text(root, 'Подтверждение пароля')
 	assert i18n_apps_has_text(root, 'Пароли не совпадают.')
 	button := i18n_apps_element(root, action_registration_create) or { panic('missing button') }
 	assert button.text == 'Создать пользователя'
+	free_tree(root)
 	state.key_input('\x7f\x7f\x7f', home)
 	assert state.error == ''
 	begin_frame_elements()

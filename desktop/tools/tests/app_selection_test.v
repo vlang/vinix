@@ -101,7 +101,6 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	mut state := app_selection_test_state()
 	begin_frame_elements()
 	root := state.element(&desktop)
-	defer { free_tree(root) }
 
 	assert root.kind == .screen
 	assert app_selection_test_element(root, 'apps.window') != none
@@ -121,6 +120,8 @@ fn test_app_selection_offers_the_optional_apps_this_machine_can_install() {
 	assert app_selection_test_element(root, 'apps.toggle.firefox') != none
 	assert app_selection_test_element(root, 'apps.toggle.keepassxc') != none
 	assert app_selection_test_element(root, 'apps.toggle.libreoffice') != none
+	// Release the initial tree before the next frame reuses its backing arrays.
+	free_tree(root)
 	for category in first_run_categories {
 		for i, app in first_run_apps {
 			if app.category == category {
