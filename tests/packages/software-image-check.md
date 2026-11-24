@@ -117,3 +117,28 @@ configuration bytes and account permissions survive the workflow.
 The host navigation fixture checks both catalog layouts, the exact offline
 option before and after administrator authorization, frozen deployment
 arguments, normal application launch and return to the configured policy.
+
+### Bundled HTTPS results
+
+At `77e86c84e2525dd396b0d334aba3f6b37fe7670a`, both QEMU guests passed
+with 1 GiB of RAM and one guest-initiated shutdown. The aarch64 run took
+137.703 seconds and the x86-64 run took 127.406 seconds. Each verified three
+signed applications after deployment, exercised offline maintenance through
+Software, and retained the HTTPS configuration byte for byte. The standard
+account could run installed applications and was refused package administration.
+The guests used retained kernels and a headless Software controller in an
+initramfs. Graphical session and production publisher acceptance remain open.
+
+The host Software functional fixture passed in regular and ASan/UBSan builds
+with sanitizer leak detection disabled. Both full desktop target typechecks
+passed. The macOS host UI staging omitted the unused native control-state
+binding that requires AppKit state. The separate host session broker crashed
+before the file chooser check. The tracked package navigation check hit the
+heap tracker capacity on both the feature and baseline sources.
+
+The accepted receipts, rejected attempts, source snapshot, staged inputs and
+boot media are in
+`~/.local/state/vinix/r14-software-offline-2Hj3zs/qualification.tar.gz`.
+The archive SHA-256 is `a2a28390090022f6ba001c8581659e21ff0750e9aa3d5bae047a33b38c757be9`.
+Independent extraction matched all 928 inventory entries and all 61 target
+receipt artifacts per architecture.
