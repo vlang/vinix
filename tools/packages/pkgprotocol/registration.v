@@ -34,16 +34,22 @@ fn close_registered_package(p RegisteredPackage) {
 	}
 }
 
+fn close_registered_packages(packages []RegisteredPackage) {
+	for p in packages { close_registered_package(p) }
+	unsafe { packages.free() }
+}
+
+fn close_registration(snapshot RegistrationSnapshot) {
+	unsafe { snapshot.architecture.free() }
+	close_registered_packages(snapshot.packages)
+}
+
 pub fn (mut snapshot RegistrationSnapshot) close() {
-	unsafe {
-		snapshot.architecture.free()
-		for p in snapshot.packages { close_registered_package(p) }
-		(&array(&snapshot.packages)).free()
-	}
+	close_registration(snapshot)
 	snapshot = RegistrationSnapshot{}
 }
 
-fn (snapshot &RegistrationSnapshot) validate() ! {
+fn validate_registration(snapshot RegistrationSnapshot) ! {
 	if snapshot.format != 1 || snapshot.generation == 0 || snapshot.architecture !in ['aarch64', 'x86_64']! {
 		return error('invalid package registration header')
 	}
@@ -115,16 +121,12 @@ fn (mut r MetadataReader) parse_registered_packages() ![]RegisteredPackage {
 	mut packages := []RegisteredPackage{cap: 16}
 	unsafe { packages.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe {
-		for p in packages { close_registered_package(p) }; (&array(&packages)).free()
-	} } }
+	defer { if !accepted { close_registered_packages(packages) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if packages.len == 4096 { return error('package registration exceeds its package limit') }
-		p := r.parse_registered_installation()!
-		pointer := unsafe { &p }
-		unsafe { packages.push_many(pointer, 1) }
+		packages << r.parse_registered_installation()!
 	}
 	accepted = true
 	return packages
@@ -134,7 +136,7 @@ fn (mut r MetadataReader) parse_registration() !RegistrationSnapshot {
 	r.expect(`{`)!
 	mut snapshot := RegistrationSnapshot{}
 	mut accepted := false
-	defer { if !accepted { snapshot.close() } }
+	defer { if !accepted { close_registration(snapshot) } }
 	mut seen := u32(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -150,7 +152,7 @@ fn (mut r MetadataReader) parse_registration() !RegistrationSnapshot {
 		}
 	}
 	if seen != 15 { return error('missing package registration envelope field') }
-	snapshot.validate()!
+	validate_registration(snapshot)!
 	accepted = true
 	return snapshot
 }
@@ -162,8 +164,8 @@ pub fn decode_registration(text string) !RegistrationSnapshot {
 	if text.len > 8 * 1024 * 1024 { return error('package registration exceeds metadata limit') }
 	mut reader := &MetadataReader{ text: text }
 	defer { unsafe { free(reader) } }
-	mut snapshot := reader.parse_registration()!
+	snapshot := reader.parse_registration()!
 	reader.spaces()
-	if reader.position != text.len { snapshot.close(); return error('trailing package registration metadata') }
+	if reader.position != text.len { close_registration(snapshot); return error('trailing package registration metadata') }
 	return snapshot
 }

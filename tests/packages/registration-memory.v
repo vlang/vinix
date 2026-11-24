@@ -18,11 +18,16 @@ struct Snapshot {
 	packages []Installation
 }
 
+fn free_registration_message(message string) {
+	unsafe { message.free() }
+}
+
 fn consume(text string, expected bool) {
 	mut accepted := true
 	mut snapshot := pkgprotocol.decode_registration(text) or {
 		accepted = false
-		message := err.msg(); unsafe { message.free(); err.free() }
+		free_registration_message(err.msg())
+		unsafe { err.free() }
 		pkgprotocol.RegistrationSnapshot{}
 	}
 	snapshot.close()
@@ -76,7 +81,8 @@ fn main() {
 				mut refused := false
 				registry.refresh(target, owner, if target == root { 'x86_64' } else { 'aarch64' }) or {
 					refused = true
-					message := err.msg(); unsafe { message.free(); err.free() }
+					free_registration_message(err.msg())
+					unsafe { err.free() }
 				}
 				assert refused && registry.generation == 1 && registry.apps.len == 32
 			}

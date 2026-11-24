@@ -28,6 +28,10 @@ pub:
 }
 
 pub fn (report &HealthReport) validate() ! {
+	validate_health_report(report)!
+}
+
+fn validate_health_report(report HealthReport) ! {
 	if report.format != 1 || report.architecture !in ['aarch64', 'x86_64']!
 		|| report.rows.len > 4096 || (report.generation == 0 && report.rows.len != 0) {
 		return error('invalid installed health report')
@@ -54,12 +58,18 @@ fn close_package_health(row PackageHealth) {
 	}
 }
 
+fn close_health_rows(rows []PackageHealth) {
+	for row in rows { close_package_health(row) }
+	unsafe { rows.free() }
+}
+
+fn close_health_report(report HealthReport) {
+	unsafe { report.architecture.free() }
+	close_health_rows(report.rows)
+}
+
 pub fn (mut report HealthReport) close() {
-	unsafe {
-		report.architecture.free()
-		for row in report.rows { close_package_health(row) }
-		(&array(&report.rows)).free()
-	}
+	close_health_report(report)
 	report = HealthReport{}
 }
 
@@ -99,14 +109,12 @@ fn (mut r MetadataReader) health_rows() ![]PackageHealth {
 	mut rows := []PackageHealth{cap: 16}
 	unsafe { rows.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { mut discarded := HealthReport{ rows: rows }; discarded.close() } }
+	defer { if !accepted { close_health_rows(rows) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if rows.len == 4096 { return error('installed health row count exceeds its bound') }
-		row := r.health_row()!
-		pointer := unsafe { &row }
-		unsafe { rows.push_many(pointer, 1) }
+		rows << r.health_row()!
 	}
 	accepted = true
 	return rows
@@ -119,7 +127,7 @@ pub fn decode_health(text string) !HealthReport {
 	r.expect(`{`)!
 	mut report := HealthReport{}
 	mut accepted := false
-	defer { if !accepted { report.close() } }
+	defer { if !accepted { close_health_report(report) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -136,7 +144,7 @@ pub fn decode_health(text string) !HealthReport {
 	}
 	r.spaces()
 	if seen != 15 || r.position != text.len { return error('incomplete or trailing installed health report') }
-	report.validate()!
+	validate_health_report(report)!
 	accepted = true
 	return report
 }

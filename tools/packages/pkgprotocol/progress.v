@@ -32,6 +32,10 @@ fn progress_path(path string) bool {
 }
 
 pub fn (event &Progress) validate() ! {
+	validate_progress(event)!
+}
+
+fn validate_progress(event Progress) ! {
 	if event.format != 1 || event.phase !in ['resolve', 'metadata', 'download', 'verify', 'copy', 'stage', 'activate', 'complete']!
 		|| (event.package != '' && !identifier(event.package)) || (event.repository != '' && !identifier(event.repository))
 		|| !printable(event.path, 1024) || !progress_path(event.path)
@@ -55,7 +59,7 @@ pub fn decode_progress(text string) !Progress {
 	r.expect(`{`)!
 	mut event := Progress{}
 	mut accepted := false
-	defer { if !accepted { event.close() } }
+	defer { if !accepted { close_progress(event) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -75,19 +79,23 @@ pub fn decode_progress(text string) !Progress {
 	}
 	r.spaces()
 	if seen != 127 || r.position != text.len { return error('incomplete or trailing package progress event') }
-	event.validate()!
+	validate_progress(event)!
 	accepted = true
 	return event
 }
 
 const progress_keys = ['format', 'phase', 'package', 'repository', 'path', 'current', 'total']
 
-pub fn (mut event Progress) close() {
+fn close_progress(event Progress) {
 	unsafe {
 		event.phase.free()
 		event.package.free()
 		event.repository.free()
 		event.path.free()
 	}
+}
+
+pub fn (mut event Progress) close() {
+	close_progress(event)
 	event = Progress{}
 }
