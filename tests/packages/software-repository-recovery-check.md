@@ -120,3 +120,37 @@ The evidence archive is
 `~/.local/state/vinix/r14-software-refresh-5Vddg5/qualification.tar.gz`.
 Its SHA-256 is `fcbab47ce4ecbe0c41d373a5dd92e4aba4d33695a44b72b9047a0ec3d338fd25`.
 Independent extraction matched all 10,104 inventory entries.
+
+## Refresh after publisher enrollment
+
+Software takes the repository ID from the completed enrollment command and
+asks for separate approval to refresh that source. It passes the window's
+offline selection to the follow-up. Cancellation preserves the trust change.
+A refresh failure preserves the service diagnostic and points to **Refresh**
+in the catalog when other repositories need current indexes.
+
+The host fixture drives both approval prompts through the element tree. It
+checks exact offline command arguments, successful refresh, cancellation and
+failure after enrollment. All five host variants passed with V `2655544`,
+including ASan/UBSan with leak detection disabled. Both tracked variants
+retained zero V bytes and records across the 9,000 compact recovery renders.
+
+Add `--software-enrollment-refresh` to the native catalog check with the
+bundled HTTPS Software inputs. After the normal image maintenance cases, the
+guest withdraws the existing publisher's image bundle and enrolls a new local
+publisher through Software as UID 1000. The guest checks two successful
+administrator operations, the new publisher's exact sequence-2 index and
+history floor, and the original publisher's cached snapshot and floor. The
+installed generation and package state stay byte-identical.
+
+At revision `f171d6a9b96f8e8b8e1d883052ce12a5bab29441`, the headless native
+Software runs passed under QEMU TCG on AArch64 in 59.987 seconds and x86_64
+in 71.433 seconds. Both had guest-initiated shutdowns. The full production
+compositor also linked statically for both targets. The native test exercised
+Software's element tree and administrator service.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-software-enrollment-refresh-AtUPPY/qualification.tar.gz)
+contains the source snapshot, host outputs, compositor builds, staged images
+and native logs. All 65 receipt entries matched per target. The independent
+archive checker verified all 9,687 sealed files and symlinks. Archive SHA-256
+`2d5ee602314424c9199b7450ddd88e772740039b4b8ec6b240f5f7ba61f82b88`.
