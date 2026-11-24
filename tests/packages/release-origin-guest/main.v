@@ -129,11 +129,7 @@ fn reject_replay(endpoint string, id string, key string) ! {
 		1, 'repository rollback or sequence equivocation refused')!
 }
 
-fn migrate(document pkgprotocol.DeploymentDocument, previous Checkpoint, endpoint string, id string, key string) ! {
-	audit(document, false)!
-	version := run_program('/usr/bin/curl', ['--disable', '--version'], 0, 'OpenSSL/')!
-	println('HWTEST INFO ' + version.split_into_lines()[0])
-	ready(endpoint)!
+fn enroll_origin(previous Checkpoint, endpoint string, id string, key string) ! {
 	url := 'https://' + endpoint + '/origin/online'
 	args := ['enroll', id, url, key]
 	package_command(['--offline', 'repo-review', ...args], 1, 'offline mode')!
@@ -148,7 +144,23 @@ fn migrate(document pkgprotocol.DeploymentDocument, previous Checkpoint, endpoin
 		require(changed.files[file]! == previous.files[file]!, 'enrollment changed ' + file)!
 	}
 	require(changed.current == previous.current, 'enrollment activated a generation')!
+}
+
+fn migrate(document pkgprotocol.DeploymentDocument, previous Checkpoint, endpoint string, id string, key string) ! {
+	audit(document, false)!
+	version := run_program('/usr/bin/curl', ['--disable', '--version'], 0, 'OpenSSL/')!
+	println('HWTEST INFO ' + version.split_into_lines()[0])
+	ready(endpoint)!
+	preconfigured := os.exists(assets + 'bundled-https')
+	if !preconfigured { enroll_origin(previous, endpoint, id, key)! }
 	package_command(['update'], 0, '')!
+	if preconfigured {
+		refreshed := checkpoint('offline')!
+		package_command(['--offline', 'update'], 1, 'repository rollback or sequence equivocation refused')!
+		require(checkpoint('offline')! == refreshed && refreshed.files[config]! == previous.files[config]!,
+			'HTTPS refresh or refused bundled replay changed configuration or trusted state')!
+		println('HWTEST PASS bundled HTTPS publisher retained configuration and refused an offline replay')
+	}
 	mut upgrade := pkgprotocol.decode_review(package_command(['review', 'upgrade'], 0, '')!)!
 	defer { upgrade.close() }
 	require(upgrade.rows.len == 10 && upgrade.rows.filter(it.action == 'update').map(it.id) == [runtime_id],

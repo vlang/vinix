@@ -124,3 +124,18 @@ The `bundle.sha256` manifest has 8,805 file and symlink entries and SHA-256
 `50d182a0b23412ef0c5e7847303b160e9ef2c6b49040723beb58cc4ecb463a31`.
 All entries matched after independent extraction. Each `system.vjfs.zst`
 decoded to the corresponding `disk.raw.sha256`.
+
+## Bundled HTTPS publisher
+
+Pass `--bundled-https` after `NEW_WORK` to the installed runner. It stages the
+same signed baseline with the disposable publisher's HTTPS URL in the reviewed
+configuration. The first boot uses offline refresh and deployment from that
+bundled copy. The second boot refreshes the configured URL, checks that an
+offline refresh refuses the older bundled sequence, then upgrades and rolls
+back. The final boot verifies the retained package generation and trust history.
+
+The recipe requires identical publisher configuration across all three boots.
+The host request log must show one index/signature pair from online refresh,
+the new runtime object requests, and two index/signature pairs from the older
+HTTPS origin used for replay controls. The offline operations use the same
+signature and sequence checks over the staged files.

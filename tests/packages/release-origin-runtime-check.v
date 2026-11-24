@@ -123,11 +123,11 @@ fn stop_fixture(mut child os.Process, work string) {
 	child.close()
 }
 
-fn verify_requests(work string, objects []string) ! {
+fn verify_requests(work string, objects []string, preconfigured bool) ! {
 	metadata := ['origin online/index.json -', 'origin online/index.sig -']
 	replay := ['origin older/index.json -', 'origin older/index.sig -']
 	requests := os.read_file(work + '/requests.log')!.split_into_lines()
-	prefix := [...metadata, ...metadata, ...metadata]
+	prefix := if preconfigured { metadata } else { [...metadata, ...metadata, ...metadata] }
 	suffix := [...replay, ...replay]
 	if requests.len != prefix.len + objects.len + suffix.len || requests[..prefix.len] != prefix
 		|| requests[requests.len - suffix.len..] != suffix
@@ -137,8 +137,9 @@ fn verify_requests(work string, objects []string) ! {
 }
 
 fn check() ! {
-	if os.args.len != 8 || os.args[1] !in ['aarch64', 'x86_64'] {
-		return error('usage: release-origin-runtime-check ARCH KERNEL CURL_ROOT BASELINE_BUNDLE UPDATE_BUNDLE CONFIG NEW_WORK')
+	preconfigured := os.args.len == 9 && os.args[8] == '--bundled-https'
+	if (os.args.len != 8 && !preconfigured) || os.args[1] !in ['aarch64', 'x86_64'] {
+		return error('usage: release-origin-runtime-check ARCH KERNEL CURL_ROOT BASELINE_BUNDLE UPDATE_BUNDLE CONFIG NEW_WORK [--bundled-https]')
 	}
 	arch := os.args[1]
 	kernel := os.abs_path(os.args[2])
@@ -157,10 +158,27 @@ fn check() ! {
 		physical := os.real_path(path)
 		pins[physical] = pkgcore.hash_file(physical)!
 	}
+	key := work + '/key.pem'
+	defer { os.rm(key) or {} }
+	hwhost.run_tool(['openssl', 'req', '-new', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days',
+		'1', '-subj', '/CN=Vinix installed release origin', '-addext', 'subjectAltName=IP:10.0.2.2',
+		'-keyout', key, '-out', work + '/ca.pem'], map[string]string{}, work + '/certificate.log', 60)!
+	os.chmod(key, 0o600)!
+	os.mkdir(work + '/served')!
+	mut server, endpoint := start_fixture(host, root, work)!
+	defer { stop_fixture(mut server, work) }
+	mut configuration := os.abs_path(os.args[6])
+	if preconfigured {
+		settings := json2.decode[pkgcore.Config](os.read_file(configuration)!)!
+		if settings.repositories.len != 1 { return error('bundle requires one reviewed publisher') }
+		repository := pkgcore.Repository{ ...settings.repositories[0], url: 'https://' + endpoint + '/origin/online' }
+		configuration = work + '/https-config.json'
+		os.write_file(configuration, json2.encode(pkgcore.Config{ ...settings, repositories: [repository] }) + '\n')!
+	}
 	boot := work + '/boot'
 	target := boot + '/rootfs'
 	os.mkdir_all(target)!
-	repo := prepare_image(target, arch, os.abs_path(os.args[6]), os.abs_path(os.args[4]))!
+	repo := prepare_image(target, arch, configuration, os.abs_path(os.args[4]))!
 	installed_bundle := target + pkgcore.image_repositories_path + '/' + repo.id
 	baseline := signed_index(installed_bundle, repo)!
 	served := work + '/served/online'
@@ -182,18 +200,11 @@ fn check() ! {
 	os.cp(cli, target + '/usr/bin/vinix-package')!
 	os.chmod(target + '/usr/bin/vinix-package', 0o755)!
 	os.chmod(target + '/usr/bin/curl', 0o755)!
-	key := work + '/key.pem'
-	defer { os.rm(key) or {} }
-	hwhost.run_tool(['openssl', 'req', '-new', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days',
-		'1', '-subj', '/CN=Vinix installed release origin', '-addext', 'subjectAltName=IP:10.0.2.2',
-		'-keyout', key, '-out', work + '/ca.pem'], map[string]string{}, work + '/certificate.log', 60)!
-	os.chmod(key, 0o600)!
-	mut server, endpoint := start_fixture(host, root, work)!
-	defer { stop_fixture(mut server, work) }
 	fixture := target + '/usr/share/release-origin'
 	os.mkdir_all(fixture)!
 	os.cp(work + '/ca.pem', fixture + '/ca.pem')!
 	os.write_file(fixture + '/endpoint', endpoint + '\n')!
+	if preconfigured { os.write_file(fixture + '/bundled-https', '')! }
 	os.write_file(target + '/.vinix-image-id', 'vinix-release-origin-installed-1\n')!
 	os.write_file(work + '/inputs.json', json2.encode(pins) + '\n')!
 	result := hwhost.run_scenario(if arch == 'x86_64' {
@@ -217,13 +228,18 @@ fn check() ! {
 				'HWTEST PASS seven release roots installed offline on a clean disk',
 				'HWTEST PASS HTTPS origin has the same publisher, updates SQLite and refuses replay after rollback',
 				'HWTEST PASS restored release and HTTPS trust survived cold boot',
+				...if preconfigured {
+					['HWTEST PASS bundled HTTPS publisher retained configuration and refused an offline replay']
+				} else {
+					[]string{}
+				},
 			]
 			forbidden:    ['HWTEST FAIL', 'Kernel panic', 'running from memory',
 				'sysdisk: updating the system on']
 		}, hwhost.Run{ kernel: kernel, guest: guest, state: boot, timeout: 1800, memory_mib: 2048, keep: true })
 	os.write_file(work + '/result.json', json2.encode(result) + '\n')!
 	if !result.passed { return error(result.reason) }
-	verify_requests(work, objects)!
+	verify_requests(work, objects, preconfigured)!
 	for path, expected in pins {
 		if pkgcore.hash_file(path)! != expected {
 			return error('qualification input changed: ' + path)

@@ -173,10 +173,13 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 	defer { unsafe { expected.free() } }
 	for repository in config.repositories {
 		url := 'file://' + image_repositories_path + '/' + repository.id
-		defer { unsafe { url.free() } }
-		if repository.url == url { expected[repository.id] = 0 }
+		path := physical + '/' + repository.id
+		defer { unsafe { url.free(); path.free() } }
+		if repository.url == url || (repository.url.starts_with('https://') && publisher_entry_exists(path)) {
+			expected[repository.id] = 0
+		}
 	}
-	if expected.len == 0 { return error('image repository bundle needs explicitly configured file repositories under ' + image_repositories_path) }
+	if expected.len == 0 { return error('image repository bundle needs configured HTTPS or image file repositories') }
 	export_stage_directory(physical, expected, 0)!
 	mut needed := u64(4 * 1024 * 1024)
 	for repository in config.repositories {

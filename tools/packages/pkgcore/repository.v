@@ -198,9 +198,9 @@ fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Prog
 		message := 'Updating trusted repository ' + repository.id
 		println(message)
 		defer { unsafe { message.free() } }
+		base := repository_fetch_base(directory, repository, config.policy.offline, false)!
 		index_path := work + '/index.json'
 		sig_path := work + '/index.sig'
-		base := repository.url.trim_right('/')
 		index_url := base + '/index.json'; sig_url := base + '/index.sig'
 		defer { unsafe { index_path.free(); sig_path.free(); base.free(); index_url.free(); sig_url.free() } }
 		fetch_progress(index_url, index_path, max_metadata, false, config.policy.offline,

@@ -296,6 +296,69 @@ fn test_image_bundle_capture_publish_retry_and_real_offline_consumer() {
 	println('PACKAGE IMAGE BUNDLE captured signed closure atomic publication offline dependency install both architectures PASS')
 }
 
+fn test_image_bundle_bootstraps_a_configured_https_publisher_offline() {
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_bundle_fixture(false)!
+		defer { os.rmdir_all(work) or {} }
+		root := work + '/image'
+		os.mkdir(root)!
+		repository := Repository{ id: 'native', url: 'https://packages.example.invalid/release', public_key: key }
+		config := Config{ architecture: architecture, repositories: [repository],
+			policy: Policy{ offline: architecture == 'x86_64', reserve_bytes: 0 } }
+		source := work + '/https-config.json'
+		os.write_file(source, json2.encode(config) + '\n')!
+		mut configuration := prepare_image_configuration(root, architecture, source)!
+		defer { configuration.close() }
+		mut plan := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		defer { plan.close() }
+		assert unsafe { &plan }.publish()!
+		assert unsafe { &configuration }.publish()!
+		plan.retire()!
+		assert !os.exists(state_directory(root))
+		service := Service{ root: root, offline: !config.policy.offline }
+		mut catalog := service.refresh()!
+		assert catalog.packages.len == 2
+		catalog.close()
+		directory := state_directory(root)
+		assert read_snapshots(directory)![0].repository == repository
+		bundle := root + image_repositories_path + '/native'
+		objects := bundle + '/objects'
+		os.rename(objects, work + '/saved-objects')!
+		os.symlink(work + '/saved-objects', objects)!
+		if _ := service.transact('install', ['app'], TransactionOptions{}) { assert false }
+		else { assert err.msg().contains('controlled ordinary directory') }
+		assert service.state()!.generation == 0
+		os.rm(objects)!
+		os.rename(work + '/saved-objects', objects)!
+		mut review := service.review('install', ['app'])!
+		defer { review.close() }
+		mut installed := service.transact('install', ['app'], TransactionOptions{ expected_review: review.fingerprint })!
+		defer { installed.close() }
+		assert installed.packages.len == 2 && installed.requested == ['app']
+		assert installed.packages.all(it.public_key == key && it.repository == 'native' && it.sequence == 1)
+		assert load_config(root)! == config
+		old_export := work + '/old-export'
+		// A symlink to another controlled export is still an invalid image bundle.
+		os.rename(bundle, old_export)!
+		os.symlink(old_export, bundle)!
+		if _ := service.refresh() { assert false } else { assert err.msg().contains('controlled ordinary directory') }
+		os.rm(bundle)!
+		publish_release(work + '/workspace', 'native', work + '/seed', 2, time.now().unix() + 3600, bundle)!
+		mut refreshed := service.refresh()!
+		refreshed.close()
+		catalog_bytes := os.read_file(directory + '/catalog.json')!
+		history_bytes := os.read_file(directory + '/trust-history.json')!
+		assert read_snapshots(directory)![0].repository == repository
+		os.rename(bundle, work + '/new-export')!
+		os.rename(old_export, bundle)!
+		if _ := service.refresh() { assert false } else { assert err.msg().contains('retained trust history') }
+		assert os.read_file(directory + '/catalog.json')! == catalog_bytes
+		assert os.read_file(directory + '/trust-history.json')! == history_bytes
+		assert load_config(root)! == config
+	}
+	println('PACKAGE IMAGE BUNDLE HTTPS publisher installs offline without trust changes and refuses replay on both targets PASS')
+}
+
 fn test_image_bundle_requires_explicit_trust_exact_export_and_safe_sources() {
 	work, key := image_bundle_fixture(false)!; defer { os.rmdir_all(work) or {} }
 	root := work + '/image'; os.mkdir(root)!

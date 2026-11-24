@@ -348,13 +348,14 @@ configuration-only behavior. The desktop cache hashes the selected directory and
 all its contents, including payload bytes; timestamp restoration cannot hide a
 changed object.
 
-The reviewed configuration must explicitly enroll each bundled publisher at
+The reviewed configuration must explicitly enroll each bundled publisher with
+its ID and key at an HTTPS URL or at
 `file:///usr/share/vinix-packages/repositories/ID`. Put its complete
 `publish-release` export under `DIRECTORY/ID`, containing only `index.json`,
-`index.sig` and `objects/HASH`. Every configuration entry using that fixed prefix
-must be present, and unconfigured bundle entries refuse. Other configured online
-or removable repositories are unchanged. Supply absolute paths to the builder;
-the signed repository URLs refer to the target filesystem, not the host.
+`index.sig` and `objects/HASH`. Include every configuration entry using the
+fixed file prefix. HTTPS publishers can be included individually. Unconfigured
+bundle entries refuse. Supply absolute paths to the builder. The fixed file
+URLs refer to the target filesystem.
 
 Inputs must be controlled by the builder: ordinary owned directories without
 shared write access, release directories 0755, metadata/objects ordinary
@@ -407,12 +408,33 @@ reports and saved declarations survive plan closure. Both guests exercise ten
 selected modes. Target compilation and production catalog/graphical/runtime
 acceptance remain separate.
 
-No consumer catalog, replay floor, generation or installed state is created by
-bundling. After boot, normal Refresh authenticates the bundled index and normal
-review/install creates package state. Signed updates and runtime versions keep
-their existing review and rollback rules. This is an initial offline source;
-later signed media or reviewed repository enrollment supplies new releases.
-See [bundle qualification](../../tests/packages/image-repositories-check.md).
+After boot, refresh authenticates the bundled index in offline mode. Reviewed
+installation creates the application generation. Signed updates and runtime
+versions keep their existing review and rollback rules. File-only repositories
+can receive newer releases from signed media or reviewed enrollment. See
+[bundle qualification](../../tests/packages/image-repositories-check.md).
+
+#### Use a bundled baseline with HTTPS updates
+
+Enroll the publisher's HTTPS URL in the image configuration and include its
+matching signed export in `--repositories`. The package tools use that bundle
+when run with `--offline` or when the organization policy requires offline
+operation. The cached catalog retains the configured HTTPS URL and publisher
+key. The same configuration supports online refresh when the policy allows it.
+
+```sh
+vinix-package --offline update
+vinix-package --offline deployment-review /usr/share/vinix-packages/applications.json
+vinix-package --offline deployment-apply REVIEW_FINGERPRINT /usr/share/vinix-packages/applications.json
+vinix-package update
+```
+
+The deployment commands use the application lock staged with the bundle.
+Offline refresh applies the same signature, expiry and replay checks as
+HTTPS refresh. After a newer index is accepted, an older bundled index is
+refused and the current cache and trust history stay intact. Offline acquisition
+can still use verified cached objects and bundled objects that match the current
+signed manifests. See [installed guest qualification](../../tests/packages/release-origin-check.md#bundled-https-publisher).
 
 #### Move a bundled publisher to its HTTPS repository
 

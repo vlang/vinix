@@ -5,8 +5,10 @@ import os
 import strings
 import tools.packages.pkgprotocol
 
+const package_state_path = '/var/lib/vinix-packages'
+
 pub fn state_directory(root string) string {
-	return rooted_package_path(root, '/var/lib/vinix-packages')
+	return rooted_package_path(root, package_state_path)
 }
 
 // Borrow the trimmed prefix only while constructing the independent path.
@@ -216,13 +218,15 @@ fn cached_payload_progress(config Config, installed Installed, payload Payload, 
 	if repositories.len != 1 {
 		return error('${installed.package.id}: repository was revoked or its key changed')
 	}
-	prefix := repositories[0].url.trim_right('/')
-	url := prefix + '/objects/' + payload.sha256
-	defer { unsafe { prefix.free(); url.free() } }
+	mut url := ''
+	defer { unsafe { url.free() } }
 	mut resumed := false
 	event := pkgprotocol.Progress{ phase: 'download', package: installed.package.id,
 		repository: installed.repository, path: payload.path, total: payload.bytes }
 	if !verified_file(part, payload) {
+		prefix := repository_fetch_base(directory, repositories[0], config.policy.offline, true)!
+		defer { unsafe { prefix.free() } }
+		url = prefix + '/objects/' + payload.sha256
 		number := payload.bytes.str()
 		message := 'Downloading ${installed.package.id}/${payload.path} (${number} bytes)'
 		defer { unsafe { number.free(); message.free() } }
