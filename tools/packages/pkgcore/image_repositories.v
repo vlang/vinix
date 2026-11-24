@@ -13,6 +13,12 @@ struct ImageRepository {
 	index Index
 }
 
+pub struct ImageRepositoryIndex {
+pub:
+	id string
+	index_sha256 string
+}
+
 // Owns a private, authenticated capture, independent of later source edits.
 // Publish before ImageConfiguration.publish(), then close on every path.
 pub struct ImageRepositories {
@@ -36,6 +42,7 @@ struct ImageRepositoriesOptions {
 	temporary_directory fn () string = import_temporary_directory
 	scratch string
 	flush fn (int) int = atomic_flush
+	required_indexes []ImageRepositoryIndex
 }
 
 fn image_repository_objects(index Index) !map[string]Payload {
@@ -139,13 +146,23 @@ pub fn (configuration &ImageConfiguration) prepare_repositories(source string) !
 	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{})
 }
 
+// Pin the authenticated index bytes for selected bundled publishers before
+// copying any repository into the private capture.
+pub fn (configuration &ImageConfiguration) prepare_repositories_for_indexes(source string,
+	required []ImageRepositoryIndex) !ImageRepositories {
+	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{ required_indexes: required })
+}
+
 // Capture into a caller-selected scratch filesystem for temporary image checks.
 pub fn (configuration &ImageConfiguration) prepare_repositories_in(source string, scratch string) !ImageRepositories {
 	return configuration.prepare_repositories_with(source, ImageRepositoriesOptions{ scratch: scratch })
 }
 
 fn (configuration &ImageConfiguration) prepare_repositories_with(source string, options ImageRepositoriesOptions) !ImageRepositories {
-	if source == '' { return ImageRepositories{} }
+	if source == '' {
+		if options.required_indexes.len != 0 { return error('required image repository indexes need a signed bundle') }
+		return ImageRepositories{}
+	}
 	if !image_configuration_root_matches(configuration.root, configuration.device, configuration.inode) { return error('package image root changed before repository preparation') }
 	text := if configuration.existing { read_metadata(configuration.path)! } else { configuration.text.clone() }
 	mut plan := ImageRepositories{ root: configuration.root.clone(), configuration: text,
@@ -180,6 +197,16 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 		}
 	}
 	if expected.len == 0 { return error('image repository bundle needs configured HTTPS or image file repositories') }
+	mut reviewed := map[string]string{}
+	defer { unsafe { reviewed.free() } }
+	for required in options.required_indexes {
+		if !identifier(required.id) || !digest_valid(required.index_sha256) {
+			return error('required image repository index needs a repository ID and lowercase SHA-256 digest')
+		}
+		if required.id in reviewed { return error('duplicate required image repository index: ${required.id}') }
+		if required.id !in expected { return error('required image repository is not bundled: ${required.id}') }
+		reviewed[required.id] = required.index_sha256
+	}
 	export_stage_directory(physical, expected, 0)!
 	mut needed := u64(4 * 1024 * 1024)
 	for repository in config.repositories {
@@ -198,6 +225,11 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 		item = ImageRepository{ ...item, signature: signature.trim_space() }
 		index := verify_index(repository, item.text, item.signature, time.now().unix())!
 		item = ImageRepository{ ...item, index: index }
+		if wanted := reviewed[repository.id] {
+			actual := index_digest(item.text)
+			defer { unsafe { actual.free() } }
+			if actual != wanted { return error('bundled image repository index differs from the reviewed digest: ${repository.id}') }
+		}
 		release_closures(index, repository.public_key)!
 		for p in index.packages { check_policy(p, config.policy)! }
 		objects := image_repository_objects(index)!

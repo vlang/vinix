@@ -116,7 +116,10 @@ fn test_image_input_check_revalidates_captured_inputs_and_refuses_mismatched_pla
 	source := image_check_source(work, 'aarch64', key, false)!
 	mut configuration := prepare_image_configuration(root, 'aarch64', source)!
 	defer { configuration.close() }
-	mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+	mut receipt := check_release_export(work + '/bundle/native', 'native', key)!
+	defer { receipt.close() }
+	mut repositories := unsafe { &configuration }.prepare_repositories_for_indexes(work + '/bundle',
+		[ImageRepositoryIndex{ id: receipt.repository, index_sha256: receipt.index_sha256 }])!
 	defer { repositories.close() }
 	text := unsafe { &configuration }.check_repositories(unsafe { &repositories })!
 	os.rmdir_all(work + '/bundle')!; os.rm(source)!
@@ -186,6 +189,78 @@ fn test_image_input_check_cli_uses_preflight_before_any_compiler_lookup() {
 	child.set_redirect_stdio_merged(); child.run(); diagnostic := child.stdout_slurp(); child.wait(); code := child.code; child.close()
 	assert code != 0 && diagnostic.contains('another architecture') && os.ls(root)!.len == 0
 	println('IMAGE INPUT CHECK CLI flag placement, literal paths, environment/explicit selection and reproducible compiler-free reports; normal staging and invalid-input refusals PASS')
+}
+
+struct ImageIndexRefusal {
+	arguments []string
+	diagnostic string
+}
+
+fn run_image_index_stage(arguments []string) os.Result {
+	mut child := os.new_process(arguments[0])
+	defer { child.close() }
+	child.set_args(arguments[1..])
+	child.set_redirect_stdio_merged()
+	child.run()
+	output := child.stdout_slurp()
+	child.wait()
+	return os.Result{ exit_code: child.code, output: output }
+}
+
+fn test_image_input_cli_pins_reviewed_repository_indexes_before_staging() {
+	binary := os.getenv('VINIX_PACKAGE_STAGE_CHECK_CLI')
+	if binary == '' { return }
+	work, key := image_check_fixture(false)!
+	defer { os.rmdir_all(work) or {} }
+	bundle := work + '/bundle'
+	native := bundle + '/native'
+	next := work + '/next'
+	publish_release(work + '/workspace', 'native', work + '/seed', 8, time.now().unix() + 3600, next)!
+	mut inspected := check_release_export(native, 'native', key)!
+	defer { inspected.close() }
+	organization := hash_file(bundle + '/organization/index.json')!
+	pins := ['--require-index', inspected.repository, inspected.index_sha256,
+		'--require-index', 'organization', organization]
+
+	for architecture in ['aarch64', 'x86_64']! {
+		root := work + '/' + architecture
+		os.mkdir(root)!
+		source := image_check_source(work, architecture, key, false)!
+		base := [binary, '--arch', architecture, '--staging', root, '--config', source,
+			'--cc', work + '/nonexistent-compiler']
+		stage := [...base, '--repositories', bundle]
+		plain := run_image_index_stage([...stage, '--check'])
+		assert plain.exit_code == 0, plain.output
+		pinned := run_image_index_stage([...stage, ...pins, '--check'])
+		assert pinned.exit_code == 0 && pinned.output == plain.output, pinned.output
+		normal := run_image_index_stage([...stage, ...pins])
+		assert normal.exit_code != 0 && normal.output.contains('target compiler is missing'), normal.output
+
+		for control in [
+			ImageIndexRefusal{ arguments: [...base, ...pins], diagnostic: 'need a signed bundle' },
+			ImageIndexRefusal{ arguments: [...stage, '--require-index', 'remote', inspected.index_sha256], diagnostic: 'not bundled: remote' },
+			ImageIndexRefusal{ arguments: [...stage, '--require-index', 'native', 'invalid'], diagnostic: 'lowercase SHA-256 digest' },
+			ImageIndexRefusal{ arguments: [...stage, '--require-index', 'native'], diagnostic: 'requires a repository ID' },
+			ImageIndexRefusal{ arguments: [...stage, ...pins, '--require-index', 'native', organization], diagnostic: 'duplicate required image repository index: native' },
+		] {
+			refused := run_image_index_stage(control.arguments)
+			assert refused.exit_code != 0 && refused.output.contains(control.diagnostic), refused.output
+		}
+
+		os.rename(native, work + '/reviewed')!
+		os.rename(next, native)!
+		unpinned := run_image_index_stage([...stage, '--check'])
+		assert unpinned.exit_code == 0 && unpinned.output != plain.output, unpinned.output
+		for command in [[...stage, ...pins], [...stage, ...pins, '--check']] {
+			refused := run_image_index_stage(command)
+			assert refused.exit_code != 0 && refused.output.contains('differs from the reviewed digest: native'), refused.output
+		}
+		os.rename(native, next)!
+		os.rename(work + '/reviewed', native)!
+		retry := run_image_index_stage([...stage, ...pins, '--check'])
+		assert retry.exit_code == 0 && retry.output == pinned.output && os.ls(root)!.len == 0, retry.output
+	}
+	println('IMAGE INPUT CHECK both-host exact reviewed index pins, signed replacement refusal and unchanged target retry PASS')
 }
 
 fn test_image_input_check_distinguishes_preserved_bundles_and_refuses_unsafe_or_changed_destinations() {

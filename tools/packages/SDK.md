@@ -563,6 +563,24 @@ both plans. Free the text and close both plans on every path. Neither the method
 nor `--check` publishes a bundle/configuration or creates consumer package state.
 See [preflight qualification](../../tests/packages/image-input-check.md).
 
+### Pin a reviewed repository index
+
+Pass the repository ID and lowercase `index_sha256` from a reviewed
+`check-release-export` receipt to both preflight and normal staging.
+
+```sh
+v run tools/packages/stage.v --check --arch aarch64 --staging /build/fresh-root \
+  --config /release/reviewed-packages.json --repositories /release/bundle \
+  --require-index company INDEX_SHA256
+```
+
+Repeat `--require-index` for each publisher you want to pin. Staging requires
+each selected publisher to be present in the bundle and compares the exact
+authenticated index bytes before copying the bundle or looking up any compiler.
+A newer release signed by the same publisher has a different digest and fails
+the pin. The privately captured bundle carries the admitted bytes into publication.
+The normal preflight report already includes the verified digest for each bundle.
+
 ### Require an advertised application catalog
 
 Repeat `--require-app ID` for every application an image release advertises:

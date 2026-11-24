@@ -45,6 +45,7 @@ fn stage() ! {
 	mut compiler_args := []string{}
 	mut configuration := ''
 	mut repositories := ''
+	mut required_indexes := []pkgcore.ImageRepositoryIndex{}
 	mut check := false
 	mut required_applications := []string{}
 	mut applications := ''
@@ -52,8 +53,16 @@ fn stage() ! {
 	mut arguments := os.args[1..].clone()
 	for arguments.len > 0 {
 		if arguments[0] == '--check' { check = true; arguments = arguments[1..].clone(); continue }
+		if arguments[0] == '--require-index' {
+			if arguments.len < 3 || required_indexes.len == 4096 {
+				return error('--require-index requires a repository ID and lowercase SHA-256 digest, up to 4096 indexes')
+			}
+			required_indexes << pkgcore.ImageRepositoryIndex{ id: arguments[1], index_sha256: arguments[2] }
+			arguments = arguments[3..].clone()
+			continue
+		}
 		if arguments.len < 2 {
-			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--check] [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY] [--applications REQUIREMENTS.json | --require-app ID...] [--export-deployment NEW_FILE]')
+			return error('usage: stage.v --arch aarch64|x86_64 --staging DIR [--check] [--cc COMPILER] [--config REVIEWED_CONFIG.json] [--repositories SIGNED_BUNDLE_DIRECTORY] [--require-index ID SHA256]... [--applications REQUIREMENTS.json | --require-app ID...] [--export-deployment NEW_FILE]')
 		}
 		match arguments[0] {
 			'--arch' { architecture = arguments[1] }
@@ -100,7 +109,7 @@ fn stage() ! {
 	}
 	mut image_configuration := pkgcore.prepare_image_configuration(staging, architecture, configuration)!
 	defer { image_configuration.close() }
-	mut image_repositories := unsafe { &image_configuration }.prepare_repositories(repositories)!
+	mut image_repositories := unsafe { &image_configuration }.prepare_repositories_for_indexes(repositories, required_indexes)!
 	defer { image_repositories.close() }
 	mut image_applications := pkgcore.ImageApplications{}
 	defer { image_applications.close() }
