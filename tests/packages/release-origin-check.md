@@ -139,3 +139,36 @@ The host request log must show one index/signature pair from online refresh,
 the new runtime object requests, and two index/signature pairs from the older
 HTTPS origin used for replay controls. The offline operations use the same
 signature and sequence checks over the staged files.
+
+### Bundled HTTPS results
+
+At `782e83b78273678a4516f4896c175f1bc0e6f2fa`, both clean VJFS installs
+passed under QEMU with 2 GiB of RAM and three guest-originated shutdowns.
+AArch64 took 225.968 seconds under HVF and x86-64 took 483.731 seconds under
+TCG. Each guest made seven HTTPS requests and fetched one authenticated
+SQLite runtime object. Offline installation acquired seven release roots and
+three dependencies. The newer HTTPS index blocked an offline replay of the
+bundled index without changing configuration, cache, trust history or the
+active generation. After rollback, the final boot matched the original
+application lock and still rejected the older HTTPS sequence.
+
+The image repository, service, download recovery and activation-request
+tests passed on the host. The image repository suite also passed with
+ASan/UBSan and leak detection disabled. The real-curl HTTPS suite passed
+certificate, redirect, range recovery, bounded retry and rollback checks.
+The existing file-to-HTTPS migration check passed on the host for both target
+catalogs with the new CLI. Its output is in
+`~/.local/state/vinix/r14-bundled-https-YipJAR/migration-regression.log`.
+The guest runs used retained kernels and fixture boot media with a disposable
+TLS origin. Production publisher enrollment and public HTTPS hosting remain
+release gates.
+
+The source snapshot, signed inputs, boot media, logs and installed disks are
+archived in
+`~/.local/state/vinix/r14-bundled-https-YipJAR/qualification.tar.gz`.
+The archive SHA-256 is `00849d4901ddcddd90ece1093ea4d3c1a8cce95f3de72647ddcce0c97517d4ad`.
+Independent extraction matched all 8,804 file and symlink entries in
+`bundle.sha256`, whose SHA-256 is
+`f3af7c59e2cf0a98764ba323c9f6119f1ec7f120db2ec55b698772da49c6538f`.
+Both restored `system.vjfs.zst` images decoded to their recorded raw disk
+checksums.
