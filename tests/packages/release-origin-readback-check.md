@@ -152,3 +152,35 @@ contains the source, signed exports, request logs, preflights and static
 target builds. The independent checker verified all 2,691 sealed files.
 Archive SHA-256 is
 `3461c05aaf9734c89f9e04e9121350d416c35837ae003caf7b72fd23134fd700`.
+
+### Exact HTTPS origins in hosted pins
+
+At `6984818255d414b68f8d9d8cc548555a6e64f833`, hosted pins retain the verified
+HTTPS URL as a third field. Image staging and ISO planning compare it with
+the effective configuration before compiling or modifying the image. The
+stager accepts existing two-field rows and can read hosted and digest-only rows
+in the same file. The writer refuses batches that would exceed the staging
+reader's 8 MiB limit before contacting any origin.
+
+Production and ASan/UBSan host CLIs passed the two-publisher TLS tests with
+exact URL and digest output, reversed-input retry and all twelve refusals.
+Production readback covered all 2,158 mixed-catalog objects. On both
+architectures, the resulting pin admitted seven roots and ten locked packages.
+Changing the configured path with the bundle held fixed refused preflight.
+Normal staging and ISO planning with the two-publisher fixture also rejected
+a changed URL. Production staging with the reviewed URLs built all three
+static tools and preserved both signed exports byte for byte.
+
+The AArch64 and x86-64 QEMU TCG image-input suites passed in 200.804 and
+154.089 seconds respectively. Both ran all five programs, including mixed pin
+formats, exact trailing-slash matching, retained configuration refusal,
+restored retry and the writer's size bound. Each initiated shutdown, and all
+nine artifact sizes and digests matched per guest. HTTPS checks used loopback
+TLS on the host. Leak detection and symbolization were disabled for the
+sanitizer runs.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-hosted-origin-binding-XKI3wh/qualification.tar.gz)
+contains the source snapshot, signed exports, host checks, staging and ISO
+plans, and guest receipts. The independent checker verified all 2,679 sealed
+files. Archive SHA-256 is
+`6202d8e4f89a47d68a801273e9005c2910cf5a9d0231702bbecec5a9a5c0bbc7`.
