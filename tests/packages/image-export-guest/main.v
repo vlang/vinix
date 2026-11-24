@@ -11,16 +11,24 @@ fn C.sync()
 fn C.reboot(int) int
 fn C.usleep(u32) int
 
+const fixture_dir = '/usr/share/package-fixtures/'
+
+fn run_fixture(name string, args []string) ! {
+	mut child := os.new_process(fixture_dir + name)
+	child.set_args(args)
+	child.set_redirect_stdio_merged(); child.run()
+	output := child.stdout_slurp(); child.wait(); code := child.code; child.close()
+	print(output)
+	if code != 0 || output.contains(': fn test_') { return error(name + ' failed (' + code.str() + ')') }
+	println('IMAGE EXPORT PROCESS ' + name + ' PASS')
+}
+
 fn check() ! {
-	os.setenv('VINIX_PACKAGE_STAGE_CHECK_CLI', '/usr/share/package-fixtures/stage-check', true)
+	os.setenv('VINIX_PACKAGE_STAGE_CHECK_CLI', fixture_dir + 'stage-check', true)
 	for name in ['image-export', 'image-check', 'image-repositories', 'image-configuration', 'release', 'catalog', 'deployment', 'resolve', 'atomic-new']! {
-		mut child := os.new_process('/usr/share/package-fixtures/' + name)
-		child.set_redirect_stdio_merged(); child.run()
-		output := child.stdout_slurp(); child.wait(); code := child.code; child.close()
-		print(output)
-		if code != 0 || output.contains(': fn test_') { return error(name + ' failed (' + code.str() + ')') }
-		println('IMAGE EXPORT PROCESS ' + name + ' PASS')
+		run_fixture(name, [])!
 	}
+	run_fixture('deployment-snapshot-check', ['/tmp/offline-deployment', fixture_dir + 'vinix-package'])!
 }
 
 fn main() {

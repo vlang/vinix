@@ -7,6 +7,8 @@ import json2
 import os
 import time
 
+const image_export_timeout = 240
+
 struct ImageExportArtifact { role string bytes u64 sha256 string }
 struct ImageExportGuestReceipt { format int = 1 architecture string completed_at i64 scenario string = 'packages-image-export' seconds f64 artifacts []ImageExportArtifact }
 
@@ -28,12 +30,18 @@ fn image_export_suite() hwhost.Suite {
 			hwhost.Program{ source: 'tools/packages/pkgcore/deployment_test.v', path: 'usr/share/package-fixtures/deployment' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/resolve_search_test.v', path: 'usr/share/package-fixtures/resolve' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/atomic_new_test.v', path: 'usr/share/package-fixtures/atomic-new' },
+			hwhost.Program{ source: 'tests/packages/deployment-snapshot-check.v', path: 'usr/share/package-fixtures/deployment-snapshot-check', flags: ['-manualfree'] },
+			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/share/package-fixtures/vinix-package', flags: ['-prod', '-manualfree'] },
 		], scenarios: [hwhost.Scenario{ name: 'packages-image-export', arches: ['aarch64', 'x86_64'],
 			about: 'explicit canonical image deployment export: namespace/new-file protection, failure cleanup and ordinary reviewed offline installation',
 			required: ['HWTEST START packages-image-export',
 				'ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS',
 				'ISO OFFLINE MEDIA verification checks both signed publishers and rejects duplicate receipt pins PASS',
 				'DEPLOYMENT MEDIA SAVE preserves exact bytes, refuses digest and policy drift, and supports reviewed installation after disconnect PASS',
+				'DEPLOYMENT MEDIA CLI ordinary UID 1000 saves the exact lock from root-owned media PASS',
+				'DEPLOYMENT PIN CLI ordinary UID 1000 reviews and checks coverage without the source media PASS',
+				'DEPLOYMENT PIN CLI exact bytes across coverage, review and apply, digest substitution and omission refusal, and restored retry PASS',
+				'DEPLOYMENT MEDIA CLI imports a signed bundle, saves its lock and installs from cache after disconnect PASS',
 				'REPOSITORY MEDIA keeps HTTPS identity, checks replay and objects, caches policy-allowed payloads and installs after disconnect PASS',
 				'REPOSITORY MEDIA batch authenticates both publishers before acquisition, retains verified objects after refusal and installs from the repaired offline cache PASS',
 				'REPOSITORY MEDIA bundle discovers enrolled publishers and rejects undeclared entries, aliases and late namespace changes PASS',
@@ -66,7 +74,8 @@ fn image_export_suite() hwhost.Suite {
 				'IMAGE INPUT CHECK publish/preserve/none decisions, occupied configuration, aliased/special/shared-write/damaged bundles refuse without overwriting destinations PASS',
 				'IMAGE EXPORT PROCESS atomic-new PASS', 'IMAGE EXPORT PROCESS image-export PASS', 'IMAGE EXPORT PROCESS deployment PASS', 'IMAGE EXPORT PROCESS resolve PASS', 'IMAGE EXPORT PROCESS image-check PASS', 'IMAGE EXPORT PROCESS image-repositories PASS',
 				'IMAGE EXPORT PROCESS image-configuration PASS', 'IMAGE EXPORT PROCESS release PASS', 'IMAGE EXPORT PROCESS catalog PASS',
-				'HWTEST PASS packages-image-export'], forbidden: ['V panic:', 'HWTEST FAIL'], ending: .poweroff, timeout: 180 }]
+				'IMAGE EXPORT PROCESS deployment-snapshot-check PASS',
+			'HWTEST PASS packages-image-export'], forbidden: ['V panic:', 'HWTEST FAIL'], ending: .poweroff, timeout: image_export_timeout }]
 	}
 }
 
@@ -89,9 +98,11 @@ fn image_export_guest() !int {
 	guest := hwhost.build_program(host, repository + '/' + definition.guest, work + '/guest', 'init', definition.module_paths)!
 	root := hwhost.build_extras(host, definition, work + '/guest')!
 	mut artifacts := [image_export_artifact('kernel', work + '/kernel')!, image_export_artifact('guest-init', guest)!]
-	for name in ['stage-check', 'image-export', 'image-check', 'image-repositories', 'image-configuration', 'release', 'catalog', 'deployment', 'resolve', 'atomic-new']! { artifacts << image_export_artifact(name, root + '/usr/share/package-fixtures/' + name)! }
+	for program in definition.programs {
+		artifacts << image_export_artifact(os.file_name(program.path), root + '/' + program.path)!
+	}
 	outcome := hwhost.run_scenario(host, selection.run[0], hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,
-		state: work + '/packages-image-export', timeout: if options.timeout > 180 { options.timeout } else { 180 }, keep: true })
+		state: work + '/packages-image-export', timeout: if options.timeout > image_export_timeout { options.timeout } else { image_export_timeout }, keep: true })
 	println(hwhost.report(options.arch, outcome))
 	if outcome.interrupted { return 130 }
 	if !outcome.passed { return 1 }

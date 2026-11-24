@@ -68,11 +68,14 @@ twelve package suites, desktop cache suite, the app/export fixture under
 ASan/UBSan, real package CLI and signed CLI maintenance. Sanitizer leak detection
 is disabled. There is no whole-plan heap-retention claim.
 
-The [guest controller](image-export-runtime-check.v) builds the actual stager and
-nine assertion programs. Both targets must complete all twenty report markers,
-all nine processes and guest-initiated shutdown. Each receipt pins thirteen
-artifacts: kernel, PID 1, ten binaries and raw serial output. Structural native/
-foreign payload fixtures are installed and verified but never executed.
+The guest controller builds the real stager, production package CLI and guest
+fixtures. Both targets run the image export checks and a signed offline release
+through the package CLI. That fixture imports a signed bundle, uses UID 1000 to
+save and review the lock, and installs from cache after disconnecting the media.
+Each guest must emit every required result and initiate shutdown. The receipt
+pins the kernel, PID 1, staged programs and raw serial output. The fixtures
+install and verify structural native and foreign payloads without executing
+them. [Guest controller](image-export-runtime-check.v)
 
 ```sh
 v -o /tmp/image-export-check tests/packages/image-export-check.v
@@ -85,9 +88,11 @@ VINIX_HWTEST_TCG=1 V=/path/to/reviewed/v VFLAGS=-nocache \
   --state-dir /build/new-image-export-arm
 ```
 
-Repeat for `x86_64` with its matching kernel and a fresh state directory. List
-mode creates no guest; missing inputs and existing state paths refuse. Cross
-compiler/QEMU prerequisites follow the [hardware controller](../hardware-platform/README.md).
+Repeat for `x86_64` with its matching kernel and a fresh state directory. On
+filesystems without sparse-file support, allow space for the temporary 4 GiB
+installer disk in addition to the kernel and guest images. List mode creates
+no guest. Missing inputs and existing state paths refuse. Cross compiler and
+QEMU prerequisites follow the [hardware controller](../hardware-platform/README.md).
 
 ## Qualification, 2026-10-16
 

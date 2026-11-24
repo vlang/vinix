@@ -83,6 +83,56 @@ fn ordinary_save(binary string, root string, directory string, expected string) 
 	println('DEPLOYMENT SAVE ordinary UID 1000 saves exact root-owned installed metadata into an owned relative destination without administrator authorization PASS')
 }
 
+fn check_media_save(binary string, root string, media string, destination string, architecture string, text string, digest string) ! {
+	mut receipt := pkgprotocol.decode_deployment_media_saved(command(binary, root,
+		['--offline', '--json', 'deployment-media-save', media, destination, digest])!)!
+	defer { receipt.close() }
+	assert receipt.destination == destination && receipt.architecture == architecture
+	assert receipt.sha256 == digest && receipt.roots == 1 && receipt.packages == 3
+	assert os.read_file(destination)! == text
+}
+
+fn save_media_lock(binary string, root string, media string, directory string, architecture string, text string, digest string) !string {
+	os.mkdir(directory, mode: 0o700)!
+	destination := directory + '/release lock é; $literal.json'
+	if os.geteuid() != 0 {
+		check_media_save(binary, root, media, destination, architecture, text, digest)!
+		return destination
+	}
+	assert C.chown(directory.str, 1000, 1000) == 0
+	child := C.fork()
+	if child < 0 { return error('cannot fork ordinary media saver') }
+	if child == 0 {
+		assert C.setgroups(0, unsafe { nil }) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0
+		check_media_save(binary, root, media, destination, architecture, text, digest) or { eprintln(err); C._exit(1) }
+		flush_stdout(); C._exit(0)
+	}
+	mut status := i32(0)
+	assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
+	assert os.read_file(destination)! == text
+	println('DEPLOYMENT MEDIA CLI ordinary UID 1000 saves the exact lock from root-owned media PASS')
+	return destination
+}
+
+fn ordinary_pinned_review(binary string, root string, path string, digest string, fingerprint string) ! {
+	if os.geteuid() != 0 { return }
+	child := C.fork()
+	if child < 0 { return error('cannot fork ordinary release reviewer') }
+	if child == 0 {
+		assert C.setgroups(0, unsafe { nil }) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0
+		mut review := pkgprotocol.decode_review(command(binary, root, ['--offline', 'deployment-add-review', path, digest])!)!
+		assert review.fingerprint == fingerprint
+		review.close()
+		mut audit := pkgprotocol.decode_deployment_audit(command_status(binary, root, ['--offline', '--json', 'deployment-add-audit', path, digest], 3)!)!
+		assert audit.deployment_sha256 == digest && audit.rows.all(it.status == 'missing')
+		audit.close()
+		C._exit(0)
+	}
+	mut status := i32(0)
+	assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
+	println('DEPLOYMENT PIN CLI ordinary UID 1000 reviews and checks coverage without the source media PASS')
+}
+
 fn check_pinned_additions(binary string, root string, path string, text string, digest string) ! {
 	before := command(binary, root, ['deployment-snapshot'])!
 	mut unpinned := pkgprotocol.decode_review(command(binary, root, ['deployment-add-review', path])!)!
@@ -90,6 +140,7 @@ fn check_pinned_additions(binary string, root string, path string, text string, 
 	mut pinned := pkgprotocol.decode_review(command(binary, root, ['--offline', 'deployment-add-review', path, digest])!)!
 	defer { pinned.close() }
 	assert pinned.fingerprint != unpinned.fingerprint && pinned.operation == 'deploy-add'
+	ordinary_pinned_review(binary, root, path, digest, pinned.fingerprint)!
 	assert command_status(binary, root, ['deployment-add-apply', pinned.fingerprint, path], 1)!.contains('review is stale')
 	assert command_status(binary, root, ['deployment-add-apply', unpinned.fingerprint, path, digest], 1)!.contains('review is stale')
 	mut audit := pkgprotocol.decode_deployment_audit(command_status(binary, root, ['--offline', '--json', 'deployment-add-audit', path, digest], 3)!)!
@@ -202,15 +253,28 @@ fn check() ! {
 	// Restore the archived manifests in a newly signed catalog. Snapshot metadata
 	// alone cannot supply trust or payloads to a new machine.
 	for index, id in ['app', 'runtime'] { os.write_file(work + '/repository/manifests/' + id + '-' + architecture + '-1.0.0.json', old_manifests[index])! }
-	pkgcore.publish_release(work + '/repository', 'trusted', work + '/seed', 3, time.now().unix() + 3600, work + '/approved-media')!
+	media := work + '/approved-media'
+	os.mkdir(media, mode: 0o755)!
+	pkgcore.publish_release(work + '/repository', 'trusted', work + '/seed', 3, time.now().unix() + 3600, media + '/trusted')!
+	media_deployment := media + '/' + pkgprotocol.deployment_mirror_filename
+	os.write_file(media_deployment, first)!
+	os.chmod(media_deployment, 0o644)!
 	consumer := work + '/consumer'; os.mkdir_all(consumer + '/etc/vinix-packages')!
-	os.write_file(consumer + '/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ ...config,
-		repositories: [pkgcore.Repository{ ...config.repositories[0], url: 'file://' + work + '/approved-media' }] }))!
+	consumer_config := consumer + '/etc/vinix-packages/config.json'
+	consumer_config_text := json2.encode(pkgcore.Config{ ...config,
+		repositories: [pkgcore.Repository{ ...config.repositories[0], url: 'https://release.example.invalid/trusted' }] })
+	os.write_file(consumer_config, consumer_config_text)!
 	mut absent := pkgprotocol.decode_deployment_audit(audit_command(binary, consumer, path, false)!)!; defer { absent.close() }
 	assert absent.generation == 0 && absent.rows.len == 3 && absent.rows.all(it.status == 'missing')
 	assert !os.exists(consumer + '/var')
-	command(binary, consumer, ['update'])!
-	check_pinned_additions(binary, consumer, path, first, saved.sha256)!
+	command(binary, consumer, ['update-media', media])!
+	assert os.read_file(consumer_config)! == consumer_config_text
+	local_lock := save_media_lock(binary, consumer, media, work + '/saved-release', architecture, first, saved.sha256)!
+	os.rename(media, work + '/disconnected-media')!
+	assert !os.exists(media)
+	check_pinned_additions(binary, consumer, local_lock, first, saved.sha256)!
+	command(binary, consumer, ['--offline', 'verify'])!
+	println('DEPLOYMENT MEDIA CLI imports a signed bundle, saves its lock and installs from cache after disconnect PASS')
 	mut review := pkgprotocol.decode_review(command(binary, consumer, ['deployment-review', path])!)!; defer { review.close() }
 	assert review.rows.all(it.version == '1.0.0') && review.rows.len == 3
 	command(binary, consumer, ['deployment-apply', review.fingerprint, path])!
