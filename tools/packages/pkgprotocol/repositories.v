@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgprotocol
 
+import crypto.sha256
+
+const repository_refresh_domain = 'vinix-package repository refresh 1'
+
 pub struct Repository {
 pub:
 	id         string
@@ -52,6 +56,23 @@ pub fn validate_repository(id string, url string, public_key string) ! {
 	if !digest(public_key) {
 		return error('Enter the 64-character lowercase hexadecimal publisher key obtained through a trusted channel.')
 	}
+}
+
+// Hash the literal fields of a validated repository. Validated fields exclude
+// newlines, so each is delimited without normalizing the URL or key.
+pub fn repository_refresh_fingerprint(repository Repository) string {
+	mut bytes := []u8{cap: repository_refresh_domain.len + repository.id.len + repository.url.len + repository.public_key.len + 4}
+	defer { unsafe { bytes.free() } }
+	for part in [repository_refresh_domain, repository.id, repository.url, repository.public_key]! {
+		for byte in part { bytes << byte }
+		bytes << `\n`
+	}
+	mut hash := sha256.new()
+	mut digest := []u8{len: sha256.size}
+	defer { unsafe { hash.free(); free(hash); digest.free() } }
+	hash.write(bytes) or { panic(err) }
+	hash.checksum_into(mut digest)
+	return digest.hex()
 }
 
 

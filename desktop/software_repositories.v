@@ -258,13 +258,17 @@ fn (mut a SoftwareApp) load_repository_review() {
 }
 
 fn (mut a SoftwareApp) refresh_after_enrollment() {
-	// The accepted enrollment command ends in ID, URL and key. Copy the ID
-	// before retiring its worker so the follow-up uses the approved source.
-	id := a.worker.args[a.worker.args.len - 3].clone()
-	defer { unsafe { id.free() } }
+	// The accepted enrollment command ends in ID, URL and key. Bind the
+	// follow-up to these exact arguments before retiring the worker.
+	offset := a.worker.args.len - 3
+	id := a.worker.args[offset].clone()
+	fingerprint := pkgprotocol.repository_refresh_fingerprint(pkgprotocol.Repository{
+		id: id, url: a.worker.args[offset + 1], public_key: a.worker.args[offset + 2]
+	})
+	defer { unsafe { id.free(); fingerprint.free() } }
 	a.retire_worker()
 	a.clear_admin_prompt()
-	a.start(['update', id], false)
+	a.start(['update', id, fingerprint], false)
 	if a.worker == unsafe { nil } {
 		message := 'Repository trust was saved, but its catalog refresh could not start. ' + a.status
 		a.set_status(message)
@@ -342,7 +346,9 @@ fn (mut a SoftwareApp) handle_repositories(event_id string) {
 			if id == '' { return }
 			a.repository_focus = 0
 			a.select_all = false
-			a.start(['update', id], false)
+			fingerprint := pkgprotocol.repository_refresh_fingerprint(a.repository_status.repositories[a.repository_selected])
+			a.start(['update', id, fingerprint], false)
+			unsafe { fingerprint.free() }
 			if a.worker != unsafe { nil } { a.repository_worker = .targeted_refresh }
 		}
 		'software.offline' {

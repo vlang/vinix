@@ -87,3 +87,15 @@ fn test_repository_status_bounds_and_identity_validation() {
 		assert false
 	}
 }
+
+fn test_repository_refresh_fingerprint_binds_literal_fields() {
+	repository := Repository{ id: 'fixture', url: 'file:///media/repository with spaces; $literal',
+		public_key: 'a'.repeat(64) }
+	fingerprint := repository_refresh_fingerprint(repository)
+	assert fingerprint == 'ee38d08b041945eff64139770a34c09a287a15f72ca2103ff315227787a8b0ee'
+	for changed in [Repository{ ...repository, id: 'other' },
+		Repository{ ...repository, url: 'file:///media/repository%20with%20spaces; $literal' },
+		Repository{ ...repository, public_key: 'b'.repeat(64) }] {
+		assert repository_refresh_fingerprint(changed) != fingerprint
+	}
+}

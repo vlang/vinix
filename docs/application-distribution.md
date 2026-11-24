@@ -635,11 +635,13 @@ vinix-package repo-revoke company
 Software's **Repositories** screen offers the same administration workflow.
 Select an enrolled repository and choose **Refresh selected** to fetch its
 signed index. **Go offline** uses the selected repository's local source or
-bundled copy, while **Use policy** uses the configured access policy. The
-refresh requires administrator approval. Other repositories keep their
-authenticated cached indexes and must pass the current signature, expiry and
-replay checks. Use the main catalog's **Refresh** to fetch all configured
-indexes. In a compact window, enlarge the Repositories pane to select a source.
+bundled copy, while **Use policy** uses the configured access policy. Refresh
+requires administrator approval and checks that the displayed URL and publisher
+key still match. Reload the list if the identity changed. Other repositories
+keep their authenticated cached indexes and must pass the current signature,
+expiry and replay checks. Use the main catalog's **Refresh** to fetch all
+configured indexes. In a compact window, enlarge the Repositories pane to
+select a source.
 
 Select an existing repository or enter its ID, HTTPS/local source URL and public
 key. **Review trust** verifies the signed catalog without enabling trust, then

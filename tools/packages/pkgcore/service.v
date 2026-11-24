@@ -28,23 +28,44 @@ fn (service Service) configuration() !Config {
 }
 
 pub fn (service Service) refresh() !Catalog {
-	return service.refresh_selected('')
+	return service.refresh_selected('', '')
 }
 
 // Refresh one configured source. Every other source must have a current,
 // authenticated snapshot for its exact configured identity.
 pub fn (service Service) refresh_repository(id string) !Catalog {
 	if !identifier(id) { return error('invalid repository ID') }
-	return service.refresh_selected(id)
+	return service.refresh_selected(id, '')
 }
 
-fn (service Service) refresh_selected(id string) !Catalog {
+// Refuse a different URL or key for a previously displayed repository ID.
+pub fn (service Service) refresh_repository_with_identity(id string, fingerprint string) !Catalog {
+	if !identifier(id) { return error('invalid repository ID') }
+	if !digest_valid(fingerprint) { return error('invalid repository identity fingerprint') }
+	return service.refresh_selected(id, fingerprint)
+}
+
+fn check_repository_refresh_identity(config Config, id string, fingerprint string) ! {
+	for repository in config.repositories {
+		if repository.id != id { continue }
+		actual := pkgprotocol.repository_refresh_fingerprint(pkgprotocol.Repository{
+			id: repository.id, url: repository.url, public_key: repository.public_key
+		})
+		defer { free_owned_string(actual) }
+		if actual == fingerprint { return }
+		break
+	}
+	return error('${id}: repository identity changed; reload the repository list and review the current URL and publisher key')
+}
+
+fn (service Service) refresh_selected(id string, fingerprint string) !Catalog {
 	directory := service.directory()!
 	defer { unsafe { directory.free() } }
 	guard := acquire(directory)!
 	defer { guard.release() }
 	config := service.configuration()!
 	defer { close_decoded_configuration(config) }
+	if fingerprint != '' { check_repository_refresh_identity(config, id, fingerprint)! }
 	return refresh_progress(config, directory, id, service.progress)
 }
 

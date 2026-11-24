@@ -12,7 +12,7 @@ import tools.packages.audiopcm
 
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  capabilities (read-only JSON supported interface versions)\n' +
-	'  update [REPOSITORY_ID] | search [QUERY] | info ID | list | status | updates | view\n' +
+	'  update [REPOSITORY_ID [IDENTITY_SHA256]] | search [QUERY] | info ID | list | status | updates | view\n' +
 	'  admin [--progress] [--offline] update|apply|cleanup-apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
 	'  install ID... | remove ID... | upgrade | repair | rollback | gc | verify | health\n' +
 	'  cleanup-review | cleanup-apply REVIEW_FINGERPRINT (obsolete generations only)\n' +
@@ -437,8 +437,12 @@ fn checked(arguments []string) !int {
 			println('Revoked repository ${names[0]}; installed payloads and personal data were retained for inspection/removal. Trust history was retained.')
 		}
 		'update' {
-			if names.len > 1 { return error('update takes at most one repository ID') }
-			mut catalog := if names.len == 1 { service.refresh_repository(names[0])! } else { service.refresh()! }
+			mut catalog := match names.len {
+				0 { service.refresh()! }
+				1 { service.refresh_repository(names[0])! }
+				2 { service.refresh_repository_with_identity(names[0], names[1])! }
+				else { return error('update takes a repository ID and optional identity fingerprint') }
+			}
 			catalog.close()
 		}
 		'view', 'search', 'info', 'updates' {

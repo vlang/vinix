@@ -48,7 +48,8 @@ pub fn validate_arguments(arguments []string) ! {
 	command := args[0]
 	if command == 'update' {
 		if args.len == 1 || (args.len == 2 && identifier(args[1])) { return }
-		return error('administrator update takes at most one repository ID')
+		if args.len == 3 && identifier(args[1]) && hex(args[2], 64) { return }
+		return error('administrator update takes a repository ID and optional identity fingerprint')
 	}
 	if args.len < 2 || !hex(args[1], 64) { return error('administrator package changes require their exact review fingerprint') }
 	match command {

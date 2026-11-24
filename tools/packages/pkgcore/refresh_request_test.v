@@ -207,8 +207,28 @@ fn test_targeted_refresh_keeps_authenticated_unselected_repositories() {
 		if _ := offline.refresh() { assert false }
 		else { assert err.msg().contains('offline mode') }
 		assert !os.exists(history)
+		fingerprint := pkgprotocol.repository_refresh_fingerprint(pkgprotocol.Repository{
+			id: local.id, url: local.url, public_key: local.public_key
+		})
+		cached := os.read_file(cache)!
+		for repositories in [[Repository{ ...local, url: local.url + '-new' }, remote],
+			[Repository{ ...local, public_key: 'b'.repeat(64) }, remote], [remote]] {
+			save_configuration(config_path, Config{ architecture: arch, repositories: repositories })!
+			guarded := Service{ ...offline, progress: fn (_ pkgprotocol.Progress) {
+				panic('a changed repository identity must refuse before reporting any fetch progress')
+			} }
+			if _ := guarded.refresh_repository_with_identity(local.id, fingerprint) {
+				assert false, 'refresh accepted different configured trust'
+			} else {
+				assert err.msg().contains('repository identity changed')
+			}
+			assert os.read_file(cache)! == cached && !os.exists(history) && !os.exists(directory + '/refresh')
+		}
+		save_configuration(config_path, Config{ architecture: arch, repositories: [local, remote] })!
+		if _ := offline.refresh_repository_with_identity(local.id, 'broken') { assert false }
+		else { assert err.msg().contains('invalid repository identity fingerprint') }
 		for _ in 0 .. 2 {
-			mut catalog := offline.refresh_repository('local')!
+			mut catalog := offline.refresh_repository_with_identity(local.id, fingerprint)!
 			assert catalog.packages.len == 2 && catalog.packages[0].sequence == 2 && catalog.packages[1].sequence == 7
 			catalog.close()
 		}

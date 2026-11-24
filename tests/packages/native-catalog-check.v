@@ -392,7 +392,8 @@ fn check() !int {
 				...if targeted_refresh {
 					['SOFTWARE IMAGE selected refresh approval advanced field and retained HTTPS catalog and installed generation PASS']
 				} else if enrollment_refresh {
-					['SOFTWARE IMAGE separate enrollment and selected refresh approvals retained HTTPS catalog and installed generation PASS']
+					['SOFTWARE IMAGE separate enrollment and selected refresh approvals retained HTTPS catalog and installed generation PASS',
+						'SOFTWARE IMAGE stale selected URL or key refused before metadata fetch or publication PASS']
 				} else { []string{} }] }
 		} else { selection.run[0] }
 	outcome := hwhost.run_scenario(host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,

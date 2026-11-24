@@ -22,6 +22,12 @@ fn repository_recovery_configuration(id string) pkgprotocol.RepositoryConfigurat
 		repositories: [pkgprotocol.Repository{ id: id, url: repository_recovery_url, public_key: repository_recovery_key }] }
 }
 
+fn repository_recovery_fingerprint(id string) string {
+	return pkgprotocol.repository_refresh_fingerprint(pkgprotocol.Repository{
+		id: id, url: repository_recovery_url, public_key: repository_recovery_key
+	})
+}
+
 fn repository_recovery_approve_child() ! {
 	mut password := [2]u8{}
 	repository_recovery_require(C.read(0, unsafe { &password[0] }, password.len) == password.len
@@ -42,7 +48,7 @@ fn repository_enrollment_refresh_service(args []string, mode string) ! {
 		println('fixture: trust saved')
 		return
 	}
-	if args == ['admin', '--progress', '--offline', 'update', 'draft'] {
+	if args == ['admin', '--progress', '--offline', 'update', 'draft', repository_recovery_fingerprint('draft')] {
 		repository_recovery_approve_child()!
 		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
 		if mode == 'enrollment-refresh-failed' {
@@ -72,14 +78,15 @@ fn repository_recovery_service(args []string) !bool {
 		return true
 	}
 	if mode == 'targeted-approved' {
-		repository_recovery_require(args[1..] == ['admin', '--progress', '--offline', 'update', 'field'],
+		repository_recovery_require(args[1..] == ['admin', '--progress', '--offline', 'update', 'field', repository_recovery_fingerprint('field')],
 			'wrong administrator refresh arguments')!
 		repository_recovery_approve_child()!
 		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
 		return true
 	}
 	if mode == 'targeted-failed' {
-		repository_recovery_require(args[1..] == ['--progress', 'update', 'field'], 'wrong direct refresh arguments')!
+		repository_recovery_require(args[1..] == ['--progress', 'update', 'field', repository_recovery_fingerprint('field')],
+			'wrong direct refresh arguments')!
 		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
 		flush_stdout()
 		mut release := u8(0)
@@ -386,7 +393,7 @@ fn repository_targeted_refresh() ! {
 	os.setenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY', 'targeted-approved', true)
 	repository_recovery_activate(mut app, action, const_width, const_height)!
 	repository_recovery_require(app.admin_prompt && app.repository_worker == .targeted_refresh
-		&& app.worker.args == ['admin', '--progress', '--offline', 'update', 'field'],
+		&& app.worker.args == ['admin', '--progress', '--offline', 'update', 'field', repository_recovery_fingerprint('field')],
 		'selected offline refresh did not ask for the exact administrator action')!
 	pid := app.worker.pid
 	repository_recovery_activate(mut app, 'software.admin.cancel', const_width, const_height)!
@@ -416,7 +423,8 @@ fn repository_targeted_refresh() ! {
 	}
 	app.key_input('\x1b')
 	repository_recovery_require(app.repository_mode && !app.offline_requested && app.worker.is_alive()
-		&& app.worker.args == ['--progress', 'update', 'field'], 'active refresh allowed navigation or argument changes')!
+		&& app.worker.args == ['--progress', 'update', 'field', repository_recovery_fingerprint('field')],
+		'active refresh allowed navigation or argument changes')!
 	repository_recovery_require(C.write(app.worker.stdio_fd[0], c'x', 1) == 1, 'cannot release targeted refresh child')!
 	repository_recovery_wait(mut app, 0)!
 	repository_recovery_require(app.status.contains('no authenticated cached index')
@@ -460,7 +468,7 @@ fn repository_refresh_after_enrollment() ! {
 			time.sleep(time.millisecond)
 		}
 		repository_recovery_require(app.worker != unsafe { nil } && app.repository_worker == .refresh && app.admin_prompt
-			&& app.worker.args == ['admin', '--progress', '--offline', 'update', 'draft']
+			&& app.worker.args == ['admin', '--progress', '--offline', 'update', 'draft', repository_recovery_fingerprint('draft')]
 			&& app.status.contains('trust was saved') && app.status.contains('Enter your administrator password')
 			&& app.admin_password_len == 0, 'enrollment did not request independent approval for the reviewed repository')!
 		if outcome == 'cancel' {

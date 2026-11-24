@@ -137,7 +137,8 @@ fn image_enroll_and_refresh(mut app SoftwareApp, password string) ! {
 		time.sleep(5 * time.millisecond)
 	}
 	assert app.admin_prompt && app.repository_worker == .refresh, app.status
-	assert app.worker.args == ['admin', '--progress', '--offline', 'update', repository.id]
+	assert app.worker.args == ['admin', '--progress', '--offline', 'update', repository.id,
+		pkgprotocol.repository_refresh_fingerprint(repository)]
 	assert app.status.contains('trust was saved') && app.admin_password_len == 0
 	image_approve(mut app, password)!
 	assert app.status == 'Repository trusted and its catalog refreshed.' && app.repository_mode
@@ -379,7 +380,9 @@ fn image_run() ! {
 		assert app.selected_repository_refresh_id() == 'field'
 		image_control(mut app, 'software.offline')!
 		image_control(mut app, 'software.repository.refresh')!
-		assert app.admin_prompt && app.worker.args == ['admin', '--progress', '--offline', 'update', 'field']
+		field := app.repository_status.repositories[app.repository_selected]
+		assert app.admin_prompt && app.worker.args == ['admin', '--progress', '--offline', 'update', 'field',
+			pkgprotocol.repository_refresh_fingerprint(field)]
 		observed_progress := image_approve(mut app, password)!
 		assert observed_progress && app.status == 'Selected repository refreshed.' && app.repository_mode
 		image_control(mut app, 'software.repository.back')!

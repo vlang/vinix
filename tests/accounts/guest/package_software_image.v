@@ -7,6 +7,7 @@ import json2
 import os
 import sessioncore
 import tools.packages.pkgcore
+import tools.packages.pkgprotocol
 
 fn image_targeted_refresh(mut t Test, db accountcore.Database, alex accountcore.User, bundle string) ! {
 	directory := pkgcore.state_directory('')
@@ -68,7 +69,23 @@ fn image_enrollment_refresh(mut t Test, db accountcore.Database, alex accountcor
 	assert json2.decode[pkgcore.TrustHistory](os.read_file(history_path)!)!.repositories == [floor, ...history.repositories]
 	assert os.read_file(directory + '/current/state.json')! == active && os.readlink(directory + '/current')! == generation
 	assert os.read_file(log)!.count(approval) == count + 2
+	config_path := '/etc/vinix-packages/config.json'
+	configuration := os.read_file(config_path)!
+	saved_catalog := os.read_file(directory + '/catalog.json')!
+	saved_history := os.read_file(history_path)!
+	displayed := pkgprotocol.Repository{ id: repository.id, url: repository.url, public_key: repository.public_key }
+	for stale in [pkgprotocol.Repository{ ...displayed, url: displayed.url + '-previous' },
+		pkgprotocol.Repository{ ...displayed, public_key: config.repositories[0].public_key }] {
+		refusal := run(['/usr/bin/vinix-package', '--progress', '--offline', 'update', repository.id,
+			pkgprotocol.repository_refresh_fingerprint(stale)], '', none, none)
+		assert refusal.status == 1 && refusal.output.contains('repository identity changed'), refusal.output
+		assert !refusal.output.contains(pkgprotocol.progress_prefix) && !os.exists(directory + '/refresh')
+		assert os.read_file(config_path)! == configuration
+		assert os.read_file(directory + '/catalog.json')! == saved_catalog && os.read_file(history_path)! == saved_history
+		assert os.read_file(directory + '/current/state.json')! == active
+	}
 	os.rename(bundle + '-paused', bundle)!
+	t.say('SOFTWARE IMAGE stale selected URL or key refused before metadata fetch or publication PASS')
 	t.say('SOFTWARE IMAGE separate enrollment and selected refresh approvals retained HTTPS catalog and installed generation PASS')
 }
 

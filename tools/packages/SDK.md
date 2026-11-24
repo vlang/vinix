@@ -457,6 +457,16 @@ vinix-package --offline update field
 vinix-package admin --offline update field
 ```
 
+To bind the command to a previously displayed repository, supply its identity
+fingerprint as the second operand after `update field`. Use
+`pkgprotocol.repository_refresh_fingerprint` or compute lowercase SHA-256
+over these UTF-8 lines, each followed by a newline. The first line is
+`vinix-package repository refresh 1`, followed by the literal repository ID,
+URL and publisher key. The service checks the fingerprint under the writer
+lock and refuses a changed or removed identity before fetching metadata.
+Software uses this form for **Refresh selected** and the refresh after
+enrollment.
+
 Every other configured repository must already have an authenticated cached
 index for its exact configured URL and publisher key. A missing, expired,
 invalid or replayed index prevents publication of the combined catalog.
