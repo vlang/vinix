@@ -22,7 +22,7 @@ pub fn (mut info ReleaseOriginInfo) close() {
 // Verify the publisher's complete local export without contacting its origin.
 pub fn check_release_export(directory string, id string, public_key string) !ReleaseInfo {
 	if !identifier(id) { return error('invalid release repository ID') }
-	return check_signed_release(directory, id, public_key, '', -1)
+	return check_signed_release(directory, id, public_key, '', -1, none)
 }
 
 fn valid_release_origin(url string) bool {
@@ -36,11 +36,11 @@ pub fn check_release_origin(directory string, id string, public_key string, url 
 	if !valid_release_origin(url) {
 		return error('release origin requires a valid HTTPS repository URL')
 	}
-	release := check_signed_release(directory, id, public_key, url, -1)!
+	release := check_signed_release(directory, id, public_key, url, -1, none)!
 	return ReleaseOriginInfo{ url: url.clone(), release: release }
 }
 
-fn check_signed_release(directory string, id string, public_key string, url string, pin_parent_fd int) !ReleaseInfo {
+fn check_signed_release(directory string, id string, public_key string, url string, pin_parent_fd int, media_pin ?&IsoOfflinePublisher) !ReleaseInfo {
 	path := publisher_path(directory)!
 	defer { unsafe { path.free() } }
 	fd := capture_prepared_root(path, 'signed release export')!
@@ -68,6 +68,9 @@ fn check_signed_release(directory string, id string, public_key string, url stri
 	}
 	text := read_metadata(index_path)!
 	defer { unsafe { text.free() } }
+	digest := index_digest(text)
+	mut accepted := false
+	defer { if !accepted { unsafe { digest.free() } } }
 	signature := read_metadata(signature_path)!
 	defer { unsafe { signature.free() } }
 	index := verify_index(Repository{ id: id, public_key: public_key }, text, signature, time.now().unix())!
@@ -76,6 +79,19 @@ fn check_signed_release(directory string, id string, public_key string, url stri
 	defer { unsafe { trimmed.free() } }
 	objects := signed_release_objects(index, 0)!
 	defer { unsafe { objects.free() } }
+	if pin := media_pin {
+		if digest != pin.index_sha256 || index.sequence != pin.sequence {
+			return error('offline repository index differs from the ISO package receipt: ${id}')
+		}
+		mut bytes := u64(0)
+		for _, object in objects {
+			if object.bytes > ~u64(0) - bytes { return error('offline repository payload sizes overflow: ${id}') }
+			bytes += object.bytes
+		}
+		if bytes != pin.payload_bytes {
+			return error('offline repository payload bytes differ from the ISO package receipt: ${id}')
+		}
+	}
 	release_closures(index, public_key)!
 	verify_release_stage(release, text, trimmed, objects, true)!
 	if url != '' {
@@ -93,10 +109,11 @@ fn check_signed_release(directory string, id string, public_key string, url stri
 	if index.expires <= time.now().unix() {
 		return error('signed release expired during verification')
 	}
+	accepted = true
 	return ReleaseInfo{
 		repository:    id.clone()
 		public_key:    public_key.clone()
-		index_sha256:  index_digest(text)
+		index_sha256:  digest
 		directory:     release.clone()
 		sequence:      index.sequence
 		expires:       index.expires

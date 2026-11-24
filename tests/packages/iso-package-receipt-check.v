@@ -535,6 +535,7 @@ fn check_offline_export(tool string, iso string, receipt string, work string, ex
 	wrong_digest, message := command([tool, 'export-offline', iso, bad_receipt, missing])
 	assert wrong_digest == 1 && message.contains('ISO SHA-256 differs') && !os.exists(missing)
 	assert !os.ls(work)!.any(it.starts_with('.vinix-iso-offline-'))
+	check_verified_media(tool, media, receipt, work, repository.id, objects[0])!
 
 	// Exercise the copied media from an empty store with only the original key
 	// and the new local URL. Local enrollment and deployment each need a review.
@@ -556,6 +557,81 @@ fn check_offline_export(tool string, iso string, receipt string, work string, ex
 	defer { installed.close() }
 	assert installed.requested == expected.requested && installed.packages == expected.packages
 	println('ISO offline media preserves signed repositories and lock, refuses replacements and restores through reviewed enrollment and deployment on a clean offline root PASS')
+}
+
+fn refuse_offline_verification(tool string, directory string, receipt string, diagnostic string) ! {
+	code, output := command([tool, 'verify-offline', directory, receipt])
+	if code != 1 || !output.contains(diagnostic) {
+		return error('unexpected offline media verification result: ' + output)
+	}
+}
+
+fn check_verified_media(tool string, media string, receipt string, work string, publisher string, object string) ! {
+	copy := work + '/copied-media'
+	checked(['cp', '-Rp', media, copy])!
+	args := [tool, 'verify-offline', copy, receipt]
+	code, output := command(args)
+	os.write_file(work + '/offline-media-verification.json', output)!
+	if code != 0 { return error('copied offline media verification failed: ' + output) }
+	printed := json2.decode[json2.Any](output)!.as_map()
+	source := os.read_file(receipt)!
+	expected := json2.decode[json2.Any](source)!.as_map()
+	assert printed['format']!.int() == 1 && printed['directory']!.str() == copy
+	for field in ['iso_sha256', 'architecture', 'deployment_sha256'] {
+		assert printed[field]!.str() == expected[field]!.str()
+	}
+	assert printed['applications']!.as_array().map(it.str()) == expected['applications']!.as_array().map(it.str())
+	assert printed['repositories']!.as_array().map(it.str()) == [publisher]
+
+	deployment := copy + '/' + pkgprotocol.deployment_mirror_filename
+	text := os.read_file(deployment)!
+	os.write_file(deployment, text + ' ')!
+	refuse_offline_verification(tool, copy, receipt, 'release lock differs')!
+	os.write_file(deployment, text)!
+	path := copy + '/' + publisher + '/objects/' + object
+	mut bytes := os.read_bytes(path)!
+	if bytes.len == 0 { bytes << u8(1) } else { bytes[0] ^= 1 }
+	os.write_file_array(path, bytes)!
+	refuse_offline_verification(tool, copy, receipt, 'export payload changed')!
+	os.rm(path)!
+	refuse_offline_verification(tool, copy, receipt, 'missing entries')!
+	os.symlink(media + '/' + publisher + '/objects/' + object, path)!
+	refuse_offline_verification(tool, copy, receipt, 'ordinary single-link file')!
+	os.rm(path)!
+	os.cp(media + '/' + publisher + '/objects/' + object, path)!
+	os.chmod(path, 0o644)!
+	signature := copy + '/' + publisher + '/index.sig'
+	signed := os.read_file(signature)!
+	os.write_file(signature, '0'.repeat(128) + '\n')!
+	refuse_offline_verification(tool, copy, receipt, 'signature')!
+	os.write_file(signature, signed)!
+	os.write_file(copy + '/unreviewed', 'extra entry')!
+	refuse_offline_verification(tool, copy, receipt, 'unexpected export entry')!
+	os.rm(copy + '/unreviewed')!
+	alias := work + '/offline-media-alias'
+	os.symlink(copy, alias)!
+	refuse_offline_verification(tool, alias + '/', receipt, 'ordinary directory')!
+
+	changed := work + '/offline-verification-changed-receipt.json'
+	index := expected['publishers']!.as_array()[0]!.as_map()
+	digest := index['index_sha256']!.str()
+	os.write_file(changed, source.replace(digest, '0'.repeat(64)))!
+	refuse_offline_verification(tool, copy, changed, 'index differs from the ISO package receipt')!
+	sequence := index['sequence']!.u64()
+	os.write_file(changed, source.replace('"sequence":${sequence}', '"sequence":${sequence + 1}'))!
+	refuse_offline_verification(tool, copy, changed, 'index differs from the ISO package receipt')!
+	payload_bytes := index['payload_bytes']!.u64()
+	os.write_file(changed, source.replace('"payload_bytes":${payload_bytes}', '"payload_bytes":${payload_bytes + 1}'))!
+	refuse_offline_verification(tool, copy, changed, 'payload bytes differ from the ISO package receipt')!
+	root := expected['applications']!.as_array()[0]!.str()
+	os.write_file(changed, source.replace('"${root}"', '"unreviewed-root"'))!
+	refuse_offline_verification(tool, copy, changed, 'application declaration differs from the ISO package receipt')!
+	refused, usage := command([tool, 'verify-offline', copy])
+	assert refused == 1 && usage.contains('usage: package-receipt verify-offline')
+	retry, resulting := command(args)
+	assert retry == 0 && resulting == output
+	checked(['diff', '-r', media, copy])!
+	println('ISO offline verification admits exact copied media and refuses namespace, payload, deployment and receipt drift PASS')
 }
 
 fn run() ! {

@@ -107,8 +107,20 @@ fn test_iso_offline_media_exclusive_publication_retires_stages_and_preserves_out
 	for id in ['native', 'organization']! {
 		assert os.read_file(destination + '/' + id + '/index.json')! == os.read_file(work + '/bundle/' + id + '/index.json')!
 	}
+	report := json2.decode[ImageInputCheck](applications.report())!
+	pins := report.bundled_repositories.map(IsoOfflinePublisher{ id: it.id, public_key: key,
+		sequence: it.sequence, index_sha256: it.index_sha256, payload_bytes: it.payload_bytes })
+	verify_iso_offline_media(destination, 'aarch64', ['editor', 'modern'],
+		report.image_application_deployment_sha256, pins)!
+	refused = false
+	verify_iso_offline_media(destination, 'aarch64', ['editor', 'modern'],
+		report.image_application_deployment_sha256, [pins[0], pins[0]]) or {
+		refused = err.msg().contains('duplicate publisher pin')
+	}
+	assert refused
 	assert os.ls(root)!.len == 0
 	println('ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS')
+	println('ISO OFFLINE MEDIA verification checks both signed publishers and rejects duplicate receipt pins PASS')
 }
 
 fn test_image_catalog_refuses_identical_replaced_capture_before_report_and_declaration() {

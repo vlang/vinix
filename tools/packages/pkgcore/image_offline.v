@@ -2,7 +2,73 @@
 module pkgcore
 
 import os
+import time
 import tools.packages.pkgprotocol
+
+pub struct IsoOfflinePublisher {
+pub:
+	id string
+	public_key string
+	sequence u64
+	index_sha256 string
+	payload_bytes u64
+	reviewed_origin string @[omitempty]
+}
+
+// Verify a mode-preserving copy of exported media against the trusted ISO
+// receipt's application and publisher pins. This does not need an ISO copy,
+// package state, private scratch storage, or the repository origin.
+pub fn verify_iso_offline_media(directory string, architecture string, applications []string, deployment_sha256 string, publishers []IsoOfflinePublisher) ! {
+	if publishers.len == 0 || publishers.len > max_image_repository_indexes {
+		return error('offline media verification requires bundled publishers in the ISO package receipt')
+	}
+	mut entries := {pkgprotocol.deployment_mirror_filename: u64(0)}
+	defer { unsafe { entries.free() } }
+	for publisher in publishers {
+		if !identifier(publisher.id) || publisher.id in entries || publisher.sequence == 0
+			|| !digest_valid(publisher.index_sha256) {
+			return error('invalid or duplicate publisher pin in the ISO package receipt')
+		}
+		entries[publisher.id] = 0
+	}
+	path := publisher_path(directory)!
+	defer { unsafe { path.free() } }
+	fd := capture_prepared_root(path, 'ISO offline media')!
+	defer { C.close(fd) }
+	root := publisher_real_path(path)!
+	defer { unsafe { root.free() } }
+	check_offline_media_root(root, fd, entries)!
+	lock_path := os.join_path(root, pkgprotocol.deployment_mirror_filename)
+	defer { unsafe { lock_path.free() } }
+	export_stage_file(lock_path)!
+	deployment := read_release_lock_matching_digest(lock_path, deployment_sha256)!
+	defer { unsafe { deployment.free() } }
+	mut document := decode_deployment(deployment, architecture)!
+	defer { document.close() }
+	if document.format != 2 || document.packages.len == 0 || document.packages != applications {
+		return error('offline media application declaration differs from the ISO package receipt')
+	}
+	mut expires := max_i64
+	for publisher in publishers {
+		if !atomic_captured_parent_matches(root, fd) { return error('ISO offline media root changed during verification') }
+		repository := os.join_path(root, publisher.id)
+		defer { unsafe { repository.free() } }
+		mut checked := check_signed_release(repository, publisher.id, publisher.public_key, '', -1,
+			unsafe { &publisher })!
+		defer { checked.close() }
+		if checked.expires < expires { expires = checked.expires }
+	}
+	export_stage_metadata(lock_path, deployment)!
+	check_offline_media_root(root, fd, entries)!
+	if expires <= time.now().unix() { return error('offline media repository expired during verification') }
+}
+
+fn check_offline_media_root(root string, fd int, entries map[string]u64) ! {
+	if !atomic_captured_parent_matches(root, fd) { return error('ISO offline media root changed during verification') }
+	check_export_parent(root, 'ISO offline media')!
+	export_stage_directory(root, entries, 0o755)!
+	if !atomic_captured_parent_matches(root, fd) { return error('ISO offline media root changed during verification') }
+}
 
 // An ISO verifier can populate only its private, captured destination stage.
 pub struct IsoOfflineMedia {

@@ -805,6 +805,21 @@ ISO package receipt. Choose a filesystem that supports exclusive atomic rename.
 Use `TMPDIR` for verifier scratch space. The export also needs room for the
 complete bundle on the output filesystem.
 
+After copying the exported directory, verify the copy against the ISO package
+receipt from the trusted release checksums. Keep the original file modes and
+use a copy whose directories are owned by the account running the check.
+
+```sh
+/tmp/vinix-package-receipt verify-offline /media/usb/release-apps vinix-packages-arm64.json
+```
+
+This read-only check needs only the copied directory and the trusted receipt.
+It compares the lock and application list and verifies each bundled publisher's
+index, signature, sequence, expiry and complete object inventory. Success
+reports the ISO digest named by the receipt, architecture, deployment digest,
+application IDs and repository IDs. Enrollment and deployment still require
+their own reviews on the destination system.
+
 On the destination system, use the verified publisher ID and independently
 trusted public key to review each required repository at its local media URL.
 Apply the reviewed repository changes, refresh offline and review the copied

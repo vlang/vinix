@@ -33,21 +33,12 @@ struct Preflight {
 	bundled_repositories []IndexSummary
 }
 
-struct Publisher {
-	id string
-	public_key string
-	sequence u64
-	index_sha256 string
-	payload_bytes u64
-	reviewed_origin string @[omitempty]
-}
-
 struct Selection {
 	architecture string
 	configuration_sha256 string
 	deployment_sha256 string
 	applications []string
-	publishers []Publisher
+	publishers []pkgcore.IsoOfflinePublisher
 }
 
 struct Receipt {
@@ -57,7 +48,7 @@ struct Receipt {
 	deployment_sha256 string
 	architecture string
 	applications []string
-	publishers []Publisher
+	publishers []pkgcore.IsoOfflinePublisher
 }
 
 struct ArchiveAudit {
@@ -88,6 +79,16 @@ struct OfflineMediaExport {
 	receipt Receipt
 }
 
+struct OfflineMediaVerification {
+	format int = 1
+	directory string
+	iso_sha256 string
+	architecture string
+	deployment_sha256 string
+	applications []string
+	repositories []string
+}
+
 fn check_inputs(configuration &pkgcore.ImageConfiguration, repositories &pkgcore.ImageRepositories, declaration string) !Preflight {
 	report := if declaration == '' {
 		configuration.check_repositories(repositories)!
@@ -109,7 +110,7 @@ fn preflight(root string, arch string, config string, bundle string, declaration
 }
 
 fn package_selection(input Preflight, arch string, reviewed_origins map[string]string) !Selection {
-	mut publishers := []Publisher{cap: input.bundled_repositories.len}
+	mut publishers := []pkgcore.IsoOfflinePublisher{cap: input.bundled_repositories.len}
 	for index in input.bundled_repositories {
 		configured := input.configuration.repositories.filter(it.id == index.id)
 		if configured.len != 1 { return error('preflight omitted publisher ' + index.id) }
@@ -117,7 +118,7 @@ fn package_selection(input Preflight, arch string, reviewed_origins map[string]s
 		if reviewed_origin != '' && (!reviewed_origin.starts_with('https://') || configured[0].url != reviewed_origin) {
 			return error('ISO package URL differs from the reviewed HTTPS origin: ' + index.id)
 		}
-		publishers << Publisher{id: index.id, public_key: configured[0].public_key, sequence: index.sequence,
+		publishers << pkgcore.IsoOfflinePublisher{id: index.id, public_key: configured[0].public_key, sequence: index.sequence,
 			index_sha256: index.index_sha256, payload_bytes: index.payload_bytes, reviewed_origin: reviewed_origin}
 	}
 	return Selection{architecture: arch, configuration_sha256: input.configuration_sha256,
@@ -478,6 +479,19 @@ fn export_offline(arguments []string) ! {
 	println(json2.encode(OfflineMediaExport{ destination: destination, receipt: receipt }))
 }
 
+fn verify_offline(arguments []string) ! {
+	if arguments.len != 2 {
+		return error('usage: package-receipt verify-offline MEDIA_DIRECTORY RECEIPT.json')
+	}
+	directory := arguments[0]
+	receipt := read_application_receipt(arguments[1])!
+	pkgcore.verify_iso_offline_media(directory, receipt.architecture, receipt.applications,
+		receipt.deployment_sha256, receipt.publishers)!
+	println(json2.encode(OfflineMediaVerification{ directory: directory, iso_sha256: receipt.iso_sha256,
+		architecture: receipt.architecture, deployment_sha256: receipt.deployment_sha256,
+		applications: receipt.applications, repositories: receipt.publishers.map(it.id) }))
+}
+
 fn verify_installed(arguments []string) !int {
 	if arguments.len !in [4, 5]! {
 		return error('usage: package-receipt verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME]')
@@ -533,9 +547,12 @@ fn run() ! {
 	if os.args.len >= 2 && os.args[1] == 'export-offline' {
 		return export_offline(os.args[2..])
 	}
+	if os.args.len >= 2 && os.args[1] == 'verify-offline' {
+		return verify_offline(os.args[2..])
+	}
 	archive := os.args.len == 5 && os.args[1] == 'verify-archive'
 	if !archive && (os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']!) {
-		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | export-deployment ISO RECEIPT.json NEW_FILE [RELEASE_UNIX_TIME] | export-offline ISO RECEIPT.json NEW_DIRECTORY | checksums RECEIPT.json | origins RECEIPT.json SHA256')
+		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | export-deployment ISO RECEIPT.json NEW_FILE [RELEASE_UNIX_TIME] | export-offline ISO RECEIPT.json NEW_DIRECTORY | verify-offline MEDIA_DIRECTORY RECEIPT.json | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }
