@@ -99,3 +99,25 @@ contains the committed sources, baseline and fixed logs, generated code, and
 target builds. The independent checker verified all 693 sealed files.
 Archive SHA-256 is
 `4b3854272a66eba7096c6c45f3c82bd828bbfc109cc14e2897ee03965c1cb794`.
+
+## Maintenance from the compact catalog
+
+At `abf919c408c4b5e3e1df888700ba457b1da7e183`, the idle compact Software
+catalog opens Maintenance at 320×240 and larger. The regression check failed
+at `ec6d02255` because the entry was missing at that size.
+
+The host fixture drove all seven entries through their existing service
+workflows. It checked both size thresholds, bounded controls after resizing,
+status and retained failure access, input and active-worker guards, and
+preservation of the catalog query, filter and selection on return. The full
+host fixture also passed under ASan and UBSan with process leak detection
+disabled. The allocation tracker measured zero retained bytes over 1,000
+Maintenance open, render, resize and Back cycles. The existing health,
+progress and view allocation modes passed. The Software guest fixture
+linked statically for AArch64 and x86_64. Interactive checks ran on the host.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-compact-maintenance-z4MZDb/qualification.tar.gz)
+contains the committed sources, baseline and final logs, generated code and
+target builds. The independent checker verified all 1,138 sealed files.
+Archive SHA-256 is
+`581a1b0907750c81db8ddfee2cbd9a0e43b3c3199653c5cbd2644830a2dabc47`.
