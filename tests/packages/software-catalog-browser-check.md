@@ -101,3 +101,30 @@ contains the baseline, committed changes, generated code, host checks and
 guest receipts. The independent checker verified all 1,818 sealed files and
 symlinks. Archive SHA-256 is
 `3020930524f6b51991a0eb4b11df449090ac6f81bdbf2a3311460f78549931b3`.
+
+## Catalog decoder allocation retention
+
+At `6b7294dfc4645e56f23e273e3feed207316ff7fb`, the Software view decoder
+appends dependency and package records by value and frees partial views by
+value. It also releases ignored extension keys and strings without keeping
+their descriptors on the heap. Successful replies retain their owned fields
+until the caller closes or transfers them.
+
+The initial focused test at `cefc7ab04` retained 442,368 bytes across 320
+successful and refused attempts. After the row and dependency fix, the
+expanded test retained 13,824 bytes in extension string descriptors. The
+final 448-attempt test retained zero bytes and zero allocations. The full
+Software fixture's earlier tracker trap became 24,000 retained bytes after
+the row fix. It reached zero tracked bytes over the complete 1,000-cycle
+reload, rejection, search, and navigation check after the extension fix.
+
+On 2026-11-24, all 27 protocol test files, the full host Software fixture
+and the package navigation allocation check passed. ASan/UBSan passed for
+the focused decoder and full host Software fixture with process leak
+detection disabled. The AArch64 and x86_64 guest fixtures linked statically.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-catalog-decoder-vs70lQ/qualification.tar.gz)
+contains the committed decoder sources, baseline and fixed logs, generated
+code, and both target builds. The independent checker verified all 662 sealed
+files. Archive SHA-256 is
+`ac2f8de1e383941eba577633e1bfa1b2a5d635b419a5e70ad6b154370720378b`.
