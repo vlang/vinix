@@ -79,6 +79,8 @@ mut:
 	snapshot_media_saved pkgprotocol.DeploymentMediaSaved
 	snapshot_media bool
 	snapshot_media_source string
+	snapshot_receipt bool
+	snapshot_receipt_path []u8
 	snapshot_media_sha256 []u8
 	snapshot_sha256_focus bool
 	snapshot_pending_sha256 string
@@ -696,8 +698,7 @@ fn (mut a SoftwareApp) poll() bool {
 		a.worker_failed = true
 	}
 	if a.repository_worker == .media_import {
-		// Recover the exact approved directory before retiring the worker argv.
-		software_repository_text(mut a.deployment_path, a.worker.args.last())
+		a.restore_media_import_fields(a.worker.args)
 		if code == 0 && (!a.progress_seen || a.progress_snapshot.phase != 'complete') {
 			a.operation_line('The media import ended without a complete result. Check the catalog before retrying.')
 			a.worker_failed = true
@@ -1624,6 +1625,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.repository_key.free()
 		a.repository_result.free()
 		a.deployment_path.free()
+		a.snapshot_receipt_path.free()
 		a.snapshot_media_sha256.free()
 		a.release_deployment_path.free()
 		a.mirror_path.free()

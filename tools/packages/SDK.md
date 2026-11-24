@@ -865,9 +865,12 @@ root and package counts. Run it directly as the owner of the destination.
 After it succeeds you can disconnect the media and review the local file.
 In Software, open **Deployment → Offline media…** and enter the media
 directory. **Import media** uses the enrolled keys and asks for administrator
-approval. After a successful import, Software reloads its catalog in offline
-mode. If the bundle includes a deployment lock, choose **Save media lock** and
-enter a new local filename. To require the exact lock, paste the trusted release
+approval. Choose **Import with receipt…** to bind the import to a reviewed ISO
+release. Enter the absolute receipt path and **Receipt SHA-256** from the
+trusted release checksums, then approve **Import media**. After a successful
+import, Software reloads its catalog in offline mode. If the bundle includes a
+deployment lock, choose **Save media lock** and enter a new local filename.
+To require the exact lock, paste the trusted release
 receipt's `deployment_sha256` into **Expected SHA-256**. The save receipt shows
 the digest of the local file. **Check coverage** and **Review additions** use
 that digest. Applying the review uses the same digest and requires separate

@@ -16,11 +16,17 @@ fn (mut a SoftwareApp) clear_deployment_snapshot() {
 	a.snapshot_pending = ''
 	a.snapshot_pending_sha256 = ''
 	a.snapshot_media_source = ''
-	a.snapshot_media_sha256.clear()
-	a.snapshot_sha256_focus = false
+	a.clear_media_receipt()
 	a.snapshot_media = false
 	a.snapshot_mode = false; a.snapshot_ready = false
 	a.focus = false; a.select_all = false
+}
+
+fn (mut a SoftwareApp) clear_media_receipt() {
+	a.snapshot_receipt = false
+	a.snapshot_receipt_path.clear()
+	a.snapshot_media_sha256.clear()
+	a.snapshot_sha256_focus = false
 }
 
 fn (mut a SoftwareApp) begin_deployment_snapshot() {
@@ -46,9 +52,24 @@ fn (mut a SoftwareApp) media_directory_valid(path string) bool {
 fn (mut a SoftwareApp) import_offline_media() {
 	path := editor_bytes_text(a.deployment_path)
 	if !a.media_directory_valid(path) { return }
-	mut args := ['update-media', path]
+	mut args := []string{cap: 4}
+	defer { unsafe { (&array(&args)).free() } }
+	args << 'update-media'
+	args << path
+	if a.snapshot_receipt {
+		receipt := editor_bytes_text(a.snapshot_receipt_path)
+		if !software_deployment_path_valid(receipt) {
+			a.set_status('Enter the absolute path to the ISO package receipt.')
+			return
+		}
+		if a.snapshot_media_sha256.len != 64 {
+			a.set_status('Enter all 64 lowercase hex digits from the trusted release checksums.')
+			return
+		}
+		args << receipt
+		args << editor_bytes_text(a.snapshot_media_sha256)
+	}
 	a.start(args, false)
-	unsafe { (&array(&args)).free() }
 	if a.worker != unsafe { nil } {
 		a.clear_failure()
 		a.repository_worker = .media_import
@@ -57,7 +78,19 @@ fn (mut a SoftwareApp) import_offline_media() {
 	}
 }
 
+fn (mut a SoftwareApp) restore_media_import_fields(args []string) {
+	// The worker owns the literal approved arguments until it is retired.
+	index := args.index('update-media')
+	if index < 0 || index + 1 >= args.len { return }
+	software_repository_text(mut a.deployment_path, args[index + 1])
+	if args.len == index + 4 {
+		software_repository_text(mut a.snapshot_receipt_path, args[index + 2])
+		software_repository_text(mut a.snapshot_media_sha256, args[index + 3])
+	}
+}
+
 fn (mut a SoftwareApp) reload_imported_media_catalog() {
+	a.clear_media_receipt()
 	a.clear_failure()
 	a.offline_requested = true
 	mut args := ['view']
@@ -200,21 +233,39 @@ fn (mut a SoftwareApp) finish_deployment_snapshot(code int) {
 fn (mut a SoftwareApp) handle_deployment_snapshot(event_id string) {
 	if a.worker != unsafe { nil } { return }
 	match event_id {
-		'software.snapshot.back' { a.clear_deployment_snapshot() }
+		'software.snapshot.back' {
+			if a.snapshot_receipt {
+				a.clear_media_receipt()
+				a.focus = true; a.select_all = false
+				a.set_status('Choose how to import the signed media or save its deployment lock.')
+			} else { a.clear_deployment_snapshot() }
+		}
 		'software.snapshot.another' { a.begin_deployment_snapshot_mode(a.snapshot_media) }
 		'software.snapshot.export' { if !a.snapshot_media { a.export_deployment_snapshot() } }
 		'software.snapshot.import' {
 			if a.snapshot_media && a.snapshot_media_source == '' && !a.snapshot_ready { a.import_offline_media() }
 		}
+		'software.snapshot.import-receipt' {
+			if a.snapshot_media && a.snapshot_media_source == '' && !a.snapshot_ready && !a.snapshot_receipt
+				&& a.media_directory_valid(editor_bytes_text(a.deployment_path)) {
+				a.clear_failure()
+				a.snapshot_receipt = true
+				a.focus = true; a.select_all = false
+				a.set_status('Use the receipt SHA-256 from the trusted release checksums.')
+			}
+		}
+		'software.snapshot.receipt-path' {
+			if a.snapshot_receipt { a.focus = true; a.select_all = false; a.snapshot_sha256_focus = false }
+		}
 		'software.deployment.path' {
-			if !a.snapshot_ready { a.focus = true; a.select_all = false; a.snapshot_sha256_focus = false }
+			if !a.snapshot_ready && !a.snapshot_receipt { a.focus = true; a.select_all = false; a.snapshot_sha256_focus = false }
 		}
 		'software.snapshot.sha256' {
-			if a.snapshot_media_source != '' && !a.snapshot_ready {
+			if (a.snapshot_receipt || a.snapshot_media_source != '') && !a.snapshot_ready {
 				a.focus = true; a.select_all = false; a.snapshot_sha256_focus = true
 			}
 		}
-		'software.snapshot.save' { if !a.snapshot_ready { a.save_deployment_snapshot() } }
+		'software.snapshot.save' { if !a.snapshot_ready && !a.snapshot_receipt { a.save_deployment_snapshot() } }
 		'software.snapshot.previous' { if a.details_page > 0 { a.details_page-- } }
 		'software.snapshot.next' { if a.details_page + 1 < a.details_pages.len { a.details_page++ } }
 		'software.snapshot.audit', 'software.snapshot.review' {
@@ -242,14 +293,19 @@ fn (mut a SoftwareApp) snapshot_key_input(input string) {
 		return
 	}
 	if a.snapshot_ready { return }
-	if input == '\t' && a.snapshot_media_source != '' {
-		a.handle_deployment_snapshot(if a.snapshot_sha256_focus { 'software.deployment.path' } else { 'software.snapshot.sha256' })
+	if input == '\t' && (a.snapshot_receipt || a.snapshot_media_source != '') {
+		a.handle_deployment_snapshot(if !a.snapshot_sha256_focus { 'software.snapshot.sha256' }
+			else if a.snapshot_receipt { 'software.snapshot.receipt-path' } else { 'software.deployment.path' })
 		return
 	}
-	if a.snapshot_sha256_focus && a.focus {
+	if (a.snapshot_receipt || a.snapshot_sha256_focus) && a.focus {
 		match input {
 			'\x01' { a.select_all = true }
-			'\x08', '\x7f' { console_backspace(mut a.snapshot_media_sha256, a.select_all); a.select_all = false }
+			'\x08', '\x7f' {
+				if a.snapshot_sha256_focus { console_backspace(mut a.snapshot_media_sha256, a.select_all) }
+				else { console_backspace(mut a.snapshot_receipt_path, a.select_all) }
+				a.select_all = false
+			}
 			'\r', '\n' { a.focus = false; a.select_all = false }
 			else { a.snapshot_paste_input(input) }
 		}
@@ -276,6 +332,19 @@ fn (mut a SoftwareApp) snapshot_paste_input(input string) {
 		if a.snapshot_media_sha256.cap == 0 { a.snapshot_media_sha256 = []u8{cap: 64} }
 		if a.select_all { a.snapshot_media_sha256.clear() }
 		for byte in input { a.snapshot_media_sha256 << byte }
+		a.select_all = false
+		return
+	}
+	if a.snapshot_receipt {
+		if input == '' { return }
+		length := if a.select_all { 0 } else { a.snapshot_receipt_path.len }
+		if input.len > software_deployment_path_limit - length || !software_deployment_text_valid(input) {
+			a.set_status('Use a valid receipt path without control characters, up to 4096 bytes.')
+			return
+		}
+		if a.snapshot_receipt_path.cap == 0 { a.snapshot_receipt_path = []u8{cap: software_deployment_path_limit} }
+		if a.select_all { a.snapshot_receipt_path.clear() }
+		for byte in input { a.snapshot_receipt_path << byte }
 		a.select_all = false
 		return
 	}
@@ -330,10 +399,11 @@ fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 			if source_step {
 				children << software_button('software.snapshot.import', 'Import media', 14, 104, button_width)
 				children << software_button('software.snapshot.save', title, 26 + button_width, 104, button_width)
+				children << software_button('software.snapshot.import-receipt', 'Import with receipt…', 14, 142, button_width)
 				if failure {
-					children << software_button('software.failure', 'Failure details', 14, 142, button_width)
-					status_y = 180
+					children << software_button('software.failure', 'Failure details', 26 + button_width, 142, button_width)
 				}
+				status_y = 180
 			} else {
 				children << software_button('software.snapshot.save', title, 14, action_y, button_width)
 				if failure { children << software_button('software.failure', 'Failure details', 26 + button_width, action_y, button_width) }
@@ -372,7 +442,41 @@ fn (a &SoftwareApp) build_snapshot_compact(width int, height int) ui2.Element {
 	return ui2.screen(app_surface, children)
 }
 
+fn (a &SoftwareApp) build_media_receipt(width int, height int) ui2.Element {
+	mut children := frame_elements(12)
+	compact := width < 640 || height < 610
+	idle := a.worker == unsafe { nil }
+	fields_y := if compact { 42 } else { 94 }
+	action_y := fields_y + 106
+	children << software_label('Import with ISO receipt', 14, 8, if compact && idle { width - 98 } else { width - 28 }, 28, false)
+	if idle {
+		children << software_button('software.snapshot.back', 'Back', if compact { width - 70 } else { 14 },
+			if compact { 8 } else { 46 }, if compact { 56 } else { 112 })
+	}
+	children << software_label('ISO receipt file (absolute path)', 14, fields_y, width - 28, 18, false)
+	children << console_field('software.snapshot.receipt-path', editor_bytes_text(a.snapshot_receipt_path),
+		14, fields_y + 18, width - 28, a.focus && !a.snapshot_sha256_focus)
+	children << software_label('Receipt SHA-256', 14, fields_y + 52, width - 28, 18, false)
+	children << console_field('software.snapshot.sha256', editor_bytes_text(a.snapshot_media_sha256),
+		14, fields_y + 70, width - 28, a.focus && a.snapshot_sha256_focus)
+	if idle {
+		button_width := if compact && a.failure_pages.len > 0 { (width - 40) / 2 } else { 174 }
+		children << software_button('software.snapshot.import', 'Import media', 14, action_y, button_width)
+		if compact && a.failure_pages.len > 0 {
+			children << software_button('software.failure', 'Failure details', 26 + button_width, action_y, button_width)
+		}
+	} else { children << software_label('Wait for offline media.', 14, action_y, width - 28, 28, false) }
+	progress := a.repository_worker == .media_import && a.progress_seen
+	if progress { children << a.progress_bar(width, if compact { 280 } else { height }) }
+	if compact {
+		status_y := if progress { 192 } else { 182 }
+		children << software_label(a.status, 14, status_y, width - 28, height - status_y - 8, false)
+	} else { a.add_status_footer(mut children, width, height, progress) }
+	return ui2.screen(app_surface, children)
+}
+
 fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Element {
+	if a.snapshot_receipt && width >= 320 && height >= 240 { return a.build_media_receipt(width, height) }
 	if width < 640 || height < 610 { return a.build_snapshot_compact(width, height) }
 	mut children := frame_elements(28)
 	source_step := a.snapshot_media && a.snapshot_media_source == ''
@@ -410,7 +514,10 @@ fn (mut a SoftwareApp) build_deployment_snapshot(width int, height int) ui2.Elem
 			children << software_label('This saves metadata, not application payloads or personal data. Restoring needs trusted repositories or offline media, explicit license consent and a fresh review.', 14, 246, width - 28, 60, false)
 		}
 		if a.worker == unsafe { nil } {
-			if source_step { children << software_button('software.snapshot.import', 'Import media', 14, 326, 180) }
+			if source_step {
+				children << software_button('software.snapshot.import', 'Import media', 14, 326, 180)
+				children << software_button('software.snapshot.import-receipt', 'Import with receipt…', 406, 326, 180)
+			}
 			children << software_button('software.snapshot.save', if a.snapshot_media { 'Save media lock' } else { 'Save installed' }, if source_step { 210 } else { 14 }, if a.snapshot_media && !source_step { 348 } else { 326 }, 180)
 		}
 	}

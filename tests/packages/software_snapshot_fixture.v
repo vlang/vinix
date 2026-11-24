@@ -10,6 +10,7 @@ import tools.packages.pkgprotocol
 const software_snapshot_fixture_path = '/private/tmp/部署 with spaces; $literal/organization-managed-installed-applications/recovery-records-with-complete-historical-metadata/requested-roots-and-transitive-runtime-data-dependencies/retained-versions-and-publisher-sequence-floors/installed applications and exact historical runtimes.json'
 const software_media_fixture_source = '/media/发行 with spaces; $unexpanded'
 const software_import_fixture_lock = '/home/test/local release lock.json'
+const software_import_fixture_receipt = '/review/已签署 release; $literal.json'
 
 fn software_snapshot_fixture_receipt(path string) pkgprotocol.DeploymentSnapshotSaved {
 	return pkgprotocol.DeploymentSnapshotSaved{ generation: if path == '/empty-save.json' { u64(0) } else { u64(7) },
@@ -55,21 +56,25 @@ fn software_media_import_service_fixture() !bool {
 	if work == '' { return false }
 	mode := os.getenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE')
 	args := os.args[1..]
-	if args.len >= 3 && args[0] == 'admin' && args[1] == '--progress' && args[2] == 'update-media' {
-		assert args == ['admin', '--progress', 'update-media', software_media_fixture_source]
+	if args.len >= 3 && args[0] == 'admin' && args[1] == '--progress' && 'update-media' in args {
+		if mode.starts_with('receipt-') {
+			assert args == ['admin', '--progress', '--offline', 'update-media', software_media_fixture_source,
+				software_import_fixture_receipt, 'a'.repeat(64)]
+		} else { assert args == ['admin', '--progress', 'update-media', software_media_fixture_source] }
 		mut credential := [2]u8{}
 		for index in 0 .. credential.len { assert C.read(0, &credential[index], 1) == 1 }
 		assert credential[1] == `\n`
 		if credential[0] == `?` { eprintln('Fixture refused administrator approval.'); exit(21) }
 		assert credential[0] == `!`
 		os.write_file(work + '/approved', mode)!
+		if mode == 'receipt-refused' { eprintln('offline repository index differs from the ISO package receipt'); exit(22) }
 		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{
 			phase: 'verify', repository: 'trusted', path: 'index.json' }))
 		if mode == 'incomplete' { return true }
 		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
 		flush_stdout()
 		if mode == 'late' { eprintln('Fixture refused publication after the progress frame.'); exit(23) }
-		if mode == 'hold' {
+		if mode in ['hold', 'receipt-hold']! {
 			for _ in 0 .. 5000 {
 				if os.exists(work + '/release') { return true }
 				time.sleep(time.millisecond)
@@ -196,6 +201,75 @@ fn check_software_media_import() ! {
 	assert app.snapshot_mode && app.deployment_mode && app.offline_requested && app.repository_worker == .none
 	assert app.rows.len == 1 && editor_bytes_text(app.deployment_path) == software_media_fixture_source
 	println('Software media import: administrator approval and cancellation, literal frozen source, progress/exit guards, offline catalog reload, failure and offline save/review handoff PASS')
+	check_software_media_receipt_import(mut app, work)!
+}
+
+fn check_software_media_receipt_import(mut app SoftwareApp, work string) ! {
+	for name in ['approved', 'catalog-read', 'release']! { os.rm(work + '/' + name) or {} }
+	app.handle('software.snapshot.back')!
+	app.handle('software.deployment.media-save')!
+	app.paste_input(software_media_fixture_source)
+	compact := app.build(ui2.rect(0, 0, 320, 240))!
+	deployment_form_geometry(compact, 320, 240)
+	assert compact.children.any(it.id == 'software.snapshot.import-receipt' && it.text == 'Import with receipt…')
+	free_window_tree(compact)
+	app.handle('software.snapshot.import-receipt')!
+	for size in [ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 640, 610)]! {
+		tree := app.build(size)!
+		deployment_form_geometry(tree, size.width, size.height)
+		assert tree.children.any(it.id == 'software.snapshot.receipt-path') && tree.children.any(it.id == 'software.snapshot.sha256')
+		assert !tree.children.any(it.id == 'software.snapshot.save' || it.id == 'software.deployment.path')
+		free_window_tree(tree)
+	}
+	app.paste_input('relative.json'); app.handle('software.snapshot.import')!
+	assert app.worker == unsafe { nil } && app.status.contains('absolute path to the ISO')
+	app.key_input('\x01'); app.paste_input(software_import_fixture_receipt)
+	app.key_input('\x01'); app.paste_input('/bad\nreceipt.json')
+	assert editor_bytes_text(app.snapshot_receipt_path) == software_import_fixture_receipt
+	app.key_input('\t'); app.paste_input('abc'); app.paste_input('A'); app.paste_input('a'.repeat(62))
+	assert editor_bytes_text(app.snapshot_media_sha256) == 'abc'
+	app.handle('software.snapshot.import')!
+	assert app.worker == unsafe { nil } && app.status.contains('64 lowercase hex')
+	digest := 'a'.repeat(64)
+	app.key_input('\x01'); app.paste_input(digest)
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'receipt-refused', true)
+	app.handle('software.snapshot.import')!
+	assert app.admin_prompt && app.worker.args == ['admin', '--progress', '--offline', 'update-media',
+		software_media_fixture_source, software_import_fixture_receipt, digest]
+	app.handle('software.admin.cancel')!
+	assert app.snapshot_receipt && app.worker == unsafe { nil } && !os.exists(work + '/approved')
+	app.handle('software.snapshot.import')!
+	app.key_input('!'); app.handle('software.admin.approve')!
+	software_repository_text(mut app.deployment_path, '/retargeted-media')
+	software_repository_text(mut app.snapshot_receipt_path, '/retargeted-receipt.json')
+	software_repository_text(mut app.snapshot_media_sha256, 'b'.repeat(64))
+	wait_for_software(mut app)
+	assert app.snapshot_receipt && app.status.contains('index differs from the ISO package receipt')
+	assert editor_bytes_text(app.deployment_path) == software_media_fixture_source
+	assert editor_bytes_text(app.snapshot_receipt_path) == software_import_fixture_receipt
+	assert editor_bytes_text(app.snapshot_media_sha256) == digest && !os.exists(work + '/catalog-read')
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'receipt-hold', true)
+	app.handle('software.snapshot.import')!; app.key_input('!'); app.handle('software.admin.approve')!
+	for _ in 0 .. 5000 {
+		app.poll()
+		if app.progress_seen && app.progress_snapshot.phase == 'complete' { break }
+		time.sleep(time.millisecond)
+	}
+	assert app.worker != unsafe { nil } && app.progress_snapshot.phase == 'complete'
+	busy := app.build(ui2.rect(0, 0, 320, 240))!
+	deployment_form_geometry(busy, 320, 240)
+	assert busy.children.any(it.id == 'software.progress') && !busy.children.any(it.id == 'software.snapshot.back')
+	free_window_tree(busy)
+	app.handle('software.snapshot.back')!; app.paste_input('/cannot-retarget')
+	assert app.snapshot_receipt && !app.prepare_close() && !os.exists(work + '/catalog-read')
+	os.write_file(work + '/release', '')!
+	wait_for_software(mut app)
+	assert !app.snapshot_receipt && app.snapshot_receipt_path.len == 0 && app.snapshot_media_sha256.len == 0
+	assert app.snapshot_mode && app.status.contains('Media imported') && os.read_file(work + '/catalog-read')! == 'receipt-hold'
+	assert editor_bytes_text(app.deployment_path) == software_media_fixture_source
+	app.handle('software.snapshot.save')!
+	assert app.snapshot_media_source == software_media_fixture_source && app.snapshot_media_sha256.len == 0
+	println('Software receipt import: compact fields, literal authorization arguments, cancellation, refusal and exact offline handoff PASS')
 }
 
 fn software_media_save_service_fixture(args []string) bool {
@@ -534,6 +608,12 @@ fn check_software_snapshot_memory() ! {
 					free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
 					free_window_tree(app.build(ui2.rect(0, 0, 900, 660))!)
 					app.paste_input(software_media_fixture_source)
+					app.handle_deployment_snapshot('software.snapshot.import-receipt')
+					app.paste_input(software_import_fixture_receipt)
+					app.key_input('\t'); app.paste_input('abc')
+					free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
+					free_window_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+					app.handle_deployment_snapshot('software.snapshot.back')
 					app.save_deployment_snapshot()
 					app.handle_deployment_snapshot('software.snapshot.sha256')
 					app.paste_input('abc')
