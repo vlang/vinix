@@ -82,3 +82,30 @@ initial and final disk images also matched the SHA-256 digests in the
 qualification receipts when decoded. The archive SHA-256 is
 `7b4fe007a8bbb20308d2d68c49c40bf665a247ccfef19c6356539bac4914e2e0`.
 [Installed-system archive](/Users/alex/.local/state/vinix/r14-distribution-sweep-NmmWfI/installed.tar.gz)
+
+## Release coverage qualification
+
+Revision `8fd026bd3a780f3d9b78ac6a0b04f43cf69bdd8a` adds the read-only
+`deployment-add-audit` command and Software's **Check release coverage**
+action. Coverage checks all declared pins and requires each release root to
+remain explicitly requested. Other installed apps and explicitly selected
+dependencies are allowed. The report can open a fresh additive review.
+
+Both QEMU guests passed the deployment audit suite with retained kernels and
+newly built package tools. AArch64 completed in 34.3 seconds and x86-64 in
+52.0 seconds. The ordinary UID 1000 check read root-owned metadata. The
+signed CLI scenarios exercised extra apps, explicit selections, pin drift
+and exit status 3. The core fixture exercised missing records, sequence
+floors, missing explicit release selections and an empty lock refusal.
+[Guest driver](deployment-audit-runtime-check.v)
+
+The host core suite passed ASan and UBSan with leak detection disabled. The
+full headless Software suite passed, including frozen-source reload, separate
+additive review, and zero tracked bytes over 1,000 release-form cycles.
+The headless Software sources also typechecked for both Linux targets.
+[Software driver](distribution-check.v)
+
+The independent archive checker verified 200 sealed entries. The archive
+SHA-256 is
+`25eea8f694ac3480066e7d62bd96ffd3b118a763272c7a796a01d368ccc8327e`.
+[Release coverage archive](/Users/alex/.local/state/vinix/r14-release-coverage-AJC5O4/qualification.tar.gz)
