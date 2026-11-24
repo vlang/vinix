@@ -4,7 +4,14 @@ module pkgcore
 import encoding.utf8
 import tools.packages.pkgprotocol
 
-fn save_deployment_snapshot_locked(service Service, directory string, path string, names []string) !pkgprotocol.DeploymentSnapshotSaved {
+struct DeploymentSnapshotOutput {
+	path string
+	parent string
+	name string
+	options AtomicWriteOptions
+}
+
+fn save_deployment_snapshot_locked(service Service, directory string, names []string, output DeploymentSnapshotOutput) !pkgprotocol.DeploymentSnapshotSaved {
 	config := service.configuration()!; defer { close_decoded_configuration(config) }
 	current := read_state(directory, config.architecture)!
 	defer { if current.generation != 0 { close_decoded_state(current) } }
@@ -13,11 +20,12 @@ fn save_deployment_snapshot_locked(service Service, directory string, path strin
 	mut document := owned_deployment_lock(config.architecture, plan)!; defer { document.close() }
 	text := encode_deployment_lock(document, true)!; defer { unsafe { text.free() } }
 	mut saved := pkgprotocol.DeploymentSnapshotSaved{ generation: current.generation, architecture: config.architecture.clone(),
-		destination: path.clone(), sha256: index_digest(text), roots: u64(document.packages.len), packages: u64(document.locked.len) }
+		destination: output.path.clone(), sha256: index_digest(text), roots: u64(document.packages.len), packages: u64(document.locked.len) }
 	mut accepted := false
 	defer { if !accepted { saved.close() } }
 	saved.validate()!
-	atomic_write_new(path, text)!
+	output.options.checkpoint('prepared', output.path)!
+	atomic_write_at(output.parent, output.name, text, output.options)!
 	accepted = true
 	return saved
 }
@@ -25,11 +33,21 @@ fn save_deployment_snapshot_locked(service Service, directory string, path strin
 // Capture one installed generation and publish only to a new user-selected file.
 // No catalog, cache objects, replay history, trust enrollment or policy changes.
 pub fn (service Service) save_deployment_snapshot(path string, names []string) !pkgprotocol.DeploymentSnapshotSaved {
+	return service.save_deployment_snapshot_with(path, names, AtomicWriteOptions{})
+}
+
+fn (service Service) save_deployment_snapshot_with(path string, names []string, options AtomicWriteOptions) !pkgprotocol.DeploymentSnapshotSaved {
 	if path == '' || !printable(path, 4096) || !utf8.validate_str(path) { return error('deployment snapshot requires a printable UTF-8 new-file path of at most 4096 bytes') }
 	directory := service.directory()!; defer { unsafe { directory.free() } }
+	parent, name := atomic_file_path(path)!
+	defer { unsafe { parent.free(); name.free() } }
+	fd := open_atomic_parent(parent)!
+	defer { C.close(fd) }
+	output := DeploymentSnapshotOutput{ path: path, parent: parent, name: name,
+		options: AtomicWriteOptions{ ...options, exclusive: true, parent_fd: fd } }
 	if state_requires_lock(directory) {
 		guard := acquire_reader(directory)!; defer { guard.release() }
-		return save_deployment_snapshot_locked(service, directory, path, names)
+		return save_deployment_snapshot_locked(service, directory, names, output)
 	}
-	return save_deployment_snapshot_locked(service, directory, path, names)
+	return save_deployment_snapshot_locked(service, directory, names, output)
 }

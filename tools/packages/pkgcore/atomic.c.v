@@ -89,24 +89,37 @@ fn check_new_atomic_destination(parent int, name string) ! {
 	if C.errno != C.ENOENT { return error('cannot inspect new package metadata destination') }
 }
 
-// Capture the parent once. Creation, publication, cleanup and directory flush
-// use that descriptor; neither a stale .new alias nor a reopened path is used.
-fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
+fn atomic_file_path(path string) !(string, string) {
 	if path == '' || path.contains('\x00') { return error('package metadata requires a valid file path') }
-	if text.len > max_metadata { return error('package metadata exceeds its size limit') }
 	split := path.last_index('/') or { -1 }
 	mut end := split
 	for end > 0 && path[end - 1] == `/` { end-- }
 	parent := if split < 0 { '.'.clone() } else if end == 0 { '/'.clone() } else { path[..end] }
 	name := if split < 0 { path.clone() } else { path[split + 1..] }
-	defer { unsafe { parent.free(); name.free() } }
-	if name in ['', '.', '..']! { return error('package metadata requires a valid file name') }
-	directory := if options.parent_fd >= 0 {
-		options.parent_fd
-	} else {
-		C.open(parent.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	if name in ['', '.', '..']! {
+		unsafe { parent.free(); name.free() }
+		return error('package metadata requires a valid file name')
 	}
-	if directory < 0 { return error('cannot open ordinary package metadata parent directory') }
+	return parent, name
+}
+
+fn open_atomic_parent(parent string) !int {
+	fd := C.open(parent.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	if fd < 0 { return error('cannot open ordinary package metadata parent directory') }
+	return fd
+}
+
+fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
+	parent, name := atomic_file_path(path)!
+	defer { unsafe { parent.free(); name.free() } }
+	atomic_write_at(parent, name, text, options)!
+}
+
+// Creation, publication, cleanup and directory flush use the same descriptor.
+// Callers that prepared metadata against a captured parent can lend it here.
+fn atomic_write_at(parent string, name string, text string, options AtomicWriteOptions) ! {
+	if text.len > max_metadata { return error('package metadata exceeds its size limit') }
+	directory := if options.parent_fd >= 0 { options.parent_fd } else { open_atomic_parent(parent)! }
 	defer { if options.parent_fd < 0 { C.close(directory) } }
 	mut info := C.stat{}
 	// Native stat calls consume scratch synchronously; keep it on the stack.

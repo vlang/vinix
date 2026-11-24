@@ -87,3 +87,48 @@ fn test_saved_deployment_refuses_bad_roots_corrupt_state_writer_and_existing_out
 	assert document.packages.len == 0 && document.locked.len == 0
 	println('DEPLOYMENT SAVE malformed roots/paths/state and busy writers refuse before output; existing files preserved, temporary cleanup and fresh empty observation PASS')
 }
+
+fn replace_saved_deployment_parent(phase string, path string) ! {
+	if phase != 'prepared' { return }
+	parent := os.dir(path)
+	os.rename(parent, parent + '.moved')!
+	os.mkdir(parent)!
+	os.write_file(parent + '/sentinel', 'replacement contents')!
+}
+
+fn test_saved_deployment_refuses_parent_replacement_during_snapshot_preparation() {
+	for installed in [true, false]! {
+		work := saved_deployment_fixture('aarch64')!
+		defer { os.rmdir_all(work) or {} }
+		if !installed { os.rmdir_all(work + '/var')! }
+		service := Service{ root: work }
+		mut snapshot := service.snapshot_deployment([])!
+		defer { snapshot.close() }
+		cwd := os.getwd()
+		os.chdir(work)!
+		defer { os.chdir(cwd) or { panic(err) } }
+		os.mkdir('output')!
+		os.symlink('output', 'alias')!
+		mut refused_alias := false
+		service.save_deployment_snapshot('alias/refused', []) or {
+			refused_alias = err.msg().contains('cannot open ordinary package metadata parent directory')
+		}
+		assert refused_alias && os.ls('output')!.len == 0
+
+		path := 'output/snapshot.json'
+		options := AtomicWriteOptions{ checkpoint: replace_saved_deployment_parent }
+		mut diagnostic := ''
+		service.save_deployment_snapshot_with(path, [], options) or { diagnostic = err.msg() }
+		assert diagnostic.contains('parent path changed before writing')
+		assert os.ls('output')! == ['sentinel'] && os.ls('output.moved')!.len == 0
+		assert os.read_file('output/sentinel')! == 'replacement contents'
+
+		os.rename('output', 'output.replacement')!
+		os.rename('output.moved', 'output')!
+		mut saved := service.save_deployment_snapshot(path, [])!
+		defer { saved.close() }
+		assert saved.destination == path && os.read_file(path)! == json2.encode(snapshot) + '\n'
+		assert os.is_dir(work + '/var') == installed
+	}
+	println('DEPLOYMENT SAVE captured parent replacement refuses for installed and fresh stores; exact restoration permits a relative-path retry PASS')
+}

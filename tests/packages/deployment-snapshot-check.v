@@ -8,11 +8,12 @@ import tools.packages.pkgcore
 import tools.packages.pkgprotocol
 import tools.packages.pkgadmin
 
+#include <grp.h>
 #include <sys/wait.h>
 #include <unistd.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
-fn C.setgroups(usize, voidptr) int
+fn C.waitpid(int, &i32, int) int
+fn C.setgroups(uint, voidptr) int
 fn C.setgid(u32) int
 fn C.setuid(u32) int
 fn C._exit(int)
@@ -26,7 +27,7 @@ fn ordinary_snapshot(binary string, root string, expected string) ! {
 		assert command(binary, root, ['deployment-snapshot'])! == expected
 		C._exit(0)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	println('DEPLOYMENT SNAPSHOT ordinary UID 1000 reads exact root-owned metadata without administrator authorization PASS')
 }
@@ -57,7 +58,7 @@ fn ordinary_audit(binary string, root string, path string, expected string) ! {
 		assert audit_command(binary, root, path, true)! == expected
 		C._exit(0)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	println('DEPLOYMENT AUDIT ordinary UID 1000 reads exact root-owned comparison without administrator authorization PASS')
 }
@@ -76,7 +77,7 @@ fn ordinary_save(binary string, root string, directory string, expected string) 
 		assert os.read_file('saved.json')! == expected && os.ls('.')! == ['saved.json']
 		C._exit(0)
 	}
-	mut status := 0; assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
+	mut status := i32(0); assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	println('DEPLOYMENT SAVE ordinary UID 1000 saves exact root-owned installed metadata into an owned relative destination without administrator authorization PASS')
 }
 

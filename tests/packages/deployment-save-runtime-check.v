@@ -36,6 +36,7 @@ fn suite() hwhost.Suite {
 			required: ['HWTEST START packages-deployment-save',
 				'DEPLOYMENT SAVE exact sorted installed app/runtime/all-data metadata, subset closure, generation/digest receipt, offline revoked policy and no source mutation on both architectures PASS',
 				'DEPLOYMENT SAVE malformed roots/paths/state and busy writers refuse before output; existing files preserved, temporary cleanup and fresh empty observation PASS',
+				'DEPLOYMENT SAVE captured parent replacement refuses for installed and fresh stores; exact restoration permits a relative-path retry PASS',
 				'NEW METADATA existing file/alias/dangling/FIFO/directory/hardlink destinations refuse without replacement or blocking PASS',
 				'NEW METADATA checkpoint/write/space/flush failures, destination races, mode/parent/final substitutions, cleanup and saved-file retry refusal PASS',
 				'NEW METADATA concurrent publishers admit exactly one complete file with canonical final mode and no temporary leftovers PASS',

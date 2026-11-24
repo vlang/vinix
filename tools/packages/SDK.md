@@ -4540,8 +4540,10 @@ destination is a literal absolute or relative path in the caller's filesystem;
 `--root` selects only the installed package store, not the export location.
 Parents must already exist. Paths are nonempty printable UTF-8 up to 4096 bytes.
 
-Publication captures an ordinary parent descriptor without following a final
-parent symlink, creates an exclusive random 0600 sibling temporary, handles short
+The snapshot captures an ordinary output parent descriptor before reading
+installed state. It refuses a final parent symlink or a replacement directory
+and preserves the literal destination in its receipt. Publication uses that
+descriptor to create an exclusive random 0600 sibling temporary, handles short
 and interrupted writes, sets 0644, flushes the file and atomically renames it with
 exclusive creation. Existing ordinary/special files, dangling aliases and
 directories fail before writing; destinations created during capture/write also
