@@ -122,18 +122,24 @@ fn (mut r WindowReader) number(maximum u64) !u64 {
 	return value
 }
 
-fn close_window_elements(elements []WindowElement) {
+fn close_window_element(element WindowElement) {
 	unsafe {
-		for element in elements { element.kind.free(); element.id.free(); element.text.free() }
-		(&array(&elements)).free()
+		element.kind.free()
+		element.id.free()
+		element.text.free()
 	}
+}
+
+fn close_window_elements(elements []WindowElement) {
+	for element in elements { close_window_element(element) }
+	unsafe { (&array(&elements)).free() }
 }
 
 fn (mut r WindowReader) element() !WindowElement {
 	r.expect(`{`)!
 	mut element := WindowElement{ kind: '', id: '', text: '', x: 0, y: 0, width: 0, height: 0, color: 0, background: 0 }
 	mut accepted := false
-	defer { if !accepted { unsafe { element.kind.free(); element.id.free(); element.text.free() } } }
+	defer { if !accepted { close_window_element(element) } }
 	mut seen := u16(0)
 	mut first := true
 	for r.next(first, `}`)! {
@@ -168,8 +174,7 @@ fn (mut r WindowReader) elements() ![]WindowElement {
 	for r.next(first, `]`)! {
 		first = false
 		if elements.len == 128 { return error('native window element limit exceeded') }
-		element := r.element()!
-		unsafe { elements.push_many(&element, 1) }
+		elements << r.element()!
 	}
 	accepted = true
 	return elements
@@ -179,7 +184,10 @@ fn read_window_frame(text string) !WindowFrame {
 	mut r := &WindowReader{ text: text }
 	defer { unsafe { free(r) } }
 	r.expect(`{`)!
-	mut frame := WindowFrame{}
+	// Own the addressable record used for validation and failure cleanup.
+	// Only its decoded fields transfer to the returned frame.
+	mut frame := &WindowFrame{}
+	defer { unsafe { free(frame) } }
 	mut accepted := false
 	defer { if !accepted { frame.close() } }
 	mut seen := u16(0)
@@ -188,29 +196,32 @@ fn read_window_frame(text string) !WindowFrame {
 		first = false
 		field := r.member(window_frame_keys, seen)!
 		seen |= u16(1) << field
-		match field {
-			0 { frame = WindowFrame{ ...frame, format: int(r.number(2)!) } }
-			1 { frame = WindowFrame{ ...frame, sequence: r.number(~u64(0))! } }
-			2 { frame = WindowFrame{ ...frame, title: r.quoted()! } }
-			3 { frame = WindowFrame{ ...frame, width: int(r.number(2048)!) } }
-			4 { frame = WindowFrame{ ...frame, height: int(r.number(2048)!) } }
-			5 { frame = WindowFrame{ ...frame, background: u32(r.number(0xffffff)!) } }
-			6 { frame = WindowFrame{ ...frame, elements: r.elements()! } }
-			else {}
+		unsafe {
+			match field {
+				0 { *frame = WindowFrame{ ...frame, format: int(r.number(2)!) } }
+				1 { *frame = WindowFrame{ ...frame, sequence: r.number(~u64(0))! } }
+				2 { *frame = WindowFrame{ ...frame, title: r.quoted()! } }
+				3 { *frame = WindowFrame{ ...frame, width: int(r.number(2048)!) } }
+				4 { *frame = WindowFrame{ ...frame, height: int(r.number(2048)!) } }
+				5 { *frame = WindowFrame{ ...frame, background: u32(r.number(0xffffff)!) } }
+				6 { *frame = WindowFrame{ ...frame, elements: r.elements()! } }
+				else {}
+			}
 		}
 	}
 	r.spaces()
 	if seen != 0x7f || r.position != text.len { return error('missing or trailing native window frame fields') }
 	frame.validate()!
 	accepted = true
-	return frame
+	return *frame
 }
 
 fn read_window_event_json(text string) !WindowEvent {
 	mut r := &WindowReader{ text: text }
 	defer { unsafe { free(r) } }
 	r.expect(`{`)!
-	mut event := WindowEvent{}
+	mut event := &WindowEvent{}
+	defer { unsafe { free(event) } }
 	mut accepted := false
 	defer { if !accepted { event.close() } }
 	mut seen := u16(0)
@@ -219,13 +230,15 @@ fn read_window_event_json(text string) !WindowEvent {
 		first = false
 		field := r.member(window_event_keys, seen)!
 		seen |= u16(1) << field
-		match field {
-			0 { event = WindowEvent{ ...event, format: int(r.number(2)!) } }
-			1 { event = WindowEvent{ ...event, kind: r.quoted()! } }
-			2 { event = WindowEvent{ ...event, sequence: r.number(~u64(0))! } }
-			3 { event = WindowEvent{ ...event, id: r.quoted()! } }
-			4 { event = WindowEvent{ ...event, text: r.quoted()! } }
-			else {}
+		unsafe {
+			match field {
+				0 { *event = WindowEvent{ ...event, format: int(r.number(2)!) } }
+				1 { *event = WindowEvent{ ...event, kind: r.quoted()! } }
+				2 { *event = WindowEvent{ ...event, sequence: r.number(~u64(0))! } }
+				3 { *event = WindowEvent{ ...event, id: r.quoted()! } }
+				4 { *event = WindowEvent{ ...event, text: r.quoted()! } }
+				else {}
+			}
 		}
 	}
 	r.spaces()
@@ -234,5 +247,5 @@ fn read_window_event_json(text string) !WindowEvent {
 	}
 	event.validate()!
 	accepted = true
-	return event
+	return *event
 }

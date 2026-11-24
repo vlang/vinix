@@ -136,11 +136,8 @@ pub fn (frame &WindowFrame) encode() !string {
 
 // Only decoded frames own these fields. Publisher-created frames borrow theirs.
 pub fn (mut frame WindowFrame) close() {
-	unsafe {
-		frame.title.free()
-		for element in frame.elements { element.kind.free(); element.id.free(); element.text.free() }
-		(&array(&frame.elements)).free()
-	}
+	unsafe { frame.title.free() }
+	close_window_elements(frame.elements)
 	frame = WindowFrame{}
 }
 

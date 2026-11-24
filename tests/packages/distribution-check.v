@@ -216,6 +216,10 @@ fn check() ! {
 			repository + '/tools/packages/pkgprotocol/repository_configuration_test.v'])!
 		run(work + '/repository-configuration-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap',
+			'-path', '@vlib|@vmodules|' + repository, '-o', work + '/window-decoder-memory',
+			repository + '/tools/packages/appsdk/window_ownership_test.v'])!
+		run(work + '/window-decoder-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts'], repository + '/tools/packages/pkgadmin', work)!
 		run(v, [...helper_flags, '-no-skip-unused', '-gc', 'none', '-manualfree', '-d', 'track_heap',
 			'-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',

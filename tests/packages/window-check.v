@@ -30,7 +30,7 @@ fn suite(repository string, architecture string, sandbox string) !hwhost.Suite {
 	mut programs := [
 		hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package' },
 		hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account' },
-		hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session' },
+		hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session', flags: ['-enable-globals'] },
 	]
 	mut binaries := [hwhost.RootBinary{ source: sandbox, path: 'usr/bin/vinix-sandbox' }]
 	example := os.getenv('VINIX_WINDOW_EXAMPLE')
@@ -86,7 +86,8 @@ fn check() !int {
 	os.cp(options.kernel, kernel)!
 	hwhost.watch_interrupts()
 	guest_dir := work + '/guest'
-	guest := hwhost.build_program(host, repository + '/' + definition.guest, guest_dir, 'init', definition.module_paths)!
+	guest := hwhost.build_program_with_flags(host, repository + '/' + definition.guest,
+		guest_dir, 'init', definition.module_paths, ['-enable-globals'])!
 	root := hwhost.build_extras(host, definition, guest_dir)!
 	mut artifacts := []Artifact{}
 	for role, path in {'kernel': kernel, 'sandbox': root + '/usr/bin/vinix-sandbox', 'guest-init': guest,
