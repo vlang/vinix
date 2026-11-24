@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import accountcore
+import crypto.sha256
 import json2
 import os
 import time
@@ -106,6 +108,7 @@ fn qualify_package_admin(mut t Test) ! {
 		}
 	}
 	assert completed && service.verify()!.packages.len == 0
+	qualify_approved_media_import(mut t, db, alex, sam, repository)!
 	mut revoke := pkgcore.review_repository('', 'revoke', pkgcore.Repository{ id: 'admin-publisher' }, false)!
 	defer { revoke.close() }
 	revoked := run(['/usr/bin/vinix-package', 'admin', 'repo-apply', revoke.fingerprint, 'revoke', 'admin-publisher'], alex_password + '\n', db, alex)
@@ -114,6 +117,92 @@ fn qualify_package_admin(mut t Test) ! {
 	assert log.contains('uid=1000 run packages-change as alex: exit 0') && !log.contains(alex_password)
 	assert os.ls('/run/user/1000')!.all(!it.starts_with('pkg-'))
 	t.say('PACKAGE ADMIN reviewed-remove rollback trust-revocation root-state audit no-password-log clean-runtime PASS')
+}
+
+fn qualify_approved_media_import(mut t Test, db accountcore.Database, alex accountcore.User, sam accountcore.User, repository string) ! {
+	service := pkgcore.Service{}
+	before := service.state()!
+	config_path := '/etc/vinix-packages/config.json'
+	config_text := os.read_file(config_path)!
+	config := pkgcore.load_config('')!
+	mut deployment := service.lock_deployment(['admin-fixture'])!
+	defer { deployment.close() }
+	lock_text := json2.encode(deployment) + '\n'
+	lock_digest := sha256.hexhash(lock_text)
+	media := '/tmp/release media é'
+	os.mkdir(media, mode: 0o755)!
+	mut release := pkgcore.publish_release(repository, 'admin-publisher', '/tmp/package-publisher/admin-seed',
+		2, time.now().unix() + 3600, media + '/admin-publisher')!
+	defer { release.close() }
+	objects := media + '/admin-publisher/objects'
+	mut payload_bytes := u64(0)
+	for name in os.ls(objects)! { payload_bytes += os.file_size(objects + '/' + name) }
+	os.write_file(media + '/' + pkgprotocol.deployment_mirror_filename, lock_text)!
+	receipt := '/tmp/approved release é; $literal.json'
+	receipt_text := json2.encode(pkgcore.IsoPackageReceipt{
+		architecture: config.architecture
+		iso_sha256: sha256.hexhash('fixture ISO')
+		configuration_sha256: sha256.hexhash(config_text)
+		deployment_sha256: lock_digest
+		applications: deployment.packages
+		publishers: [pkgcore.IsoOfflinePublisher{ id: 'admin-publisher', public_key: config.repositories[0].public_key,
+			sequence: release.sequence, index_sha256: release.index_sha256, payload_bytes: payload_bytes }]
+	}) + '\n'
+	os.write_file(receipt, receipt_text)!
+	receipt_digest := sha256.hexhash(receipt_text)
+	package_cli := '/usr/bin/vinix-package'
+	command := [package_cli, 'admin', '--progress', '--offline', 'update-media', media, receipt, receipt_digest]
+	catalog_path := pkgcore.state_directory('') + '/catalog.json'
+	previous_catalog := os.read_file(catalog_path)!
+	denied := run(command, sam_password + '\n', db, sam)
+	assert denied.status != 0 && denied.output.contains('cannot approve')
+	os.write_file(receipt, receipt_text + ' ')!
+	changed := run(command, alex_password + '\n', db, alex)
+	assert changed.status != 0 && changed.output.contains('ISO package receipt SHA-256 differs'), changed.output
+	assert !changed.output.contains(pkgprotocol.media_import_result_prefix)
+	assert os.read_file(catalog_path)! == previous_catalog && service.state()! == before
+	os.write_file(receipt, receipt_text)!
+	imported := run(command, alex_password + '\n', db, alex)
+	assert imported.status == 0 && os.read_file(catalog_path)! != previous_catalog, imported.output
+	assert os.read_file(config_path)! == config_text && service.state()! == before
+	assert !imported.output.contains(pkgadmin.result_prefix) && !imported.output.contains(alex_password)
+	mut frames := 0
+	mut completed := false
+	for line in imported.output.split_into_lines() {
+		if line.starts_with(pkgprotocol.progress_prefix) {
+			mut progress := pkgprotocol.decode_progress(line[pkgprotocol.progress_prefix.len..])!
+			if progress.phase == 'complete' { completed = true }
+			progress.close()
+		} else if line.starts_with(pkgprotocol.media_import_result_prefix) {
+			mut result := pkgprotocol.decode_media_import_result(line[pkgprotocol.media_import_result_prefix.len..])!
+			assert completed && result.receipt_sha256 == receipt_digest && result.deployment_sha256 == lock_digest
+			result.close()
+			frames++
+		}
+	}
+	assert frames == 1
+	saved_path := alex.home + '/saved release lock.json'
+	saved := run([package_cli, '--offline', '--json', 'deployment-media-save', media, saved_path, lock_digest], '', db, alex)
+	assert saved.status == 0, saved.output
+	mut saved_receipt := pkgprotocol.decode_deployment_media_saved(saved.output)!
+	defer { saved_receipt.close() }
+	assert saved_receipt.sha256 == lock_digest && saved_receipt.destination == saved_path
+	assert os.read_file(saved_path)! == lock_text && owner_of(saved_path) == int(alex.uid)
+	os.rename(media, '/tmp/disconnected release media')!
+	reviewed := run([package_cli, '--offline', 'deployment-add-review', saved_path, saved_receipt.sha256], '', db, alex)
+	assert reviewed.status == 0, reviewed.output
+	mut review := pkgprotocol.decode_review(reviewed.output)!
+	defer { review.close() }
+	assert review.rows.len == 1 && review.rows[0].id == 'admin-fixture' && review.rows[0].action == 'install'
+	apply := run([package_cli, 'admin', '--offline', 'deployment-add-apply', review.fingerprint, saved_path, saved_receipt.sha256], alex_password + '\n', db, alex)
+	assert apply.status == 0 && service.state()!.generation > before.generation, apply.output
+	covered := run([package_cli, '--offline', '--json', 'deployment-add-audit', saved_path, saved_receipt.sha256], '', db, alex)
+	assert covered.status == 0, covered.output
+	mut audit := pkgprotocol.decode_deployment_audit(covered.output)!
+	defer { audit.close() }
+	assert audit.matches && audit.deployment_sha256 == lock_digest
+	assert os.ls('/run/user/1000')!.all(!it.starts_with('pkg-'))
+	t.say('PACKAGE ADMIN receipt-bound media import, digest handoff and approved offline deployment PASS')
 }
 
 fn package_admin_peer_probe(nonce string, fingerprint string) !int {

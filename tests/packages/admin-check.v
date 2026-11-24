@@ -45,6 +45,7 @@ fn suite(repository string) !hwhost.Suite {
 				'PACKAGE DEPLOYMENT empty-offline formats-1-2 revoked-catalog authenticated-remove stale-refusal retained-data authorized-rollback PASS',
 				'PACKAGE VIEW ordinary-admin-standard complete-catalog installed-launch-fields typed-flags nested-refusal read-only PASS',
 				'PACKAGE POLICY ordinary-admin-standard public-read complete-impact literal-path password-role stale-file-refusal atomic-policy-only reload clean-runtime PASS',
+				'PACKAGE ADMIN receipt-bound media import, digest handoff and approved offline deployment PASS',
 				'PACKAGE ADMIN reviewed-remove rollback trust-revocation root-state audit no-password-log clean-runtime PASS', 'HWTEST PASS packages-admin'],
 			forbidden: ['V panic:', 'FAIL: fn main.qualify_package_admin'], ending: .poweroff, timeout: 300 }]
 	}

@@ -97,10 +97,14 @@ fn test_admin_output_requires_bound_receipt_and_exact_eof() {
 	request := Request{ nonce: '0123456789abcdef0123456789abcdef', arguments: arguments }
 	receipt := request.receipt(37); defer { unsafe { receipt.free() } }
 	oversized := 'x'.repeat(16385); defer { unsafe { oversized.free() } }
+	media := pkgprotocol.media_import_result_prefix
+	media_at_limit := media + 'x'.repeat(pkgprotocol.media_import_result_limit)
 	inputs := [receipt + '\n', 'diagnostic\nVINIX-PACKAGE-PROGRESS {"phase":"check"}\n' + receipt + '\n',
-		oversized + '\n' + receipt + '\n', receipt.replace(request.nonce, 'ffffffffffffffffffffffffffffffff') + '\n',
+		oversized + '\n' + receipt + '\n', media_at_limit + '\n' + receipt + '\n',
+		receipt.replace(request.nonce, 'ffffffffffffffffffffffffffffffff') + '\n',
 		receipt + '\nextra', receipt.clone(), 'diagnostic\n', '', receipt + '\n\n',
-		result_prefix + oversized + '\n', pkgprotocol.progress_prefix + oversized + '\n', receipt + 'x\n']
+		result_prefix + oversized + '\n', pkgprotocol.progress_prefix + oversized + '\n', receipt + 'x\n',
+		media_at_limit + 'x\n' + receipt + '\n', media + oversized + '\n' + receipt + '\n']
 	defer { unsafe { inputs.free() } }
 	path := os.temp_dir() + '/vinix-admin-stream-' + os.getpid().str(); defer { unsafe { path.free() } }
 	before := admin_client_fds()
@@ -112,14 +116,14 @@ fn test_admin_output_requires_bound_receipt_and_exact_eof() {
 		$if track_heap ? { C.vinix_heap_begin() }
 		for _ in 0 .. admin_client_cycles() {
 			assert C.lseek(fd, 0, C.SEEK_SET) == 0
-			if status := receive_output(fd, request) { assert index < 3 && status == 37 } else {
+			if status := receive_output(fd, request) { assert index < 4 && status == 37 } else {
 				message := admin_client_error(err)
-				wanted := if index == 3 { 'administrator package completion receipt is invalid' }
-					else if index == 11 { 'invalid administrator package result code' }
-					else if index in [4, 8]! { 'data followed the administrator package completion receipt' }
-					else if index in [9, 10]! { 'administrator protocol output exceeds its bound' }
+				wanted := if index == 4 { 'administrator package completion receipt is invalid' }
+					else if index == 12 { 'invalid administrator package result code' }
+					else if index in [5, 9]! { 'data followed the administrator package completion receipt' }
+					else if index in [10, 11, 13, 14]! { 'administrator protocol output exceeds its bound' }
 					else { 'administrator package completion was lost; check package state before retrying' }
-				assert index >= 3 && message == wanted
+				assert index >= 4 && message == wanted
 				unsafe { message.free() }
 			}
 		}

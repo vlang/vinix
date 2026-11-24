@@ -858,8 +858,9 @@ vinix-package admin update-media /media/usb/release-apps /review/vinix-packages-
 
 With `--progress`, a receipt-bound import also emits a
 `VINIX-PACKAGE-MEDIA-RESULT` line followed by a format-1 JSON object with
-`receipt_sha256` and `deployment_sha256`. Use the result after the command
-exits successfully.
+`receipt_sha256` and `deployment_sha256`. The JSON body is limited to 512
+bytes, including when using the administrator transport. Use the result
+after the command exits successfully.
 
 `deployment-media-save MEDIA_DIRECTORY NEW_FILE [EXPECTED_SHA256]` checks the
 bundle's nonempty format-2 lock against the current authenticated catalog,

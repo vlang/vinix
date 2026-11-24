@@ -2,6 +2,7 @@
 module pkgprotocol
 
 pub const media_import_result_prefix = 'VINIX-PACKAGE-MEDIA-RESULT '
+pub const media_import_result_limit = 512
 
 pub struct MediaImportResult {
 pub:
@@ -18,7 +19,7 @@ pub fn (mut result MediaImportResult) close() {
 const media_import_keys = ['format', 'receipt_sha256', 'deployment_sha256']
 
 pub fn decode_media_import_result(text string) !MediaImportResult {
-	if text.len > 512 { return error('media import result exceeds its size limit') }
+	if text.len > media_import_result_limit { return error('media import result exceeds its size limit') }
 	mut r := &MetadataReader{ text: text }
 	defer { unsafe { free(r) } }
 	r.expect(`{`)!

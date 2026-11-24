@@ -143,6 +143,12 @@ fn receive_output(fd int, request &Request) !int {
 				pending.clear()
 			} else {
 				if skip { continue }
+				if pending.len == pkgprotocol.media_import_result_prefix.len + pkgprotocol.media_import_result_limit {
+					line := unsafe { tos(pending.data, pending.len) }
+					if line.starts_with(pkgprotocol.media_import_result_prefix) {
+						return error('administrator protocol output exceeds its bound')
+					}
+				}
 				if pending.len == pending.cap {
 					line := unsafe { tos(pending.data, pending.len) }
 					if line.starts_with(result_prefix) || line.starts_with(pkgprotocol.progress_prefix) { return error('administrator protocol output exceeds its bound') }
