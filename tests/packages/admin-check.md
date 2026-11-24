@@ -135,3 +135,30 @@ receipt verified.
 
 The build logs, source patches, receipts, QMP and serial evidence are archived
 with the [isolated launch rerun](launch-client-check.md#current-compiler-rerun).
+
+## Receipt-bound offline media
+
+Source revision `1a26de8d9141e8d61a38105b675a712be779524d` passed the
+administrator scenario on 2026-11-25. AArch64 completed in 30.6 seconds and
+x86-64 in 53.9 seconds, with guest-initiated shutdown on both targets.
+
+The real authentication service denied a standard account and admitted an
+ordinary administrator. Changing approved receipt bytes refused import and
+preserved the catalog and installed state. Restoring the receipt produced one
+matching result with the receipt and deployment SHA-256 values after completion
+progress. The administrator saved the exact lock as an ordinary user and
+disconnected the media before reviewing and separately approving installation
+from cache. Coverage matched the saved digest. The test used a fixture publisher,
+data package and guest accounts.
+
+The administrator transport now enforces the same 512-byte result body limit as
+the parser. The new regression fails with the previous transport. The corrected
+client retained zero tracked bytes across 1,000 iterations of each stream case.
+LLVM AddressSanitizer and UndefinedBehaviorSanitizer passed with sanitizer leak
+detection disabled. The tracked protocol decoder also passed.
+
+The checker verified 170 sealed files and links. The gzip SHA-256 is
+`155443ce7ae0a49620ecce2d9cff2801970d95057f185d5078ba2a840ed6c50e`.
+The shared checkout could not create its Git index lock because the host disk
+was full. Both commits and the verified archive are retained on a RAM volume.
+[Evidence and restore instructions](/Volumes/VinixAdminMediaEvidence/RESTORE.md)
