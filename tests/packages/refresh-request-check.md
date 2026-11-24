@@ -119,3 +119,18 @@ append package, history and snapshot records by value and use the same owned
 floor cleanup on decode refusal and history retirement. The array still owns
 each record's fields after the append. Generated C keeps these temporary
 records and string descriptors on the stack.
+
+On 2026-11-24, revision `5b1e6a348b875f00974072df6f4dd158e5f6bbc0`
+retained zero tracked bytes across all 4,608 host refresh requests and both
+64-call publication-failure scopes with V `2655544`. Tracked history,
+snapshot and signed-index decoder suites passed. Nine ordinary host suites
+passed, and the decoder and focused refresh suites passed under ASan/UBSan
+with leak detection disabled. All three QEMU refresh cut points passed on
+AArch64 (HVF) and x86_64 (TCG), with guest shutdown after each recovery.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-refresh-heap-rSAt0v/qualification.tar.gz)
+contains the source snapshot, allocation stacks, before and after generated C,
+test binaries, initial disks, logs and 11 verified receipt entries per target.
+The QEMU runs used `--failures-only`. The independent archive checker verified
+all 131 sealed files. Archive SHA-256
+`a787514b9143721b0f81d45df1fe69fa297bd74b55a3be47039dde2113141ce6`.
