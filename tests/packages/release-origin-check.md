@@ -101,3 +101,26 @@ All three boots use test media to load the kernel and require guest-originated
 QMP shutdowns. The loopback server log must contain the exact metadata requests
 and only the newly needed runtime objects. Production publisher enrollment and
 public HTTPS repository acceptance remain separate release gates.
+
+### Installed-guest results
+
+At `cac3548fe`, both fresh VJFS guests passed with 2 GiB of RAM and three
+guest-originated shutdowns. AArch64 completed in 171.977 seconds under HVF.
+x86-64 completed in 483.689 seconds under TCG. Both used curl 8.14.1 and
+OpenSSL 3.3.7, fetched one authenticated runtime object, and made exactly
+eleven HTTPS requests. The offline control made no HTTPS request. The audit
+isolated the SQLite runtime change, then reported a full match after rollback
+and again after the final cold boot.
+
+The accepted builds use the retained kernels and a V-built ARM musl GCC
+adapter. Earlier link failures and refusals for a missing or mismatched
+installer image ID are retained with the run receipts.
+
+The source snapshot, signed inputs, boot media, logs and both installed disks
+are archived in
+`~/.local/state/vinix/r14-installed-release-origin-ByhN6F/qualification.tar.gz`.
+The archive SHA-256 is `53c309120c874d626a9c257bd192ce6ff79721087c2c849b3d65e0872011c290`.
+The `bundle.sha256` manifest has 8,805 file and symlink entries and SHA-256
+`50d182a0b23412ef0c5e7847303b160e9ef2c6b49040723beb58cc4ecb463a31`.
+All entries matched after independent extraction. Each `system.vjfs.zst`
+decoded to the corresponding `disk.raw.sha256`.
