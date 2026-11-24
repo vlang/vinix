@@ -53,7 +53,11 @@ fn decode_history(text string, publisher bool) !TrustHistory {
 // fields. Synthetic histories can borrow fields and must not use this cleanup.
 fn close_decoded_history(history TrustHistory) {
 	unsafe {
-		for floor in history.repositories { floor.id.free(); floor.public_key.free(); floor.index_sha256.free() }
+		for floor in history.repositories { close_decoded_floor(floor) }
 		(&array(&history.repositories)).free()
 	}
+}
+
+fn close_decoded_floor(floor RepositoryFloor) {
+	unsafe { floor.id.free(); floor.public_key.free(); floor.index_sha256.free() }
 }

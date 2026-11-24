@@ -169,17 +169,29 @@ fn refresh_locked(config Config, directory string) !Catalog {
 	return refresh_progress(config, directory, '', no_progress)
 }
 
+// Free through a value parameter so the caller's string descriptor stays on
+// the stack when its data is released.
+fn free_owned_string(value string) {
+	unsafe { value.free() }
+}
+
 fn fetch_snapshot(config Config, directory string, work string, repository Repository, parent int, target StageTarget,
 	report fn (pkgprotocol.Progress)) !Snapshot {
 	message := 'Updating trusted repository ' + repository.id
 	println(message)
-	defer { unsafe { message.free() } }
+	defer { free_owned_string(message) }
 	base := repository_fetch_base(directory, repository, config.policy.offline, false)!
 	index_path := work + '/index.json'
 	sig_path := work + '/index.sig'
 	index_url := base + '/index.json'
 	sig_url := base + '/index.sig'
-	defer { unsafe { index_path.free(); sig_path.free(); base.free(); index_url.free(); sig_url.free() } }
+	defer {
+		free_owned_string(index_path)
+		free_owned_string(sig_path)
+		free_owned_string(base)
+		free_owned_string(index_url)
+		free_owned_string(sig_url)
+	}
 	// Progress can run caller code. Each transfer checks its own file, and
 	// the workspace check also rejects a moved file in a different directory.
 	check_repository_workspace(directory, parent, target)!
@@ -190,9 +202,9 @@ fn fetch_snapshot(config Config, directory string, work string, repository Repos
 		pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.sig' }, report)!
 	check_repository_workspace(directory, parent, target)!
 	text := read_metadata(index_path)!
-	raw_signature := read_metadata(sig_path) or { unsafe { text.free() }; return err }
+	raw_signature := read_metadata(sig_path) or { free_owned_string(text); return err }
 	signature := raw_signature.trim_space()
-	unsafe { raw_signature.free() }
+	free_owned_string(raw_signature)
 	return Snapshot{ repository: repository, text: text, signature: signature }
 }
 

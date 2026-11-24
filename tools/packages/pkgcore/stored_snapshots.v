@@ -43,8 +43,7 @@ fn read_stored_snapshots(text string) ![]Snapshot {
 		if values.len == 4096 { return error('cached repository metadata exceeds its identity limit') }
 		value := r.cached_snapshot()!
 		// Transfer before checking uniqueness so a refusal retires this record.
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << value
 		for index in 0 .. values.len - 1 {
 			if values[index].repository.id == value.repository.id { return error('duplicate cached repository identity') }
 		}

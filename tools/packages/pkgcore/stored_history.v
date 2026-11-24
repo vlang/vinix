@@ -9,7 +9,7 @@ fn (mut r StoredReader) history_floor() !RepositoryFloor {
 	r.expect(`{`)!
 	mut value := RepositoryFloor{}
 	mut accepted := false
-	defer { if !accepted { unsafe { value.id.free(); value.public_key.free(); value.index_sha256.free() } } }
+	defer { if !accepted { close_decoded_floor(value) } }
 	mut seen := u32(0); mut first := true
 	for r.next(first, `}`)! {
 		first = false
@@ -41,8 +41,7 @@ fn (mut r StoredReader) history_floors() ![]RepositoryFloor {
 		value := r.history_floor()!
 		// Transfer before checking uniqueness so refusal retires this record too.
 		// Comparing borrowed fields avoids allocating concatenated identity keys.
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << value
 		for index in 0 .. values.len - 1 {
 			if values[index].id == value.id && values[index].public_key == value.public_key {
 				return error('duplicate repository history identity')

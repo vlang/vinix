@@ -33,8 +33,7 @@ fn (mut r StoredReader) index_packages() ![]Package {
 		first = false
 		if values.len == 4096 { return error('signed package count exceeds its bound') }
 		value := r.package()!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << value
 	}
 	accepted = true
 	return values

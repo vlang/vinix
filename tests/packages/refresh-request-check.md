@@ -106,3 +106,16 @@ and QEMU command logs alongside them. The
 [ledger](results/2026-10-18/refresh-request-ledger.json) binds all saved evidence,
 original source snapshots, generated C, deployed binaries, prebuilt kernels and
 the V-only media adapter. Run the retention helper with `--verify` to check it.
+
+## Refresh allocation follow-up
+
+V `2655544` moved some fetch string descriptors and temporary decoded records
+to the heap. The captured stacks accounted for all 14 live allocations and
+1,984 retained bytes per refused history publication. The test measured
+126,976 bytes across 64 calls before the fix.
+
+Fetch cleanup now passes owned string descriptors by value. The typed readers
+append package, history and snapshot records by value and use the same owned
+floor cleanup on decode refusal and history retirement. The array still owns
+each record's fields after the append. Generated C keeps these temporary
+records and string descriptors on the stack.
