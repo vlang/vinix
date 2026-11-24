@@ -172,3 +172,18 @@ Independent extraction matched all 8,804 file and symlink entries in
 `f3af7c59e2cf0a98764ba323c9f6119f1ec7f120db2ec55b698772da49c6538f`.
 Both restored `system.vjfs.zst` images decoded to their recorded raw disk
 checksums.
+
+## Bundled payload reuse during online upgrades
+
+Use `--reuse-bundle` in place of `--bundled-https` with the installed
+runner. It retains the HTTPS catalog refresh, replay, upgrade, rollback
+and cold-boot checks. Before upgrading, it removes three unchanged objects
+from the disposable guest's cache. It keeps one exact image object, corrupts
+another without changing its length, and leaves a 1,536-byte partial for
+the third.
+
+The server offers the two fallback objects and the updated SQLite runtime.
+The request log requires a fresh request for the corrupt local object, a
+range request at byte 1536 for the partial, and zero requests for the exact
+image object. All three cache objects must match their signed digests before
+the upgrade qualifies.

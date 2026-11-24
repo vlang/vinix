@@ -436,6 +436,13 @@ refused and the current cache and trust history stay intact. Offline acquisition
 can still use verified cached objects and bundled objects that match the current
 signed manifests. See [installed guest qualification](../../tests/packages/release-origin-check.md#bundled-https-publisher).
 
+Online refresh reads metadata from the configured HTTPS origin. During an
+online install or upgrade, a missing cache object can be copied from the
+image bundle when its length and SHA-256 match the current signed manifest.
+An unavailable or invalid bundled object is fetched over HTTPS. A retained
+download prefix continues through the HTTPS resume path. See
+[online upgrade qualification](../../tests/packages/release-origin-check.md#bundled-payload-reuse-during-online-upgrades).
+
 #### Move a bundled publisher to its HTTPS repository
 
 After the initial offline install, use the **Repositories** page in Software to

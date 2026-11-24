@@ -359,6 +359,41 @@ fn test_image_bundle_bootstraps_a_configured_https_publisher_offline() {
 	println('PACKAGE IMAGE BUNDLE HTTPS publisher installs offline without trust changes and refuses replay on both targets PASS')
 }
 
+fn test_online_install_reuses_payloads_from_the_authenticated_image_bundle() {
+	for architecture in ['aarch64', 'x86_64']! {
+		work, key := image_bundle_fixture(false)!
+		defer { os.rmdir_all(work) or {} }
+		root := work + '/image'
+		os.mkdir(root)!
+		repository := Repository{ id: 'native', url: 'https://127.0.0.1:1/release', public_key: key }
+		config := Config{ architecture: architecture, repositories: [repository],
+			policy: Policy{ reserve_bytes: 0 } }
+		source := work + '/https-config.json'
+		os.write_file(source, json2.encode(config) + '\n')!
+		mut configuration := prepare_image_configuration(root, architecture, source)!
+		defer { configuration.close() }
+		mut plan := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		defer { plan.close() }
+		assert unsafe { &plan }.publish()!
+		assert unsafe { &configuration }.publish()!
+		plan.retire()!
+		mut catalog := Service{ root: root, offline: true }.refresh()!
+		catalog.close()
+		service := Service{ root: root }
+		mut review := service.review('install', ['app'])!
+		defer { review.close() }
+		mut installed := service.transact('install', ['app'], TransactionOptions{ expected_review: review.fingerprint })!
+		defer { installed.close() }
+		assert installed.generation == 1 && installed.requested == ['app'] && installed.packages.len == 2
+		mut verified := service.verify()!
+		defer { verified.close() }
+		assert verified == installed
+		assert load_config(root)! == config
+		assert read_snapshots(state_directory(root))![0].repository == repository
+	}
+	println('PACKAGE IMAGE BUNDLE online installation reuses verified image payloads with inaccessible HTTPS objects PASS')
+}
+
 fn test_image_bundle_requires_explicit_trust_exact_export_and_safe_sources() {
 	work, key := image_bundle_fixture(false)!; defer { os.rmdir_all(work) or {} }
 	root := work + '/image'; os.mkdir(root)!

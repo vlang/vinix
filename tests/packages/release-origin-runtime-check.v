@@ -11,6 +11,12 @@ import tools.packages.pkgcore
 const release_apps = ['org.ffmpeg.cli', 'org.ffmpeg.probe', 'org.neovim.editor', 'org.sqlite.cli',
 	'org.vinix.counter', 'org.vinix.memo', 'org.vinix.package-hello']
 
+struct BundleReuse {
+	local string
+	corrupt string
+	resume string
+}
+
 fn checked(args []string) !string {
 	result := os.exec(args)
 	if result.exit_code != 0 { return error('${args[0]} failed: ${result.output}') }
@@ -91,6 +97,16 @@ fn required_objects(arch string, baseline pkgcore.Index, update pkgcore.Index) !
 	return needed.keys().sorted()
 }
 
+fn unchanged_entrypoint(arch string, id string, baseline pkgcore.Index, update pkgcore.Index) !string {
+	old := baseline.packages.filter(it.id == id && it.architecture == arch)
+	current := update.packages.filter(it.id == id && it.architecture == arch)
+	if old.len != 1 || current != old { return error('expected unchanged package: ' + id) }
+	entry := old[0].entrypoint
+	files := old[0].files.filter(it.path == entry && it.bytes > 1536)
+	if files.len != 1 { return error('expected one reusable entrypoint: ' + id) }
+	return files[0].sha256
+}
+
 fn start_fixture(host hwhost.Host, root string, work string) !(&os.Process, string) {
 	server := work + '/https-fixture'
 	hwhost.run_tool([host.v, '-o', server, root + '/tests/packages/https-fixture.v'], map[string]string{},
@@ -123,23 +139,24 @@ fn stop_fixture(mut child os.Process, work string) {
 	child.close()
 }
 
-fn verify_requests(work string, objects []string, preconfigured bool) ! {
+fn verify_requests(work string, object_requests []string, preconfigured bool) ! {
 	metadata := ['origin online/index.json -', 'origin online/index.sig -']
 	replay := ['origin older/index.json -', 'origin older/index.sig -']
 	requests := os.read_file(work + '/requests.log')!.split_into_lines()
 	prefix := if preconfigured { metadata } else { [...metadata, ...metadata, ...metadata] }
 	suffix := [...replay, ...replay]
-	if requests.len != prefix.len + objects.len + suffix.len || requests[..prefix.len] != prefix
+	if requests.len != prefix.len + object_requests.len + suffix.len || requests[..prefix.len] != prefix
 		|| requests[requests.len - suffix.len..] != suffix
-		|| requests[prefix.len..requests.len - suffix.len].sorted() != objects.map('origin online/objects/' + it + ' -') {
+		|| requests[prefix.len..requests.len - suffix.len].sorted() != object_requests.sorted() {
 		return error('unexpected HTTPS requests; see ' + work + '/requests.log')
 	}
 }
 
 fn check() ! {
-	preconfigured := os.args.len == 9 && os.args[8] == '--bundled-https'
+	reuse := os.args.len == 9 && os.args[8] == '--reuse-bundle'
+	preconfigured := reuse || (os.args.len == 9 && os.args[8] == '--bundled-https')
 	if (os.args.len != 8 && !preconfigured) || os.args[1] !in ['aarch64', 'x86_64'] {
-		return error('usage: release-origin-runtime-check ARCH KERNEL CURL_ROOT BASELINE_BUNDLE UPDATE_BUNDLE CONFIG NEW_WORK [--bundled-https]')
+		return error('usage: release-origin-runtime-check ARCH KERNEL CURL_ROOT BASELINE_BUNDLE UPDATE_BUNDLE CONFIG NEW_WORK [--bundled-https|--reuse-bundle]')
 	}
 	arch := os.args[1]
 	kernel := os.abs_path(os.args[2])
@@ -187,7 +204,9 @@ fn check() ! {
 		capture(update + '/' + leaf, served + '/' + leaf, mut pins)!
 		capture(installed_bundle + '/' + leaf, work + '/served/older/' + leaf, mut pins)!
 	}
-	objects := required_objects(arch, baseline, signed_index(served, repo)!)!
+	updated := signed_index(served, repo)!
+	objects := required_objects(arch, baseline, updated)!
+	mut expected_objects := objects.map('origin online/objects/' + it + ' -')
 	for hash in objects {
 		capture(update + '/objects/' + hash, served + '/objects/' + hash, mut pins)!
 	}
@@ -205,6 +224,22 @@ fn check() ! {
 	os.cp(work + '/ca.pem', fixture + '/ca.pem')!
 	os.write_file(fixture + '/endpoint', endpoint + '\n')!
 	if preconfigured { os.write_file(fixture + '/bundled-https', '')! }
+	if reuse {
+		tests := BundleReuse{
+			local: unchanged_entrypoint(arch, 'org.vinix.counter', baseline, updated)!
+			corrupt: unchanged_entrypoint(arch, 'org.vinix.memo', baseline, updated)!
+			resume: unchanged_entrypoint(arch, 'org.vinix.package-hello', baseline, updated)!
+		}
+		if tests.local == tests.corrupt || tests.local == tests.resume || tests.corrupt == tests.resume {
+			return error('bundle reuse requires three distinct cached objects')
+		}
+		for hash in [tests.corrupt, tests.resume]! {
+			capture(update + '/objects/' + hash, served + '/objects/' + hash, mut pins)!
+		}
+		expected_objects << ['origin online/objects/' + tests.corrupt + ' -',
+			'origin online/objects/' + tests.resume + ' bytes=1536-']
+		os.write_file(fixture + '/bundle-reuse.json', json2.encode(tests) + '\n')!
+	}
 	os.write_file(target + '/.vinix-image-id', 'vinix-release-origin-installed-1\n')!
 	os.write_file(work + '/inputs.json', json2.encode(pins) + '\n')!
 	result := hwhost.run_scenario(if arch == 'x86_64' {
@@ -233,19 +268,24 @@ fn check() ! {
 				} else {
 					[]string{}
 				},
+				...if reuse {
+					['HWTEST PASS bundled payload reused, corrupt payload fetched and HTTPS prefix resumed']
+				} else {
+					[]string{}
+				},
 			]
 			forbidden:    ['HWTEST FAIL', 'Kernel panic', 'running from memory',
 				'sysdisk: updating the system on']
 		}, hwhost.Run{ kernel: kernel, guest: guest, state: boot, timeout: 1800, memory_mib: 2048, keep: true })
 	os.write_file(work + '/result.json', json2.encode(result) + '\n')!
 	if !result.passed { return error(result.reason) }
-	verify_requests(work, objects, preconfigured)!
+	verify_requests(work, expected_objects, preconfigured)!
 	for path, expected in pins {
 		if pkgcore.hash_file(path)! != expected {
 			return error('qualification input changed: ' + path)
 		}
 	}
-	println('INSTALLED RELEASE ORIGIN ${arch} three cold boots and ${objects.len} authenticated HTTPS objects PASS')
+	println('INSTALLED RELEASE ORIGIN ${arch} three cold boots and ${expected_objects.len} authenticated HTTPS objects PASS')
 }
 
 fn main() {

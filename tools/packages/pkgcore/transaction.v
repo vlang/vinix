@@ -223,7 +223,10 @@ fn cached_payload_progress(config Config, installed Installed, payload Payload, 
 	mut resumed := false
 	event := pkgprotocol.Progress{ phase: 'download', package: installed.package.id,
 		repository: installed.repository, path: payload.path, total: payload.bytes }
-	if !verified_file(part, payload) {
+	retained_prefix := info.st_mode & 0o170000 == 0o100000 && info.st_size > 0 &&
+		u64(info.st_size) < payload.bytes
+	if !verified_file(part, payload) && (config.policy.offline || retained_prefix ||
+		!copy_bundled_payload(directory, repositories[0], payload, part, event, report)!) {
 		prefix := repository_fetch_base(directory, repositories[0], config.policy.offline, true)!
 		defer { unsafe { prefix.free() } }
 		url = prefix + '/objects/' + payload.sha256

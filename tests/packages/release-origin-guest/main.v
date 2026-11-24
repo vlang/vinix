@@ -29,6 +29,12 @@ struct Checkpoint {
 	current string
 }
 
+struct BundleReuse {
+	local string
+	corrupt string
+	resume string
+}
+
 fn require(condition bool, reason string) ! {
 	if !condition { return error(reason) }
 }
@@ -146,6 +152,35 @@ fn enroll_origin(previous Checkpoint, endpoint string, id string, key string) ! 
 	require(changed.current == previous.current, 'enrollment activated a generation')!
 }
 
+fn prepare_bundle_reuse(probe BundleReuse, id string) ! {
+	bundle := '/usr/share/vinix-packages/repositories/' + id + '/objects/'
+	cache := store + '/objects/'
+	for hash in [probe.local, probe.corrupt, probe.resume]! {
+		bytes := os.read_bytes(cache + hash)!
+		require(bytes.len > 1536 && sha256.sum(bytes).hex() == hash &&
+			os.read_bytes(bundle + hash)! == bytes, 'expected verified image and cache bytes')!
+		os.rm(cache + hash)!
+		if hash == probe.resume {
+			os.write_file_array(cache + hash + '.part', bytes[..1536])!
+		} else if hash == probe.corrupt {
+			mut damaged := bytes.clone()
+			damaged[0] ^= 1
+			os.write_file_array(bundle + hash, damaged)!
+		}
+	}
+}
+
+fn check_bundle_reuse(probe BundleReuse, id string) ! {
+	cache := store + '/objects/'
+	for hash in [probe.local, probe.corrupt, probe.resume]! {
+		require(sha256.sum(os.read_bytes(cache + hash)!).hex() == hash && !os.exists(cache + hash + '.part'),
+			'upgrade did not publish a verified object')!
+	}
+	corrupt := '/usr/share/vinix-packages/repositories/' + id + '/objects/' + probe.corrupt
+	require(sha256.sum(os.read_bytes(corrupt)!).hex() != probe.corrupt, 'upgrade changed the bundled input')!
+	println('HWTEST PASS bundled payload reused, corrupt payload fetched and HTTPS prefix resumed')
+}
+
 fn migrate(document pkgprotocol.DeploymentDocument, previous Checkpoint, endpoint string, id string, key string) ! {
 	audit(document, false)!
 	version := run_program('/usr/bin/curl', ['--disable', '--version'], 0, 'OpenSSL/')!
@@ -161,12 +196,17 @@ fn migrate(document pkgprotocol.DeploymentDocument, previous Checkpoint, endpoin
 			'HTTPS refresh or refused bundled replay changed configuration or trusted state')!
 		println('HWTEST PASS bundled HTTPS publisher retained configuration and refused an offline replay')
 	}
+	probe_path := assets + 'bundle-reuse.json'
+	reuse := os.exists(probe_path)
+	probe := if reuse { json2.decode[BundleReuse](os.read_file(probe_path)!)! } else { BundleReuse{} }
+	if reuse { prepare_bundle_reuse(probe, id)! }
 	mut upgrade := pkgprotocol.decode_review(package_command(['review', 'upgrade'], 0, '')!)!
 	defer { upgrade.close() }
 	require(upgrade.rows.len == 10 && upgrade.rows.filter(it.action == 'update').map(it.id) == [runtime_id],
 		'unexpected signed upgrade review')!
 	package_command(['apply', upgrade.fingerprint, 'upgrade'], 0, '')!
 	package_command(['--json', 'verify'], 0, '')!
+	if reuse { check_bundle_reuse(probe, id)! }
 	audit(document, true)!
 	mut rollback := pkgprotocol.decode_review(package_command(['review', 'rollback'], 0, '')!)!
 	defer { rollback.close() }
