@@ -24,8 +24,18 @@ mut:
 fn C.mkdirat(int, &char, u32) int
 
 fn create_export_stage(parent_path string, prefix string, kind string) !ExportStage {
+	return create_export_stage_with_parent(parent_path, prefix, kind, -1)
+}
+
+// A supplied descriptor is borrowed. The stage retains an independent one.
+fn create_export_stage_with_parent(parent_path string, prefix string, kind string, captured_parent int) !ExportStage {
 	check_export_parent(parent_path, kind)!
-	parent := C.open(parent_path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	flags := C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW
+	parent := if captured_parent >= 0 {
+		C.openat(captured_parent, c'.', flags)
+	} else {
+		C.open(parent_path.str, flags)
+	}
 	if parent < 0 { return error('cannot capture ${kind} parent directory') }
 	mut accepted := false
 	defer { if !accepted { C.close(parent) } }

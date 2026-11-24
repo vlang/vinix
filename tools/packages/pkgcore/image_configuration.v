@@ -38,17 +38,17 @@ fn image_configuration_parents(root string) ! {
 	}
 }
 
-fn open_image_configuration_directory(parent int, name string, create bool) !int {
+fn open_image_package_directory(parent int, name string, create bool, kind string) !int {
 	if create && C.mkdirat(parent, name.str, 0o755) != 0 && C.errno != C.EEXIST {
-		return error('cannot create image package configuration directory: ' + name)
+		return error('cannot create image package ${kind} directory: ${name}')
 	}
 	fd := C.openat(parent, name.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 { return error('cannot open ordinary image package configuration directory: ' + name) }
+	if fd < 0 { return error('cannot open ordinary image package ${kind} directory: ${name}') }
 	mut info := C.stat{}
 	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o022 != 0
 		|| (info.st_uid != 0 && info.st_uid != u32(os.geteuid())) {
 		C.close(fd)
-		return error('image package configuration parents must be ordinary controlled directories without shared write access')
+		return error('image package ${kind} parents must be ordinary controlled directories without shared write access')
 	}
 	return fd
 }
@@ -171,9 +171,9 @@ fn (plan &ImageConfiguration) publish_configuration_with(options AtomicWriteOpti
 	if C.fstat(root, unsafe { &info }) != 0 || u64(info.st_dev) != plan.device || u64(info.st_ino) != plan.inode {
 		return error('package image root changed before configuration publication')
 	}
-	etc := open_image_configuration_directory(root, 'etc', !plan.existing)!
+	etc := open_image_package_directory(root, 'etc', !plan.existing, 'configuration')!
 	defer { C.close(etc) }
-	directory := open_image_configuration_directory(etc, 'vinix-packages', !plan.existing)!
+	directory := open_image_package_directory(etc, 'vinix-packages', !plan.existing, 'configuration')!
 	defer { C.close(directory) }
 	etc_path := plan.root + '/etc'
 	defer { unsafe { etc_path.free() } }

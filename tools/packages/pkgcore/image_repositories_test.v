@@ -518,3 +518,59 @@ fn test_image_bundle_rechecks_configuration_root_parents_and_retained_state() {
 	if _ := unsafe { &plan }.publish() { assert false } else {}
 	assert os.ls(root)!.len == 0
 }
+
+fn image_bundle_replace_disk_ancestor(ancestor string) !u64 {
+	os.rename(ancestor, ancestor + '.moved')!
+	os.mkdir(ancestor)!
+	os.write_file(ancestor + '/sentinel', 'replacement contents')!
+	return ~u64(0)
+}
+
+fn image_bundle_replace_verified_directory(phase string, target string) ! {
+	if phase != 'verified-existing' { return }
+	os.rename(target, target + '.moved')!
+	os.cp_all(target + '.moved', target, true)!
+}
+
+fn test_image_bundle_publish_keeps_budget_ancestor_and_preserved_bundle_bound_to_captures() {
+	work, key := image_bundle_fixture(false)!
+	defer { os.rmdir_all(work) or {} }
+	source := image_bundle_configuration(work, 'aarch64', key, Policy{})!
+	index := os.read_file(work + '/bundle/native/index.json')!
+	for partial_tree in [false, true]! {
+		root := work + '/' + if partial_tree { 'partial' } else { 'fresh' }
+		os.mkdir(root)!
+		ancestor := if partial_tree { root + '/usr/share' } else { root }
+		if partial_tree { os.mkdir_all(ancestor)! }
+		mut configuration := prepare_image_configuration(root, 'aarch64', source)!
+		defer { configuration.close() }
+		mut plan := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+		defer { plan.close() }
+		mut diagnostic := ''
+		unsafe { &plan }.publish_with(ImageRepositoriesOptions{ available_space: image_bundle_replace_disk_ancestor }) or {
+			diagnostic = err.msg()
+		}
+		expected := if partial_tree { 'repository ancestor changed' } else { 'image root changed' }
+		assert diagnostic.contains(expected), diagnostic
+		assert os.ls(ancestor)! == ['sentinel'] && os.ls(ancestor + '.moved')!.len == 0
+		assert os.read_file(ancestor + '/sentinel')! == 'replacement contents'
+		os.rename(ancestor, ancestor + '.replacement')!
+		os.rename(ancestor + '.moved', ancestor)!
+		assert unsafe { &plan }.publish()!
+
+		target := root + image_repositories_path
+		diagnostic = ''
+		unsafe { &plan }.publish_with(ImageRepositoriesOptions{ checkpoint: image_bundle_replace_verified_directory }) or {
+			diagnostic = err.msg()
+		}
+		assert diagnostic.contains('published image repository directory changed during verification'), diagnostic
+		assert os.read_file(target + '/native/index.json')! == index
+		assert os.read_file(target + '.moved/native/index.json')! == index
+		assert os.ls(os.dir(target))!.sorted() == ['repositories', 'repositories.moved']
+		os.rename(target, target + '.replacement')!
+		os.rename(target + '.moved', target)!
+		assert !unsafe { &plan }.publish()!
+		assert !os.exists(root + '/etc') && !os.exists(root + '/var')
+	}
+	println('IMAGE BUNDLE ancestor replacement during budgeting and identical bundle replacement during verification refuse; restoration permits publication and preservation PASS')
+}

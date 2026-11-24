@@ -35,6 +35,7 @@ fn image_input_suite() hwhost.Suite {
 				'IMAGE INPUT CHECK generic and per-target index files, strict admission and explicit precedence PASS',
 				'IMAGE INPUT CHECK publish/preserve/none decisions, occupied configuration, aliased/special/shared-write/damaged bundles refuse without overwriting destinations PASS',
 				'PACKAGE IMAGE CONFIG directory replacements and late consumer state refuse before writing and restoration permits retry PASS',
+				'IMAGE BUNDLE ancestor replacement during budgeting and identical bundle replacement during verification refuse; restoration permits publication and preservation PASS',
 				'IMAGE INPUT PROCESS image-check PASS', 'IMAGE INPUT PROCESS image-repositories PASS',
 				'IMAGE INPUT PROCESS image-configuration PASS', 'IMAGE INPUT PROCESS release PASS', 'IMAGE INPUT PROCESS catalog PASS',
 				'HWTEST PASS packages-image-input'], forbidden: ['V panic:', 'HWTEST FAIL'], ending: .poweroff, timeout: 180 }]

@@ -6,6 +6,7 @@ import time
 
 pub const image_repositories_path = '/usr/share/vinix-packages/repositories'
 const max_image_repository_indexes = 4096
+const image_repository_directory_names = ['usr', 'share', 'vinix-packages']!
 
 struct ImageRepository {
 	id string
@@ -317,6 +318,22 @@ fn (plan &ImageRepositories) capture_from(source string, options ImageRepositori
 
 pub fn (plan &ImageRepositories) publish() !bool { return plan.publish_with(ImageRepositoriesOptions{}) }
 
+// Open the selected range of package directories through an already held
+// ancestor. Only the remaining components may need to be created.
+fn open_image_repository_directories(ancestor int, start int, end int, create bool) !int {
+	mut directory := C.openat(ancestor, c'.', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if directory < 0 { return error('cannot retain image repository ancestor') }
+	mut accepted := false
+	defer { if !accepted { C.close(directory) } }
+	for i in start .. end {
+		next := open_image_package_directory(directory, image_repository_directory_names[i], create, 'repository')!
+		C.close(directory)
+		directory = next
+	}
+	accepted = true
+	return directory
+}
+
 fn (plan &ImageRepositories) publish_with(options ImageRepositoriesOptions) !bool {
 	if plan.capture == '' { return false }
 	plan.current()!
@@ -326,12 +343,45 @@ fn (plan &ImageRepositories) publish_with(options ImageRepositoriesOptions) !boo
 	target := plan.root + image_repositories_path
 	parent := os.dir(target)
 	defer { unsafe { target.free(); parent.free() } }
-	if image_configuration_exists(target)! { plan.verify(target, 0o755)!; return false }
+	root := capture_prepared_root(plan.root, 'image repositories')!
+	defer { C.close(root) }
+	mut info := C.stat{}
+	if C.fstat(root, unsafe { &info }) != 0 || u64(info.st_dev) != plan.device || u64(info.st_ino) != plan.inode {
+		return error('package image root changed before repository publication')
+	}
+	depth := ancestor.count('/') - plan.root.count('/')
+	ancestor_fd := open_image_repository_directories(root, 0, depth, false)!
+	defer { C.close(ancestor_fd) }
+	if !atomic_captured_parent_matches(ancestor, ancestor_fd) {
+		return error('image repository ancestor changed before publication')
+	}
+	if image_configuration_exists(target)! {
+		if ancestor != parent { return error('image repository parent appeared during publication; retry') }
+		directory := open_image_package_directory(ancestor_fd, 'repositories', false, 'repository')!
+		defer { C.close(directory) }
+		if !atomic_captured_parent_matches(target, directory) {
+			return error('published image repository directory changed before verification')
+		}
+		plan.verify(target, 0o755)!
+		options.checkpoint('verified-existing', target)!
+		plan.current()!
+		checked := image_repositories_parents(plan.root)!
+		unsafe { checked.free() }
+		if !atomic_captured_parent_matches(parent, ancestor_fd) || !atomic_captured_parent_matches(target, directory) {
+			return error('published image repository directory changed during verification')
+		}
+		return false
+	}
 	disk_check(options.available_space(ancestor)!, plan.needed, 64 * 1024 * 1024)!
-	make_package_directories(parent, 0o755)!
+	plan.current()!
 	checked := image_repositories_parents(plan.root)!
 	unsafe { checked.free() }
-	mut exporting := create_export_stage(parent, '.vinix-image-repositories', 'image repositories')!
+	if !atomic_captured_parent_matches(ancestor, ancestor_fd) {
+		return error('image repository ancestor changed before publication')
+	}
+	directory := open_image_repository_directories(ancestor_fd, depth, image_repository_directory_names.len, true)!
+	defer { C.close(directory) }
+	mut exporting := create_export_stage_with_parent(parent, '.vinix-image-repositories', 'image repositories', directory)!
 	defer { exporting.close() }
 	plan.write_stage(target, options, mut exporting) or { return exporting.failure(err) }
 	return true
@@ -350,12 +400,13 @@ fn (plan &ImageRepositories) write_stage(target string, options ImageRepositorie
 	exporting.check()!
 	plan.verify(plan.capture, 0o700)!
 	plan.verify(stage, 0o700)!
+	exporting.check()!
+	if C.fchmod(exporting.root, 0o755) != 0 { return error('cannot set published image repository directory mode') }
+	sync_directory(stage)!
+	plan.verify(stage, 0o755)!
 	plan.current()!
 	checked_parent := image_repositories_parents(plan.root)!
 	unsafe { checked_parent.free() }
-	os.chmod(stage, 0o755)!
-	sync_directory(stage)!
-	plan.verify(stage, 0o755)!
 	exporting.publish_with(target, options.flush)!
 }
 

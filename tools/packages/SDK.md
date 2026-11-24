@@ -374,12 +374,14 @@ to redistribute their selected payloads and notices.
 Before compiling, staging captures the authenticated bytes in a private temporary
 directory. Source changes or removal cannot redirect the capture. Both temporary
 and destination space are checked with 64 MiB of build headroom, including the
-two simultaneous copies when they share a filesystem. The final image bundle is
-verified again, flushed and published with an exclusive atomic directory rename.
-Expiry is rechecked before publication. Failed copies or validation retire the
-captured ordinary image stage and preserve any existing bundle. An identical destination
-is verified and retained; different or damaged contents refuse rather than being
-updated. Retry with the same valid source or rebuild a fresh staging image.
+two simultaneous copies when they share a filesystem. Staging holds the
+destination ancestor used for the space check and opens any remaining directories
+relative to it. It verifies and flushes the final bundle before an exclusive
+atomic directory rename. Expiry is rechecked before publication. Failed copies
+or validation retire the captured ordinary image stage and preserve any existing
+bundle. An identical destination is verified and retained only while its
+directory still matches the captured identity. Different or damaged contents
+refuse. Retry with the same valid source or rebuild a fresh staging image.
 
 For V image builders, call `configuration.prepare_repositories(source)` after
 `prepare_image_configuration`, publish the returned `ImageRepositories` before
