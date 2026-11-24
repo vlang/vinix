@@ -5,7 +5,9 @@ import crypto.sha256
 import json2
 import os
 import rand
+import strconv
 import tarstream
+import time
 import tools.packages.imageinputs
 import tools.packages.pkgcore
 import tools.packages.pkgprotocol
@@ -55,6 +57,11 @@ struct Receipt {
 	architecture string
 	applications []string
 	publishers []Publisher
+}
+
+struct ArchiveAudit {
+	release_time i64
+	receipt Receipt
 }
 
 fn preflight(root string, arch string, config string, bundle string, declaration string, indexes string) !Preflight {
@@ -205,7 +212,7 @@ fn capture_package_members(archive string, root string, expected Selection) ! {
 	}
 }
 
-fn check_iso(iso string, work string, expected Selection, expected_sha256 string) !Receipt {
+fn check_iso(iso string, work string, expected Selection, expected_sha256 string, release_time i64) !Receipt {
 	before := pkgcore.hash_file(iso)!
 	if expected_sha256 != '' && before != expected_sha256 {
 		return error('ISO SHA-256 differs from the package receipt')
@@ -223,10 +230,17 @@ fn check_iso(iso string, work string, expected Selection, expected_sha256 string
 	os.mkdir(root, mode: 0o700)!
 	capture_package_members(archive, root, expected)!
 	if !os.is_file(root + config_path) { return error('ISO is missing its selected package configuration') }
-	bundle := root + repository_path
-	input := preflight(root, expected.architecture, '',
-		if os.is_dir(bundle) && os.ls(bundle)!.len > 0 { bundle } else { '' },
-		if os.is_file(root + declaration_path) { root + declaration_path } else { '' }, '')!
+	repositories := root + repository_path
+	bundle := if os.is_dir(repositories) && os.ls(repositories)!.len > 0 { repositories } else { '' }
+	declaration := if os.is_file(root + declaration_path) { root + declaration_path } else { '' }
+	input := if release_time == 0 {
+		preflight(root, expected.architecture, '', bundle, declaration, '')!
+	} else {
+		mut configuration := pkgcore.prepare_image_configuration(root, expected.architecture, '')!
+		defer { configuration.close() }
+		report := unsafe { &configuration }.audit_archived_image(bundle, declaration, root, release_time)!
+		json2.decode[Preflight](report)!
+	}
 	if input.configuration_sha256 != expected.configuration_sha256 {
 		return error('ISO package configuration differs from the preflight selection')
 	}
@@ -347,12 +361,24 @@ fn run() ! {
 		println(json2.encode(package_selection(input, arch, map[string]string{})!))
 		return
 	}
-	if os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']! {
-		return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | checksums RECEIPT.json | origins RECEIPT.json SHA256')
+	archive := os.args.len == 5 && os.args[1] == 'verify-archive'
+	if !archive && (os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']!) {
+		return error('usage: package-receipt plan ARCH | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }
-	if os.args[1] == 'verify-receipt' {
+	if archive || os.args[1] == 'verify-receipt' {
+		mut release_time := i64(0)
+		if archive {
+			value := os.args[4]
+			if value == '' || !value.bytes().all(it >= `0` && it <= `9`) {
+				return error('archive verification requires a valid past Unix release time')
+			}
+			release_time = strconv.parse_int(value, 10, 64)!
+			if release_time <= 0 || release_time > time.now().unix() {
+				return error('archive verification requires a valid past Unix release time')
+			}
+		}
 		receipt := json2.decode[Receipt](os.read_file(os.args[3])!)!
 		receipt_architecture(receipt)!
 		expected := Selection{
@@ -363,12 +389,14 @@ fn run() ! {
 			publishers: receipt.publishers
 		}
 		iso := receipt_image(os.args[2], work, false)!
-		println(json2.encode(check_iso(iso, work, expected, receipt.iso_sha256)!))
+		verified := check_iso(iso, work, expected, receipt.iso_sha256, release_time)!
+		if archive { println(json2.encode(ArchiveAudit{release_time: release_time, receipt: verified})) }
+		else { println(json2.encode(verified)) }
 		return
 	}
 	expected := json2.decode[Selection](os.read_file(os.args[3])!)!
 	iso := receipt_image(os.args[2], work, os.args[1] == 'verify-staged')!
-	println(json2.encode(check_iso(iso, work, expected, '')!))
+	println(json2.encode(check_iso(iso, work, expected, '', 0)!))
 }
 
 fn main() {

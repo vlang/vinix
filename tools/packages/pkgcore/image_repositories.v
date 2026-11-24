@@ -33,6 +33,7 @@ pub struct ImageRepositories {
 	device u64
 	inode u64
 	needed u64
+	archived_at i64
 mut:
 	// capture borrows the owned guard's path; the guard alone closes it.
 	capture string
@@ -47,6 +48,7 @@ struct ImageRepositoriesOptions {
 	scratch string
 	flush fn (int) int = atomic_flush
 	required_indexes []ImageRepositoryIndex
+	archived_at i64
 }
 
 fn image_repository_objects(index Index) !map[string]Payload {
@@ -131,13 +133,21 @@ fn (plan &ImageRepositories) current() ! {
 }
 
 fn (plan &ImageRepositories) verify(directory string, mode u32) ! {
+	plan.verify_at(directory, mode, 0)!
+}
+
+fn image_index_time(archived_at i64) i64 {
+	return if archived_at == 0 { time.now().unix() } else { archived_at }
+}
+
+fn (plan &ImageRepositories) verify_at(directory string, mode u32, archived_at i64) ! {
 	if directory == plan.capture && plan.capture != '' { plan.capture_stage.check()! }
 	mut entries := map[string]u64{}
 	defer { unsafe { entries.free() } }
 	for repository in plan.repositories { entries[repository.id] = 0 }
 	export_stage_directory(directory, entries, mode)!
 	for repository in plan.repositories {
-		if repository.index.expires <= time.now().unix() { return error('image repository expired after preparation; obtain a current signed release') }
+		if repository.index.expires <= image_index_time(archived_at) { return error('image repository expired after preparation; obtain a current signed release') }
 		path := directory + '/' + repository.id
 		defer { unsafe { path.free() } }
 		objects := image_repository_objects(repository.index)!
@@ -211,7 +221,8 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 	text := if configuration.existing { read_metadata(configuration.path)! } else { configuration.text.clone() }
 	mut plan := ImageRepositories{ root: configuration.root.clone(), configuration: text,
 		configuration_existing: configuration.existing, architecture: configuration.architecture.clone(),
-		device: configuration.device, inode: configuration.inode, needed: 4 * 1024 * 1024 }
+		device: configuration.device, inode: configuration.inode, needed: 4 * 1024 * 1024,
+		archived_at: options.archived_at }
 	mut accepted := false
 	defer { if !accepted { plan.close() } }
 	unsafe { plan.repositories.flags |= .noslices }
@@ -274,7 +285,7 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 		signature := read_metadata(signature_path)!
 		defer { unsafe { signature.free() } }
 		item = ImageRepository{ ...item, signature: signature.trim_space() }
-		index := verify_index(repository, item.text, item.signature, time.now().unix())!
+		index := verify_index(repository, item.text, item.signature, image_index_time(options.archived_at))!
 		item = ImageRepository{ ...item, index: index }
 		if required.index_sha256 != '' {
 			actual := index_digest(item.text)
@@ -326,10 +337,10 @@ fn (plan &ImageRepositories) capture_from(source string, options ImageRepositori
 		defer { unsafe { input.free(); target.free() } }
 		image_repository_copy(input, target, item)!
 	}
-	plan.verify(capturing.path, 0o700)!
+	plan.verify_at(capturing.path, 0o700, options.archived_at)!
 	options.checkpoint('captured', capturing.path)!
 	capturing.check()!
-	plan.verify(capturing.path, 0o700)!
+	plan.verify_at(capturing.path, 0o700, options.archived_at)!
 }
 
 pub fn (plan &ImageRepositories) publish() !bool { return plan.publish_with(ImageRepositoriesOptions{}) }

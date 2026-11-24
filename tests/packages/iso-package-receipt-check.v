@@ -328,6 +328,27 @@ fn check_published_receipt(tool string, iso string, receipt string, work string,
 	}
 }
 
+fn check_archive_receipt(tool string, iso string, receipt string, work string) ! {
+	release_time := time.now().unix() - 1
+	code, output := command([tool, 'verify-archive', iso, receipt, release_time.str()])
+	os.write_file(work + '/archive-verifier.log', output)!
+	if code != 0 { return error('archive receipt failed verification: ' + output) }
+	expected := '{"release_time":${release_time},"receipt":' + os.read_file(receipt)!.trim_space() + '}\n'
+	if output != expected {
+		return error('archive verification changed the receipt or release time: ' + output)
+	}
+	for value in ['0', '-1', 'yesterday', (time.now().unix() + 3600).str()] {
+		refused, reason := command([tool, 'verify-archive', iso, receipt, value])
+		if refused == 0 || !reason.contains('valid past Unix release time') {
+			return error('archive verifier accepted an invalid release time: ' + reason)
+		}
+	}
+	refused, reason := command([tool, 'verify-archive', iso, work + '/changed-receipt.json', release_time.str()])
+	if refused == 0 || !reason.contains('invalid ISO package receipt') {
+		return error('archive verifier accepted an unsupported receipt format: ' + reason)
+	}
+}
+
 fn run() ! {
 	if os.args.len == 4 && os.args[1] in ['fixture', 'hosted-fixture']! {
 		return prepare_fixture(os.args[2], os.abs_path(os.args[3]), os.args[1] == 'hosted-fixture')
@@ -485,6 +506,7 @@ fn run() ! {
 			if scenario == 'match' {
 				check_origin_notes(tool, receipt, work, arch, publisher['id']!.str(), origin)!
 				check_published_receipt(tool, iso, receipt, work, origin)!
+				check_archive_receipt(tool, iso, receipt, work)!
 			}
 		} else if code == 0 || !output.contains(diagnostic) {
 			return error('unexpected ISO verification outcome for ${scenario}: ${output}')

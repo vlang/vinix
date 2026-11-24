@@ -738,6 +738,19 @@ checks the embedded configuration, signed indexes and payloads, reviewed
 HTTPS origins, and application declaration offline. Successful verification
 prints the resulting receipt. Bundled signed indexes must still be current.
 
+For a historical audit, obtain the release timestamp from a trusted release
+record and supply it as Unix seconds:
+
+```sh
+/tmp/vinix-package-receipt verify-archive vinix-arm64.iso vinix-packages-arm64.json RELEASE_UNIX_TIME
+```
+
+Archive verification checks the same ISO digest, signatures, payloads and
+package inputs, and evaluates index expiry at the supplied release time.
+The result records that time alongside the verified receipt. Use trusted
+release checksums and a trusted timestamp. Normal image staging, receipt
+verification and package operations evaluate expiry at the current time.
+
 To require an independently reviewed selection, generate one plan per target
 with the candidate package input environment.
 

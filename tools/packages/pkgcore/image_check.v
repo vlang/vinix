@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
+import time
 import tools.packages.pkgprotocol
 
 // SDK 1 image-input report. This describes the selected trust/policy and the
@@ -50,6 +51,29 @@ struct ImageInputCheck {
 // while their owners are alive; no private capture paths enter the report.
 pub fn (configuration &ImageConfiguration) check_repositories(repositories &ImageRepositories) !string {
 	return configuration.check_inputs(repositories, [], '', ImageDeploymentOutput{})
+}
+
+// Audit an existing image at a trusted historical time. Only the report
+// leaves this method. The captured repositories cannot reach publication.
+pub fn (configuration &ImageConfiguration) audit_archived_image(bundle string, declaration string, scratch string, release_time i64) !string {
+	if !configuration.existing || release_time <= 0 || release_time > time.now().unix() {
+		return error('archived image audit requires an existing configuration and a valid past release time')
+	}
+	mut repositories := configuration.prepare_repositories_with(bundle, ImageRepositoriesOptions{
+		scratch: scratch
+		archived_at: release_time
+	})!
+	defer { repositories.close() }
+	report := if declaration == '' {
+		configuration.check_repositories(unsafe { &repositories })!
+	} else {
+		configuration.check_application_file(unsafe { &repositories }, declaration)!
+	}
+	repositories.retire() or {
+		unsafe { report.free() }
+		return err
+	}
+	return report
 }
 
 // Check an advertised application set together, using only the captured signed
@@ -130,12 +154,12 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 			return error('image input check requires repositories captured for this configuration')
 		}
 		repositories.current()!
-		repositories.verify(repositories.capture, 0o700)!
+		repositories.verify_at(repositories.capture, 0o700, repositories.archived_at)!
 		parent := image_repositories_parents(configuration.root)!
 		unsafe { parent.free() }
 		target := configuration.root + image_repositories_path
 		defer { unsafe { target.free() } }
-		if image_configuration_exists(target)! { repositories.verify(target, 0o755)!; bundle_action = 'preserve' }
+		if image_configuration_exists(target)! { repositories.verify_at(target, 0o755, repositories.archived_at)!; bundle_action = 'preserve' }
 		else { bundle_action = 'publish' }
 	}
 	mut deployment := if required.len > 0 { image_application_deployment(config, repositories, selection)! }
