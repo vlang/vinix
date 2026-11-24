@@ -37,3 +37,33 @@ The independent archive checker verified all 13,242 sealed files and links.
 The archive SHA-256 is
 `adbc53acc46a38c00ee55ebe0c7161e385507a383beabdf14b8cb420d2cb10e7`.
 [Qualification archive](/Users/alex/.local/state/vinix/r14-bundle-import-vQTZER/qualification.tar.gz)
+
+## Receipt-bound import
+
+Source revision `9e3d7d9ba2d9e4fa46794425a7eaa98e5a384ee2` adds
+`update-media MEDIA_DIRECTORY ISO_RECEIPT.json RECEIPT_SHA256`. The import
+checks the exact receipt and lock bytes, target architecture, publisher set,
+enrolled keys, signed index digests and sequences, and signed payload byte
+counts before acquisition. The catalog uses the same authenticated index
+bytes. [Offline workflow](../../tools/packages/SDK.md#check-release-image-package-inputs)
+
+The production and ASan/UBSan host fixtures rejected a semantically identical
+receipt or lock with changed bytes, wrong architecture, wrong key, wrong
+payload total, missing publisher, and a different release signed by the enrolled
+key. The refused attempts left the catalog, replay history, and object cache
+untouched. Restoring the approved media allowed import and an exact retry.
+The administrator argument checks passed. Leak detection was disabled.
+
+The production CLI imported real exported ISO fixtures using their generated
+receipts for both architectures. Each saved lock matched the original and the
+consumer retained its configured URL. Both retained expired bundles refused
+with their exact receipts. Both complete QEMU suites passed with retained
+kernels and rebuilt programs. AArch64 ran in 136.1 seconds and x86-64 in 138.9
+seconds. UID 1000 saved and reviewed the lock, and installation verified from
+cache after the media was disconnected.
+
+The complete evidence tar restored byte for byte from the persistent
+Zstandard delta and passed independent verification of 1,215 sealed files and
+links. The delta SHA-256 is
+`c7ad34397c6ac3acf879f6e3b6003aedd274dda0699310e196445961de4d3ca1`.
+[Restore instructions](/Users/alex/.local/state/vinix/r14-pinned-media-import-pBycTy/RESTORE.md)
