@@ -19,6 +19,7 @@ struct IndexSummary {
 	sequence u64
 	index_sha256 string
 	payload_bytes u64
+	reviewed_origin string
 }
 
 struct Preflight {
@@ -35,6 +36,7 @@ struct Publisher {
 	sequence u64
 	index_sha256 string
 	payload_bytes u64
+	reviewed_origin string @[omitempty]
 }
 
 struct Selection {
@@ -55,7 +57,7 @@ struct Receipt {
 	publishers []Publisher
 }
 
-fn preflight(root string, arch string, config string, bundle string, declaration string, indexes string) !Selection {
+fn preflight(root string, arch string, config string, bundle string, declaration string, indexes string) !Preflight {
 	mut configuration := pkgcore.prepare_image_configuration(root, arch, config)!
 	defer { configuration.close() }
 	mut repositories := unsafe { &configuration }.prepare_repositories_for_index_file(bundle, indexes, root)!
@@ -66,13 +68,20 @@ fn preflight(root string, arch string, config string, bundle string, declaration
 		unsafe { &configuration }.check_application_file(unsafe { &repositories }, declaration)!
 	}
 	repositories.retire()!
-	input := json2.decode[Preflight](report)!
+	return json2.decode[Preflight](report)
+}
+
+fn package_selection(input Preflight, arch string, reviewed_origins map[string]string) !Selection {
 	mut publishers := []Publisher{cap: input.bundled_repositories.len}
 	for index in input.bundled_repositories {
 		configured := input.configuration.repositories.filter(it.id == index.id)
 		if configured.len != 1 { return error('preflight omitted publisher ' + index.id) }
+		reviewed_origin := reviewed_origins[index.id] or { index.reviewed_origin }
+		if reviewed_origin != '' && (!reviewed_origin.starts_with('https://') || configured[0].url != reviewed_origin) {
+			return error('ISO package URL differs from the reviewed HTTPS origin: ' + index.id)
+		}
 		publishers << Publisher{id: index.id, public_key: configured[0].public_key, sequence: index.sequence,
-			index_sha256: index.index_sha256, payload_bytes: index.payload_bytes}
+			index_sha256: index.index_sha256, payload_bytes: index.payload_bytes, reviewed_origin: reviewed_origin}
 	}
 	return Selection{architecture: arch, configuration_sha256: input.configuration_sha256,
 		deployment_sha256: input.image_application_deployment_sha256,
@@ -212,12 +221,17 @@ fn check_iso(iso string, work string, expected Selection) !Receipt {
 	capture_package_members(archive, root, expected)!
 	if !os.is_file(root + config_path) { return error('ISO is missing its selected package configuration') }
 	bundle := root + repository_path
-	actual := preflight(root, expected.architecture, '',
+	input := preflight(root, expected.architecture, '',
 		if os.is_dir(bundle) && os.ls(bundle)!.len > 0 { bundle } else { '' },
 		if os.is_file(root + declaration_path) { root + declaration_path } else { '' }, '')!
-	if actual.configuration_sha256 != expected.configuration_sha256 {
+	if input.configuration_sha256 != expected.configuration_sha256 {
 		return error('ISO package configuration differs from the preflight selection')
 	}
+	mut reviewed_origins := map[string]string{}
+	for publisher in expected.publishers {
+		if publisher.reviewed_origin != '' { reviewed_origins[publisher.id] = publisher.reviewed_origin }
+	}
+	actual := package_selection(input, expected.architecture, reviewed_origins)!
 	if actual.publishers != expected.publishers { return error('ISO signed repositories differ from the preflight selection') }
 	if actual.deployment_sha256 != expected.deployment_sha256 || actual.applications != expected.applications {
 		return error('ISO application declaration differs from the preflight selection')
@@ -285,7 +299,8 @@ fn run() ! {
 		if config == '' && bundle == '' && declaration == '' && indexes == '' { return }
 		work := workspace()!
 		defer { os.rmdir_all(work) or {} }
-		println(json2.encode(preflight(work, arch, config, bundle, declaration, indexes)!))
+		input := preflight(work, arch, config, bundle, declaration, indexes)!
+		println(json2.encode(package_selection(input, arch, map[string]string{})!))
 		return
 	}
 	if os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged']! {

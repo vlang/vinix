@@ -328,7 +328,9 @@ fn test_image_input_cli_requires_the_exact_reviewed_https_origin() {
 		assert digest_only.exit_code == 0, digest_only.output
 		os.write_file(pins, row + '\r\n' + local_row)!
 		hosted := run_image_index_stage([...stage, '--check'])
-		assert hosted.exit_code == 0 && hosted.output == digest_only.output, hosted.output
+		hosted_field := ',"reviewed_origin":"${origin}"'
+		assert hosted.exit_code == 0 && hosted.output.contains(hosted_field), hosted.output
+		assert hosted.output.replace(hosted_field, '') == digest_only.output, hosted.output
 		normal := run_image_index_stage(stage)
 		assert normal.exit_code != 0 && normal.output.contains('target compiler is missing'), normal.output
 

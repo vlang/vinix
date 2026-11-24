@@ -219,7 +219,7 @@ fn make_iso(root string, work string, scenario string) !string {
 	return iso
 }
 
-fn prepare_fixture(architecture string, out string) ! {
+fn prepare_fixture(architecture string, out string, hosted bool) ! {
 	if architecture !in ['aarch64', 'x86_64']! { return error('unsupported fixture architecture') }
 	os.mkdir(out, mode: 0o700)!
 	root := out + '/staged'
@@ -239,10 +239,13 @@ fn prepare_fixture(architecture string, out string) ! {
 	mut release := pkgcore.publish_release(out + '/publisher', 'fixture', seed, 1,
 		time.now().unix() + 86_400, out + '/bundle/fixture')!
 	defer { release.close() }
-	os.write_file(out + '/indexes.txt', release.repository + ' ' + release.index_sha256 + '\n')!
+	origin := if hosted { 'https://packages.example.invalid/release/' } else { '' }
+	pin := release.repository + ' ' + release.index_sha256
+	os.write_file(out + '/indexes.txt', pin + (if hosted { ' ' + origin } else { '' }) + '\n')!
 	input := out + '/config.json'
 	os.write_file(input, json2.encode(pkgcore.Config{architecture: architecture,
-		repositories: [pkgcore.Repository{id: 'fixture', public_key: key, url: 'file:///' + repositories + '/fixture'}]}))!
+		repositories: [pkgcore.Repository{id: 'fixture', public_key: key,
+			url: if hosted { origin } else { 'file:///' + repositories + '/fixture' }}]}))!
 	mut configuration := pkgcore.prepare_image_configuration(root, architecture, input)!
 	defer { configuration.close() }
 	mut bundle := configuration.prepare_repositories_for_index_file(out + '/bundle', out + '/indexes.txt', out)!
@@ -256,11 +259,11 @@ fn prepare_fixture(architecture string, out string) ! {
 }
 
 fn run() ! {
-	if os.args.len == 4 && os.args[1] == 'fixture' {
-		return prepare_fixture(os.args[2], os.abs_path(os.args[3]))
+	if os.args.len == 4 && os.args[1] in ['fixture', 'hosted-fixture']! {
+		return prepare_fixture(os.args[2], os.abs_path(os.args[3]), os.args[1] == 'hosted-fixture')
 	}
 	if os.args.len != 5 {
-		return error('usage: iso-package-receipt-check fixture ARCH NEW_INPUTS | RECEIPT_TOOL STAGED_PACKAGE_ROOT PLAN.json NEW_WORK')
+		return error('usage: iso-package-receipt-check fixture|hosted-fixture ARCH NEW_INPUTS | RECEIPT_TOOL STAGED_PACKAGE_ROOT PLAN.json NEW_WORK')
 	}
 	tool := os.abs_path(os.args[1])
 	source := os.abs_path(os.args[2])
@@ -269,13 +272,18 @@ fn run() ! {
 	if os.exists(out) || os.is_link(out) { return error('expected a new output directory') }
 	os.mkdir(out, mode: 0o700)!
 	os.setenv('COPYFILE_DISABLE', '1', true)
-	for scenario in ['match', 'wrong-configuration', 'missing-declaration', 'wrong-object', 'wrong-signature', 'stale-index',
+	plan_document := json2.decode[json2.Any](os.read_file(plan)!)!.as_map()
+	planned_publisher := plan_document['publishers']!.as_array()[0]!.as_map()
+	origin := (planned_publisher['reviewed_origin'] or { json2.Any('') }).str()
+	mut scenarios := ['match', 'wrong-configuration', 'missing-declaration', 'wrong-object', 'wrong-signature', 'stale-index',
 		'alias', 'duplicate', 'blocked-parent', 'search-only-parent', 'missing-parent', 'late-parent', 'legacy-file',
 		'contiguous-file', 'pax-path', 'non-ustar-header', 'spaced-size', 'wrong-compression', 'nested-compression',
 		'concatenated-gzip-prefix', 'concatenated-gzip-suffix', 'trailing-gzip-bytes', 'bad-gzip-crc',
 		'bad-gzip-size', 'truncated-gzip-trailer', 'case-shadow-index', 'case-shadow-object',
 		'unrelated-hard-links', 'package-hard-link', 'hard-link-directory', 'hard-link-forward',
-		'hard-link-symlink', 'symlink-parent']! {
+		'hard-link-symlink', 'symlink-parent']
+	if origin != '' { scenarios << ['wrong-reviewed-origin', 'wrong-hosted-configuration'] }
+	for scenario in scenarios {
 		work := out + '/' + scenario
 		root := work + '/root'
 		os.mkdir_all(root)!
@@ -314,6 +322,22 @@ fn run() ! {
 				selection = work + '/stale-plan.json'
 				os.write_file(selection, json2.encode(record))!
 				diagnostic = 'signed repositories differ'
+			}
+			'wrong-reviewed-origin', 'wrong-hosted-configuration' {
+				mut record := json2.decode[json2.Any](os.read_file(plan)!)!.as_map()
+				different := origin.trim_right('/') + '/changed'
+				if scenario == 'wrong-reviewed-origin' {
+					mut publisher := record['publishers']!.as_array()[0].as_map()
+					publisher['reviewed_origin'] = json2.Any(different)
+					record['publishers'] = json2.Any([json2.Any(publisher)])
+				} else {
+					path := root + '/' + config
+					os.write_file(path, os.read_file(path)!.replace(origin, different))!
+					record['configuration_sha256'] = json2.Any(pkgcore.hash_file(path)!)
+				}
+				selection = work + '/changed-plan.json'
+				os.write_file(selection, json2.encode(record))!
+				diagnostic = 'ISO package URL differs from the reviewed HTTPS origin'
 			}
 			'alias' {
 				original := root + '/' + config
@@ -362,6 +386,22 @@ fn run() ! {
 				|| report['applications']!.as_array().map(it.str()) != document.packages
 				|| report['publishers']!.as_array().len != 1 {
 				return error('ISO receipt differs from the embedded inputs')
+			}
+			publisher := report['publishers']!.as_array()[0].as_map()
+			if (publisher['reviewed_origin'] or { json2.Any('') }).str() != origin {
+				return error('ISO receipt differs from the reviewed HTTPS origin')
+			}
+			if origin != '' && scenario == 'match' {
+				capture := work + '/private'
+				os.mkdir(capture, mode: 0o700)!
+				captured_iso := capture + '/image.iso'
+				os.cp(iso, captured_iso)!
+				os.chmod(captured_iso, 0o400)!
+				private_code, private_output := command([tool, 'verify-staged', captured_iso, selection])
+				os.write_file(work + '/private-verifier.log', private_output)!
+				if private_code != 0 || private_output != output {
+					return error('private ISO receipt differs from the copied ISO receipt')
+				}
 			}
 			receipt := work + '/receipt.json'
 			os.write_file(receipt, output)!

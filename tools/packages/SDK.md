@@ -729,8 +729,11 @@ mkdir reviewed-package-plans
 ```
 
 Review the application IDs, configuration and deployment digests, and each
-publisher's public key, signed index digest and sequence. Keep the reviewed
-plan files as emitted. Pass the directory to the release driver with
+publisher's public key, signed index digest and sequence. When a hosted pin
+selects a publisher, review its `reviewed_origin` as well. Final verification
+checks this exact URL against the embedded configuration and includes it in
+the public receipt. Keep the reviewed plan files as emitted. Pass the directory
+to the release driver with
 `--package-review=reviewed-package-plans`. It requires a populated, identical
 plan for every requested target before it checks out the release source.
 Before boot testing, the driver records `SHA256SUMS` for the complete asset

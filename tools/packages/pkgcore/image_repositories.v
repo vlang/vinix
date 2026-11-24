@@ -13,6 +13,7 @@ struct ImageRepository {
 	text string
 	signature string
 	index Index
+	reviewed_origin string
 }
 
 pub struct ImageRepositoryIndex {
@@ -267,9 +268,9 @@ fn (configuration &ImageConfiguration) prepare_repositories_with(source string, 
 		signature_path := path + '/index.sig'
 		defer { unsafe { index_path.free(); signature_path.free() } }
 		index_text := read_metadata(index_path)!
-		mut item := ImageRepository{ id: repository.id.clone(), text: index_text }
+		mut item := ImageRepository{ id: repository.id.clone(), text: index_text, reviewed_origin: required.origin.clone() }
 		mut transferred := false
-		defer { if !transferred { unsafe { item.id.free(); item.text.free(); item.signature.free() }; close_decoded_index(item.index) } }
+		defer { if !transferred { unsafe { item.id.free(); item.text.free(); item.signature.free(); item.reviewed_origin.free() }; close_decoded_index(item.index) } }
 		signature := read_metadata(signature_path)!
 		defer { unsafe { signature.free() } }
 		item = ImageRepository{ ...item, signature: signature.trim_space() }
@@ -445,7 +446,7 @@ pub fn (mut plan ImageRepositories) close() {
 
 fn (mut plan ImageRepositories) close_metadata() {
 	for item in plan.repositories {
-		unsafe { item.id.free(); item.text.free(); item.signature.free() }
+		unsafe { item.id.free(); item.text.free(); item.signature.free(); item.reviewed_origin.free() }
 		close_decoded_index(item.index)
 	}
 	plan.capture_stage.close()

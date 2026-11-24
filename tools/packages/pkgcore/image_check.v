@@ -18,6 +18,7 @@ struct ImageBundleCheck {
 	firmware_packages int
 	objects int
 	payload_bytes u64
+	reviewed_origin string @[omitempty]
 }
 
 struct ImageInputCheck {
@@ -158,7 +159,8 @@ fn (configuration &ImageConfiguration) plan_inputs(repositories &ImageRepositori
 		row := ImageBundleCheck{ id: repository.id, sequence: repository.index.sequence, expires: repository.index.expires,
 			index_sha256: index_digest(repository.text), packages: repository.index.packages.len,
 			aarch64_packages: arm, x86_64_packages: x86, shared_packages: neutral, proprietary_packages: proprietary,
-			firmware_packages: firmware, objects: objects.len, payload_bytes: bytes }
+			firmware_packages: firmware, objects: objects.len, payload_bytes: bytes,
+			reviewed_origin: repository.reviewed_origin }
 		pointer := unsafe { &row }
 		unsafe { rows.push_many(pointer, 1) }
 	}
