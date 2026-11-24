@@ -1255,6 +1255,37 @@ contains the source, signed fixtures, retained ISOs, receipts and logs.
 The independent checker verified all 804 sealed files. Archive SHA-256 is
 `5be8927877f19a377f065f6280dcabd340f9c2d2b24595daac2a0c0d3dd99c8d`.
 
+### Audit an archived ISO at its release time
+
+At `7e642c1db3e4663ee998827a565375f0042e3b2e`,
+`package-receipt verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME` checks
+the exact ISO, embedded signatures, payloads and deployment against the
+trusted receipt. It evaluates expiry at the supplied timestamp and returns
+the timestamp alongside the verified receipt. Image planning, publication
+and ordinary receipt verification use the current clock.
+
+The production verifier reproduced both original bootable desktop receipts
+at their retained qualification time, Unix `1795416093`. Current verification
+refused both expired indexes. Production and ASan/UBSan builds also checked
+the two retained expired fixtures, including exact expiry and one second
+after expiry, invalid signatures and changed objects. The cross-target
+check refused before extractor lookup. The ordinary verifier refused the
+archive result as an input receipt.
+
+Both builds passed 33 legacy and 35 hosted fixture cases per architecture,
+including archive output, invalid timestamps and current-time verification.
+Sanitizer runs disabled leak detection and symbolization. Both
+configuration-only ISO receipts also matched. The AArch64 and x86-64 QEMU
+image-input suites passed all five programs and initiated shutdown in
+141.885 and 138.924 seconds respectively. All nine receipt artifact digests
+matched on each target.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-historical-iso-audit-u1Y4hG/qualification.tar.gz)
+contains the source, retained desktop ISOs and receipts, signed fixture
+controls and QEMU logs. The independent checker verified all 920 sealed files.
+Archive SHA-256 is
+`4cfe9c15eac5af54723436fef90fb8ac310db97ce19c5f26051f1ea2085c434d`.
+
 ## Qualification, 2026-10-16
 
 All **30 host checks passed**, including the desktop cache assertions, the
