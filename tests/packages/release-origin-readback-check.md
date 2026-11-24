@@ -123,3 +123,32 @@ contains the source, test logs, signed inputs, target builds and both guest
 receipts. The independent checker verified all 2,512 sealed files. Archive
 SHA-256 is
 `b1c4729b4f3024adcca0053014a7eb93dd141349ab239eb71f46e4b46efd7f2e`.
+
+### Image index pins after hosted release verification
+
+At `7f1add84a052e25dbe412f88f09c0ef7de099003`,
+`write-hosted-release-index-pins` verifies a complete HTTPS readback for
+every selected signed export before publishing the image pin file. The
+two-publisher batch and the reversed-order retry produced the exact offline
+pin bytes. Twelve refusal cases included a different index from the second
+origin after the first had passed, a certificate hostname mismatch, a
+destination inside an export, invalid operands and incompatible options.
+The fixture checks exact HTTP request order, preserved existing pin files,
+absent new outputs on refusal, and unchanged signed exports and publisher
+history.
+
+The normal, production and ASan/UBSan host builds passed with real loopback
+TLS. The sanitizer run disabled leak detection and symbolization. The
+production CLI also verified all 2,158 objects across 20 variants of the
+mixed catalog and wrote its exact pin. Image preflight accepted that pin on
+both architectures, resolving seven application roots and ten locked packages.
+A wrong pin refused on each architecture before modifying its image root.
+Normal staging with the two-publisher pins built all three static target
+tools on both architectures and copied both signed exports byte for byte.
+CLI execution and TLS checks ran on the host against disposable origins.
+
+The [qualification archive](/Users/alex/.local/state/vinix/r14-hosted-index-pins-ggQ1fO/qualification.tar.gz)
+contains the source, signed exports, request logs, preflights and static
+target builds. The independent checker verified all 2,691 sealed files.
+Archive SHA-256 is
+`3461c05aaf9734c89f9e04e9121350d416c35837ae003caf7b72fd23134fd700`.
