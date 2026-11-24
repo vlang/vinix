@@ -349,6 +349,100 @@ fn check_archive_receipt(tool string, iso string, receipt string, work string) !
 	}
 }
 
+fn check_installed_receipt(tool string, iso string, receipt string, work string, roots []string) ! {
+	root := work + '/root'
+	// A host fixture mounts the image under an alternate root. Map local
+	// file URLs to that root while keeping the signed publisher identity.
+	config_path := root + '/' + config
+	configuration := pkgcore.load_config(root)!
+	repository := configuration.repositories[0]
+	if repository.url.starts_with('file://') {
+		os.write_file(config_path, json2.encode(pkgcore.Config{ ...configuration,
+			repositories: [pkgcore.Repository{ ...repository, url: 'file://' + root + '/' + repositories + '/' + repository.id }] }))!
+	}
+	service := pkgcore.Service{ root: root, offline: true }
+	mut catalog := service.refresh()!
+	catalog.close()
+	mut state := service.transact('install', roots, pkgcore.TransactionOptions{})!
+	defer { state.close() }
+	snapshot := work + '/installed.json'
+	saved_path := work + '/snapshot-receipt.json'
+	mut saved := service.save_deployment_snapshot(snapshot, [])!
+	defer { saved.close() }
+	os.write_file(saved_path, json2.encode(saved) + '\n')!
+	args := [tool, 'verify-installed', iso, receipt]
+	code, output := command([...args, snapshot, saved_path])
+	os.write_file(work + '/installed-verifier.log', output)!
+	if code != 0 { return error('saved release coverage refused: ' + output) }
+	report := json2.decode[json2.Any](output)!.as_map()
+	coverage := report['coverage']!.as_map()
+	assert report['format']!.int() == 1 && report['snapshot_sha256']!.str() == saved.sha256
+	assert output.contains('"receipt":' + os.read_file(receipt)!.trim_space() + ',')
+	assert coverage['architecture']!.str() == saved.architecture
+	assert coverage['deployment_sha256']!.str() == report['receipt']!.as_map()['deployment_sha256']!.str()
+	assert coverage['generation']!.u64() == state.generation && coverage['matches']!.bool()
+	assert coverage['rows']!.as_array().len == int(saved.packages)
+
+	release_time := time.now().unix() - 1
+	historical_code, historical_output := command([...args, snapshot, saved_path, release_time.str()])
+	os.write_file(work + '/installed-archive-verifier.log', historical_output)!
+	assert historical_code == 0
+	assert json2.decode[json2.Any](historical_output)!.as_map()['release_time']!.i64() == release_time
+	invalid_time, _ := command([...args, snapshot, saved_path, '0'])
+	assert invalid_time == 1
+
+	// Keep the installed proof intact and construct independent refusal inputs.
+	before := os.read_file(snapshot)!
+	changed_snapshot := work + '/changed-snapshot.json'
+	os.write_file(changed_snapshot, before + ' ')!
+	bad_digest, bad_digest_text := command([...args, changed_snapshot, saved_path])
+	assert bad_digest == 1 && bad_digest_text.contains('snapshot SHA-256 differs')
+	alias := work + '/snapshot-alias.json'
+	os.symlink(snapshot, alias)!
+	bad_alias, bad_alias_text := command([...args, alias, saved_path])
+	assert bad_alias == 1 && bad_alias_text.contains('bounded regular file')
+	changed_saved := work + '/changed-snapshot-receipt.json'
+	os.write_file(changed_saved, json2.encode(pkgprotocol.DeploymentSnapshotSaved{ ...saved, packages: saved.packages + 1 }))!
+	bad_count, bad_count_text := command([...args, snapshot, changed_saved])
+	assert bad_count == 1 && bad_count_text.contains('snapshot counts differ')
+	os.write_file(changed_saved, json2.encode(pkgprotocol.DeploymentSnapshotSaved{ ...saved,
+		architecture: if saved.architecture == 'aarch64' { 'x86_64' } else { 'aarch64' } }))!
+	bad_arch, bad_arch_text := command([...args, snapshot, changed_saved])
+	assert bad_arch == 1 && bad_arch_text.contains('snapshot architecture differs')
+	mut document := pkgprotocol.decode_deployment_document(before)!
+	defer { document.close() }
+	mut bad_roots := document.packages.clone()
+	bad_roots[0] = 'absent-snapshot-root'
+	os.write_file(changed_snapshot, (pkgprotocol.DeploymentDocument{ ...document, packages: bad_roots }).encode()!)!
+	os.write_file(changed_saved, json2.encode(pkgprotocol.DeploymentSnapshotSaved{ ...saved,
+		sha256: pkgcore.hash_file(changed_snapshot)! }))!
+	bad_root, bad_root_text := command([...args, changed_snapshot, changed_saved])
+	assert bad_root == 1 && bad_root_text.contains('installed snapshot root is absent')
+	bad_iso, bad_iso_text := command([tool, 'verify-installed', iso, work + '/changed-receipt.json', snapshot, saved_path])
+	assert bad_iso == 1 && bad_iso_text.contains('invalid ISO package receipt')
+	assert os.read_file(snapshot)! == before && pkgcore.hash_file(snapshot)! == saved.sha256
+	assert service.state()! == state
+
+	mut removed := service.transact('remove', roots, pkgcore.TransactionOptions{})!
+	defer { removed.close() }
+	empty_snapshot := work + '/after-removal.json'
+	mut empty := service.save_deployment_snapshot(empty_snapshot, [])!
+	defer { empty.close() }
+	empty_receipt := work + '/after-removal-receipt.json'
+	os.write_file(empty_receipt, json2.encode(empty) + '\n')!
+	drift, drift_text := command([...args, empty_snapshot, empty_receipt])
+	os.write_file(work + '/installed-drift.log', drift_text)!
+	assert drift == 3
+	result := json2.decode[json2.Any](drift_text)!.as_map()
+	reported_drift := result['coverage']!.as_map()
+	assert !reported_drift['matches']!.bool()
+	assert result['snapshot_sha256']!.str() == empty.sha256
+	rows := reported_drift['rows']!.as_array()
+	assert rows.len == int(saved.packages)
+	for row in rows { assert row.as_map()['status']!.str() == 'missing' }
+	println('ISO installed coverage exact receipt, saved snapshot, archive time, drift and input refusals PASS')
+}
+
 fn run() ! {
 	if os.args.len == 4 && os.args[1] in ['fixture', 'hosted-fixture']! {
 		return prepare_fixture(os.args[2], os.abs_path(os.args[3]), os.args[1] == 'hosted-fixture')
@@ -507,6 +601,7 @@ fn run() ! {
 				check_origin_notes(tool, receipt, work, arch, publisher['id']!.str(), origin)!
 				check_published_receipt(tool, iso, receipt, work, origin)!
 				check_archive_receipt(tool, iso, receipt, work)!
+				check_installed_receipt(tool, iso, receipt, work, document.packages)!
 			}
 		} else if code == 0 || !output.contains(diagnostic) {
 			return error('unexpected ISO verification outcome for ${scenario}: ${output}')

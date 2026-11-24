@@ -64,6 +64,14 @@ struct ArchiveAudit {
 	receipt Receipt
 }
 
+struct InstalledVerification {
+	format int = 1
+	release_time i64 @[omitempty]
+	receipt Receipt
+	snapshot_sha256 string
+	coverage pkgprotocol.DeploymentAudit
+}
+
 fn preflight(root string, arch string, config string, bundle string, declaration string, indexes string) !Preflight {
 	mut configuration := pkgcore.prepare_image_configuration(root, arch, config)!
 	defer { configuration.close() }
@@ -361,6 +369,57 @@ fn required_application_plan(env map[string]string, arch string) !Selection {
 	return selection
 }
 
+fn archived_release_time(value string) !i64 {
+	if value == '' || !value.bytes().all(it >= `0` && it <= `9`) {
+		return error('archive verification requires a valid past Unix release time')
+	}
+	release_time := strconv.parse_int(value, 10, 64)!
+	if release_time <= 0 || release_time > time.now().unix() {
+		return error('archive verification requires a valid past Unix release time')
+	}
+	return release_time
+}
+
+fn verify_published_image(source string, receipt Receipt, work string, release_time i64) !Receipt {
+	receipt_architecture(receipt)!
+	expected := Selection{
+		architecture: receipt.architecture
+		configuration_sha256: receipt.configuration_sha256
+		deployment_sha256: receipt.deployment_sha256
+		applications: receipt.applications
+		publishers: receipt.publishers
+	}
+	iso := receipt_image(source, work, false)!
+	return check_iso(iso, work, expected, receipt.iso_sha256, release_time)
+}
+
+fn verify_installed(arguments []string) !int {
+	if arguments.len !in [4, 5]! {
+		return error('usage: package-receipt verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME]')
+	}
+	release_time := if arguments.len == 5 { archived_release_time(arguments[4])! } else { i64(0) }
+	receipt_text := pkgcore.read_metadata(arguments[1])!
+	defer { unsafe { receipt_text.free() } }
+	receipt := json2.decode[Receipt](receipt_text)!
+	if receipt.applications.len == 0 || !pkgcore.digest_valid(receipt.deployment_sha256) {
+		return error('installed release verification requires an ISO receipt with an application declaration')
+	}
+	saved_text := pkgcore.read_metadata(arguments[3])!
+	defer { unsafe { saved_text.free() } }
+	mut saved := pkgprotocol.decode_deployment_saved(saved_text)!
+	defer { saved.close() }
+	if saved.architecture != receipt.architecture { return error('installed snapshot architecture differs from the ISO receipt') }
+	work := workspace()!
+	defer { os.rmdir_all(work) or {} }
+	verified := verify_published_image(arguments[0], receipt, work, release_time)!
+	mut coverage := pkgcore.audit_saved_deployment_coverage(work + '/root' + declaration_path,
+		verified.deployment_sha256, arguments[2], saved)!
+	defer { coverage.close() }
+	println(json2.encode(InstalledVerification{ release_time: release_time, receipt: verified,
+		snapshot_sha256: saved.sha256, coverage: coverage }))
+	return if coverage.matches { 0 } else { 3 }
+}
+
 fn run() ! {
 	if os.args.len == 3 && os.args[1] == 'checksums' {
 		return print_checksums(os.args[2])
@@ -385,35 +444,19 @@ fn run() ! {
 		return pkgcore.write_iso_package_review_pair(os.args[2], json2.encode(amd64) + '\n',
 			json2.encode(arm64) + '\n')
 	}
+	if os.args.len >= 2 && os.args[1] == 'verify-installed' {
+		exit(verify_installed(os.args[2..])!)
+	}
 	archive := os.args.len == 5 && os.args[1] == 'verify-archive'
 	if !archive && (os.args.len != 4 || os.args[1] !in ['verify', 'verify-staged', 'verify-receipt']!) {
-		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | checksums RECEIPT.json | origins RECEIPT.json SHA256')
+		return error('usage: package-receipt plan ARCH | plan-pair NEW_DIRECTORY | verify ISO PLAN.json | verify-staged PRIVATE_ISO PLAN.json | verify-receipt ISO RECEIPT.json | verify-archive ISO RECEIPT.json RELEASE_UNIX_TIME | verify-installed ISO RECEIPT.json SNAPSHOT.json SNAPSHOT_RECEIPT.json [RELEASE_UNIX_TIME] | checksums RECEIPT.json | origins RECEIPT.json SHA256')
 	}
 	work := workspace()!
 	defer { os.rmdir_all(work) or {} }
 	if archive || os.args[1] == 'verify-receipt' {
-		mut release_time := i64(0)
-		if archive {
-			value := os.args[4]
-			if value == '' || !value.bytes().all(it >= `0` && it <= `9`) {
-				return error('archive verification requires a valid past Unix release time')
-			}
-			release_time = strconv.parse_int(value, 10, 64)!
-			if release_time <= 0 || release_time > time.now().unix() {
-				return error('archive verification requires a valid past Unix release time')
-			}
-		}
+		release_time := if archive { archived_release_time(os.args[4])! } else { i64(0) }
 		receipt := json2.decode[Receipt](os.read_file(os.args[3])!)!
-		receipt_architecture(receipt)!
-		expected := Selection{
-			architecture: receipt.architecture
-			configuration_sha256: receipt.configuration_sha256
-			deployment_sha256: receipt.deployment_sha256
-			applications: receipt.applications
-			publishers: receipt.publishers
-		}
-		iso := receipt_image(os.args[2], work, false)!
-		verified := check_iso(iso, work, expected, receipt.iso_sha256, release_time)!
+		verified := verify_published_image(os.args[2], receipt, work, release_time)!
 		if archive { println(json2.encode(ArchiveAudit{release_time: release_time, receipt: verified})) }
 		else { println(json2.encode(verified)) }
 		return

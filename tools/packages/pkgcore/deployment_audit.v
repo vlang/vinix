@@ -14,6 +14,9 @@ fn compare_deployment(expected DeploymentLock, installed DeploymentLock, generat
 		actual[pin.id] = i
 		if mode == .exact && pin.id !in targets { ids << pin.id }
 	}
+	for root in installed.packages {
+		if root !in actual { return error('installed snapshot root is absent from its locked records: ${root}') }
+	}
 	ids.sort()
 	mut rows := []pkgprotocol.DeploymentAuditRow{cap: ids.len}
 	mut accepted := false
@@ -86,4 +89,32 @@ fn (service Service) audit_deployment_mode(path string, mode DeploymentMode) !pk
 		return audit_deployment_locked(service, directory, path, mode)
 	}
 	return audit_deployment_locked(service, directory, path, mode)
+}
+
+// Compare saved metadata using the two reviewed digests. The snapshot receipt
+// supplies its recorded generation and counts, and grants no package authority.
+pub fn audit_saved_deployment_coverage(release_path string, release_sha256 string, snapshot_path string, saved pkgprotocol.DeploymentSnapshotSaved) !pkgprotocol.DeploymentAudit {
+	saved.validate()!
+	release_text := read_metadata(release_path)!
+	defer { unsafe { release_text.free() } }
+	release_digest := index_digest(release_text)
+	defer { unsafe { release_digest.free() } }
+	if release_digest != release_sha256 { return error('captured release lock differs from the ISO package receipt') }
+	mut expected := decode_deployment(release_text, saved.architecture)!
+	defer { expected.close() }
+	if expected.format != 2 || expected.packages.len == 0 {
+		return error('installed release verification requires a nonempty format-2 release lock')
+	}
+	snapshot_text := read_metadata(snapshot_path)!
+	defer { unsafe { snapshot_text.free() } }
+	snapshot_digest := index_digest(snapshot_text)
+	defer { unsafe { snapshot_digest.free() } }
+	if snapshot_digest != saved.sha256 { return error('installed snapshot SHA-256 differs from its saved receipt') }
+	mut installed := decode_deployment(snapshot_text, saved.architecture)!
+	defer { installed.close() }
+	if installed.format != 2 { return error('installed snapshot requires a format-2 document') }
+	if u64(installed.packages.len) != saved.roots || u64(installed.locked.len) != saved.packages {
+		return error('installed snapshot counts differ from its saved receipt')
+	}
+	return compare_deployment(expected, installed, saved.generation, release_digest, .additions)
 }

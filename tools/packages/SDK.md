@@ -752,6 +752,29 @@ The result records that time alongside the verified receipt. Use trusted
 release checksums and a trusted timestamp. Normal image staging, receipt
 verification and package operations evaluate expiry at the current time.
 
+To check release coverage from another machine, save the installed system's
+complete metadata and keep the saved receipt with it:
+
+```sh
+vinix-package --json deployment-snapshot-save installed.json > installed-receipt.json
+/tmp/vinix-package-receipt verify-installed vinix-arm64.iso vinix-packages-arm64.json \
+    installed.json installed-receipt.json
+```
+
+Use the ISO and package receipt from the trusted release checksums, and the
+snapshot and saved receipt from the installed system. The verifier checks
+the ISO and its embedded release lock, then checks the snapshot's exact
+bytes, architecture and counts against the saved receipt. The snapshot
+and saved receipt can be copied under new filenames.
+
+The JSON result includes the verified ISO receipt, snapshot SHA-256,
+recorded generation and release coverage rows. Extra installed apps are
+allowed. Exit status 0 means all release pins and roots are present, 3
+reports missing or changed metadata, and 1 indicates input or verification
+failure. An optional final `RELEASE_UNIX_TIME` checks bundled index expiry
+at the trusted historical release time and includes it in the result.
+Use payload health checks to verify the installed files themselves.
+
 For a release that advertises the same catalog on both architectures, generate
 both plans with the candidate package input environment:
 
