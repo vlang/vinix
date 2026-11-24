@@ -993,9 +993,11 @@ An identical controlled ordinary single-link file is preserved. Different
 contents, aliases, special files, shared-write parents or unexpected modes
 refuse before replacement. Publication rechecks the captured root, unchanged
 configuration, current signed bundle and payloads, and available space with
-64 MiB headroom. Errors after publication report that the file was saved; a
-retry preserves its complete bytes. A changed release set needs a fresh staging
-root rather than overwriting an existing declaration.
+64 MiB headroom. It holds the declaration parent and published repository
+directory open during verification and refuses a replacement before writing
+or reporting preservation. If a later step fails after publication, the error
+reports the saved file. A retry preserves its complete bytes. A changed release
+set requires a fresh staging root.
 
 In Software, **Deployment → Review release apps** discovers this optional file
 and starts the ordinary read-only review. It discloses the full resulting set,

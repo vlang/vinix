@@ -168,6 +168,13 @@ fn image_catalog_checkpoint(phase string, temporary string) ! {
 	kind := os.getenv('VINIX_IMAGE_CATALOG_FAULT')
 	defer { unsafe { kind.free() } }
 	if kind == 'race' && phase == 'flushed' { os.write_file(os.dir(temporary) + '/applications.json', 'concurrent owner bytes')! }
+	if phase == 'prepared' && kind in ['parent-replacement', 'bundle-replacement']! {
+		parent := os.dir(temporary)
+		path := if kind == 'parent-replacement' { parent } else { parent + '/repositories' }
+		os.rename(path, path + '.moved')!
+		os.mkdir(path)!
+		os.write_file(path + '/sentinel', 'replacement contents')!
+	}
 	if kind == phase { return error('injected image catalog failure') }
 }
 
@@ -215,6 +222,46 @@ fn test_image_catalog_failure_cleanup_and_changed_dependencies_refuse_before_pub
 	}
 	assert !os.exists(root + '/var')
 	println('IMAGE CATALOG changed trust/payloads, write/space/flush/checkpoint failures and concurrent destinations refuse safely; saved diagnostics, cleanup and retry PASS')
+}
+
+fn test_image_catalog_publish_refuses_replaced_declaration_parent_or_published_bundle() {
+	work, key := image_apps_fixture()!
+	defer { os.rmdir_all(work) or {}; os.unsetenv('VINIX_IMAGE_CATALOG_FAULT') }
+	root := work + '/image'
+	os.mkdir(root)!
+	source := image_apps_config(work, 'aarch64', key, Policy{})!
+	mut configuration := prepare_image_configuration(root, 'aarch64', source)!
+	defer { configuration.close() }
+	mut repositories := unsafe { &configuration }.prepare_repositories(work + '/bundle')!
+	defer { repositories.close() }
+	mut applications := unsafe { &configuration }.prepare_applications(unsafe { &repositories }, ['editor'])!
+	defer { applications.close() }
+	assert unsafe { &repositories }.publish()! && unsafe { &configuration }.publish()!
+	path := root + pkgprotocol.image_applications_path
+	parent := os.dir(path)
+	for kind in ['parent-replacement', 'bundle-replacement']! {
+		replaced := if kind == 'parent-replacement' { parent } else { root + image_repositories_path }
+		before := os.ls(replaced)!.sorted()
+		os.setenv('VINIX_IMAGE_CATALOG_FAULT', kind, true)
+		mut diagnostic := ''
+		unsafe { &applications }.publish_with(unsafe { &repositories },
+			AtomicWriteOptions{ checkpoint: image_catalog_checkpoint }) or { diagnostic = err.msg() }
+		expected := if kind == 'parent-replacement' { 'deployment parent changed' } else { 'repository directory changed' }
+		assert diagnostic.contains(expected), diagnostic
+		assert !os.exists(path) && os.ls(replaced)!.sorted() == ['sentinel']
+		assert os.read_file(replaced + '/sentinel')! == 'replacement contents'
+		assert os.ls(replaced + '.moved')!.sorted() == before
+
+		os.rename(replaced, replaced + '.replacement')!
+		os.rename(replaced + '.moved', replaced)!
+		assert unsafe { &applications }.publish(unsafe { &repositories })!
+		assert os.read_file(path)! == applications.text
+		assert !unsafe { &applications }.publish(unsafe { &repositories })!
+		os.rm(path)!
+		os.rmdir_all(replaced + '.replacement')!
+	}
+	assert !os.exists(root + '/var')
+	println('IMAGE CATALOG replaced output parent and published bundle refuse before writing; restoration permits exact publication and preservation PASS')
 }
 
 fn test_image_application_catalog_reports_owned_reproducible_joint_lock_for_both_hosts() {

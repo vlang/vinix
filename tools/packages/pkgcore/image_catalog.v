@@ -58,6 +58,11 @@ pub fn (plan &ImageApplications) publish(repositories &ImageRepositories) !bool 
 	return plan.publish_with(repositories, AtomicWriteOptions{})
 }
 
+fn image_catalog_directory_matches(path string, fd int) bool {
+	mut info := C.stat{}
+	return C.fstat(fd, unsafe { &info }) == 0 && atomic_parent_matches(path, u64(info.st_dev), u64(info.st_ino))
+}
+
 fn (plan &ImageApplications) publish_with(repositories &ImageRepositories, options AtomicWriteOptions) !bool {
 	if plan.root == '' { return false } // no requirements were selected
 	if repositories.root != plan.root || repositories.architecture != plan.architecture
@@ -68,17 +73,33 @@ fn (plan &ImageApplications) publish_with(repositories &ImageRepositories, optio
 	repositories.current()!
 	target := plan.root + pkgprotocol.image_applications_path
 	bundle := plan.root + image_repositories_path
-	parent := os.dir(target)
-	defer { unsafe { target.free(); bundle.free(); parent.free() } }
+	defer { unsafe { target.free(); bundle.free() } }
+	parent, name := atomic_file_path(target)!
+	defer { unsafe { parent.free(); name.free() } }
 	// Both must already be published. Do not create a declaration pointing at
 	// missing trust or media, or initialize consumer package state.
 	image_configuration_architecture(plan.root, plan.architecture)!
+	ancestor := image_repositories_parents(plan.root)!
+	defer { unsafe { ancestor.free() } }
+	if ancestor != parent { return error('image application deployment requires its published repository directory') }
+	directory := open_atomic_parent(parent)!
+	defer { C.close(directory) }
+	bundle_directory := open_atomic_parent(bundle)!
+	defer { C.close(bundle_directory) }
 	repositories.verify(repositories.capture, 0o700)!
 	repositories.verify(bundle, 0o755)!
+	options.checkpoint('prepared', target)!
 	repositories.current()!
-	if image_applications_action(plan.root, plan.text)! == 'preserve' { return false }
-	disk_check(free_bytes(parent)!, u64(plan.text.len), 64 * 1024 * 1024)!
-	atomic_write_with(target, plan.text, AtomicWriteOptions{ ...options, exclusive: true })!
+	preserve := image_applications_action(plan.root, plan.text)! == 'preserve'
+	if !preserve { disk_check(free_bytes(parent)!, u64(plan.text.len), 64 * 1024 * 1024)! }
+	if !image_catalog_directory_matches(parent, directory) {
+		return error('image application deployment parent changed during verification')
+	}
+	if !image_catalog_directory_matches(bundle, bundle_directory) {
+		return error('published image repository directory changed during verification')
+	}
+	if preserve { return false }
+	atomic_write_at(parent, name, plan.text, AtomicWriteOptions{ ...options, exclusive: true, parent_fd: directory })!
 	return true
 }
 
