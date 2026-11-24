@@ -15,10 +15,12 @@ empty matches clear selection. Back retains the query, filter and selection.
 Selection is visible on return to the full list, including after a resize,
 without overriding deliberate paging on subsequent same-size builds.
 
-Only browser navigation, search/filter and Details actions are accepted.
-Application requests, maintenance, reload, new review and confirmation cannot
-start work. Pending workers, frozen proposals and other forms refuse entry.
-Service authorization, protocol and package mutation behavior are unchanged.
+At 320×240, **Review install**, **Review uninstall**, and **Review updates**
+start read-only proposals when the selected row permits them. Uninstall applies
+to a requested installation. Updates resolves the complete installed set.
+Starting a proposal leaves the browser and shows the existing plan. Use the
+full review to confirm and request administrator approval. Pending workers,
+frozen proposals and other forms refuse browser entry.
 
 The V Software fixture checks both architectures, all six package kinds,
 all 4,096 catalog entries, installed/update subsets, Unicode and rejected

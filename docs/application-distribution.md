@@ -1710,8 +1710,12 @@ Catalog/Installed/Updates, Previous/Next package and complete **Details** at
 details. Arrow/Page keys select packages when search is unfocused. Back/Escape
 returns to catalog status and maintenance controls, retaining the query, filter
 and selected package. The full list keeps that selection visible after resizing.
-Browsing cannot launch, reload or start a package change; pending work blocks
-entry. See [compact browser qualification](../tests/packages/software-catalog-browser-check.md).
+From 320×240, the browser can start a read-only install or uninstall review
+for the selected package. **Review updates** resolves the complete installed
+set when the selection has a planned update. The compact plan supports reading
+and cancellation. Confirmation is available in the full review and retains
+the separate administrator approval. Pending work blocks browser entry.
+See [compact browser qualification](../tests/packages/software-catalog-browser-check.md).
 
 At 320×240 or larger, the idle compact catalog also offers **Deployment** and
 **Export offline**. Deployment opens the organization and release forms.

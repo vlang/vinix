@@ -364,6 +364,63 @@ fn check_software_offline_navigation(receipt string) ! {
 	println('Software offline mode: wide/compact controls, approved offline refresh, frozen release review/apply, normal launch and policy return passed')
 }
 
+fn check_catalog_browser_reviews(mut app SoftwareApp) ! {
+	for index, operation in ['install', 'upgrade', 'remove']! {
+		installed_version := if operation == 'install' { '' } else { '1.0.0' }
+		updatable := operation == 'upgrade'
+		app.rows[0] = SoftwareRow{ ...app.rows[0],
+			installed_version: installed_version, updatable: updatable
+		}
+		control := ['software.catalog.review-install', 'software.catalog.review-upgrade', 'software.catalog.review-remove']![index]
+		app.handle('software.catalog.browse')!
+		for size in [ui2.rect(0, 0, 319, 240), ui2.rect(0, 0, 320, 239), ui2.rect(0, 0, 320, 240)]! {
+			tree := app.build(size)!
+			available := size.width >= 320 && size.height >= 240
+			assert tree.children.any(it.id == control) == available
+			assert tree.children.any(it.id == 'software.catalog.review-remove') == (available && operation != 'install')
+			assert tree.children.any(it.id == 'software.details')
+			assert !tree.children.any(it.id == 'software.confirm')
+			repository_recovery_check_frames(tree, size)!
+			free_window_tree(tree)
+		}
+		if operation != 'install' {
+			app.handle('software.catalog.review-install')!
+			assert app.catalog_browser_mode && app.worker == unsafe { nil }
+		}
+		if operation == 'remove' {
+			app.rows[0] = SoftwareRow{ ...app.rows[0], requested: false }
+			blocked := app.build(ui2.rect(0, 0, 320, 240))!
+			assert !blocked.children.any(it.id == control)
+			free_window_tree(blocked)
+			app.handle(control)!
+			assert app.catalog_browser_mode && app.worker == unsafe { nil }
+			app.rows[0] = SoftwareRow{ ...app.rows[0], requested: true }
+		}
+		os.setenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION', 'review-complete', true)
+		app.handle(control)!
+		assert !app.catalog_browser_mode && app.package_review_running() && !app.admin_prompt
+		names := if operation == 'upgrade' { []string{} } else { ['editor'] }
+		assert app.worker.args == ['review', operation, ...names]
+		wait_for_package_navigation_output(mut app, false)
+		working := app.build(ui2.rect(0, 0, 320, 240))!
+		assert working.children.any(it.id == 'software.review.stop') && !working.children.any(it.id == 'software.confirm')
+		free_window_tree(working)
+		release := u8(`!`); assert C.write(app.worker.stdio_fd[0], &release, 1) == 1
+		wait_for_software(mut app)
+		assert app.review_ready && app.review_snapshot.operation == operation && app.review_snapshot.names == names
+		compact := app.build(ui2.rect(0, 0, 320, 240))!
+		assert compact.children.any(it.id == 'software.report.read') && !compact.children.any(it.id == 'software.confirm')
+		free_window_tree(compact)
+		full := app.build(ui2.rect(0, 0, 640, 610))!
+		assert full.children.any(it.id == 'software.confirm')
+		free_window_tree(full)
+		app.handle('software.cancel')!
+		assert app.review == '' && app.selected == 0 && app.filter == 1 && app.query.bytestr() == 'Editor'
+	}
+	os.unsetenv('VINIX_SOFTWARE_PACKAGE_NAVIGATION')
+	println('Software compact catalog: selected install/uninstall and whole-set update reviews, stale action refusal, compact reading and separate full confirmation PASS')
+}
+
 fn check_software_package_navigation() ! {
 	check_package_plan_boundaries()!
 	receipt := os.temp_dir() + '/vinix-package-navigation-' + os.getpid().str()
@@ -372,6 +429,7 @@ fn check_software_package_navigation() ! {
 	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192}, query: 'Editor'.bytes(), filter: 1 }
 	seed_package_navigation_catalog(mut app)
 	defer { app.close_app() }
+	check_catalog_browser_reviews(mut app)!
 	for operation in package_navigation_operations {
 		for mode in ['review-partial', 'review-complete']! {
 			for action in ['software.review.stop', 'software.cancel', 'escape']! {

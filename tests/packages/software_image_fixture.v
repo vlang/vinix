@@ -160,7 +160,12 @@ fn image_select(mut app SoftwareApp, id string) ! {
 	app.focus = false
 }
 fn image_apply(mut app SoftwareApp, action string, password string) ! {
-	image_control(mut app, action)!
+	if app.catalog_browser_mode {
+		image_control_at(mut app, action, ui2.rect(0, 0, 320, 240))!
+		assert !app.catalog_browser_mode && app.worker_review && !app.admin_prompt
+	} else {
+		image_control(mut app, action)!
+	}
 	image_wait(mut app)!
 	assert app.review_ready, app.status
 	for row in app.review_snapshot.rows {
@@ -418,7 +423,8 @@ fn image_run() ! {
 		assert image_approve(mut app, password)!
 		image_control(mut app, 'software.updates')!
 		assert app.matching.len == 3 && app.rows.all(it.updatable)
-		image_apply(mut app, 'software.upgrade', password)!
+		image_control_at(mut app, 'software.catalog.browse', ui2.rect(0, 0, 320, 240))!
+		image_apply(mut app, 'software.catalog.review-upgrade', password)!
 		assert app.rows.all(it.installed_version == '1.1.0')
 		image_apply(mut app, 'software.rollback', password)!
 		assert app.rows.all(it.installed_version == '1.0.0')
@@ -427,11 +433,13 @@ fn image_run() ! {
 	} else {
 		assert phase == 'reinstall'
 		image_select(mut app, 'org.vinix.memo')!
-		image_apply(mut app, 'software.remove', password)!
+		image_control_at(mut app, 'software.catalog.browse', ui2.rect(0, 0, 320, 240))!
+		image_apply(mut app, 'software.catalog.review-remove', password)!
 		image_select(mut app, 'org.vinix.memo')!
 		assert app.rows[app.selected].installed_version == ''
 		assert !os.exists('/var/lib/vinix-packages/current/share/applications/vinix-org.vinix.memo.desktop')
-		image_apply(mut app, 'software.install', password)!
+		image_control_at(mut app, 'software.catalog.browse', ui2.rect(0, 0, 320, 240))!
+		image_apply(mut app, 'software.catalog.review-install', password)!
 		image_memo(mut app, false)!
 		println('SOFTWARE IMAGE updates rollback uninstall registration cached-reinstall retained-memo PASS')
 	}

@@ -53,6 +53,23 @@ fn (mut a SoftwareApp) close_catalog_browser() {
 	a.keep_catalog_selection_visible()
 }
 
+fn (a &SoftwareApp) catalog_review_choices(row SoftwareRow) (string, bool) {
+	if !a.catalog_browsable() || a.catalog_browser_notice { return '', false }
+	acquire := if row.updatable { 'upgrade' }
+		else if row.installed_version == '' && row.diagnostic == '' && a.catalog_error == '' { 'install' }
+		else { '' }
+	return acquire, row.installed_version != '' && row.requested
+}
+
+fn (mut a SoftwareApp) start_catalog_review(operation string) {
+	if a.selected < 0 || a.selected >= a.rows.len || a.selected !in a.matching { return }
+	row := a.rows[a.selected]
+	acquire, removable := a.catalog_review_choices(row)
+	if (operation == 'remove' && !removable) || (operation != 'remove' && operation != acquire) { return }
+	a.close_catalog_browser()
+	a.begin_review(operation, if operation == 'upgrade' { []string{} } else { [row.id] })
+}
+
 fn (mut a SoftwareApp) handle_catalog_browser(action string) {
 	match action {
 		'software.catalog.back' { a.close_catalog_browser() }
@@ -68,12 +85,15 @@ fn (mut a SoftwareApp) handle_catalog_browser(action string) {
 			a.select_catalog_package(if action == 'software.catalog.next' { 1 } else { -1 })
 		}
 		'software.details' { a.open_details() }
-		else {} // Browsing cannot start a service call, review or application.
+		'software.catalog.review-install' { a.start_catalog_review('install') }
+		'software.catalog.review-upgrade' { a.start_catalog_review('upgrade') }
+		'software.catalog.review-remove' { a.start_catalog_review('remove') }
+		else {} // Only the dedicated review entries can start a service call.
 	}
 }
 
 fn (a &SoftwareApp) build_catalog_browser(width int, height int) ui2.Element {
-	mut children := frame_elements(9)
+	mut children := frame_elements(10)
 	button_width := if width >= 180 { (width - 40) / 2 } else { width - 28 }
 	children << software_button('software.catalog.back', 'Back', 14, 8, button_width)
 	if width < 180 || height < 220 {
@@ -87,13 +107,29 @@ fn (a &SoftwareApp) build_catalog_browser(width int, height int) ui2.Element {
 	children << software_button('software.catalog.next', 'Next', width - 14 - button_width, 84, button_width)
 	position := a.matching.index(a.selected)
 	if position >= 0 && a.selected >= 0 && a.selected < a.rows.len {
+		row := a.rows[a.selected]
+		acquire, removable := a.catalog_review_choices(row)
+		reviews := width >= 320 && height >= 240 && (acquire != '' || removable)
+		preview_width := if reviews { button_width } else { width - 28 }
 		number := (position + 1).str(); total := a.matching.len.str()
 		if a.catalog_browser_notice && a.status_readable() {
 			children << software_button('software.status', 'Read status', 14, 118, width - 28)
-		} else { children << software_label(number + ' / ' + total, 14, 118, width - 28, 24, true) }
+		} else { children << software_label(number + ' / ' + total, 14, 118, preview_width, 24, true) }
 		unsafe { number.free(); total.free() }
-		children << software_label(if a.catalog_browser_notice { a.status } else { a.rows[a.selected].name }, 14, 146, width - 28, 36, false)
-		children << software_button('software.details', 'Details', 14, height - 36, width - 28)
+		children << software_label(if a.catalog_browser_notice { a.status } else { row.name }, 14, 146, width - 28, 36, false)
+		if reviews {
+			children << software_button('software.details', 'Details', width - 14 - button_width, 118, button_width)
+			if acquire != '' {
+				children << software_button(if acquire == 'upgrade' { 'software.catalog.review-upgrade' } else { 'software.catalog.review-install' },
+					if acquire == 'upgrade' { 'Review updates' } else { 'Review install' }, 14, height - 36, if removable { button_width } else { width - 28 })
+			}
+			if removable {
+				children << software_button('software.catalog.review-remove', 'Review uninstall', if acquire != '' { width - 14 - button_width } else { 14 },
+					height - 36, if acquire != '' { button_width } else { width - 28 })
+			}
+		} else {
+			children << software_button('software.details', 'Details', 14, height - 36, width - 28)
+		}
 	} else {
 		if a.catalog_browser_notice && a.status_readable() {
 			children << software_button('software.status', 'Read status', 14, 118, width - 28)
