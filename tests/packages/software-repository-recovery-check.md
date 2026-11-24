@@ -103,3 +103,19 @@ controller activates **Go offline** and **Refresh selected** from the
 rendered element tree as UID 1000. The root observer checks the exact retained
 HTTPS snapshot, new field index and signature, updated trust history, unchanged
 installed generation and one additional successful administrator approval.
+
+At `b7f43becb6342b9b73d5b854e535e07c9f393f62`, all five host variants passed
+with V `2655544` and the retained headless UI source. Both tracked variants
+retained zero V bytes and records across the 9,000 compact recovery renders.
+ASan and UBSan passed with process leak detection disabled.
+
+Both production compositors linked statically. The native controller fixture
+passed on AArch64 in 56.579 seconds and x86-64 in 69.402 seconds with QEMU TCG
+and guest-initiated shutdowns. It used the actual Software element tree and
+administrator service on the staged image. Framebuffer input and presentation
+for this control remain unqualified.
+
+The evidence archive is
+`~/.local/state/vinix/r14-software-refresh-5Vddg5/qualification.tar.gz`.
+Its SHA-256 is `fcbab47ce4ecbe0c41d373a5dd92e4aba4d33695a44b72b9047a0ec3d338fd25`.
+Independent extraction matched all 10,104 inventory entries.
