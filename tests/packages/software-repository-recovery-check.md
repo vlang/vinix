@@ -154,3 +154,31 @@ contains the source snapshot, host outputs, compositor builds, staged images
 and native logs. All 65 receipt entries matched per target. The independent
 archive checker verified all 9,687 sealed files and symlinks. Archive SHA-256
 `2d5ee602314424c9199b7450ddd88e772740039b4b8ec6b240f5f7ba61f82b88`.
+
+## Refresh identity binding
+
+At revision `cc7c6262bee890260b381fe06c77c7251e468c80`, both selected refresh
+paths pass an identity fingerprint for the repository ID, URL and key. Under
+the writer lock, the package service checks the current configured identity
+before fetching metadata. Host checks cover changed URLs, rotated keys, removed
+repositories and a successful retry with the matching identity. All five host
+UI modes passed with V `2655544`. Both tracked rendering modes retained zero
+V bytes and records across 9,000 trees. The focused refresh check retained zero
+tracked allocations across 72 scopes and 4,608 requests. ASan and UBSan passed
+with process leak detection disabled.
+
+On 2026-11-24, the manual and post-enrollment approval paths passed on AArch64
+and x86_64 under QEMU TCG. Each exercised Software's actual element tree and
+administrator service on the staged image and ended with guest-initiated
+shutdown. Both enrollment runs used the guest CLI to refuse stale URL and key
+fingerprints before fetch or publication and verified unchanged catalog, trust
+history and installed generation. Both production compositors linked
+statically. Framebuffer interaction and installed-root boot were outside these
+four runs.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-refresh-identity-8RoREo/qualification.tar.gz)
+contains the pinned source, host checks, compositor builds and native receipts.
+All 65 receipt entries matched per enrollment run and all 66 per manual run.
+The independent archive checker verified all 10,181 sealed files and symlinks.
+Archive SHA-256 is
+`b0020f8d173d4cf11d2802fd58369f87a0dd79b1568391ef927dc30ea66b559e`.
