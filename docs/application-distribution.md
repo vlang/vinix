@@ -1713,6 +1713,12 @@ and selected package. The full list keeps that selection visible after resizing.
 Browsing cannot launch, reload or start a package change; pending work blocks
 entry. See [compact browser qualification](../tests/packages/software-catalog-browser-check.md).
 
+At 320×240 or larger, the idle compact catalog also offers **Deployment** and
+**Export offline**. Deployment opens the organization and release forms.
+Export offline opens the destination and scope form. Back retains the catalog
+query, filter and selected package. Each operation still requires its own
+review before approval.
+
 **Read status** opens the current status or local validation diagnostic in a
 separate read-only pager. It is available from idle full-screen footers, compact
 catalog screens and catalog browser notices. Long paths, Unicode and invalid

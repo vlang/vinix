@@ -33,10 +33,33 @@ fn check_software_deployment_form() ! {
 	defer { unsafe { path.free() } }
 	os.write_file(path, '{}')!
 	mut app := SoftwareApp{ service_path: os.executable(), administration_required: true,
-		release_deployment_path: path.clone(), query: 'kept search'.bytes(), filter: 1, output: []u8{cap: 8192} }
+		release_deployment_path: path.clone(), query: 'kept search'.bytes(), filter: 1,
+		rows: [SoftwareRow{ id: 'selected', kind: 'linux', installed_version: '1.0.0' }],
+		matching: [0], selected: 0, output: []u8{cap: 8192} }
 	defer { app.close_app() }
-	app.handle('software.deployment')!
+	app.set_status('Deployment review failed.')
 	app.capture_failure(['deployment-review'], 23)
+	for size in [ui2.rect(0, 0, 319, 240), ui2.rect(0, 0, 320, 239),
+		ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 400, 300)]! {
+		tree := app.build(size)!
+		want_entries := size.width >= 320 && size.height >= 240
+		assert tree.children.any(it.id == 'software.deployment') == want_entries
+		assert tree.children.any(it.id == 'software.mirror') == want_entries
+		assert tree.children.any(it.id == 'software.failure')
+		assert tree.children.any(it.id == 'software.status')
+		deployment_form_geometry(tree, size.width, size.height)
+		free_window_tree(tree)
+	}
+	app.handle('software.mirror')!
+	export_form := app.build(ui2.rect(0, 0, 320, 240))!
+	assert export_form.children.any(it.id == 'software.mirror.path')
+	assert export_form.children.any(it.id == 'software.mirror.review')
+	assert !export_form.children.any(it.id == 'software.confirm')
+	free_window_tree(export_form)
+	assert app.mirror_mode && app.worker == unsafe { nil } && !app.admin_prompt
+	app.handle('software.mirror.back')!
+	assert !app.mirror_mode && app.selected == 0 && app.query.bytestr() == 'kept search' && app.filter == 1
+	app.handle('software.deployment')!
 	for size in [ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 639, 609), ui2.rect(0, 0, 640, 240), ui2.rect(0, 0, 320, 610)]! {
 		for index in 0 .. 8 {
 			app.deployment_action = index
@@ -87,6 +110,7 @@ fn check_software_deployment_form() ! {
 	review := app.build(ui2.rect(0, 0, 320, 240))!
 	assert !app.deployment_form_compact && review.children.any(it.id == 'software.cancel')
 	assert !review.children.any(it.id == 'software.confirm' || it.id == 'software.deployment.path')
+	assert !review.children.any(it.id in ['software.deployment', 'software.mirror']!)
 	free_window_tree(review)
 	app.handle('software.cancel')!
 	free_window_tree(app.build(ui2.rect(0, 0, 320, 240))!)
@@ -116,7 +140,8 @@ fn check_software_deployment_form() ! {
 	assert app.deployment_action == 0
 	for _ in 0 .. 12 { app.handle('software.deployment.action.next')! }
 	assert app.deployment_action == 4
-	app.key_input('\x1b'); assert !app.deployment_mode && app.query.bytestr() == 'kept search' && app.filter == 1
+	app.key_input('\x1b'); assert !app.deployment_mode && app.selected == 0 && app.query.bytestr() == 'kept search' && app.filter == 1
+	println('Software compact catalog: Deployment and Export offline entries, bounds, review isolation and Back retain catalog state PASS')
 	println('Software compact deployment: complete bounded help and controls at 320x240, literal editing, keyboard/pager/resize anchors, optional actions, stale chooser, status/failure, review/audit/snapshot/policy/release routing and separate confirmation PASS')
 }
 

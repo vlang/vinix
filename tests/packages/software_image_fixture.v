@@ -317,10 +317,20 @@ fn image_run() ! {
 	if phase.starts_with('cold-') {
 		image_cold_maintenance(mut app, phase, password)!
 	} else if phase == 'install' {
+		compact := ui2.rect(0, 0, 320, 240)
+		image_control_at(mut app, 'software.mirror', compact)!
+		assert app.mirror_mode && app.worker == unsafe { nil } && !app.admin_prompt
+		export_form := app.build(compact)!
+		assert image_tree_has(export_form, 'software.mirror.path') && image_tree_has(export_form, 'software.mirror.review')
+		assert !image_tree_has(export_form, 'software.confirm')
+		image_free_tree(export_form)
+		image_control_at(mut app, 'software.mirror.back', compact)!
+		assert !app.mirror_mode && app.worker == unsafe { nil }
+		println('SOFTWARE IMAGE compact catalog opened Export offline and returned without starting work PASS')
 		refresh := if bundled_https { 'software.release.catalog.offline' } else { 'software.refresh' }
 		if manual_refresh {
 			assert bundled_https
-			image_control(mut app, 'software.deployment')!
+			image_control_at(mut app, 'software.deployment', compact)!
 			image_compact_deployment_action(mut app, 'software.deployment.release')!
 			assert app.release_catalog_mode && app.deployment_mode
 			image_control(mut app, 'software.release.catalog.back')!
@@ -349,7 +359,7 @@ fn image_run() ! {
 			image_control(mut app, 'software.deployment.back')!
 		}
 		image_release_audit(mut app, 'initial-empty', '')!
-		image_control(mut app, 'software.deployment')!
+		image_control_at(mut app, 'software.deployment', compact)!
 		assert app.release_deployment_available && editor_bytes_text(app.deployment_path) == pkgprotocol.image_applications_path
 		image_compact_deployment_action(mut app, 'software.deployment.release')!
 		assert app.worker_review && !app.admin_prompt && !app.review_ready
@@ -365,6 +375,7 @@ fn image_run() ! {
 		println('SOFTWARE IMAGE staged-release-catalog discovered full-set review separate administrator approval exact offline install PASS')
 		image_release_audit(mut app, 'initial-installed', '1.0.0')!
 		println('SOFTWARE IMAGE compact-deployment 320x240 keyboard paging visible release review and audit separate approval PASS')
+		println('SOFTWARE IMAGE compact catalog opened Deployment for signed release review and separate approval PASS')
 		image_counter(mut app)!
 		image_memo(mut app, true)!
 		document := os.home_dir() + '/software document ; $literal.txt'

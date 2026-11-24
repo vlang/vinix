@@ -187,7 +187,7 @@ fn (mut a SoftwareApp) stop_package_review() {
 }
 
 fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
-	mut children := frame_elements(10)
+	mut children := frame_elements(12)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil } && !a.details_mode
 	readable := a.package_review_readable() && !a.details_mode
 	browsable := a.catalog_browsable() && !a.details_mode
@@ -232,6 +232,11 @@ fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
 			children << software_button('software.repositories', if width < 220 { 'Sources' } else { 'Repositories' },
 				if launchable { width - 14 - half_width } else { 14 }, next_y, half_width)
 			next_y += 38
+			if width >= 320 && height >= 240 {
+				children << software_button('software.deployment', 'Deployment', 14, next_y, half_width)
+				children << software_button('software.mirror', 'Export offline', width - 14 - half_width, next_y, half_width)
+				next_y += 38
+			}
 		}
 	}
 	if available {
@@ -242,6 +247,8 @@ fn (a &SoftwareApp) build_packages_compact(width int, height int) ui2.Element {
 	if progress { children << a.progress_bar(width, height) }
 	footer := height - if progress { 88 } else { 98 }
 	y := if footer > next_y { footer } else { next_y }
-	children << software_label(a.status, 14, y, width - 28, if height > y + 8 { height - y - 8 } else { 1 }, false)
+	if height > y + 8 {
+		children << software_label(a.status, 14, y, width - 28, height - y - 8, false)
+	}
 	return ui2.screen(app_surface, children)
 }
