@@ -10,10 +10,12 @@ pub:
 	directory  string
 	id         string
 	public_key string
+	origin     string // Optional HTTPS origin whose signed bytes must match.
 }
 
 // Verify complete signed releases and save their exact authenticated index
-// digests in the format consumed by image staging.
+// digests in the format consumed by image staging. A supplied origin must
+// match its local export before the file can be published.
 pub fn write_release_index_pins(destination string, sources []ReleaseIndexSource) ! {
 	if sources.len == 0 || sources.len > max_image_repository_indexes {
 		return error('release index pins require 1 to 4096 signed releases')
@@ -24,6 +26,9 @@ pub fn write_release_index_pins(destination string, sources []ReleaseIndexSource
 	for i, source in sorted {
 		if !identifier(source.id) { return error('invalid release repository ID') }
 		if i > 0 && source.id == sorted[i - 1].id { return error('duplicate release repository ID: ${source.id}') }
+		if source.origin != '' && !valid_release_origin(source.origin) {
+			return error('release origin requires a valid HTTPS repository URL')
+		}
 	}
 
 	if destination == '' || !printable(destination, 4096) || destination.contains('\\') {
@@ -48,7 +53,7 @@ pub fn write_release_index_pins(destination string, sources []ReleaseIndexSource
 	defer { unsafe { pins.free() } }
 	mut first_expiry := i64(0)
 	for source in sorted {
-		mut release := check_signed_release(source.directory, source.id, source.public_key, '', directory)!
+		mut release := check_signed_release(source.directory, source.id, source.public_key, source.origin, directory)!
 		defer { release.close() }
 		pins.write_string(release.repository)
 		pins.write_u8(` `)

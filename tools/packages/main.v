@@ -52,6 +52,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n' +
 	'  check-release-export RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX\n' +
 	'  write-release-index-pins NEW_FILE RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX [RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX...]\n' +
+	'  write-hosted-release-index-pins NEW_FILE RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX HTTPS_URL [RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX HTTPS_URL...]\n' +
 	'  check-release-origin RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX HTTPS_URL\n'
 
 fn publisher_reply[T](mut info T) {
@@ -290,17 +291,25 @@ fn checked(arguments []string) !int {
 			publisher_reply(mut info)
 			return 0
 		}
-		'write-release-index-pins' {
-			if names.len < 4 || (names.len - 1) % 3 != 0 || root_option || as_json {
+		'write-release-index-pins', 'write-hosted-release-index-pins' {
+			hosted := command == 'write-hosted-release-index-pins'
+			width := if hosted { 4 } else { 3 }
+			if names.len <= width || (names.len - 1) % width != 0 || root_option || as_json || (hosted && offline) {
+				if hosted {
+					return error('write-hosted-release-index-pins requires a new file and RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX HTTPS_URL groups without --root, --json or --offline')
+				}
 				return error('write-release-index-pins requires a new file and RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX triples without --root or --json')
 			}
-			mut sources := []pkgcore.ReleaseIndexSource{cap: (names.len - 1) / 3}
+			mut sources := []pkgcore.ReleaseIndexSource{cap: (names.len - 1) / width}
 			defer { unsafe { sources.free() } }
-			for i := 1; i < names.len; i += 3 {
+			for i := 1; i < names.len; i += width {
+				origin := if hosted { names[i + 3] } else { '' }
+				if hosted && origin == '' { return error('release origin requires a valid HTTPS repository URL') }
 				sources << pkgcore.ReleaseIndexSource{
 					directory:  names[i]
 					id:         names[i + 1]
 					public_key: names[i + 2]
+					origin:     origin
 				}
 			}
 			pkgcore.write_release_index_pins(names[0], sources)!

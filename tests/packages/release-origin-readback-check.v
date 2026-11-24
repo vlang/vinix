@@ -137,7 +137,7 @@ fn check_local_export(cli string, work string, local string, key string, origina
 	println('RELEASE EXPORT offline receipt, ten refusals and exact retry PASS')
 }
 
-fn check_index_pins(cli string, work string, local string, key string) ! {
+fn check_index_pins(cli string, work string, local string, key string) !string {
 	seed := work + '/secondary-seed'
 	defer { os.rm(seed) or {} }
 	secondary := work + '/release secondary'
@@ -202,6 +202,60 @@ fn check_index_pins(cli string, work string, local string, key string) ! {
 		return error('restored export did not produce the original pins')
 	}
 	println('RELEASE INDEX PINS canonical offline writes, exact retry and nine refusals PASS')
+	return secondary_key
+}
+
+fn (fixture Fixture) check_hosted_pins(name string, destination string, options []string, sources []string, status int, diagnostic string, requests []string) ! {
+	log := fixture.work + '/requests.log'
+	before := os.read_file(log)!
+	run(fixture.work + '/' + name, [fixture.cli, ...options, 'write-hosted-release-index-pins',
+		destination, ...sources], status, diagnostic)!
+	if os.read_file(log)! != before + requests.map(it + ' -\n').join('') {
+		return error('unexpected HTTPS requests in ${name}')
+	}
+}
+
+fn check_hosted_index_pins(fixture Fixture, served string, secondary_key string, paths []string) ! {
+	work := fixture.work
+	secondary := work + '/release secondary'
+	os.cp_all(secondary, served + '/secondary', false)!
+	first := [fixture.local, fixture.id, fixture.key, fixture.url + '/ranges']
+	second := [secondary, 'secondary', secondary_key, fixture.url + '/ranges/secondary']
+	first_reads := paths.map('ranges ' + it)
+	all_reads := [...first_reads, ...paths.map('ranges secondary/' + it)]
+	original := inventory(fixture.local)!
+	secondary_original := inventory(secondary)!
+	history := work + '/workspace/.publisher/history.json'
+	floor := pkgcore.hash_file(history)!
+	expected := os.read_file(work + '/image-indexes.txt')!
+	pins := work + '/hosted-indexes.txt'
+	failed := work + '/hosted-refusal.txt'
+	fixture.check_hosted_pins('hosted-pins-batch', pins, [], [...second, ...first], 0, '', all_reads)!
+	fixture.check_hosted_pins('hosted-pins-existing', pins, [], first, 1, 'destination already exists', [])!
+	fixture.check_hosted_pins('hosted-pins-duplicate', failed, [], [...first, ...first], 1, 'duplicate release repository ID', [])!
+	fixture.check_hosted_pins('hosted-pins-incomplete', failed, [], first[..3], 1, 'HTTPS_URL groups', [])!
+	fixture.check_hosted_pins('hosted-pins-offline', failed, ['--offline'], first, 1, 'or --offline', [])!
+	fixture.check_hosted_pins('hosted-pins-root', failed, ['--root', work + '/untouched-hosted-root'], first, 1, 'without --root', [])!
+	fixture.check_hosted_pins('hosted-pins-json', failed, ['--json'], first, 1, 'without --root, --json', [])!
+	for i, invalid in ['', 'file://' + served, 'http://127.0.0.1/ranges'] {
+		fixture.check_hosted_pins('hosted-pins-invalid-url-${i}', failed, [], [...first, ...second[..3], invalid],
+			1, 'requires a valid HTTPS repository URL', [])!
+	}
+	fixture.check_hosted_pins('hosted-pins-second-mismatch', failed, [], [...first, ...second[..3], fixture.url + '/ranges/other'],
+		1, 'hosted release index differs', [...first_reads, 'ranges other/index.json'])!
+	fixture.check_hosted_pins('hosted-pins-hostname', failed, [], [...first[..3], first[3].replace('127.0.0.1', 'localhost')],
+		1, 'download failed (60)', [])!
+	inside := secondary + '/pins.txt'
+	fixture.check_hosted_pins('hosted-pins-inside-export', inside, [], second, 1,
+		'must be saved outside each signed release export', [])!
+	if os.exists(failed) || os.is_link(failed) || os.exists(work + '/untouched-hosted-root') || os.exists(inside)
+		|| os.read_file(pins)! != expected || inventory(fixture.local)! != original || inventory(secondary)! != secondary_original
+		|| pkgcore.hash_file(history)! != floor {
+		return error('hosted pin verification changed a refused destination, signed export or publisher history')
+	}
+	fixture.check_hosted_pins('hosted-pins-retry', failed, [], [...first, ...second], 0, '', all_reads)!
+	if os.read_file(failed)! != expected { return error('restored HTTPS inputs produced different pins') }
+	println('RELEASE INDEX PINS hosted batch and retry match canonical offline bytes; twelve refusals preserve destinations PASS')
 }
 
 fn check() ! {
@@ -219,7 +273,7 @@ fn check() ! {
 	local := work + '/release 1'
 	original := inventory(local)!
 	check_local_export(cli, work, local, key, original)!
-	check_index_pins(cli, work, local, key)!
+	secondary_key := check_index_pins(cli, work, local, key)!
 	local_mode := (os.lstat(local)!).mode
 	served := work + '/served'
 	os.cp_all(local, served, false)!
@@ -298,6 +352,7 @@ fn check() ! {
 		return error('a refusal contacted the server or changed the reviewed export')
 	}
 	println('RELEASE ORIGIN READBACK identity, transport, offline and certificate refusals PASS')
+	check_hosted_index_pins(fixture, served, secondary_key, all_requests)!
 	if os.args.len == 6 {
 		mixed := os.abs_path(os.args[4])
 		index := json2.decode[pkgcore.Index](os.read_file(mixed + '/index.json')!)!
@@ -317,6 +372,13 @@ fn check() ! {
 			|| mixed_info.release.index_sha256 != pkgcore.hash_file(mixed + '/index.json')! {
 			return error('mixed catalog receipt does not describe the reviewed export')
 		}
+		pins := work + '/mixed-hosted-indexes.txt'
+		mixed_fixture.check_hosted_pins('mixed-hosted-pins', pins, [], [mixed, index.repository, os.args[5],
+			url + '/ranges/mixed'], 0, '', [...metadata, ...paths, ...metadata].map('ranges mixed/' + it))!
+		if os.read_file(pins)! != index.repository + ' ' + mixed_export.index_sha256 + '\n' {
+			return error('hosted mixed catalog pin differs from the reviewed index')
+		}
+		println('RELEASE INDEX PINS mixed hosted catalog verified all ${paths.len} objects PASS')
 	}
 }
 

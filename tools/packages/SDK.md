@@ -1289,6 +1289,23 @@ temporary directory and retain at most one response at a time. The command
 preserves the export, publisher history, consumer configuration and installed
 state. See [released repository readback qualification](../../tests/packages/release-origin-readback-check.md).
 
+To require HTTPS readback before saving the pins used by a release build, supply
+each reviewed export and its intended origin in one command:
+
+```sh
+vinix-package write-hosted-release-index-pins /release/reviewed-indexes.txt \
+  /release/bundle/company company COMPANY_PUBLIC_KEY_HEX https://packages.example.org/company \
+  /release/bundle/tools tools TOOLS_PUBLIC_KEY_HEX https://packages.example.org/tools
+```
+
+Each origin must pass the same complete readback as `check-release-origin`.
+The command writes the same sorted index pins as `write-release-index-pins`
+only after every origin passes. A readback refusal leaves the new destination
+absent, and a directory flush failure after publication reports the saved file.
+Use the verified URLs in the reviewed image configuration and use the pin file
+as `VINIX_PACKAGE_IMAGE_INDEXES`. The pins bind index bytes. Each HTTPS check
+verifies the bytes served during that run.
+
 #### Publication and recovery
 
 Complete-stage verification runs before directory flushing/sequence reservation

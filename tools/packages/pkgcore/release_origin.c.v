@@ -25,11 +25,15 @@ pub fn check_release_export(directory string, id string, public_key string) !Rel
 	return check_signed_release(directory, id, public_key, '', -1)
 }
 
+fn valid_release_origin(url string) bool {
+	return url.starts_with('https://') && pkgprotocol.valid_repository_url(url)
+}
+
 // Compare a hosted repository with a complete signed export using the caller's
 // independently verified publisher key. Only the private transfer stage is written.
 pub fn check_release_origin(directory string, id string, public_key string, url string) !ReleaseOriginInfo {
 	if !identifier(id) { return error('invalid release repository ID') }
-	if !url.starts_with('https://') || !pkgprotocol.valid_repository_url(url) {
+	if !valid_release_origin(url) {
 		return error('release origin requires a valid HTTPS repository URL')
 	}
 	release := check_signed_release(directory, id, public_key, url, -1)!
