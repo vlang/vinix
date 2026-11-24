@@ -2,6 +2,8 @@
 module main
 
 import accountcore
+import crypto.sha256
+import json2
 import os
 import sessioncore
 import tools.packages.pkgcore
@@ -32,6 +34,42 @@ fn image_targeted_refresh(mut t Test, db accountcore.Database, alex accountcore.
 	assert os.readlink(directory + '/current')! == generation && os.read_file(log)!.count(approvals) == count + 1
 	os.rename(bundle + '-paused', bundle)!
 	t.say('SOFTWARE IMAGE selected refresh approval advanced field and retained HTTPS catalog and installed generation PASS')
+}
+
+fn image_enrollment_refresh(mut t Test, db accountcore.Database, alex accountcore.User, bundle string) ! {
+	directory := pkgcore.state_directory('')
+	history_path := directory + '/trust-history.json'
+	history := json2.decode[pkgcore.TrustHistory](os.read_file(history_path)!)!
+	config := pkgcore.load_config('')!
+	before := pkgcore.read_snapshots(directory)!
+	assert before.len == 1 && before[0].repository == config.repositories[0]
+	assert history.repositories.len == 1 && history.repositories[0].id == 'native'
+	active := os.read_file(directory + '/current/state.json')!
+	generation := os.readlink(directory + '/current')!
+	base := '/usr/share/native-catalog/releases'
+	repository := json2.decode[pkgcore.Repository](os.read_file(base + '/field-repository.json')!)!
+	field := pkgcore.image_repositories_path + '/field'
+	os.rename(bundle, bundle + '-paused')!
+	os.rename(base + '/field-next', field)!
+	approval := 'uid=1000 run packages-change as alex: exit 0'
+	log := '/var/log/vinix/auth.log'
+	count := os.read_file(log)!.count(approval)
+	result := run(['/usr/share/package-fixtures/software-image', 'enrollment-refresh'], '', db, alex)
+	assert result.status == 0, result.output
+	t.say(result.output)
+	assert pkgcore.load_config('')! == pkgcore.Config{ ...config, repositories: [repository, ...config.repositories] }
+	after := pkgcore.read_snapshots(directory)!
+	index := os.read_file(field + '/index.json')!
+	signature := os.read_file(field + '/index.sig')!.trim_space()
+	assert after.len == 2 && after[1] == before[0]
+	assert after[0] == pkgcore.Snapshot{ repository: repository, text: index, signature: signature }
+	floor := pkgcore.RepositoryFloor{ id: repository.id, public_key: repository.public_key,
+		sequence: 2, index_sha256: sha256.hexhash(index) }
+	assert json2.decode[pkgcore.TrustHistory](os.read_file(history_path)!)!.repositories == [floor, ...history.repositories]
+	assert os.read_file(directory + '/current/state.json')! == active && os.readlink(directory + '/current')! == generation
+	assert os.read_file(log)!.count(approval) == count + 2
+	os.rename(bundle + '-paused', bundle)!
+	t.say('SOFTWARE IMAGE separate enrollment and selected refresh approvals retained HTTPS catalog and installed generation PASS')
 }
 
 fn qualify_package_software_image(mut t Test) ! {
@@ -90,5 +128,8 @@ fn qualify_package_software_image(mut t Test) ! {
 	assert os.ls('/run/user/1000')!.all(!it.starts_with('pkg-'))
 	assert os.ls('/run/user/1001')!.all(!it.starts_with('pkg-'))
 	t.say('SOFTWARE IMAGE unchanged-staged-trust root-owned-state separate-user-data clean-runtime PASS')
+	if os.exists('/usr/share/package-fixtures/enrollment-refresh') {
+		image_enrollment_refresh(mut t, db, alex, bundle)!
+	}
 }
 fn scenario_packages_software_image(mut t Test) { qualify_package_software_image(mut t) or { t.check(false, err.msg()) } }

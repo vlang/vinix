@@ -98,7 +98,7 @@ fn image_frame(mut app SoftwareApp, sequence u64) ! {
 	}
 	return error('Software window timeout: ' + app.status)
 }
-fn image_approve(mut app SoftwareApp, password string) !bool {
+fn image_submit_password(mut app SoftwareApp, password string) ! {
 	assert app.admin_prompt
 	image_control(mut app, 'software.admin.password')!
 	app.paste_input(password)
@@ -106,7 +106,45 @@ fn image_approve(mut app SoftwareApp, password string) !bool {
 	image_control(mut app, 'software.admin.approve')!
 	assert !app.admin_prompt && app.admin_password_len == 0 && app.admin_password.all(it == 0)
 	assert !app.prepare_close()
+}
+fn image_approve(mut app SoftwareApp, password string) !bool {
+	image_submit_password(mut app, password)!
 	return image_wait(mut app)!
+}
+
+fn image_enroll_and_refresh(mut app SoftwareApp, password string) ! {
+	repository := json2.decode[pkgprotocol.Repository](os.read_file('/usr/share/native-catalog/releases/field-repository.json')!)!
+	image_control(mut app, 'software.repositories')!
+	image_wait(mut app)!
+	assert app.repository_status.repositories.len == 1 && app.repository_status.repositories[0].id == 'native'
+	image_control(mut app, 'software.offline')!
+	image_control(mut app, 'software.repository.new')!
+	app.paste_input(repository.id)
+	image_control(mut app, 'software.repository.url')!
+	app.paste_input(repository.url)
+	image_control(mut app, 'software.repository.key')!
+	app.paste_input(repository.public_key)
+	image_control(mut app, 'software.repository.enroll')!
+	image_wait(mut app)!
+	assert app.repository_review_ready && app.repository_review.id == repository.id
+	assert app.repository_review.public_key == repository.public_key && app.repository_review.sequence == 2
+	image_control(mut app, 'software.repository.confirm')!
+	assert app.admin_prompt && app.repository_worker == .enroll
+	image_submit_password(mut app, password)!
+	for _ in 0 .. 6000 {
+		app.poll()
+		if app.admin_prompt || app.worker == unsafe { nil } { break }
+		time.sleep(5 * time.millisecond)
+	}
+	assert app.admin_prompt && app.repository_worker == .refresh, app.status
+	assert app.worker.args == ['admin', '--progress', '--offline', 'update', repository.id]
+	assert app.status.contains('trust was saved') && app.admin_password_len == 0
+	image_approve(mut app, password)!
+	assert app.status == 'Repository trusted and its catalog refreshed.' && app.repository_mode
+	assert app.selected_repository_refresh_id() == repository.id
+	image_control(mut app, 'software.repository.back')!
+	image_wait(mut app)!
+	assert app.catalog_error == '' && app.rows.len == 3 && app.rows.all(it.installed_version == '1.1.0')
 }
 fn image_select(mut app SoftwareApp, id string) ! {
 	image_control(mut app, 'software.catalog')!
@@ -266,7 +304,7 @@ fn image_run() ! {
 	phase := os.args[1]
 	bundled_https := os.exists('/usr/share/package-fixtures/bundled-https')
 	manual_refresh := os.exists('/usr/share/package-fixtures/manual-release-refresh')
-	if bundled_https && phase !in ['install', 'targeted-refresh']! {
+	if bundled_https && phase !in ['install', 'targeted-refresh', 'enrollment-refresh']! {
 		assert !app.offline && !app.offline_requested
 		compact := ui2.rect(0, 0, 320, 240)
 		image_control_at(mut app, 'software.offline', compact)!
@@ -331,6 +369,8 @@ fn image_run() ! {
 		image_wait(mut app)!
 		assert app.status.contains('Explicit ordinary-user document grant'), app.status
 		println('SOFTWARE IMAGE ordinary-admin real-refresh cancel bad-password review install progress native-window-1-2 document-grant PASS')
+	} else if phase == 'enrollment-refresh' {
+		image_enroll_and_refresh(mut app, password)!
 	} else if phase == 'targeted-refresh' {
 		image_control(mut app, 'software.repositories')!
 		image_wait(mut app)!

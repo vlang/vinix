@@ -182,7 +182,7 @@ fn (mut a SoftwareApp) prepare_repository_details() {
 		if review.previous_public_key != '' && review.previous_public_key != review.public_key {
 			values << 'This replaces the publisher key. Old-key applications lose launch and rollback trust.'.clone()
 		}
-		values << 'Confirming enables trust and refreshes authenticated catalogs. It does not install applications.'.clone()
+		values << 'Confirming enables trust. Refreshing this repository requires separate approval.'.clone()
 	} else {
 		values << 'Revocation disables acquisition, launch and rollback for this exact repository configuration.'.clone()
 		values << 'Installed payloads, personal data and sequence history remain. Uninstall stays available.'.clone()
@@ -248,13 +248,33 @@ fn (mut a SoftwareApp) load_repository_review() {
 		a.set_status(if review.previous_public_key != '' && review.previous_public_key != review.public_key {
 			'Confirming replaces this publisher key. Old-key apps lose launch and rollback trust. Compare the new key through your trusted channel before confirming.'
 		} else {
-			'Compare the exact publisher key through your trusted channel. Confirming enables trust and refreshes signed catalogs; it does not install applications.'
+			'Compare the exact publisher key through your trusted channel. Confirming enables trust, then asks for approval to refresh this repository.'
 		})
 	} else {
 		a.repository_summary = 'Revocation disables acquisition, launch and rollback.'.clone()
 		a.set_status('Confirming revokes this exact repository configuration. Installed payloads, personal data and sequence history remain; uninstall stays available.')
 	}
 	a.prepare_repository_details()
+}
+
+fn (mut a SoftwareApp) refresh_after_enrollment() {
+	// The accepted enrollment command ends in ID, URL and key. Copy the ID
+	// before retiring its worker so the follow-up uses the approved source.
+	id := a.worker.args[a.worker.args.len - 3].clone()
+	defer { unsafe { id.free() } }
+	a.retire_worker()
+	a.clear_admin_prompt()
+	a.start(['update', id], false)
+	if a.worker == unsafe { nil } {
+		message := 'Repository trust was saved, but its catalog refresh could not start. ' + a.status
+		a.set_status(message)
+		unsafe { message.free() }
+		return
+	}
+	a.repository_worker = .refresh
+	a.set_status(if a.admin_prompt {
+		'Repository trust was saved. Enter your administrator password to refresh this repository.'
+	} else { 'Repository trust was saved. Refreshing this repository…' })
 }
 
 fn (mut a SoftwareApp) handle_repositories(event_id string) {

@@ -646,8 +646,9 @@ key. **Review trust** verifies the signed catalog without enabling trust, then
 shows its publisher key, previous key/source when replacing one, architecture,
 sequence, expiry and catalog entry count. Compare the key through your trusted
 channel. Long source URLs are paged; each part must be displayed before
-confirmation becomes available. **Confirm trust** applies that exact review and
-refreshes authenticated catalogs. Applications still require installation review.
+confirmation becomes available. **Confirm trust** applies that exact review.
+Software then requests separate administrator approval to refresh the enrolled
+repository. Applications still require installation review.
 
 An admitted trust or revocation proposal also offers **Read review** in full and
 compact windows. The shared read-only reader preserves the complete current and
@@ -672,10 +673,10 @@ and final repository validation remain in place. See
 **Review revocation** and **Confirm revocation** disable an existing publisher
 without downloading metadata. If the repository list cannot be loaded, enter its
 ID to review revocation directly. Signature, expiry, stale-review and access
-failures reach the window. A refresh failure after successful enrollment clearly
-reports that trust was saved while the catalog remains unavailable; reload or
-refresh after correcting the failure. Organization policy and the launch account
-are preserved; there is no implicit privilege escalation or license acceptance.
+failures reach the window. A refresh failure after successful enrollment reports
+that trust was saved and shows the diagnostic. Use **Refresh** in the main
+catalog when other configured repositories also need current authenticated
+indexes. Enrollment preserves organization policy and the launch account.
 
 Trust reviews bind the configuration, operation and exact repository identity.
 Enrollment additionally binds retained sequence history and the exact verified

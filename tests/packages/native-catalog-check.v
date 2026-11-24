@@ -215,16 +215,18 @@ fn stage_native_inputs(inputs string, root string) ![]NativeArtifact {
 	return artifacts
 }
 
-fn stage_field_releases(publisher string, root string) !pkgcore.Repository {
+fn stage_field_releases(publisher string, root string, baseline_required bool) !pkgcore.Repository {
 	workspace := publisher + '/field-workspace'
 	os.mkdir_all(workspace + '/manifests')!
 	os.mkdir_all(workspace + '/objects')!
 	seed := publisher + '/field-seed'
 	key := pkgcore.keygen(seed)!
 	defer { os.rm(seed) or {} }
-	mut baseline := pkgcore.publish_release(workspace, 'field', seed, 1, time.now().unix() + 3600,
-		publisher + '/bundle/field')!
-	baseline.close()
+	if baseline_required {
+		mut baseline := pkgcore.publish_release(workspace, 'field', seed, 1, time.now().unix() + 3600,
+			publisher + '/bundle/field')!
+		baseline.close()
+	}
 	mut next := pkgcore.publish_release(workspace, 'field', seed, 2, time.now().unix() + 3600,
 		root + '/usr/share/native-catalog/releases/field-next')!
 	next.close()
@@ -232,7 +234,8 @@ fn stage_field_releases(publisher string, root string) !pkgcore.Repository {
 		public_key: key }
 }
 
-fn stage_native_image(host hwhost.Host, inputs string, root string, work string, bundled_https bool, targeted_refresh bool) ![]NativeArtifact {
+fn stage_native_image(host hwhost.Host, inputs string, root string, work string, bundled_https bool,
+	targeted_refresh bool, enrollment_refresh bool) ![]NativeArtifact {
 	// Verify and capture the builder's exact inputs before using them to create
 	// complete signed release exports. The signing seed stays outside the image.
 	verified := work + '/verified-inputs'
@@ -251,7 +254,11 @@ fn stage_native_image(host hwhost.Host, inputs string, root string, work string,
 	configuration := publisher + '/image-config.json'
 	url := if bundled_https { 'https://packages.example.invalid/release' } else { 'file://' + pkgcore.image_repositories_path + '/native' }
 	mut repositories := [pkgcore.Repository{ id: 'native', url: url, public_key: key }]
-	if targeted_refresh { repositories << stage_field_releases(publisher, root)! }
+	if targeted_refresh { repositories << stage_field_releases(publisher, root, true)! }
+	if enrollment_refresh {
+		field := stage_field_releases(publisher, root, false)!
+		os.write_file(root + '/usr/share/native-catalog/releases/field-repository.json', json2.encode(field))!
+	}
 	os.write_file(configuration, json2.encode(pkgcore.Config{ architecture: host.arch, launch_user: 'alex',
 		policy: pkgcore.Policy{ offline: !bundled_https, reserve_bytes: 0 },
 		repositories: repositories }) + '\n')!
@@ -286,12 +293,14 @@ fn check() !int {
 	profiles := '--profiles' in os.args
 	manual_refresh := '--software-manual-release-refresh' in os.args
 	targeted_refresh := '--software-targeted-refresh' in os.args
-	bundled_https := '--software-bundled-https' in os.args || manual_refresh || targeted_refresh
+	enrollment_refresh := '--software-enrollment-refresh' in os.args
+	bundled_https := '--software-bundled-https' in os.args || manual_refresh || targeted_refresh || enrollment_refresh
 	installed := '--installed' in os.args
 	persistent := '--persistent' in os.args || installed
 	software := '--software' in os.args || bundled_https || persistent
 	image := '--image' in os.args || software || profiles
-	arguments := os.args[1..].filter(it !in ['--image', '--software', '--software-bundled-https', '--software-manual-release-refresh', '--software-targeted-refresh', '--persistent', '--installed', '--profiles'])
+	arguments := os.args[1..].filter(it !in ['--image', '--software', '--software-bundled-https', '--software-manual-release-refresh', '--software-targeted-refresh', '--software-enrollment-refresh', '--persistent', '--installed', '--profiles'])
+	if targeted_refresh && enrollment_refresh { return error('choose either preconfigured selected refresh or enrollment refresh') }
 	if profiles && software { return error('--profiles selects the native image scenario; run Software scenarios separately') }
 	if bundled_https && persistent { return error('Bundled HTTPS Software checks require a single boot') }
 	options := hwhost.parse_options(arguments)!
@@ -344,7 +353,7 @@ fn check() !int {
 		artifacts << native_artifact('image/usr/share/package-fixtures/ffmpeg.tar.xz', path)!
 		artifacts << native_artifact('image/usr/share/package-fixtures/profile-exports', root + '/usr/share/package-fixtures/profile-exports')!
 	}
-	artifacts << if image { stage_native_image(host, inputs, root, work, bundled_https, targeted_refresh)! } else { stage_native_inputs(inputs, root)! }
+	artifacts << if image { stage_native_image(host, inputs, root, work, bundled_https, targeted_refresh, enrollment_refresh)! } else { stage_native_inputs(inputs, root)! }
 	if bundled_https {
 		marker := 'usr/share/package-fixtures/bundled-https'
 		os.write_file(root + '/' + marker, '')!
@@ -358,6 +367,11 @@ fn check() !int {
 	}
 	if targeted_refresh {
 		marker := 'usr/share/package-fixtures/targeted-refresh'
+		os.write_file(root + '/' + marker, '')!
+		artifacts << native_artifact('image/' + marker, root + '/' + marker)!
+	}
+	if enrollment_refresh {
+		marker := 'usr/share/package-fixtures/enrollment-refresh'
 		os.write_file(root + '/' + marker, '')!
 		artifacts << native_artifact('image/' + marker, root + '/' + marker)!
 	}
@@ -377,6 +391,8 @@ fn check() !int {
 				else { 'SOFTWARE IMAGE first-run offline refresh resumed exact release review before activation PASS' },
 				...if targeted_refresh {
 					['SOFTWARE IMAGE selected refresh approval advanced field and retained HTTPS catalog and installed generation PASS']
+				} else if enrollment_refresh {
+					['SOFTWARE IMAGE separate enrollment and selected refresh approvals retained HTTPS catalog and installed generation PASS']
 				} else { []string{} }] }
 		} else { selection.run[0] }
 	outcome := hwhost.run_scenario(host, scenario, hwhost.Run{ kernel: work + '/kernel', guest: guest, extras: root,

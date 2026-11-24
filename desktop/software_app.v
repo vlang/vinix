@@ -686,10 +686,15 @@ fn (mut a SoftwareApp) poll() bool {
 	policy_worker := a.policy_worker
 	cleanup_worker := a.cleanup_worker
 	mirroring := a.worker_mirror
+	if repository_worker == .enroll && code == 0 && !a.worker_failed {
+		a.refresh_after_enrollment()
+		return true
+	}
 	a.retire_worker()
 	if repository_worker == .targeted_refresh { a.repository_worker = .none }
 	a.clear_admin_prompt()
-	if code != 0 || ((verifying || health || cleanup_worker != .none || repository_worker == .targeted_refresh) && a.worker_failed) {
+	if code != 0 || ((verifying || health || cleanup_worker != .none
+		|| repository_worker in [.enroll, .refresh, .targeted_refresh]) && a.worker_failed) {
 		if data_worker == .purge && a.data_ready { a.prepare_personal_data_details() }
 		if cleanup_worker != .none { a.clear_cleanup_review() }
 		if policy_worker == .review { a.clear_policy_review(); a.prepare_policy_pages(false) }
@@ -699,7 +704,7 @@ fn (mut a SoftwareApp) poll() bool {
 		diagnostic := software_output_tail(a.output)
 		if repository_worker == .refresh {
 			unsafe { a.repository_result.free() }
-			a.repository_result = 'Repository trust was saved, but catalog refresh failed: ' + diagnostic
+			a.repository_result = 'Repository trust was saved, but catalog refresh failed. Use Refresh in the catalog to refresh all repositories.\n' + diagnostic
 			a.read_repositories()
 			unsafe { diagnostic.free() }
 			return true
@@ -741,10 +746,6 @@ fn (mut a SoftwareApp) poll() bool {
 		if !a.worker_failed { a.load_repositories() }
 	} else if repository_worker == .review {
 		if a.worker_failed { a.clear_repository_review() } else { a.load_repository_review() }
-	} else if repository_worker == .enroll {
-		a.start(['update'], false)
-		if a.worker != unsafe { nil } { a.repository_worker = .refresh }
-		a.set_status('Repository trust was saved. Refreshing authenticated catalogs…')
 	} else if repository_worker == .targeted_refresh {
 		a.clear_failure()
 		a.set_status('Selected repository refreshed.')
@@ -752,7 +753,7 @@ fn (mut a SoftwareApp) poll() bool {
 		unsafe { a.repository_result.free() }
 		a.repository_result = if repository_worker == .revoke {
 			'Repository revoked. Installed payloads, personal data and trust history were retained.'.clone()
-		} else { 'Repository trusted and authenticated catalogs refreshed.'.clone() }
+		} else { 'Repository trusted and its catalog refreshed.'.clone() }
 		a.read_repositories()
 	} else if view {
 		if !a.worker_failed && a.load_view() && a.release_catalog_mode && a.catalog_error == '' {

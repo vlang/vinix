@@ -142,6 +142,7 @@ fn qualify() ! {
 		for marker in ['REPOSITORY RECOVERY four real child Stop/failure/invalid recovery paths retain configured identities and literal drafts PASS',
 			'REPOSITORY RECOVERY nine compact/tiny canvases, lifecycle guards and nonoverlapping geometry PASS',
 			'REPOSITORY REFRESH selected enrolled source, literal arguments, approval, cancellation and guarded failure PASS',
+			'REPOSITORY ENROLLMENT separate approval refreshes the reviewed source and retains trust after cancellation or failure PASS',
 			'REPOSITORY RECOVERY explicit production-safe checks PASS']! {
 			require(text.split_into_lines().filter(it == marker).len == 1, 'missing/duplicate focused PASS marker')!
 		}

@@ -47,7 +47,7 @@ fn (mut a SoftwareApp) operation_line(line string) {
 		a.progress_seen = true
 		text := if a.verification_running() && event.phase == 'complete' {
 			'Verification checks finished; waiting for the service to exit.'.clone()
-		} else if a.repository_worker == .targeted_refresh && event.phase == 'complete' {
+		} else if a.repository_worker in [.refresh, .targeted_refresh] && event.phase == 'complete' {
 			'Repository refresh finished; waiting for the service to exit.'.clone()
 		} else { software_progress_text(event) }
 		a.set_status(text)

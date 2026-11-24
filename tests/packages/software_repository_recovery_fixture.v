@@ -22,17 +22,59 @@ fn repository_recovery_configuration(id string) pkgprotocol.RepositoryConfigurat
 		repositories: [pkgprotocol.Repository{ id: id, url: repository_recovery_url, public_key: repository_recovery_key }] }
 }
 
+fn repository_recovery_approve_child() ! {
+	mut password := [2]u8{}
+	repository_recovery_require(C.read(0, unsafe { &password[0] }, password.len) == password.len
+		&& password[0] == `x` && password[1] == `\n`, 'administrator child did not receive fixture approval')!
+}
+
+fn repository_enrollment_refresh_service(args []string, mode string) ! {
+	intent := ['enroll', 'draft', repository_recovery_url, repository_recovery_key]
+	if args == ['--offline', 'repo-review', ...intent] {
+		println(json2.encode(pkgprotocol.RepositoryReview{ format: 1, architecture: 'aarch64',
+			operation: 'enroll', id: 'draft', url: repository_recovery_url, public_key: repository_recovery_key,
+			fingerprint: 'd'.repeat(64), index_sha256: 'c'.repeat(64), sequence: 7,
+			expires: 2000000000, package_count: 3 }))
+		return
+	}
+	if args == ['admin', '--offline', 'repo-apply', 'd'.repeat(64), ...intent] {
+		repository_recovery_approve_child()!
+		println('fixture: trust saved')
+		return
+	}
+	if args == ['admin', '--progress', '--offline', 'update', 'draft'] {
+		repository_recovery_approve_child()!
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
+		if mode == 'enrollment-refresh-failed' {
+			eprintln('remote: no authenticated cached index; run update')
+			exit(23)
+		}
+		return
+	}
+	if args == ['--offline', '--json', 'repo-config'] {
+		configuration := repository_recovery_configuration('draft')
+		remote := pkgprotocol.Repository{ id: 'remote', url: 'https://publisher.example/current',
+			public_key: repository_recovery_key }
+		println(json2.encode(pkgprotocol.RepositoryConfiguration{ ...configuration,
+			repositories: [remote, ...configuration.repositories] }))
+		return
+	}
+	return error('unexpected enrollment or refresh argv: ' + args.join(' '))
+}
+
 // Private deterministic replies do not represent publisher authority.
 // Explicit checks and all I/O remain active with -prod.
 fn repository_recovery_service(args []string) !bool {
 	mode := os.getenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY')
 	if mode == '' || args.len < 2 { return false }
+	if mode.starts_with('enrollment-refresh-') {
+		repository_enrollment_refresh_service(args[1..], mode)!
+		return true
+	}
 	if mode == 'targeted-approved' {
 		repository_recovery_require(args[1..] == ['admin', '--progress', '--offline', 'update', 'field'],
 			'wrong administrator refresh arguments')!
-		mut password := [2]u8{}
-		repository_recovery_require(C.read(0, unsafe { &password[0] }, password.len) == password.len
-			&& password[0] == `x` && password[1] == `\n`, 'administrator child did not receive fixture approval')!
+		repository_recovery_approve_child()!
 		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
 		return true
 	}
@@ -388,6 +430,65 @@ fn repository_targeted_refresh() ! {
 fn check_software_repository_recovery() ! {
 	repository_recovery_functional()!
 	repository_targeted_refresh()!
+	repository_refresh_after_enrollment()!
 	repository_recovery_memory()!
 	println('REPOSITORY RECOVERY explicit production-safe checks PASS')
+}
+
+fn repository_refresh_after_enrollment() ! {
+	defer { os.unsetenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY') }
+	for outcome in ['success', 'cancel', 'failed']! {
+		os.setenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY', 'enrollment-refresh-' + outcome, true)
+		mut app := SoftwareApp{ service_path: os.executable(), repository_mode: true,
+			administration_required: true, offline_requested: true, output: []u8{cap: 8192} }
+		defer { app.close_app() }
+		app.initialize_repository_fields()
+		software_repository_text(mut app.repository_id, 'draft')
+		software_repository_text(mut app.repository_url, repository_recovery_url)
+		software_repository_text(mut app.repository_key, repository_recovery_key)
+		repository_recovery_activate(mut app, 'software.repository.enroll', 640, 610)!
+		repository_recovery_wait(mut app, 0)!
+		repository_recovery_require(app.repository_review_ready, 'enrollment did not present its trust review')!
+		repository_recovery_activate(mut app, 'software.repository.confirm', 640, 610)!
+		repository_recovery_require(app.admin_prompt && app.repository_worker == .enroll,
+			'enrollment did not retain its first administrator prompt')!
+		app.key_input('x')
+		repository_recovery_activate(mut app, 'software.admin.approve', 640, 610)!
+		for _ in 0 .. 5000 {
+			app.poll()
+			if app.repository_worker == .refresh && app.admin_prompt { break }
+			time.sleep(time.millisecond)
+		}
+		repository_recovery_require(app.worker != unsafe { nil } && app.repository_worker == .refresh && app.admin_prompt
+			&& app.worker.args == ['admin', '--progress', '--offline', 'update', 'draft']
+			&& app.status.contains('trust was saved') && app.status.contains('Enter your administrator password')
+			&& app.admin_password_len == 0, 'enrollment did not request independent approval for the reviewed repository')!
+		if outcome == 'cancel' {
+			repository_recovery_activate(mut app, 'software.admin.cancel', 640, 610)!
+		} else {
+			app.key_input('x')
+			repository_recovery_activate(mut app, 'software.admin.approve', 640, 610)!
+		}
+		repository_recovery_wait(mut app, 0)!
+		repository_recovery_require(app.repository_mode && !app.admin_prompt && app.offline_requested
+			&& app.repository_status.repositories.len == 2 && app.repository_status.repositories[0].id == 'remote'
+			&& app.selected_repository_refresh_id() == 'draft', 'follow-up refresh did not reload the saved enrollment')!
+		match outcome {
+			'success' {
+				repository_recovery_require(app.status == 'Repository trusted and its catalog refreshed.',
+					'selected enrollment refresh did not report success')!
+			}
+			'cancel' {
+				repository_recovery_require(app.status.contains('trust was saved') && app.status.contains('approval was cancelled'),
+					'cancelled refresh did not report saved trust')!
+			}
+			else {
+				repository_recovery_require(app.status.contains('trust was saved') && app.status.contains('refresh all repositories')
+					&& app.status.contains('no authenticated cached index')
+					&& app.failure_heading == 'Refresh selected repository · exit 23',
+					'failed refresh did not retain saved trust, diagnostic and full refresh guidance')!
+			}
+		}
+	}
+	println('REPOSITORY ENROLLMENT separate approval refreshes the reviewed source and retains trust after cancellation or failure PASS')
 }
