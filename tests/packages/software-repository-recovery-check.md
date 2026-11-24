@@ -182,3 +182,38 @@ All 65 receipt entries matched per enrollment run and all 66 per manual run.
 The independent archive checker verified all 10,181 sealed files and symlinks.
 Archive SHA-256 is
 `b0020f8d173d4cf11d2802fd58369f87a0dd79b1568391ef927dc30ea66b559e`.
+
+## Browse and refresh in compact windows
+
+At 180×220, the compact catalog opens **Repositories** through its **Sources**
+entry. **Browse repositories** pages through configured identities and opens
+the ordinary administrator prompt for the displayed source's **Refresh**
+action. At 320 pixels wide the compact repository list also offers **Go offline**.
+The refresh worker receives the displayed identity fingerprint. Browsing and
+refreshing preserve the editor's literal draft.
+
+At `6c5f35869e79ab63112982d65faf3a3cf830ab7e`, all five host modes passed.
+The tests reconstruct a 4,096-byte UTF-8 URL and its publisher key from the
+rendered pages, check bounded controls, and exercise password approval and
+cancellation at 320×240. Both tracked variants retained zero V bytes and
+records over 64 open, navigate, render and close cycles and over the existing
+9,000 recovery renders. ASan/UBSan passed with process leak detection disabled.
+
+Both production compositors linked statically. On 2026-11-24, the selected
+refresh check drove Software from its compact catalog through actual
+administrator approval at 320×240 on AArch64 and x86_64 under QEMU TCG. The
+selected local source advanced while the saved HTTPS index and installed
+generation stayed byte-identical. Both guests initiated shutdown. The
+retained receipts match all 66 entries on each target. These runs covered
+controller interaction on the staged image.
+
+The broader package-navigation allocation fixture retained 5,400,000 bytes
+over 1,000 cycles. It reported the same total at the earlier
+`cc7c6262b` baseline and at `b1dc7b107` before the compact catalog entry.
+The launch-navigation allocation fixture retained zero tracked bytes.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-compact-repositories-mcirSh/entry/qualification.tar.gz)
+contains the final source snapshot, host checks, compositor builds and native
+receipts. The independent checker verified all 9,789 sealed files and
+symlinks. Archive SHA-256 is
+`2d65394ecb21e592a85e9d1e576a9878f90a99271d34ab74ed76628c5841dbf9`.
