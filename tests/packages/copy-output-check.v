@@ -9,7 +9,7 @@ import tools.packages.pkgcore
 #include <sys/wait.h>
 #include <unistd.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
 fn C.link(&char, &char) int
@@ -57,7 +57,7 @@ fn check() ! {
 			}
 			C._exit(0)
 		}
-		mut status := 0
+		mut status := i32(0)
 		assert C.waitpid(child, &status, 0) == child
 		assert status == if before { 0 } else { 256 }, '${kind}: wait status ${status}'
 		assert os.read_file(source)! == 'payload'

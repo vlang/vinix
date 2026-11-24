@@ -8,10 +8,14 @@ import tools.packages.pkgcore
 #include <sys/wait.h>
 #include <unistd.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) i32
+} $else {
+	fn C.mkfifo(&char, u32) i32
+}
 fn C.link(&char, &char) int
 fn C.setpgid(int, int) int
 fn C.kill(int, int) int
@@ -85,7 +89,7 @@ fn check() ! {
 			assert os.read_file(work + '/requests')!.contains('delayed payload')
 			os.rename(path, path + '.saved')!; os.symlink(outside, path)!
 		}
-		mut status := 0
+		mut status := i32(0)
 		assert C.waitpid(child, &status, 0) == child
 		// Retire the old implementation's blocked curl grandchild as well.
 		C.kill(-child, 9)

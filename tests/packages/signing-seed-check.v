@@ -7,7 +7,11 @@ import time
 #include <sys/stat.h>
 #include <unistd.h>
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) i32
+} $else {
+	fn C.mkfifo(&char, u32) i32
+}
 fn C.chown(&char, i32, i32) i32
 
 fn command(binary string, args []string) !os.Result {

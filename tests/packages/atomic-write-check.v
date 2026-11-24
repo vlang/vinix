@@ -7,10 +7,14 @@ import tools.packages.pkgcore
 #include <sys/wait.h>
 #include <unistd.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) i32
+} $else {
+	fn C.mkfifo(&char, u32) i32
+}
 fn C.link(&char, &char) int
 
 fn check() ! {
@@ -50,7 +54,7 @@ fn check() ! {
 			pkgcore.atomic_write(path + if kind == 'nul-path' { '\x00ignored' } else { '' }, text) or { C._exit(1) }
 			C._exit(0)
 		}
-		mut status := 0
+		mut status := i32(0)
 		assert C.waitpid(child, &status, 0) == child
 		expected := if before {
 			if kind == 'temporary-fifo' { 14 } else if kind == 'temporary-directory' { 256 } else { 0 }

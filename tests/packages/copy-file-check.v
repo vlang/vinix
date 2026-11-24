@@ -7,10 +7,14 @@ import tools.packages.pkgcore
 #include <sys/wait.h>
 #include <unistd.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) i32
+} $else {
+	fn C.mkfifo(&char, u32) i32
+}
 fn C.link(&char, &char) int
 
 fn check() ! {
@@ -51,7 +55,7 @@ fn check() ! {
 			}
 			C._exit(0)
 		}
-		mut status := 0
+		mut status := i32(0)
 		assert C.waitpid(child, &status, 0) == child
 		expected := if !before || kind in ['oversized-source', 'offline-oversized-source'] { 256 }
 			else if kind in ['source-fifo', 'target-fifo'] { 14 } else { 0 }

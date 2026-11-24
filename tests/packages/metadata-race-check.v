@@ -14,9 +14,13 @@ $if linux {
 fn C.fork() int
 fn C._exit(int)
 fn C.alarm(u32) u32
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C.kill(int, int) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) i32
+} $else {
+	fn C.mkfifo(&char, u32) i32
+}
 fn C.renamex_np(&char, &char, u32) int
 fn C.syscall(i64, ...voidptr) i64
 
@@ -60,7 +64,7 @@ fn check() ! {
 		reader := C.fork()
 		if reader < 0 {
 			C.kill(mutator, 9)
-			mut status := 0
+			mut status := i32(0)
 			C.waitpid(mutator, &status, 0)
 			return error('cannot start bounded metadata reader')
 		}
@@ -77,10 +81,10 @@ fn check() ! {
 			}
 			C._exit(0)
 		}
-		mut status := 0
+		mut status := i32(0)
 		waited := C.waitpid(reader, &status, 0)
 		C.kill(mutator, 9)
-		mut mutator_status := 0
+		mut mutator_status := i32(0)
 		assert C.waitpid(mutator, &mutator_status, 0) == mutator
 		assert waited == reader
 		println('${kind}: reader wait status ${status} (0=bounded captured reads, 14=alarm, 10752=alias bytes read)')

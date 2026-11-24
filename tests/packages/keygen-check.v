@@ -7,7 +7,11 @@ import tools.packages.pkgcore
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) i32
+} $else {
+	fn C.mkfifo(&char, u32) i32
+}
 fn C.link(&char, &char) int
 fn C.fork() int
 fn C.waitpid(int, &i32, int) int
