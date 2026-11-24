@@ -244,3 +244,39 @@ contains the baseline trace, fixed source snapshot, host checks and guest
 receipts. The independent checker verified all 1,232 sealed files and
 symlinks. Archive SHA-256 is
 `362f1193381a05e3ae1142eabf3113b9228180ac51c6aae79e22b0c2757a0d62`.
+
+## Repository and offline export decoder retention
+
+At `4d603cbec7a8be8d29d2ea19356b2ef0d06bdab7`, the repository configuration,
+repository status, trust review, mirror review and deployment mirror review
+decoders release partially read metadata by value. The repository arrays
+append records by value. Repository validation also takes the temporary by
+value, so the compiler keeps it on the stack. Callers release successful
+replies through the existing `close()` methods.
+
+On 2026-11-24, the tracker measured 1,280 decode attempts across those five
+reply types. Each type exercised successful parsing, a late field type error,
+a semantic refusal and trailing data. At `d19f4f80b` with the same test, the
+five types retained 518,144 bytes across 3,072 allocations. The fixed decoders
+retained zero bytes and zero allocations. The existing configuration reader
+test and the 1,000-cycle Software repository and export navigation checks also
+retained zero tracked bytes.
+
+All 27 protocol test files and all five focused host modes passed for both
+repository recovery and compact mirror. ASan/UBSan ran with process leak
+detection disabled. The separate compact mirror ARM production C-generation
+step failed on deprecated calls in two UI2 Linux helpers at both revisions.
+The supplementary full host Software fixture also stopped at the same stale
+repository report wording assertion at both revisions.
+
+The staged Software image built and ran in headless QEMU on AArch64 and x86_64.
+The compact selected refresh advanced the selected repository and preserved the
+saved HTTPS catalog and installed generation. Both guests initiated shutdown,
+and all 66 receipt entries matched on each target. This guest run covered the
+repository flow. The export decoder and export navigation checks ran on the host.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-review-envelopes-zfhC8s/qualification.tar.gz)
+contains the source snapshot, generated decoder code, baseline and fixed host
+logs, and guest receipts. The independent archive checker verified all 2,385
+sealed files and symlinks. Archive SHA-256 is
+`1e4488b2137f07779906835c0fbee24202a0bbdec9f020de1150fc7e934f0c0d`.
