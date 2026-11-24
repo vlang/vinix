@@ -101,3 +101,21 @@ Only that worker is built with the intermediate history checkpoint. Preparation
 and recovery use the ordinary package binary. The cut suspends the worker at
 completed application checkpoints, and the host kills QEMU before rebooting
 the same ext2 disk.
+
+On 2026-11-24, revision `3766de2fb34bb3aac8f798702abff8d970c1548c`
+passed all three cuts on AArch64 (HVF) and x86_64 (TCG). Each run required
+QEMU to exit from SIGKILL on the first boot and recorded guest shutdown after
+the recovery assertions on the second. Both target CLI binaries lacked the
+history checkpoint included in their respective cut workers. The refresh,
+service and trust-recovery host suites passed, along with the focused
+selected-refresh test under ASan/UBSan with leak detection disabled.
+
+The [retained archive](/Users/alex/.local/state/vinix/r14-refresh-crash-4Lnrax/qualification.tar.gz)
+contains the source snapshot, target inputs, disk images, receipts, serial
+and QMP logs. All 11 receipt sizes and digests matched per target. A fresh
+extraction matched all 155 SHA-256 manifest entries. The archive's SHA-256 is
+`81f832e157766eb9ee5cb1ee7ace9f1a02ba520b20001f3b9f3aef3193c8abab`.
+
+These runs qualify recovery at completed metadata checkpoints on QEMU ext2.
+Cuts during writes, physical storage power loss and wider filesystem
+qualification remain open.
