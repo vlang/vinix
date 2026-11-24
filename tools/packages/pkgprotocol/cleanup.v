@@ -57,7 +57,8 @@ pub fn decode_cleanup_review(text string) !CleanupReview {
 	mut r := &MetadataReader{ text: text }
 	defer { unsafe { free(r) } }
 	r.expect(`{`)!
-	mut review := CleanupReview{}
+	mut review := &CleanupReview{}
+	defer { unsafe { free(review) } }
 	mut accepted := false
 	defer { if !accepted { review.close() } }
 	mut seen := u16(0)
@@ -66,19 +67,21 @@ pub fn decode_cleanup_review(text string) !CleanupReview {
 		first = false
 		field := r.member(cleanup_keys, seen)!
 		seen |= u16(1) << field
-		match field {
-			0 { r.expect(`1`)! }
-			1 { review = CleanupReview{ ...review, architecture: r.quoted(16)! } }
-			2 { review = CleanupReview{ ...review, generation: r.unsigned(~u64(0))! } }
-			3 { review = CleanupReview{ ...review, previous: r.unsigned(~u64(0))! } }
-			4 { review = CleanupReview{ ...review, fingerprint: r.quoted(64)! } }
-			5 { review = CleanupReview{ ...review, generations: r.cleanup_generations()! } }
-			else {}
+		unsafe {
+			match field {
+				0 { r.expect(`1`)! }
+				1 { *review = CleanupReview{ ...review, architecture: r.quoted(16)! } }
+				2 { *review = CleanupReview{ ...review, generation: r.unsigned(~u64(0))! } }
+				3 { *review = CleanupReview{ ...review, previous: r.unsigned(~u64(0))! } }
+				4 { *review = CleanupReview{ ...review, fingerprint: r.quoted(64)! } }
+				5 { *review = CleanupReview{ ...review, generations: r.cleanup_generations()! } }
+				else {}
+			}
 		}
 	}
 	r.spaces()
 	if seen != 63 || r.position != text.len { return error('incomplete or trailing cleanup review') }
 	review.validate()!
 	accepted = true
-	return review
+	return *review
 }

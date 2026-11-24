@@ -28,7 +28,8 @@ fn suite() hwhost.Suite {
 		module_paths: ['.', 'tools/accounts'], directories: ['tmp:1777'], programs: [
 			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/deployment_audit_test.v', path: 'usr/share/package-fixtures/audit-core' },
-			hwhost.Program{ source: 'tools/packages/pkgprotocol/deployment_audit_test.v', path: 'usr/share/package-fixtures/audit-protocol' },
+			hwhost.Program{ source: 'tools/packages/pkgprotocol/deployment_audit_test.v', path: 'usr/share/package-fixtures/audit-protocol',
+				flags: ['-manualfree', '-d', 'track_heap'] },
 			hwhost.Program{ source: 'tests/packages/deployment-snapshot-check.v', path: 'usr/share/package-fixtures/audit-probe' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/deployment_observation_test.v', path: 'usr/share/package-fixtures/observation-core' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/stored_decode_test.v', path: 'usr/share/package-fixtures/stored-decode' },
@@ -39,6 +40,7 @@ fn suite() hwhost.Suite {
 				'DEPLOYMENT AUDIT missing/unexpected packages, versions, architecture, digests, publisher/repository, floor and requested-root differences PASS',
 				'DEPLOYMENT AUDIT writer exclusion, malformed/roots-only/mismatched/aliased inputs and corrupt state refusal; empty read without initialization PASS',
 				'DEPLOYMENT AUDIT PROTOCOL complete typed fields, duplicate/unknown keys, bounded sorted union rows and coherent drift result PASS',
+				'DEPLOYMENT AUDIT PROTOCOL 1000 complete and partial-invalid decode/close cycles retain zero tracked bytes PASS',
 				'DEPLOYMENT AUDIT ordinary UID 1000 reads exact root-owned comparison without administrator authorization PASS',
 				'DEPLOYMENT AUDIT CLI exact offline metadata and sequence-floor matches, missing/changed drift exit 3, no fresh-state initialization and authenticated reproduction PASS',
 				'Deployment observation: exact SDK JSON and optional LF; inclusive metadata bound and overflow refusal release growth buffers PASS',

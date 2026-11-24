@@ -66,12 +66,16 @@ fn close_deployment_audit_row(row DeploymentAuditRow) {
 	}
 }
 
+fn close_deployment_audit_rows(rows []DeploymentAuditRow) {
+	for row in rows { close_deployment_audit_row(row) }
+	unsafe { (&array(&rows)).free() }
+}
+
 pub fn (mut report DeploymentAudit) close() {
 	unsafe {
 		report.architecture.free(); report.deployment_sha256.free()
-		for row in report.rows { close_deployment_audit_row(row) }
-		(&array(&report.rows)).free()
 	}
+	close_deployment_audit_rows(report.rows)
 	report = DeploymentAudit{}
 }
 
@@ -106,14 +110,12 @@ fn (mut r MetadataReader) deployment_audit_rows() ![]DeploymentAuditRow {
 	mut rows := []DeploymentAuditRow{cap: 16}
 	unsafe { rows.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { mut discarded := DeploymentAudit{ rows: rows }; discarded.close() } }
+	defer { if !accepted { close_deployment_audit_rows(rows) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if rows.len == 8192 { return error('deployment audit row count exceeds its bound') }
-		row := r.deployment_audit_row()!
-		pointer := unsafe { &row }
-		unsafe { rows.push_many(pointer, 1) }
+		rows << r.deployment_audit_row()!
 	}
 	accepted = true
 	return rows
@@ -123,25 +125,29 @@ pub fn decode_deployment_audit(text string) !DeploymentAudit {
 	if text.len > 8 * 1024 * 1024 { return error('deployment audit exceeds its bound') }
 	mut r := &MetadataReader{ text: text }; defer { unsafe { free(r) } }
 	r.expect(`{`)!
-	mut report := DeploymentAudit{}; mut accepted := false
+	mut report := &DeploymentAudit{}
+	defer { unsafe { free(report) } }
+	mut accepted := false
 	defer { if !accepted { report.close() } }
 	mut seen := u16(0); mut first := true
 	for r.next(first, `}`)! {
 		first = false
 		field := r.member(deployment_audit_keys, seen)!; seen |= u16(1) << field
-		match field {
-			0 { r.expect(`1`)! }
-			1 { report = DeploymentAudit{ ...report, generation: r.unsigned(~u64(0))! } }
-			2 { report = DeploymentAudit{ ...report, architecture: r.quoted(16)! } }
-			3 { report = DeploymentAudit{ ...report, deployment_sha256: r.quoted(64)! } }
-			4 { report = DeploymentAudit{ ...report, matches: r.boolean()! } }
-			5 { report = DeploymentAudit{ ...report, rows: r.deployment_audit_rows()! } }
-			else {}
+		unsafe {
+			match field {
+				0 { r.expect(`1`)! }
+				1 { *report = DeploymentAudit{ ...report, generation: r.unsigned(~u64(0))! } }
+				2 { *report = DeploymentAudit{ ...report, architecture: r.quoted(16)! } }
+				3 { *report = DeploymentAudit{ ...report, deployment_sha256: r.quoted(64)! } }
+				4 { *report = DeploymentAudit{ ...report, matches: r.boolean()! } }
+				5 { *report = DeploymentAudit{ ...report, rows: r.deployment_audit_rows()! } }
+				else {}
+			}
 		}
 	}
 	r.spaces()
 	if seen != 63 || r.position != text.len { return error('incomplete or trailing deployment audit') }
 	report.validate()!
 	accepted = true
-	return report
+	return *report
 }

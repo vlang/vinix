@@ -37,26 +37,30 @@ pub fn decode_deployment_saved(text string) !DeploymentSnapshotSaved {
 	if text.len > 32 * 1024 { return error('saved deployment snapshot receipt exceeds its bound') }
 	mut r := &MetadataReader{ text: text }; defer { unsafe { free(r) } }
 	r.expect(`{`)!
-	mut saved := DeploymentSnapshotSaved{}; mut accepted := false
+	mut saved := &DeploymentSnapshotSaved{}
+	defer { unsafe { free(saved) } }
+	mut accepted := false
 	defer { if !accepted { saved.close() } }
 	mut seen := u16(0); mut first := true
 	for r.next(first, `}`)! {
 		first = false
 		field := r.member(deployment_saved_keys, seen)!; seen |= u16(1) << field
-		match field {
-			0 { r.expect(`1`)! }
-			1 { saved = DeploymentSnapshotSaved{ ...saved, generation: r.unsigned(~u64(0))! } }
-			2 { saved = DeploymentSnapshotSaved{ ...saved, architecture: r.quoted(16)! } }
-			3 { saved = DeploymentSnapshotSaved{ ...saved, destination: r.quoted(4096)! } }
-			4 { saved = DeploymentSnapshotSaved{ ...saved, sha256: r.quoted(64)! } }
-			5 { saved = DeploymentSnapshotSaved{ ...saved, roots: r.unsigned(4096)! } }
-			6 { saved = DeploymentSnapshotSaved{ ...saved, packages: r.unsigned(4096)! } }
-			else {}
+		unsafe {
+			match field {
+				0 { r.expect(`1`)! }
+				1 { *saved = DeploymentSnapshotSaved{ ...saved, generation: r.unsigned(~u64(0))! } }
+				2 { *saved = DeploymentSnapshotSaved{ ...saved, architecture: r.quoted(16)! } }
+				3 { *saved = DeploymentSnapshotSaved{ ...saved, destination: r.quoted(4096)! } }
+				4 { *saved = DeploymentSnapshotSaved{ ...saved, sha256: r.quoted(64)! } }
+				5 { *saved = DeploymentSnapshotSaved{ ...saved, roots: r.unsigned(4096)! } }
+				6 { *saved = DeploymentSnapshotSaved{ ...saved, packages: r.unsigned(4096)! } }
+				else {}
+			}
 		}
 	}
 	r.spaces()
 	if seen != 127 || r.position != text.len { return error('incomplete or trailing saved deployment snapshot receipt') }
 	saved.validate()!
 	accepted = true
-	return saved
+	return *saved
 }

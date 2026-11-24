@@ -28,7 +28,8 @@ fn suite() hwhost.Suite {
 		module_paths: ['.', 'tools/accounts'], directories: ['tmp:1777'], programs: [
 			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package' },
 			hwhost.Program{ source: 'tools/packages/pkgcore/cleanup_test.v', path: 'usr/share/package-fixtures/cleanup-core' },
-			hwhost.Program{ source: 'tools/packages/pkgprotocol/cleanup_test.v', path: 'usr/share/package-fixtures/cleanup-protocol' },
+			hwhost.Program{ source: 'tools/packages/pkgprotocol/cleanup_test.v', path: 'usr/share/package-fixtures/cleanup-protocol',
+				flags: ['-manualfree', '-d', 'track_heap'] },
 			hwhost.Program{ source: 'tests/packages/cleanup-check.v', path: 'usr/share/package-fixtures/cleanup-probe' },
 		], scenarios: [hwhost.Scenario{ name: 'packages-reviewed-cleanup', arches: ['aarch64', 'x86_64'],
 			about: 'reviewed obsolete generation retirement, ordinary root-owned readers, stale approvals and signed real CLI retention',
