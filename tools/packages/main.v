@@ -49,7 +49,8 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  wine-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  apple-catalog RECIPE_DIRECTORY PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
-	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n'
+	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n' +
+	'  check-release-origin RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX HTTPS_URL\n'
 
 fn publisher_reply[T](mut info T) {
 	defer { info.close() }
@@ -276,6 +277,14 @@ fn checked(arguments []string) !int {
 		'apple-catalog' {
 			if names.len != 3 { return error('apple-catalog requires a recipe directory, prepared roots and a new lock directory') }
 			mut info := pkgcore.apple_catalog(names[0], names[1], names[2])!
+			publisher_reply(mut info)
+			return 0
+		}
+		'check-release-origin' {
+			if names.len != 4 || root_option || offline {
+				return error('check-release-origin requires a signed release directory, repository ID, public key and HTTPS URL without installation root or offline options')
+			}
+			mut info := pkgcore.check_release_origin(names[0], names[1], names[2], names[3])!
 			publisher_reply(mut info)
 			return 0
 		}

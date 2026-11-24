@@ -1129,6 +1129,30 @@ failure reports that the complete directory exists but its durability is uncerta
 Upload this complete release to a new remote directory, then switch the server's
 release route. Serving a mutable workspace can expose a torn metadata pair.
 
+#### Check the hosted release
+
+Run `check-release-origin` with the reviewed `publish-release` directory, the
+repository ID, and an independently verified publisher public key.
+
+```sh
+vinix-package check-release-origin RELEASE_DIRECTORY REPOSITORY_ID PUBLIC_KEY_HEX HTTPS_URL
+```
+
+The command authenticates the local export and verifies its complete dependency
+closure and payloads. It compares the hosted index and signature byte for byte,
+downloads each distinct signed object once, and checks its length and SHA-256.
+It reads the hosted index and signature again after the last object to detect a
+release switch during the downloads. The HTTPS requests use the normal package
+transport and certificate checks.
+
+Success emits format-1 JSON with `url` and `release`. The latter matches the
+`publish-release` receipt for those signed bytes. Transfers use a private
+temporary directory and retain at most one response at a time. The command
+preserves the export, publisher history, consumer configuration and installed
+state. See [released repository readback qualification](../../tests/packages/release-origin-readback-check.md).
+
+#### Publication and recovery
+
 Complete-stage verification runs before directory flushing/sequence reservation
 and again after reservation immediately before publication. It requires the exact
 captured signed metadata, root/object namespace, authenticated payload lengths

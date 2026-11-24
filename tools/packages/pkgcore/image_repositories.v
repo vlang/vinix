@@ -39,6 +39,10 @@ struct ImageRepositoriesOptions {
 }
 
 fn image_repository_objects(index Index) !map[string]Payload {
+	return signed_release_objects(index, max_files)
+}
+
+fn signed_release_objects(index Index, limit int) !map[string]Payload {
 	mut objects := map[string]Payload{}
 	mut accepted := false
 	defer { if !accepted { unsafe { objects.free() } } }
@@ -48,7 +52,7 @@ fn image_repository_objects(index Index) !map[string]Payload {
 				return error('image repository has inconsistent authenticated object lengths')
 			}
 			objects[payload.sha256] = payload
-			if objects.len > max_files { return error('image repository exceeds the bundled object limit') }
+			if limit > 0 && objects.len > limit { return error('image repository exceeds the bundled object limit') }
 		}
 	}
 	accepted = true

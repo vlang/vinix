@@ -46,7 +46,12 @@ fn serve(mut connection openssl.SSLConn, root string, log string) ! {
 		reply(mut connection, '302 Found', 'Location: http://127.0.0.1:9/refused\r\nContent-Length: 0\r\n', '')!
 		return
 	}
-	mut body := os.read_file(root + '/' + relative) or {
+	mut source := relative
+	if mode == 'origin-switch' && relative == 'index.json' {
+		requests := os.read_file(log)!.split_into_lines()
+		if requests.filter(it == 'origin-switch index.json -').len > 1 { source = 'next-index.json' }
+	}
+	mut body := os.read_file(root + '/' + source) or {
 		reply(mut connection, '404 Not Found', 'Content-Length: 0\r\n', '')!
 		return
 	}
