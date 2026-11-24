@@ -33,6 +33,7 @@ fn image_export_suite() hwhost.Suite {
 			required: ['HWTEST START packages-image-export',
 				'ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS',
 				'ISO OFFLINE MEDIA verification checks both signed publishers and rejects duplicate receipt pins PASS',
+				'DEPLOYMENT MEDIA SAVE preserves exact bytes, refuses digest and policy drift, and supports reviewed installation after disconnect PASS',
 				'REPOSITORY MEDIA keeps HTTPS identity, checks replay and objects, caches policy-allowed payloads and installs after disconnect PASS',
 				'REPOSITORY MEDIA batch authenticates both publishers before acquisition, retains verified objects after refusal and installs from the repaired offline cache PASS',
 				'REPOSITORY MEDIA bundle discovers enrolled publishers and rejects undeclared entries, aliases and late namespace changes PASS',

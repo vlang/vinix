@@ -27,6 +27,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json\n' +
 	'  deployment-lock [ID...] | deployment-snapshot [INSTALLED_ID...]\n' +
 	'  deployment-snapshot-save NEW_FILE [INSTALLED_ID...]\n' +
+	'  deployment-media-save MEDIA_DIRECTORY NEW_FILE [EXPECTED_SHA256]\n' +
 	'  deployment-audit FILE (read-only metadata drift; exit 0 match, 3 drift)\n' +
 	'  deployment-add-audit FILE (read-only release coverage; extra installed apps allowed)\n' +
 	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
@@ -348,6 +349,15 @@ fn checked(arguments []string) !int {
 	service := pkgcore.Service{ root: root, offline: offline,
 		progress: if progress && command == 'health' { print_health_progress } else if progress { print_progress } else { ignore_progress } }
 	match command {
+		'deployment-media-save' {
+			if names.len !in [2, 3]! || (names.len == 3 && !pkgcore.digest_valid(names[2])) {
+				return error('deployment-media-save requires an absolute media directory, new file and optional SHA-256 digest')
+			}
+			mut saved := service.save_media_deployment(names[0], names[1], if names.len == 3 { names[2] } else { '' })!
+			defer { saved.close() }
+			if as_json { println(json2.encode(saved)) }
+			else { println('Media deployment saved: ${saved.destination}\nApplication roots: ${saved.roots}; packages: ${saved.packages}\nSHA-256: ${saved.sha256}') }
+		}
 		'deployment-snapshot-save' {
 			if names.len == 0 { return error('deployment-snapshot-save requires a new destination file and optional installed IDs') }
 			mut saved := service.save_deployment_snapshot(names[0], names[1..])!

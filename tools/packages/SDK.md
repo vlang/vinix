@@ -829,9 +829,19 @@ cached snapshot.
 
 ```sh
 vinix-package admin update-media /media/usb/release-apps
-vinix-package --offline deployment-add-review /media/usb/release-apps/_deployment.json
-vinix-package admin --offline deployment-add-apply DEPLOYMENT_FINGERPRINT /media/usb/release-apps/_deployment.json
+vinix_deployment="$PWD/release-lock.json"
+vinix-package --offline deployment-media-save /media/usb/release-apps "$vinix_deployment"
+vinix-package --offline deployment-add-review "$vinix_deployment"
+vinix-package admin --offline deployment-add-apply DEPLOYMENT_FINGERPRINT "$vinix_deployment"
 ```
+
+`deployment-media-save MEDIA_DIRECTORY NEW_FILE [EXPECTED_SHA256]` checks the
+bundle's nonempty format-2 lock against the current authenticated catalog,
+policy and installed state. It saves the exact bytes to a new file outside the
+bundle. Supply `deployment_sha256` from the trusted release receipt to require
+that exact digest. `--json` reports the destination, architecture, digest and
+root and package counts. Run it directly as the owner of the destination.
+After it succeeds you can disconnect the media and review the local file.
 
 Use explicit repository and directory pairs to select individual publishers
 or import from several locations:
@@ -845,9 +855,7 @@ the verified payloads for this architecture and architecture-independent
 packages allowed by current organization policy. It checks space for the
 complete batch and publishes one refreshed catalog after acquisition. Use
 absolute paths to controlled ordinary directories. The bundle directory must
-be owned by the importing administrator. Its `_deployment.json` is available
-for separate review. You can disconnect the media after importing and copying
-the lock to a local filename.
+be owned by the importing administrator.
 If acquisition fails, verified cache objects remain available for retry.
 Enrollment and installed generations keep their existing state during import.
 

@@ -119,8 +119,80 @@ fn test_iso_offline_media_exclusive_publication_retires_stages_and_preserves_out
 	}
 	assert refused
 	assert os.ls(root)!.len == 0
+	check_saved_media_deployment(work, destination, deployment, key)!
 	println('ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS')
 	println('ISO OFFLINE MEDIA verification checks both signed publishers and rejects duplicate receipt pins PASS')
+}
+
+fn check_saved_media_deployment(work string, exported string, deployment string, key string) ! {
+	// The export refusal fixture deliberately publishes the same app IDs under
+	// both publishers. Use only its lock's publisher for the consumer flow.
+	media := work + '/lock-media'
+	os.mkdir(media)!
+	os.cp_all(exported + '/native', media + '/native', true)!
+	path := media + '/' + pkgprotocol.deployment_mirror_filename
+	os.write_file(path, deployment)!
+	os.chmod(path, 0o644)!
+	root := work + '/consumer'
+	config_path := root + '/etc/vinix-packages/config.json'
+	os.mkdir_all(os.dir(config_path))!
+	config := Config{ architecture: 'aarch64', repositories: [
+		Repository{ id: 'native', url: 'https://packages.example.invalid/native', public_key: key }] }
+	os.write_file(config_path, json2.encode(config))!
+	service := Service{ root: root, offline: true }
+	mut catalog := service.import_repository_media_bundle(media)!
+	catalog.close()
+	directory := state_directory(root)
+	before_catalog := read_metadata(directory + '/catalog.json')!
+	before_history := read_metadata(directory + '/trust-history.json')!
+	output := work + '/saved media lock é.json'
+	refused := work + '/refused.json'
+	if _ := service.save_media_deployment(media, refused, '0'.repeat(64)) { assert false }
+	else { assert err.msg().contains('SHA-256 differs') }
+	if _ := service.save_media_deployment(media, media + '/inside.json', '') { assert false }
+	else { assert err.msg().contains('outside the media directory') }
+	guard := acquire(directory)!
+	if _ := service.save_media_deployment(media, refused, '') { assert false }
+	else { assert err.msg().contains('another package transaction') }
+	guard.release()
+	wrong_policy := Config{ ...config, policy: Policy{ allowed: ['unrelated'] } }
+	os.write_file(config_path, json2.encode(wrong_policy))!
+	if _ := service.save_media_deployment(media, refused, '') { assert false }
+	else { assert err.msg().contains('organization allowlist') }
+	os.write_file(config_path, json2.encode(config))!
+
+	os.rm(path)!
+	os.symlink(work + '/nonexistent', path)!
+	if _ := service.save_media_deployment(media, refused, '') { assert false }
+	else { assert err.msg().contains('ordinary single-link file') }
+	os.rm(path)!
+	os.write_file(path, '{"format":1,"architecture":"aarch64","packages":["editor"]}\n')!
+	os.chmod(path, 0o644)!
+	if _ := service.save_media_deployment(media, refused, '') { assert false }
+	else { assert err.msg().contains('nonempty format-2 deployment lock') }
+	assert !os.exists(refused) && !os.exists(media + '/inside.json')
+	// Legal noncanonical whitespace must survive along with the pinned fields.
+	text := ' ' + deployment + '\n'
+	os.write_file(path, text)!
+	digest := hash_file(path)!
+	mut saved := service.save_media_deployment(media, output, digest)!
+	assert saved.destination == output && saved.architecture == 'aarch64' && saved.sha256 == digest
+	assert saved.format == 1 && saved.roots == 2 && saved.packages == 4
+	saved.close(); saved.close()
+	assert os.read_file(output)! == text && os.lstat(output)!.mode & 0o777 == 0o644
+	if _ := service.save_media_deployment(media, output, digest) { assert false }
+	else { assert err.msg().contains('already exists') }
+	assert os.read_file(output)! == text && os.read_file(path)! == text
+	assert read_metadata(directory + '/catalog.json')! == before_catalog
+	assert read_metadata(directory + '/trust-history.json')! == before_history
+	assert service.state()!.generation == 0
+	os.rename(media, work + '/disconnected-media')!
+	mut review := service.review_deployment_additions(output)!
+	defer { review.close() }
+	mut installed := service.apply_deployment_additions(output, review.fingerprint)!
+	defer { installed.close() }
+	assert installed.requested == ['editor', 'modern'] && installed.packages.len == 4
+	println('DEPLOYMENT MEDIA SAVE preserves exact bytes, refuses digest and policy drift, and supports reviewed installation after disconnect PASS')
 }
 
 fn test_image_catalog_refuses_identical_replaced_capture_before_report_and_declaration() {
