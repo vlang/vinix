@@ -28,10 +28,30 @@ fn (mut a SoftwareApp) stop_repository_read() {
 	})
 }
 
+fn (a &SoftwareApp) repository_browsable() bool {
+	return a.repository_mode && a.worker == unsafe { nil } && a.repository_operation == ''
+		&& a.repository_status.repositories.len > 0
+}
+
+fn (mut a SoftwareApp) browse_repository(index int) {
+	if !a.repository_browsable() || index < 0 || index >= a.repository_status.repositories.len { return }
+	repository := a.repository_status.repositories[index]
+	a.clear_details()
+	a.details_pages = []SoftwareDetailsPage{cap: 8}
+	unsafe { a.details_pages.flags |= .noslices }
+	mut values := ['Repository ID: ' + repository.id, 'Source URL: ' + repository.url,
+		'Publisher key: ' + repository.public_key]
+	a.details_values(0, values)
+	software_policy_free_lines(mut values)
+	a.finish_details(true)
+	a.repository_browse_index = index
+	a.report_reader_mode = true
+}
+
 fn (a &SoftwareApp) build_repositories_compact(width int, height int) ui2.Element {
 	mut children := frame_elements(8)
 	available := a.failure_pages.len > 0 && a.worker == unsafe { nil }
-	children << software_label(if a.repository_review_ready { 'Repository trust review' } else { 'Repositories · enlarge for details' }, 14, 8, width - 28, 28, false)
+	children << software_label(if a.repository_review_ready { 'Repository trust review' } else { 'Configured repositories' }, 14, 8, width - 28, 28, false)
 	button_width := if width > 202 { 174 } else { width - 28 }
 	if a.repository_read_running() {
 		children << software_button('software.repository.stop', if a.repository_worker == .review { 'Stop review' } else { 'Stop reading' }, 14, 46, button_width)
@@ -45,6 +65,7 @@ fn (a &SoftwareApp) build_repositories_compact(width int, height int) ui2.Elemen
 	if a.worker == unsafe { nil } && a.repository_operation == '' && !a.repository_review_ready
 		&& height >= next_y + 46 {
 		children << software_button('software.repository.reload', 'Reload list', 14, next_y, button_width)
+		if width >= 320 { children << a.offline_button(width - 118, next_y, 104) }
 		next_y += 38
 	}
 	if a.worker == unsafe { nil } && a.repository_review_ready && a.details_pages.len > 0 && height >= 220 {
@@ -53,6 +74,10 @@ fn (a &SoftwareApp) build_repositories_compact(width int, height int) ui2.Elemen
 	}
 	if available && height >= next_y + 46 {
 		children << software_button('software.failure', 'Failure details', 14, next_y, button_width)
+		next_y += 38
+	}
+	if width >= 180 && height >= 220 && a.repository_browsable() {
+		children << software_button('software.repository.browse', 'Browse repositories', 14, next_y, button_width)
 		next_y += 38
 	}
 	progress := a.progress_seen && height >= 240 && next_y <= height - 110

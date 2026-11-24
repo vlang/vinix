@@ -28,6 +28,7 @@ fn (mut a SoftwareApp) clear_details() {
 	a.details_compact_page = 0; a.details_compact_mode = false
 	a.details_mode = false; a.details_review = false
 	a.report_reader_mode = false
+	a.repository_browse_index = -1
 	a.details_section = 0; a.details_page = 0
 	for index in 0 .. 6 { a.details_starts[index] = -1 }
 }

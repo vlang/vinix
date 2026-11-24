@@ -143,12 +143,15 @@ fn qualify() ! {
 			'REPOSITORY RECOVERY nine compact/tiny canvases, lifecycle guards and nonoverlapping geometry PASS',
 			'REPOSITORY REFRESH selected enrolled source, literal arguments, approval, cancellation and guarded failure PASS',
 			'REPOSITORY ENROLLMENT separate approval refreshes the reviewed source and retains trust after cancellation or failure PASS',
+			'REPOSITORY BROWSER compact exact identity, bounded paging, preserved draft and approved or cancelled refresh PASS',
 			'REPOSITORY RECOVERY explicit production-safe checks PASS']! {
 			require(text.split_into_lines().filter(it == marker).len == 1, 'missing/duplicate focused PASS marker')!
 		}
 		if mode.starts_with('tracked') {
 			require(text.split_into_lines().filter(it == 'REPOSITORY RECOVERY 1000 cycles / 9000 trees retain 0 bytes / 0 records PASS').len == 1,
 				'missing/duplicate render allocation PASS marker')!
+			require(text.split_into_lines().filter(it == 'REPOSITORY BROWSER 64 open navigate render close cycles retain 0 bytes / 0 records PASS').len == 1,
+				'missing/duplicate repository browser allocation PASS marker')!
 		}
 		println('REPOSITORY RECOVERY ' + mode + ' build/check PASS')
 	}

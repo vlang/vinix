@@ -108,22 +108,30 @@ fn (mut a SoftwareApp) admin_paste_input(input string) {
 fn (mut a SoftwareApp) build_admin(size ui2.Rect) ui2.Element {
 	width := int(size.width); height := int(size.height)
 	mut children := frame_elements(7)
-	if width < 320 || height < 280 {
+	if width < 180 || height < 220 {
 		children << software_label('Enlarge this window to enter your administrator password.', 14, 8, width - 28, 40, false)
 		children << software_button('software.admin.cancel', 'Cancel approval', 14, 54, if width > 28 { width - 28 } else { 1 })
 		return ui2.screen(app_surface, children)
 	}
-	children << software_label('Administrator approval', 14, 8, width - 28, 32, false)
-	children << software_label('This package change needs an administrator. Enter your own password; the reviewed operation stays fixed.', 14, 56, width - 28, 72, false)
+	compact := width < 320 || height < 280
+	field_y := if compact { 92 } else { 132 }
+	children << software_label('Administrator approval', 14, 8, width - 28, if compact { 28 } else { 32 }, false)
+	children << software_label(if compact { 'Enter your own password.' }
+		else { 'This package change needs an administrator. Enter your own password; the reviewed operation stays fixed.' },
+		14, if compact { 44 } else { 56 }, width - 28, if compact { 44 } else { 72 }, false)
 	mut field := frame_elements(1)
 	field << ui2.Element{ ...ui2.text_field('', '', editor_bytes_text(a.admin_mask).clone(), ui2.rect(8, 0, f64(width - 44), 30),
 		ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: body_text, size: 12 }, 0), key: workflow_owned_text_key }
-	children << ui2.clickable_view('software.admin.password', ui2.rect(14, 132, f64(width - 28), 30),
+	children << ui2.clickable_view('software.admin.password', ui2.rect(14, f64(field_y), f64(width - 28), 30),
 		ui2.BoxStyle{ bg: body_panel, border_color: if a.admin_focus { app_accent } else { body_rule },
 			border_top: 1, border_bottom: 1, border_left: 1, border_right: 1 }, field)
-	children << software_button('software.admin.approve', 'Approve change', 14, 182, 156)
-	children << software_button('software.admin.cancel', 'Cancel', 182, 182, 110)
-	status_y := if height >= 316 { height - 98 } else { 218 }
+	button_y := if compact { 134 } else { 182 }
+	button_width := (width - 40) / 2
+	children << software_button('software.admin.approve', if compact { 'Approve' } else { 'Approve change' },
+		14, button_y, if compact { button_width } else { 156 })
+	children << software_button('software.admin.cancel', 'Cancel', if compact { width - 14 - button_width } else { 182 },
+		button_y, if compact { button_width } else { 110 })
+	status_y := if compact { 172 } else if height >= 316 { height - 98 } else { 218 }
 	children << software_label(a.status, 14, status_y, width - 28, height - status_y - 8, false)
 	return ui2.screen(app_surface, children)
 }

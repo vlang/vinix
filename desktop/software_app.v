@@ -147,6 +147,7 @@ mut:
 	repository_mode bool
 	repository_status pkgprotocol.RepositoryConfiguration
 	repository_selected int = -1
+	repository_browse_index int = -1
 	repository_scroll int
 	repository_focus int
 	repository_id []u8

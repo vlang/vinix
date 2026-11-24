@@ -3757,7 +3757,11 @@ An idle Escape blurs the editor first, then returns to Software. See
 Idle compact repository forms from 180×130 also offer **Reload list**, including
 after stopped, failed or invalid reads. Reload preserves the entered ID, URL,
 key and previous valid list. Optional diagnostics require a complete row and
-status space; smaller windows keep their state until enlarged. See
+status space. At 180×220, **Browse repositories** pages through configured
+identities and opens the compact administrator prompt for a selected refresh.
+The request uses the displayed identity fingerprint and preserves the
+repository editor's entered values. At widths of 320 pixels or more,
+**Go offline** is available beside **Reload list**. See
 [compact recovery checks](../../tests/packages/software-repository-recovery-check.md).
 
 The lightweight [`pkgprotocol` repository module](pkgprotocol/repositories.v)

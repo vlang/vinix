@@ -142,32 +142,38 @@ fn repository_recovery_element(tree ui2.Element, id string) !ui2.Element {
 	return error('repository recovery element is absent: ' + id)
 }
 
+fn repository_recovery_check_frames(tree ui2.Element, size ui2.Rect) ! {
+	for index, child in tree.children {
+		frame := child.frame
+		repository_recovery_require(frame.x >= 0 && frame.y >= 0 && frame.width > 0 && frame.height > 0
+			&& frame.x + frame.width <= size.width && frame.y + frame.height <= size.height,
+			'repository recovery element leaves canvas: ' + child.id)!
+		for other in tree.children[index + 1..] {
+			repository_recovery_require(frame.x + frame.width <= other.frame.x || other.frame.x + other.frame.width <= frame.x
+				|| frame.y + frame.height <= other.frame.y || other.frame.y + other.frame.height <= frame.y,
+				'repository recovery elements overlap: ' + child.id + '/' + other.id)!
+		}
+	}
+}
+
 fn repository_recovery_geometry(mut app SoftwareApp, state string) ! {
 	for size in [ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 400, 300), ui2.rect(0, 0, 180, 96),
 		ui2.rect(0, 0, 180, 129), ui2.rect(0, 0, 180, 130), ui2.rect(0, 0, 180, 167),
 		ui2.rect(0, 0, 180, 168), ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 319, 239)]! {
 		tree := app.build(size)!
 		defer { free_window_tree(tree) }
-		for index, child in tree.children {
-			frame := child.frame
-			repository_recovery_require(frame.x >= 0 && frame.y >= 0 && frame.width > 0 && frame.height > 0
-				&& frame.x + frame.width <= size.width && frame.y + frame.height <= size.height,
-				'repository recovery element leaves canvas: ' + child.id)!
-			for other in tree.children[index + 1..] {
-				repository_recovery_require(frame.x + frame.width <= other.frame.x || other.frame.x + other.frame.width <= frame.x
-					|| frame.y + frame.height <= other.frame.y || other.frame.y + other.frame.height <= frame.y,
-					'repository recovery elements overlap: ' + child.id + '/' + other.id)!
-			}
-		}
+		repository_recovery_check_frames(tree, size)!
 		repository_recovery_require(tree.children.any(it.text == app.status), 'compact repositories omit status')!
 		repository_recovery_require(!tree.children.any(it.id == 'software.repository.confirm'), 'compact repositories expose trust confirmation')!
 		mut next_y := 84
 		for child in tree.children {
-			if child.id in ['software.report.read', 'software.repository.reload', 'software.failure']! { next_y += 38 }
+			if child.id in ['software.report.read', 'software.repository.reload', 'software.failure', 'software.repository.browse']! { next_y += 38 }
 		}
 		repository_recovery_require(tree.children.any(it.id == 'software.progress')
 			== (app.progress_seen && size.height >= 240 && next_y <= size.height - 110),
 			'compact repository progress is absent or overlaps action rows')!
+		repository_recovery_require(tree.children.any(it.id == 'software.repository.browse')
+			== (size.height >= 220 && app.repository_browsable()), 'compact repository browser has the wrong availability')!
 		if state in ['stopped', 'failed', 'invalid', 'ready']! {
 			_ := repository_recovery_element(tree, 'software.repository.back')!
 			repository_recovery_require(tree.children.any(it.id == 'software.repository.reload') == (size.height >= 130),
@@ -435,10 +441,133 @@ fn repository_targeted_refresh() ! {
 	println('REPOSITORY REFRESH selected enrolled source, literal arguments, approval, cancellation and guarded failure PASS')
 }
 
+fn repository_browse_cycle(mut app SoftwareApp) ! {
+	repository_recovery_activate(mut app, 'software.repository.browse', 320, 240)!
+	mut tree := app.build(ui2.rect(0, 0, 180, 220))!
+	free_window_tree(tree)
+	app.handle('software.report.package.next')!
+	tree = app.build(ui2.rect(0, 0, 640, 610))!
+	free_window_tree(tree)
+	app.handle('software.report.back')!
+}
+
+fn repository_browse_refresh() ! {
+	defer { os.unsetenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY') }
+	mut app := SoftwareApp{ service_path: os.executable(), repository_mode: true,
+		administration_required: true, offline_requested: true, output: []u8{cap: 8192} }
+	defer { app.close_app() }
+	app.initialize_repository_fields()
+	software_repository_text(mut app.repository_id, 'draft')
+	software_repository_text(mut app.repository_url, repository_recovery_url)
+	software_repository_text(mut app.repository_key, repository_recovery_key)
+	app.repository_focus = 2
+	app.select_all = true
+	prefix := 'https://publisher.example/部署-é/'
+	long_url := prefix + 'a'.repeat(4096 - prefix.len - '🚀'.len) + '🚀'
+	defer { unsafe { long_url.free() } }
+	remote := pkgprotocol.Repository{ id: 'remote', url: long_url, public_key: 'a'.repeat(64) }
+	configuration := repository_recovery_configuration('field')
+	text := json2.encode(pkgprotocol.RepositoryConfiguration{ ...configuration, repositories: [remote, ...configuration.repositories] })
+	defer { unsafe { text.free() } }
+	app.repository_status = pkgprotocol.decode_repository_configuration(text)!
+
+	repository_recovery_activate(mut app, 'software.repository.browse', 320, 240)!
+	repository_recovery_require(app.repository_browse_index == 0 && app.report_reader_mode
+		&& app.worker == unsafe { nil }, 'compact repository reader opened the wrong source')!
+	mut canonical := []u8{cap: 5000}
+	mut rendered := []u8{cap: 5000}
+	mut compact := []u8{cap: 5000}
+	defer { unsafe { canonical.free(); rendered.free(); compact.free() } }
+	for page in app.details_pages {
+		for line in page.text.split_into_lines() {
+			start := if line.starts_with('• ') { '• '.len } else { 2 }
+			canonical << line[start..].bytes()
+			rendered << line.bytes()
+		}
+	}
+	literal := 'Repository ID: remoteSource URL: ' + long_url + 'Publisher key: ' + remote.public_key
+	defer { unsafe { literal.free() } }
+	repository_recovery_require(editor_bytes_text(canonical) == literal, 'repository reader lost literal identity bytes')!
+	for page, expected in app.details_compact_pages {
+		size := ui2.rect(0, 0, 180, 220)
+		tree := app.build(size)!
+		defer { free_window_tree(tree) }
+		repository_recovery_check_frames(tree, size)!
+		repository_recovery_require(app.details_compact_page == page && tree.children.any(it.text == 'remote'),
+			'compact reader lost its page or repository ID')!
+		mut shown := []u8{cap: 48}
+		for label in tree.children {
+			if label.frame.y >= 118 && label.frame.y < 172 { shown << label.text.bytes() }
+		}
+		line_bytes := expected.text.replace('\n', '')
+		repository_recovery_require(editor_bytes_text(shown) == line_bytes, 'rendered compact page differs from retained text')!
+		compact << shown
+		unsafe { shown.free(); line_bytes.free() }
+		button := repository_recovery_element(tree, 'software.report.next')!
+		app.handle(button.id)!
+	}
+	repository_recovery_require(editor_bytes_text(compact) == editor_bytes_text(rendered),
+		'compact pages lost exact source URL or publisher key bytes')!
+	for event in ['software.repository.reload', 'software.repository.confirm', 'software.repository.new',
+		'software.repository.refresh', 'software.offline']! {
+		app.handle(event)!
+	}
+	repository_recovery_require(app.report_reader_mode && app.worker == unsafe { nil } && app.offline_requested,
+		'repository reader admitted an unrelated action')!
+	app.key_input('\x1b')
+	repository_recovery_require(!app.report_reader_mode && app.repository_browse_index == -1
+		&& app.details_pages.len == 0 && app.details_compact_pages.len == 0
+		&& app.repository_focus == 2 && app.select_all && app.repository_selected == -1,
+		'closing repository details lost editor state or left pages allocated')!
+	repository_recovery_drafts(&app)!
+
+	for outcome in ['cancel', 'approve']! {
+		os.setenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY', 'targeted-approved', true)
+		repository_recovery_activate(mut app, 'software.repository.browse', 320, 240)!
+		repository_recovery_activate(mut app, 'software.report.package.next', 320, 240)!
+		repository_recovery_require(app.repository_browse_index == 1 && app.details_page == 0,
+			'next repository did not show its first identity page')!
+		repository_recovery_activate(mut app, 'software.repository.browse.refresh', 320, 240)!
+		repository_recovery_require(app.admin_prompt && app.repository_worker == .targeted_refresh
+			&& !app.report_reader_mode && app.worker.args == ['admin', '--progress', '--offline', 'update', 'field',
+				repository_recovery_fingerprint('field')], 'compact refresh did not bind approval to the displayed source')!
+		for size in [ui2.rect(0, 0, 180, 219), ui2.rect(0, 0, 180, 220), ui2.rect(0, 0, 320, 240), ui2.rect(0, 0, 640, 610)]! {
+			tree := app.build(size)!
+			defer { free_window_tree(tree) }
+			repository_recovery_check_frames(tree, size)!
+			repository_recovery_require(tree.children.any(it.id == 'software.admin.password') == (size.height >= 220)
+				&& tree.children.any(it.id == 'software.admin.approve') == (size.height >= 220)
+				&& tree.children.any(it.id == 'software.admin.cancel'), 'administrator controls have wrong compact admission')!
+		}
+		if outcome == 'approve' {
+			repository_recovery_activate(mut app, 'software.admin.password', 320, 240)!
+			app.key_input('x')
+		}
+		repository_recovery_activate(mut app, 'software.admin.' + outcome, 320, 240)!
+		repository_recovery_wait(mut app, 0)!
+		repository_recovery_require(!app.admin_prompt && app.admin_password_len == 0
+			&& app.admin_password.all(it == 0) && app.repository_mode
+			&& app.status.contains(if outcome == 'approve' { 'Selected repository refreshed.' } else { 'approval cancelled' }),
+			'compact approval did not retire its credentials and return to repositories')!
+		repository_recovery_drafts(&app)!
+	}
+	println('REPOSITORY BROWSER compact exact identity, bounded paging, preserved draft and approved or cancelled refresh PASS')
+
+	$if track_heap ? {
+		repository_browse_cycle(mut app)!
+		C.vinix_heap_begin()
+		for _ in 0 .. 64 { repository_browse_cycle(mut app)! }
+		kept := C.vinix_heap_end(); records := C.vinix_heap_count()
+		repository_recovery_require(kept == 0 && records == 0, 'repository browse cycles retained ${kept} bytes / ${records} records')!
+		println('REPOSITORY BROWSER 64 open navigate render close cycles retain 0 bytes / 0 records PASS')
+	}
+}
+
 fn check_software_repository_recovery() ! {
 	repository_recovery_functional()!
 	repository_targeted_refresh()!
 	repository_refresh_after_enrollment()!
+	repository_browse_refresh()!
 	repository_recovery_memory()!
 	println('REPOSITORY RECOVERY explicit production-safe checks PASS')
 }

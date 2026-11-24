@@ -141,6 +141,16 @@ fn (a &SoftwareApp) selected_repository_refresh_id() string {
 	return repository.id
 }
 
+fn (mut a SoftwareApp) start_repository_refresh(index int) {
+	repository := a.repository_status.repositories[index]
+	fingerprint := pkgprotocol.repository_refresh_fingerprint(repository)
+	defer { unsafe { fingerprint.free() } }
+	a.repository_focus = 0
+	a.select_all = false
+	a.start(['update', repository.id, fingerprint], false)
+	if a.worker != unsafe { nil } { a.repository_worker = .targeted_refresh }
+}
+
 fn (mut a SoftwareApp) repository_url_parts(url string, label string) {
 	mut start := 0
 	mut part := 1
@@ -341,15 +351,12 @@ fn (mut a SoftwareApp) handle_repositories(event_id string) {
 			a.start(['view'], true)
 		}
 		'software.repository.reload' { a.read_repositories() }
+		'software.repository.browse' {
+			a.browse_repository(if a.repository_selected >= 0 { a.repository_selected } else { 0 })
+		}
 		'software.repository.refresh' {
-			id := a.selected_repository_refresh_id()
-			if id == '' { return }
-			a.repository_focus = 0
-			a.select_all = false
-			fingerprint := pkgprotocol.repository_refresh_fingerprint(a.repository_status.repositories[a.repository_selected])
-			a.start(['update', id, fingerprint], false)
-			unsafe { fingerprint.free() }
-			if a.worker != unsafe { nil } { a.repository_worker = .targeted_refresh }
+			if a.selected_repository_refresh_id() == '' { return }
+			a.start_repository_refresh(a.repository_selected)
 		}
 		'software.offline' {
 			a.repository_focus = 0
@@ -486,6 +493,9 @@ fn (mut a SoftwareApp) build_repositories(width int, height int) ui2.Element {
 		children << software_button(software_row_actions[slot], a.repository_status.repositories[index].id, 14, 90 + slot * 30, 236)
 	}
 	if !reviewing {
+		if a.repository_browsable() {
+			children << software_button('software.repository.browse', 'Browse repositories', 14, height - 176, 236)
+		}
 		children << software_button('software.up', 'Previous', 14, height - 138, 110)
 		children << software_button('software.down', 'Next', 136, height - 138, 110)
 		children << software_label('Repository ID', 274, 90, width - 288, 22, false)

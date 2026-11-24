@@ -99,11 +99,14 @@ fn image_frame(mut app SoftwareApp, sequence u64) ! {
 	return error('Software window timeout: ' + app.status)
 }
 fn image_submit_password(mut app SoftwareApp, password string) ! {
+	image_submit_password_at(mut app, password, ui2.rect(0, 0, 960, 720))!
+}
+fn image_submit_password_at(mut app SoftwareApp, password string, size ui2.Rect) ! {
 	assert app.admin_prompt
-	image_control(mut app, 'software.admin.password')!
+	image_control_at(mut app, 'software.admin.password', size)!
 	app.paste_input(password)
 	assert app.admin_password_len == password.len && editor_bytes_text(app.admin_mask) != password
-	image_control(mut app, 'software.admin.approve')!
+	image_control_at(mut app, 'software.admin.approve', size)!
 	assert !app.admin_prompt && app.admin_password_len == 0 && app.admin_password.all(it == 0)
 	assert !app.prepare_close()
 }
@@ -373,21 +376,25 @@ fn image_run() ! {
 	} else if phase == 'enrollment-refresh' {
 		image_enroll_and_refresh(mut app, password)!
 	} else if phase == 'targeted-refresh' {
+		compact := ui2.rect(0, 0, 320, 240)
 		image_control(mut app, 'software.repositories')!
 		image_wait(mut app)!
 		assert app.repository_status.repositories.len == 2
-		image_control(mut app, 'software.row.1')!
-		assert app.selected_repository_refresh_id() == 'field'
-		image_control(mut app, 'software.offline')!
-		image_control(mut app, 'software.repository.refresh')!
-		field := app.repository_status.repositories[app.repository_selected]
+		image_control_at(mut app, 'software.offline', compact)!
+		image_control_at(mut app, 'software.repository.browse', compact)!
+		image_control_at(mut app, 'software.report.package.next', compact)!
+		field := app.repository_status.repositories[app.repository_browse_index]
+		assert field.id == 'field'
+		image_control_at(mut app, 'software.repository.browse.refresh', compact)!
 		assert app.admin_prompt && app.worker.args == ['admin', '--progress', '--offline', 'update', 'field',
 			pkgprotocol.repository_refresh_fingerprint(field)]
-		observed_progress := image_approve(mut app, password)!
+		image_submit_password_at(mut app, password, compact)!
+		observed_progress := image_wait(mut app)!
 		assert observed_progress && app.status == 'Selected repository refreshed.' && app.repository_mode
-		image_control(mut app, 'software.repository.back')!
+		image_control_at(mut app, 'software.repository.back', compact)!
 		image_wait(mut app)!
 		assert app.rows.len == 3 && app.rows.all(it.installed_version == '1.0.0') && app.catalog_error == ''
+		println('SOFTWARE IMAGE compact repository browser and refresh approval PASS')
 	} else if phase == 'standard' {
 		image_release_audit(mut app, 'standard-account', '1.0.0')!
 		image_select(mut app, 'org.vinix.counter')!

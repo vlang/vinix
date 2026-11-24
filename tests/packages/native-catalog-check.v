@@ -90,7 +90,7 @@ fn native_suite(sandbox string, image bool, software bool) hwhost.Suite {
 	if image { required << ['PACKAGE IMAGE BUNDLE production-staged signed repository before first refresh PASS',
 		'PACKAGE IMAGE CAPTURE guarded preparation publication checked retirement replacement preservation retry and saved output PASS',
 		'PACKAGE CATALOG EXPORT guarded workspace composition host selection recovery retry saved output and signed offline consumption PASS'] }
-	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest',
+	return hwhost.Suite{ name: 'package-native-catalog', guest: 'tests/accounts/guest', guest_flags: ['-enable-globals'],
 		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring'],
 		programs: programs,
 		files: files, binaries: binaries, directories: ['run', 'home', 'var/log', 'tmp:1777'],
@@ -337,7 +337,8 @@ fn check() !int {
 		}
 	}
 	hwhost.watch_interrupts()
-	guest := hwhost.build_program(host, repository + '/' + definition.guest, work + '/guest', 'init', definition.module_paths)!
+	guest := hwhost.build_program_with_flags(host, repository + '/' + definition.guest, work + '/guest',
+		'init', definition.module_paths, definition.guest_flags)!
 	root := hwhost.build_extras(host, definition, work + '/guest')!
 	mut artifacts := [native_artifact('kernel', work + '/kernel')!, native_artifact('guest-init', guest)!]
 	if persistent { artifacts << native_artifact(if installed { 'initial-blank-system-disk' } else { 'initial-ext2' }, disk)! }
@@ -390,7 +391,8 @@ fn check() !int {
 				if manual_refresh { 'SOFTWARE IMAGE manual offline refresh resumed exact release review before activation PASS' }
 				else { 'SOFTWARE IMAGE first-run offline refresh resumed exact release review before activation PASS' },
 				...if targeted_refresh {
-					['SOFTWARE IMAGE selected refresh approval advanced field and retained HTTPS catalog and installed generation PASS']
+					['SOFTWARE IMAGE compact repository browser and refresh approval PASS',
+						'SOFTWARE IMAGE selected refresh approval advanced field and retained HTTPS catalog and installed generation PASS']
 				} else if enrollment_refresh {
 					['SOFTWARE IMAGE separate enrollment and selected refresh approvals retained HTTPS catalog and installed generation PASS',
 						'SOFTWARE IMAGE stale selected URL or key refused before metadata fetch or publication PASS']

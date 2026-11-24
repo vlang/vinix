@@ -41,6 +41,7 @@ fn (a &SoftwareApp) report_has_packages() bool {
 	return (a.health_mode && a.health_matching.len > 0) || (a.audit_mode && a.audit_matching.len > 0)
 		|| (a.data_mode && a.data_pending == '' && a.data_status.rows.len > 0)
 		|| (a.launch_mode && a.launch_documents.len > 0)
+		|| (a.repository_browse_index >= 0 && a.repository_status.repositories.len > 1)
 		|| (a.package_review_readable() && a.review_snapshot.names.len + a.review_snapshot.rows.len > 0)
 }
 
@@ -51,6 +52,8 @@ fn (mut a SoftwareApp) report_select_package(step int) {
 		if position < 0 || position >= a.review_snapshot.names.len + a.review_snapshot.rows.len { return }
 		a.review_read_item = position
 		a.prepare_package_plan()
+	} else if a.repository_browse_index >= 0 {
+		a.browse_repository(a.repository_browse_index + step)
 	} else if a.launch_mode {
 		position := a.launch_read_file + step
 		if position < 0 || position >= a.launch_documents.len { return }
@@ -85,7 +88,8 @@ fn (mut a SoftwareApp) handle_report_reader(action string) {
 	if a.worker != unsafe { nil } { return }
 	match action {
 		'software.report.back' {
-			if a.launch_mode { a.clear_details(); a.launch_read_file = -1 }
+			if a.repository_browse_index >= 0 { a.clear_details() }
+			else if a.launch_mode { a.clear_details(); a.launch_read_file = -1 }
 			else if a.mirror_mode { a.clear_details() }
 			else if a.package_review_readable() { a.clear_details(); a.review_read_item = -1 }
 			else { a.report_reader_mode = false; a.details_compact_mode = false }
@@ -105,6 +109,12 @@ fn (mut a SoftwareApp) handle_report_reader(action string) {
 		}
 		'software.report.package.previous' { a.report_select_package(-1) }
 		'software.report.package.next' { a.report_select_package(1) }
+		'software.repository.browse.refresh' {
+			index := a.repository_browse_index
+			if index < 0 { return }
+			a.clear_details()
+			a.start_repository_refresh(index)
+		}
 		else {}
 	}
 }
@@ -123,9 +133,10 @@ fn (mut a SoftwareApp) report_reader_key_input(input string) {
 fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 	a.details_compact_mode = width < 640 || height < 610
 	a.anchor_details_compact_page()
-	mut children := frame_elements(if a.details_compact_mode { 10 } else { 24 })
+	mut children := frame_elements(if a.details_compact_mode { 12 } else { 24 })
 	content_width := if width > 28 { width - 28 } else { 1 }
-	title := if a.package_review_readable() { 'Package plan' } else if a.mirror_mode { 'Export review' } else if a.launch_mode { 'Launch draft' } else if a.data_mode { 'Personal data' } else if a.repository_mode { 'Repository trust' } else if a.cleanup_mode { 'Cleanup review' } else if a.health_mode { 'Health details' } else if a.audit_mode { 'Deployment check' } else { 'Saved deployment' }
+	browsing_repositories := a.repository_browse_index >= 0
+	title := if browsing_repositories { a.repository_status.repositories[a.repository_browse_index].id } else if a.package_review_readable() { 'Package plan' } else if a.mirror_mode { 'Export review' } else if a.launch_mode { 'Launch draft' } else if a.data_mode { 'Personal data' } else if a.repository_mode { 'Repository trust' } else if a.cleanup_mode { 'Cleanup review' } else if a.health_mode { 'Health details' } else if a.audit_mode { 'Deployment check' } else { 'Saved deployment' }
 	if a.details_compact_mode {
 		back_width := if content_width >= 56 { 56 } else { content_width }
 		children << software_button('software.report.back', 'Back', if width > back_width + 28 { width - back_width - 14 } else { 14 }, 8, back_width)
@@ -133,15 +144,22 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 			children << software_label('Enlarge to read the report.', 14, 46, content_width, 28, false)
 			return ui2.screen(app_surface, children)
 		}
-		children << software_label(title, 14, 46, content_width, 28, false)
+		if browsing_repositories {
+			children << software_button('software.repository.browse.refresh', 'Refresh', 14, 8, 80)
+		}
+		children << software_label(title, 14, 46, if browsing_repositories { width - 110 } else { content_width }, 28, false)
 		button_width := (width - 42) / 2
 		if a.report_has_packages() {
-			children << software_button('software.report.package.previous', if a.launch_mode { 'Prev file' } else { 'Prev item' }, 14, 80, button_width)
-			children << software_button('software.report.package.next', if a.launch_mode { 'Next file' } else { 'Next item' }, width - 14 - button_width, 80, button_width)
-		} else { children << software_label('Recorded metadata', 14, 80, content_width, 28, false) }
+			children << software_button('software.report.package.previous', if browsing_repositories { 'Prev repo' } else if a.launch_mode { 'Prev file' } else { 'Prev item' }, 14, 80, button_width)
+			children << software_button('software.report.package.next', if browsing_repositories { 'Next repo' } else if a.launch_mode { 'Next file' } else { 'Next item' }, width - 14 - button_width, 80, button_width)
+		} else if !browsing_repositories { children << software_label('Recorded metadata', 14, 80, content_width, 28, false) }
 		if a.details_compact_page >= 0 && a.details_compact_page < a.details_compact_pages.len {
 			page := a.details_compact_pages[a.details_compact_page]
-			children << software_label(page.label, 14, 8, width - back_width - 42, 28, false)
+			if browsing_repositories {
+				children << software_label(page.label, width - 94, 46, 80, 28, false)
+			} else {
+				children << software_label(page.label, 14, 8, width - back_width - 42, 28, false)
+			}
 			software_page_lines(mut children, page.text, 14, 118, content_width, 18)
 		}
 		children << software_button('software.report.previous', 'Previous', 14, height - 36, button_width)
@@ -150,8 +168,11 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 		children << software_label(title, 14, 8, width - 202, 28, false)
 		children << software_button('software.report.back', 'Back to report', width - 174, 8, 160)
 		if a.report_has_packages() {
-			children << software_button('software.report.package.previous', if a.launch_mode { 'Previous file' } else if a.package_review_readable() { 'Previous item' } else { 'Previous package' }, 14, 46, 160)
-			children << software_button('software.report.package.next', if a.launch_mode { 'Next file' } else if a.package_review_readable() { 'Next item' } else { 'Next package' }, 186, 46, 160)
+			children << software_button('software.report.package.previous', if browsing_repositories { 'Previous repository' } else if a.launch_mode { 'Previous file' } else if a.package_review_readable() { 'Previous item' } else { 'Previous package' }, 14, 46, 160)
+			children << software_button('software.report.package.next', if browsing_repositories { 'Next repository' } else if a.launch_mode { 'Next file' } else if a.package_review_readable() { 'Next item' } else { 'Next package' }, 186, 46, 160)
+		}
+		if browsing_repositories {
+			children << software_button('software.repository.browse.refresh', 'Refresh this repository', 358, 46, 172)
 		}
 		if a.details_page >= 0 && a.details_page < a.details_pages.len {
 			page := a.details_pages[a.details_page]
@@ -164,6 +185,7 @@ fn (mut a SoftwareApp) build_report_reader(width int, height int) ui2.Element {
 			else if a.mirror_mode { 'Read-only export proposal. Return to the full review before inspecting path parts and packages, cancelling or confirming.' }
 			else if a.launch_mode { 'Read-only draft. Return to launch options before editing arguments or grants, changing the working folder or running.' }
 			else if a.data_mode { 'Read-only details. Return to personal data before reloading, reviewing, cancelling or confirming deletion.' }
+			else if browsing_repositories { 'Back returns to the repository form and its current draft.' }
 			else if a.repository_mode { 'Read-only details. Return to the full trust review before cancelling, reviewing URL parts or confirming the change.' }
 			else if a.cleanup_mode { 'Read-only review. Return to cleanup before reloading or confirming deletion.' }
 			else { 'Read-only details. Return to the report before reloading, saving, exporting or reviewing changes.' }, 14, height - 98, content_width, 90, false)

@@ -640,8 +640,13 @@ requires administrator approval and checks that the displayed URL and publisher
 key still match. Reload the list if the identity changed. Other repositories
 keep their authenticated cached indexes and must pass the current signature,
 expiry and replay checks. Use the main catalog's **Refresh** to fetch all
-configured indexes. In a compact window, enlarge the Repositories pane to
-select a source.
+configured indexes.
+
+**Browse repositories** opens a paged view of the exact ID, source URL and
+publisher key for each configured source. At 180×220 and larger, Software can
+display the source and accept administrator approval for its **Refresh** action.
+At widths of 320 pixels or more the compact repository list also offers
+**Go offline**. Browse and refresh retain the repository form's entered values.
 
 Select an existing repository or enter its ID, HTTPS/local source URL and public
 key. **Review trust** verifies the signed catalog without enabling trust, then
