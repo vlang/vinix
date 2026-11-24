@@ -7,6 +7,7 @@ fn C.renameat(int, &char, int, &char) int
 
 struct AtomicWriteOptions {
 	exclusive bool
+	parent_fd int = -1 // Borrowed when the caller already captured the destination directory.
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 	write fn (int, voidptr, uint) int = atomic_write_bytes
 	flush fn (int) int = atomic_flush
@@ -80,6 +81,14 @@ fn atomic_new_file_matches(parent int, name string, fd int, size int) bool {
 		&& info.st_mode & 0o7777 == 0o644 && info.st_size == size
 }
 
+fn check_new_atomic_destination(parent int, name string) ! {
+	mut info := C.stat{}
+	if C.fstatat(parent, name.str, unsafe { &info }, C.AT_SYMLINK_NOFOLLOW) == 0 {
+		return error('package metadata destination already exists; choose a new file name')
+	}
+	if C.errno != C.ENOENT { return error('cannot inspect new package metadata destination') }
+}
+
 // Capture the parent once. Creation, publication, cleanup and directory flush
 // use that descriptor; neither a stale .new alias nor a reopened path is used.
 fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
@@ -92,9 +101,13 @@ fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
 	name := if split < 0 { path.clone() } else { path[split + 1..] }
 	defer { unsafe { parent.free(); name.free() } }
 	if name in ['', '.', '..']! { return error('package metadata requires a valid file name') }
-	directory := C.open(parent.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	directory := if options.parent_fd >= 0 {
+		options.parent_fd
+	} else {
+		C.open(parent.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	}
 	if directory < 0 { return error('cannot open ordinary package metadata parent directory') }
-	defer { C.close(directory) }
+	defer { if options.parent_fd < 0 { C.close(directory) } }
 	mut info := C.stat{}
 	// Native stat calls consume scratch synchronously; keep it on the stack.
 	if C.fstat(directory, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o040000 {
@@ -102,11 +115,10 @@ fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
 	}
 	device := u64(info.st_dev)
 	inode := u64(info.st_ino)
-	if options.exclusive {
-		mut existing := C.stat{}
-		if C.fstatat(directory, name.str, unsafe { &existing }, C.AT_SYMLINK_NOFOLLOW) == 0 { return error('package metadata destination already exists; choose a new file name') }
-		if C.errno != C.ENOENT { return error('cannot inspect new package metadata destination') }
+	if options.parent_fd >= 0 && !atomic_parent_matches(parent, device, inode) {
+		return error('package metadata parent path changed before writing; restore it and retry')
 	}
+	if options.exclusive { check_new_atomic_destination(directory, name)! }
 	fd, leaf := create_atomic_file(directory)!
 	temporary := if parent == '/' { parent + leaf } else { parent + '/' + leaf }
 	mut published := false

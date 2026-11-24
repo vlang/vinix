@@ -75,9 +75,17 @@ fn publisher_outside_source(source int, repository string) ! {
 		existing = next
 	}
 	defer { unsafe { existing.free() } }
-	mut directory := C.open(existing.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NONBLOCK)
-	if directory < 0 { return error('cannot inspect publisher output ancestor') }
-	defer { C.close(directory) }
+	output := C.open(existing.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NONBLOCK)
+	if output < 0 { return error('cannot inspect publisher output ancestor') }
+	defer { C.close(output) }
+	publisher_outside_directory(source, output)!
+}
+
+// Both descriptors are borrowed. Walk from the caller's captured output so a
+// replacement pathname cannot change the directory used for containment.
+fn publisher_outside_directory(source int, output int) ! {
+	mut directory := output
+	defer { if directory != output { C.close(directory) } }
 	mut original := C.stat{}
 	if C.fstat(source, unsafe { &original }) != 0 { return error('cannot inspect captured package source') }
 	for {
@@ -91,7 +99,7 @@ fn publisher_outside_source(source int, repository string) ! {
 		mut info := C.stat{}
 		if C.fstat(parent, unsafe { &info }) != 0 { C.close(parent); return error('cannot inspect publisher output parent') }
 		if current.st_dev == info.st_dev && current.st_ino == info.st_ino { C.close(parent); return }
-		C.close(directory)
+		if directory != output { C.close(directory) }
 		directory = parent
 	}
 }

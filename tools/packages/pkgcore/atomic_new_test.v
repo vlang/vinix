@@ -111,3 +111,32 @@ fn test_new_metadata_concurrent_publishers_produce_one_complete_durable_winner()
 	assert os.ls(work)! == ['saved']
 	println('NEW METADATA concurrent publishers admit exactly one complete file with canonical final mode and no temporary leftovers PASS')
 }
+
+fn test_new_metadata_uses_parent_captured_before_preparation() {
+	work := new_metadata_work()!
+	defer { os.rmdir_all(work) or {} }
+	parent := work + '/output'
+	saved := parent + '/pins.txt'
+	moved := work + '/original'
+	os.mkdir(parent)!
+	directory := capture_prepared_root(parent, 'test metadata parent')!
+	defer { C.close(directory) }
+	options := AtomicWriteOptions{ exclusive: true, parent_fd: directory }
+
+	os.rename(parent, moved)!
+	os.mkdir(parent)!
+	os.write_file(parent + '/existing', 'replacement contents')!
+	mut diagnostic := ''
+	atomic_write_with(saved, 'fixture pins\n', options) or { diagnostic = err.msg() }
+	assert diagnostic.contains('parent path changed before writing')
+	assert os.ls(parent)! == ['existing'] && os.ls(moved)!.len == 0
+	assert os.read_file(parent + '/existing')! == 'replacement contents'
+
+	os.rename(parent, work + '/replacement')!
+	os.rename(moved, parent)!
+	atomic_write_with(saved, 'fixture pins\n', options)!
+	assert os.read_file(saved)! == 'fixture pins\n' && os.ls(parent)! == ['pins.txt']
+	// The same borrowed descriptor remains usable after both operations.
+	mut info := C.stat{}
+	assert C.fstat(directory, unsafe { &info }) == 0
+}

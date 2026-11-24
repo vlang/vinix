@@ -208,3 +208,30 @@ fn test_publisher_workspace_ancestor_and_lock_checks_retire_descriptors_under_re
 		guard.release()
 	}
 }
+
+fn test_captured_publisher_output_checks_its_ancestors_after_a_rename() {
+	if !workspace_case('containment') { return }
+	work := os.real_path(os.temp_dir()) + '/vinix-publisher-output-' + os.getpid().str() + '-' + time.now().unix_micro().str()
+	os.mkdir(work, mode: 0o700)!
+	defer { os.rmdir_all(work) or {} }
+	os.mkdir(work + '/source')!
+	source := capture_prepared_root(work + '/source', 'test source')!
+	defer { C.close(source) }
+	path := work + '/pending-output'
+	os.mkdir(path)!
+	output := capture_prepared_root(path, 'test output')!
+	defer { C.close(output) }
+	publisher_outside_directory(source, output)!
+
+	os.rename(path, work + '/source/pending-output')!
+	os.mkdir(path)!
+	mut refused := false
+	publisher_outside_directory(source, output) or {
+		refused = err.msg().contains('outside the package source tree')
+	}
+	assert refused
+	publisher_outside_source(source, path)!
+	os.rename(work + '/source/pending-output', work + '/restored-output')!
+	publisher_outside_directory(source, output)!
+	println('PUBLISHER WORKSPACE captured output ancestry follows the directory after rename PASS')
+}

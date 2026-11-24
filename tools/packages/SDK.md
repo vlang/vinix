@@ -1247,7 +1247,9 @@ vinix-package --offline write-release-index-pins /release/reviewed-indexes.txt \
 Supply one release directory, repository ID and independently verified public
 key per publisher. The command verifies every complete export locally and then
 publishes the new pin file atomically. The destination's parent must already
-exist outside the release directories. Repository IDs are unique and sorted,
+exist outside the release directories. The command keeps the same captured
+output directory throughout verification and publication and refuses a
+replacement directory. Repository IDs are unique and sorted,
 so repeating the command with the same signed inputs produces identical bytes.
 
 Point `VINIX_PACKAGE_IMAGE_INDEXES` or its target-specific override at the

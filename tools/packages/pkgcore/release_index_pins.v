@@ -35,18 +35,20 @@ pub fn write_release_index_pins(destination string, sources []ReleaseIndexSource
 	if name in ['', '.', '..']! { return error('release index pins require a new file name') }
 	physical := publisher_real_path(parent)!
 	defer { unsafe { physical.free() } }
+	directory := capture_prepared_root(physical, 'release index pins parent')!
+	defer { C.close(directory) }
 	check_export_parent(physical, 'release index pins')!
 	base := physical.trim_right('/')
 	defer { unsafe { base.free() } }
 	path := base + '/' + name
 	defer { unsafe { path.free() } }
-	if publisher_entry_exists(path) { return error('release index pins destination already exists; choose a new file name') }
+	check_new_atomic_destination(directory, name)!
 
 	mut pins := strings.new_builder(sorted.len * 194)
 	defer { unsafe { pins.free() } }
 	mut first_expiry := i64(0)
 	for source in sorted {
-		mut release := check_signed_release(source.directory, source.id, source.public_key, '', physical)!
+		mut release := check_signed_release(source.directory, source.id, source.public_key, '', directory)!
 		defer { release.close() }
 		pins.write_string(release.repository)
 		pins.write_u8(` `)
@@ -57,5 +59,5 @@ pub fn write_release_index_pins(destination string, sources []ReleaseIndexSource
 	if first_expiry <= time.now().unix() { return error('signed release expired while preparing index pins') }
 	text := pins.str()
 	defer { unsafe { text.free() } }
-	atomic_write_new(path, text)!
+	atomic_write_with(path, text, AtomicWriteOptions{ exclusive: true, parent_fd: directory })!
 }
