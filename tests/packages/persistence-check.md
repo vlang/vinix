@@ -259,3 +259,27 @@ archive checker verified all 162 sealed files. Archive SHA-256 is
 
 These checks cover revocation checkpoints on QEMU ext2 disks. Physical storage
 power loss and interruptions within filesystem writes remain outside this run.
+
+## Reviewed organization policy cuts
+
+Add `--policy` to the persistence command and use a fresh state directory.
+The fixture installs two signed generations and reviews an allowlist change
+that blocks the installed app. It passes that approval to a dedicated build
+of the normal `policy-apply` command.
+
+| Case | Cut point | Policy and approval after reboot |
+| --- | --- | --- |
+| `policy-cut-reviewed` | The worker verified the approval and replacement configuration. | The previous policy is active. The same approval can apply the change. |
+| `policy-cut-configuration` | The configuration replacement and flush have completed. | The new policy is active. The original approval is stale. |
+
+The fixture compares the complete installed state, active generation link,
+repository configuration, catalog and replay history across the cut. Payload
+verification continues to work under the restrictive policy. The application
+launch planner and rollback enforce the allowlist, and a fresh reviewed policy
+restoration allows both operations again. Rollback restores version 1 while
+preserving the user file's contents, ownership and mode.
+
+The cut worker pauses with the writer lock held. The controller kills QEMU
+without a guest sync or shutdown and reboots the same ext2 disk. Preparation
+and recovery use the regular package CLI. This test exercises completed
+checkpoints around policy publication on QEMU ext2 storage.

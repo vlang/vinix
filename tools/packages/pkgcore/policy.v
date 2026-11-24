@@ -264,7 +264,13 @@ pub fn (service Service) apply_policy(path string, expected string) !PolicyDocum
 	next := Config{ ...current, policy: proposed.policy }
 	next.validate()!
 	if current.policy != next.policy {
+		$if package_policy_crash_fixture ? {
+			administration_cut_checkpoint('policy', 'reviewed')
+		}
 		save_configuration(configuration, next)!
+		$if package_policy_crash_fixture ? {
+			administration_cut_checkpoint('policy', 'configuration')
+		}
 	}
 	transferred = true
 	return proposed

@@ -97,6 +97,9 @@ fn main() {
 		'revocation-cut-reviewed', 'revocation-cut-configuration' {
 			scenario_package_revocation_recovery(mut t)
 		}
+		'policy-cut-reviewed', 'policy-cut-configuration' {
+			scenario_package_policy_recovery(mut t)
+		}
 		'elevation' { scenario_elevation(mut t) }
 		'unprivileged' { scenario_unprivileged(mut t) }
 		'seat' { scenario_seat(mut t) }

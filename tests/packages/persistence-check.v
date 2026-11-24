@@ -103,7 +103,7 @@ fn refresh_persistence_suite(image string) hwhost.Suite {
 	}
 }
 
-fn repository_persistence_suite(image string, operation string) hwhost.Suite {
+fn administration_persistence_suite(image string, operation string) hwhost.Suite {
 	base := persistence_suite(image)
 	mut scenarios := []hwhost.Scenario{}
 	label := 'PACKAGE ' + operation.to_upper()
@@ -114,7 +114,7 @@ fn repository_persistence_suite(image string, operation string) hwhost.Suite {
 		scenarios << hwhost.Scenario{
 			...base.scenarios[0]
 			name: name
-			about: 'SIGKILL at ' + operation + ' ' + phase + ', reboot the same ext2 disk and check trust'
+			about: 'SIGKILL at ' + operation + ' ' + phase + ', reboot the same ext2 disk and check configuration'
 			required: ['HWTEST START ' + name, marker, label + ' RETAINED ' + phase,
 				label + ' RECOVERY ' + phase, 'HWTEST PASS ' + name]
 			forbidden: ['V panic:', 'HWTEST FAIL']
@@ -137,8 +137,9 @@ fn selected_persistence_suite(image string, mode string) hwhost.Suite {
 	return match mode {
 		'--keygen' { keygen_persistence_suite(image) }
 		'--refresh' { refresh_persistence_suite(image) }
-		'--enrollment' { repository_persistence_suite(image, 'enrollment') }
-		'--revocation' { repository_persistence_suite(image, 'revocation') }
+		'--enrollment' { administration_persistence_suite(image, 'enrollment') }
+		'--revocation' { administration_persistence_suite(image, 'revocation') }
+		'--policy' { administration_persistence_suite(image, 'policy') }
 		else { persistence_suite(image) }
 	}
 }
@@ -154,7 +155,7 @@ fn check_recovered_key(directory string) ! {
 }
 
 fn persistence_check() !int {
-	modes := ['--keygen', '--refresh', '--enrollment', '--revocation']
+	modes := ['--keygen', '--refresh', '--enrollment', '--revocation', '--policy']
 	selected_modes := modes.filter(it in os.args[1..])
 	if selected_modes.len > 1 { return error('select only one persistence mode: ' + modes.join(', ')) }
 	mode := if selected_modes.len == 1 { selected_modes[0] } else { '' }
@@ -162,7 +163,7 @@ fn persistence_check() !int {
 	options := hwhost.parse_options(args)!
 	if options.help || options.list {
 		if options.help {
-			println('--keygen tests publisher seed recovery; --refresh tests selected catalog refresh; --enrollment tests reviewed publisher enrollment; --revocation tests reviewed publisher revocation; default tests package transactions')
+			println('--keygen tests publisher seed recovery; --refresh tests selected catalog refresh; --enrollment tests reviewed publisher enrollment; --revocation tests reviewed publisher revocation; --policy tests reviewed organization policy; default tests package transactions')
 		}
 		return hwhost.run_suite(selected_persistence_suite('', mode), args, @FILE)
 	}
