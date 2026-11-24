@@ -29,11 +29,11 @@ fn (mut a SoftwareApp) clear_failure() {
 }
 
 fn software_failure_operation(arguments []string) string {
-	for argument in arguments {
+	for index, argument in arguments {
 		if argument in ['admin', '--progress', '--offline', '--json']! { continue }
 		return match argument {
 			'view' { 'Read software catalog' }
-			'update' { 'Refresh repositories' }
+			'update' { if index + 1 < arguments.len { 'Refresh selected repository' } else { 'Refresh repositories' } }
 			'review', 'apply' { 'Reviewed package change' }
 			'install' { 'Install software' }
 			'remove' { 'Remove software' }

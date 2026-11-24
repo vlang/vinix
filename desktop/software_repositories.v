@@ -12,6 +12,7 @@ enum SoftwareRepositoryWorker {
 	enroll
 	revoke
 	refresh
+	targeted_refresh
 }
 
 fn software_repository_text(mut buffer []u8, text string) {
@@ -128,6 +129,16 @@ fn (mut a SoftwareApp) begin_repository_review(operation string) {
 	} else {
 		a.clear_repository_review()
 	}
+}
+
+fn (a &SoftwareApp) selected_repository_refresh_id() string {
+	index := a.repository_selected
+	if index < 0 || index >= a.repository_status.repositories.len { return '' }
+	repository := a.repository_status.repositories[index]
+	if repository.id != editor_bytes_text(a.repository_id)
+		|| repository.url != editor_bytes_text(a.repository_url)
+		|| repository.public_key != editor_bytes_text(a.repository_key) { return '' }
+	return repository.id
 }
 
 fn (mut a SoftwareApp) repository_url_parts(url string, label string) {
@@ -296,6 +307,7 @@ fn (mut a SoftwareApp) handle_repositories(event_id string) {
 			software_repository_text(mut a.repository_url, repository.url)
 			software_repository_text(mut a.repository_key, repository.public_key)
 			a.repository_focus = 0
+			a.select_all = false
 			return
 		}
 	}
@@ -305,6 +317,18 @@ fn (mut a SoftwareApp) handle_repositories(event_id string) {
 			a.start(['view'], true)
 		}
 		'software.repository.reload' { a.read_repositories() }
+		'software.repository.refresh' {
+			id := a.selected_repository_refresh_id()
+			if id == '' { return }
+			a.repository_focus = 0
+			a.select_all = false
+			a.start(['update', id], false)
+			if a.worker != unsafe { nil } { a.repository_worker = .targeted_refresh }
+		}
+		'software.offline' {
+			a.repository_focus = 0
+			a.toggle_offline()
+		}
 		'software.repository.new' {
 			a.repository_id.clear()
 			a.repository_url.clear()
@@ -425,6 +449,10 @@ fn (mut a SoftwareApp) build_repositories(width int, height int) ui2.Element {
 		children << software_button('software.repository.back', 'Back to Software', width - 188, 8, 174)
 		children << software_button('software.repository.reload', 'Reload list', 14, 46, 150)
 		children << software_button('software.repository.new', 'New repository', 176, 46, 150)
+		if a.selected_repository_refresh_id() != '' {
+			children << software_button('software.repository.refresh', 'Refresh selected', 338, 46, 174)
+		}
+		children << a.offline_button(524, 46, 102)
 	}
 	for slot in 0 .. a.page_rows {
 		index := a.repository_scroll + slot

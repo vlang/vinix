@@ -27,6 +27,24 @@ fn repository_recovery_configuration(id string) pkgprotocol.RepositoryConfigurat
 fn repository_recovery_service(args []string) !bool {
 	mode := os.getenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY')
 	if mode == '' || args.len < 2 { return false }
+	if mode == 'targeted-approved' {
+		repository_recovery_require(args[1..] == ['admin', '--progress', '--offline', 'update', 'field'],
+			'wrong administrator refresh arguments')!
+		mut password := [2]u8{}
+		repository_recovery_require(C.read(0, unsafe { &password[0] }, password.len) == password.len
+			&& password[0] == `x` && password[1] == `\n`, 'administrator child did not receive fixture approval')!
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
+		return true
+	}
+	if mode == 'targeted-failed' {
+		repository_recovery_require(args[1..] == ['--progress', 'update', 'field'], 'wrong direct refresh arguments')!
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
+		flush_stdout()
+		mut release := u8(0)
+		repository_recovery_require(C.read(0, unsafe { &release }, 1) == 1 && release == `x`, 'targeted writer barrier was not released')!
+		eprintln('remote: no authenticated cached index; run update')
+		exit(23)
+	}
 	if args[1] == 'repo-review' {
 		repository_recovery_require(args.len >= 3 && args[2] in ['enroll', 'revoke']!, 'unexpected trust review operation')!
 		enroll := args[2] == 'enroll'
@@ -289,8 +307,87 @@ fn repository_recovery_memory() ! {
 	}
 }
 
+fn repository_targeted_refresh() ! {
+	defer { os.unsetenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY') }
+	mut app := SoftwareApp{ service_path: os.executable(), repository_mode: true,
+		administration_required: true, output: []u8{cap: 8192}, query: 'kept query'.bytes(), filter: 1 }
+	defer { app.close_app() }
+	remote := pkgprotocol.Repository{ id: 'remote', url: 'https://publisher.example/current',
+		public_key: repository_recovery_key }
+	text := json2.encode(pkgprotocol.RepositoryConfiguration{ format: 1, scope: 'configuration',
+		architecture: 'aarch64', repositories: [remote, repository_recovery_configuration('field').repositories[0]] })
+	defer { unsafe { text.free() } }
+	app.repository_status = pkgprotocol.decode_repository_configuration(text)!
+	const_width := 640
+	const_height := 610
+	action := 'software.repository.refresh'
+	metadata_text := software_progress_text(pkgprotocol.Progress{ phase: 'verify', repository: 'field', path: 'index.json' })
+	payload_text := software_progress_text(pkgprotocol.Progress{ phase: 'verify', repository: 'field', package: 'example', path: 'bin/app' })
+	defer { unsafe { metadata_text.free(); payload_text.free() } }
+	repository_recovery_require(metadata_text == 'Verifying signed metadata: field/index.json'
+		&& payload_text == 'Verifying example/bin/app…', 'metadata and payload verification have incorrect labels')!
+	app.handle(action)!
+	repository_recovery_require(app.worker == unsafe { nil }, 'refresh accepted without a selection')!
+	repository_recovery_activate(mut app, 'software.row.1', const_width, const_height)!
+	for field in ['id', 'url', 'key']! {
+		app.handle('software.repository.' + field)!
+		app.key_input('\x01')
+		app.paste_input('draft')
+		tree := app.build(ui2.rect(0, 0, const_width, const_height))!
+		present := tree.children.any(it.id == action)
+		free_window_tree(tree)
+		app.handle(action)!
+		repository_recovery_require(!present && app.worker == unsafe { nil }, 'refresh admitted an edited trust draft')!
+		repository_recovery_activate(mut app, 'software.row.1', const_width, const_height)!
+	}
+	repository_recovery_activate(mut app, 'software.offline', const_width, const_height)!
+	os.setenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY', 'targeted-approved', true)
+	repository_recovery_activate(mut app, action, const_width, const_height)!
+	repository_recovery_require(app.admin_prompt && app.repository_worker == .targeted_refresh
+		&& app.worker.args == ['admin', '--progress', '--offline', 'update', 'field'],
+		'selected offline refresh did not ask for the exact administrator action')!
+	pid := app.worker.pid
+	repository_recovery_activate(mut app, 'software.admin.cancel', const_width, const_height)!
+	repository_recovery_require(app.worker == unsafe { nil } && C.kill(pid, 0) != 0
+		&& !app.admin_prompt && app.repository_worker == .none && !app.status.contains('trust was saved'),
+		'cancelled targeted approval left a child or incorrect trust status')!
+	repository_recovery_activate(mut app, action, const_width, const_height)!
+	app.key_input('x')
+	repository_recovery_activate(mut app, 'software.admin.approve', const_width, const_height)!
+	repository_recovery_wait(mut app, 0)!
+	repository_recovery_require(app.status == 'Selected repository refreshed.' && app.repository_mode
+		&& app.selected_repository_refresh_id() == 'field' && app.repository_worker == .none,
+		'approved refresh lost the selection or returned an incorrect result')!
+	repository_recovery_activate(mut app, 'software.offline', const_width, const_height)!
+	app.administration_required = false
+	os.setenv('VINIX_SOFTWARE_REPOSITORY_RECOVERY', 'targeted-failed', true)
+	repository_recovery_activate(mut app, action, const_width, const_height)!
+	for _ in 0 .. 5000 {
+		app.poll()
+		if app.progress_seen { break }
+		time.sleep(time.millisecond)
+	}
+	repository_recovery_require(app.worker != unsafe { nil } && app.status.contains('waiting for the service to exit')
+		&& !app.prepare_close(), 'refresh completion escaped the active writer guard')!
+	for event in [action, 'software.repository.reload', 'software.offline', 'software.repository.back']! {
+		app.handle(event)!
+	}
+	app.key_input('\x1b')
+	repository_recovery_require(app.repository_mode && !app.offline_requested && app.worker.is_alive()
+		&& app.worker.args == ['--progress', 'update', 'field'], 'active refresh allowed navigation or argument changes')!
+	repository_recovery_require(C.write(app.worker.stdio_fd[0], c'x', 1) == 1, 'cannot release targeted refresh child')!
+	repository_recovery_wait(mut app, 0)!
+	repository_recovery_require(app.status.contains('no authenticated cached index')
+		&& app.failure_heading == 'Refresh selected repository · exit 23'
+		&& app.selected_repository_refresh_id() == 'field' && app.repository_status.repositories[0] == remote
+		&& editor_bytes_text(app.query) == 'kept query' && app.filter == 1,
+		'failed refresh lost diagnostics, repository identity or search state')!
+	println('REPOSITORY REFRESH selected enrolled source, literal arguments, approval, cancellation and guarded failure PASS')
+}
+
 fn check_software_repository_recovery() ! {
 	repository_recovery_functional()!
+	repository_targeted_refresh()!
 	repository_recovery_memory()!
 	println('REPOSITORY RECOVERY explicit production-safe checks PASS')
 }

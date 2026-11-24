@@ -29,8 +29,8 @@ fn software_paragraph_fixture_text(element &ui2.Element, truncated bool) string 
 		assert child.frame.x == 0 && child.frame.y == row * 18 && child.frame.width == element.frame.width
 		assert child.text.len <= int(element.frame.width) / 8
 		if child.text.len > 0 {
-			assert usize(child.text.str) >= usize(element.text.str)
-			assert usize(child.text.str) + usize(child.text.len) <= usize(element.text.str) + usize(element.text.len)
+			assert uint(child.text.str) >= uint(element.text.str)
+			assert uint(child.text.str) + uint(child.text.len) <= uint(element.text.str) + uint(element.text.len)
 		}
 		for byte in child.text { bytes << byte }
 		row++

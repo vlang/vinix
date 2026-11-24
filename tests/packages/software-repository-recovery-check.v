@@ -141,6 +141,7 @@ fn qualify() ! {
 		require(run_code == 0, 'focused checks failed; see ' + output + '/' + mode + '.run.log')!
 		for marker in ['REPOSITORY RECOVERY four real child Stop/failure/invalid recovery paths retain configured identities and literal drafts PASS',
 			'REPOSITORY RECOVERY nine compact/tiny canvases, lifecycle guards and nonoverlapping geometry PASS',
+			'REPOSITORY REFRESH selected enrolled source, literal arguments, approval, cancellation and guarded failure PASS',
 			'REPOSITORY RECOVERY explicit production-safe checks PASS']! {
 			require(text.split_into_lines().filter(it == marker).len == 1, 'missing/duplicate focused PASS marker')!
 		}

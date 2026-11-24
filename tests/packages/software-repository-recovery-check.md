@@ -80,3 +80,26 @@ compiler inputs, vlib, third-party code, headers and linker are not frozen; the
 run is not hermetic or reproducible. This is host headless recovery validation,
 without guest graphics, screenshots, native HTTPS or full roadmap section 14
 acceptance.
+
+## Refresh a selected repository
+
+The full Repositories pane exposes **Refresh selected** for an enrolled row
+whose displayed ID, URL and key match the current editor fields. **Go offline**
+and **Use policy** control source access from the same pane. Refresh uses the
+usual administrator prompt and shows completion once the child has exited.
+Failure details remain available in the repository pane.
+
+The host fixture checks literal arguments, approval and cancellation, edited
+trust fields, and a failed child that emits a completion frame before it exits.
+It also checks that package-file verification and signed-index verification
+keep distinct progress labels.
+
+Run the native fixture with `native-catalog-check --software-targeted-refresh`
+using the same inputs as the bundled HTTPS Software scenario. It adds an
+enrolled local field repository with two signed indexes. After the initial
+installation, the guest switches the field repository to sequence 2 and
+temporarily takes the bundled HTTPS source out of service. The Software
+controller activates **Go offline** and **Refresh selected** from the
+rendered element tree as UID 1000. The root observer checks the exact retained
+HTTPS snapshot, new field index and signature, updated trust history, unchanged
+installed generation and one additional successful administrator approval.

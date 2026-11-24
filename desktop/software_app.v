@@ -687,8 +687,9 @@ fn (mut a SoftwareApp) poll() bool {
 	cleanup_worker := a.cleanup_worker
 	mirroring := a.worker_mirror
 	a.retire_worker()
+	if repository_worker == .targeted_refresh { a.repository_worker = .none }
 	a.clear_admin_prompt()
-	if code != 0 || ((verifying || health || cleanup_worker != .none) && a.worker_failed) {
+	if code != 0 || ((verifying || health || cleanup_worker != .none || repository_worker == .targeted_refresh) && a.worker_failed) {
 		if data_worker == .purge && a.data_ready { a.prepare_personal_data_details() }
 		if cleanup_worker != .none { a.clear_cleanup_review() }
 		if policy_worker == .review { a.clear_policy_review(); a.prepare_policy_pages(false) }
@@ -744,6 +745,9 @@ fn (mut a SoftwareApp) poll() bool {
 		a.start(['update'], false)
 		if a.worker != unsafe { nil } { a.repository_worker = .refresh }
 		a.set_status('Repository trust was saved. Refreshing authenticated catalogs…')
+	} else if repository_worker == .targeted_refresh {
+		a.clear_failure()
+		a.set_status('Selected repository refreshed.')
 	} else if repository_worker in [.revoke, .refresh] {
 		unsafe { a.repository_result.free() }
 		a.repository_result = if repository_worker == .revoke {
@@ -1040,14 +1044,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 		'software.offline' {
 			if !a.catalog_browsable() { return }
-			a.offline_requested = !a.offline_requested
-			a.focus = false
-			a.select_all = false
-			a.set_status(if a.offline_requested {
-				'Working offline in Software. Refresh to read signed catalogs from bundled or local repositories.'
-			} else {
-				'Software will use the configured repository policy.'
-			})
+			a.toggle_offline()
 		}
 		'software.refresh' {
 			a.clear_review()

@@ -449,6 +449,9 @@ Pass an enrolled repository ID to refresh only that source. This is useful
 when a local repository has new signed metadata and the system already has a
 newer cached HTTPS index than the one bundled with the image.
 
+In Software, open **Repositories**, select the source, choose **Go offline**
+if needed, and choose **Refresh selected**. Confirm the administrator prompt.
+
 ```sh
 vinix-package --offline update field
 vinix-package admin --offline update field

@@ -11,6 +11,17 @@ fn (a &SoftwareApp) offline_button(x int, y int, width int) ui2.Element {
 	return software_button('software.offline', if a.offline_requested { 'Use policy' } else { 'Go offline' }, x, y, width)
 }
 
+fn (mut a SoftwareApp) toggle_offline() {
+	a.offline_requested = !a.offline_requested
+	a.focus = false
+	a.select_all = false
+	a.set_status(if a.offline_requested {
+		'Working offline in Software. Refresh to read signed catalogs from bundled or local repositories.'
+	} else {
+		'Software will use the configured repository policy.'
+	})
+}
+
 fn (mut a SoftwareApp) keep_catalog_selection_visible() {
 	position := a.matching.index(a.selected)
 	if position < 0 { return }

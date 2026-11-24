@@ -24,7 +24,11 @@ fn software_progress_text(event pkgprotocol.Progress) string {
 		'metadata' { 'Reading signed metadata: ${event.repository}/${event.path} · ${current} bytes' }
 		'download' { 'Downloading ${event.package}/${event.path} · ${current} / ${total} bytes' }
 		'copy' { 'Copying ${event.package}/${event.path} · ${current} / ${total} bytes' }
-		'verify' { if event.package == '' { 'Verifying installed packages…'.clone() } else { 'Verifying ${event.package}/${event.path}…' } }
+		'verify' {
+			if event.package != '' { 'Verifying ${event.package}/${event.path}…' }
+			else if event.repository != '' { 'Verifying signed metadata: ${event.repository}/${event.path}' }
+			else { 'Verifying installed packages…'.clone() }
+		}
 		'stage' { 'Staged ${current} / ${total} packages' }
 		'activate' { 'Activating the complete package set…'.clone() }
 		'complete' { 'Package operation completed.'.clone() }
@@ -43,6 +47,8 @@ fn (mut a SoftwareApp) operation_line(line string) {
 		a.progress_seen = true
 		text := if a.verification_running() && event.phase == 'complete' {
 			'Verification checks finished; waiting for the service to exit.'.clone()
+		} else if a.repository_worker == .targeted_refresh && event.phase == 'complete' {
+			'Repository refresh finished; waiting for the service to exit.'.clone()
 		} else { software_progress_text(event) }
 		a.set_status(text)
 		unsafe { text.free() }

@@ -266,7 +266,7 @@ fn image_run() ! {
 	phase := os.args[1]
 	bundled_https := os.exists('/usr/share/package-fixtures/bundled-https')
 	manual_refresh := os.exists('/usr/share/package-fixtures/manual-release-refresh')
-	if bundled_https && phase != 'install' {
+	if bundled_https && phase !in ['install', 'targeted-refresh']! {
 		assert !app.offline && !app.offline_requested
 		compact := ui2.rect(0, 0, 320, 240)
 		image_control_at(mut app, 'software.offline', compact)!
@@ -331,6 +331,20 @@ fn image_run() ! {
 		image_wait(mut app)!
 		assert app.status.contains('Explicit ordinary-user document grant'), app.status
 		println('SOFTWARE IMAGE ordinary-admin real-refresh cancel bad-password review install progress native-window-1-2 document-grant PASS')
+	} else if phase == 'targeted-refresh' {
+		image_control(mut app, 'software.repositories')!
+		image_wait(mut app)!
+		assert app.repository_status.repositories.len == 2
+		image_control(mut app, 'software.row.1')!
+		assert app.selected_repository_refresh_id() == 'field'
+		image_control(mut app, 'software.offline')!
+		image_control(mut app, 'software.repository.refresh')!
+		assert app.admin_prompt && app.worker.args == ['admin', '--progress', '--offline', 'update', 'field']
+		observed_progress := image_approve(mut app, password)!
+		assert observed_progress && app.status == 'Selected repository refreshed.' && app.repository_mode
+		image_control(mut app, 'software.repository.back')!
+		image_wait(mut app)!
+		assert app.rows.len == 3 && app.rows.all(it.installed_version == '1.0.0') && app.catalog_error == ''
 	} else if phase == 'standard' {
 		image_release_audit(mut app, 'standard-account', '1.0.0')!
 		image_select(mut app, 'org.vinix.counter')!
