@@ -79,3 +79,32 @@ The qualification archive is
 Its SHA-256 is `c09b17323bf89a02ca4bbb06bd4c26d0928e505e8552b412b4a9a35c29cae110`.
 Independent extraction matched all 914 manifest entries and all 61 receipt
 artifacts per architecture.
+
+## Manual release review catalog refresh
+
+At `935091637e2fa1e74b3400dff5dea962a3351633`, the host regression
+reproduced the missing refresh screen on the previous revision and passed
+on the fixed code in the regular and ASan/UBSan builds with leak detection
+disabled. Both desktop targets typechecked. The fixture covers Back with
+an unchanged draft, a late file chooser response, cancelled and refused
+approval, a malformed catalog reload, and read-only review under both
+refresh choices.
+
+Run the single-boot Software image check with
+`native-catalog-check --software-manual-release-refresh`. The aarch64
+and x86-64 runs passed in 140.3 and 109.5 seconds. Both entered through
+the compact deployment form, approved an offline refresh of the signed
+HTTPS bundle, and reopened the exact release proposal before any package
+generation became active. A separate confirmation and administrator
+approval installed the three apps. Both guests retained their staged
+trust configuration and performed a guest-initiated QMP shutdown.
+The x86-64 run used the retained GCC wrapper for both guest compilation
+(`CC_AMD64`) and package staging (`CC_X86_64`) after a generated C
+`waitpid` type mismatch in the first staging attempt. These runs use the
+headless Software controller. Production graphical login for this
+workflow remains open.
+
+The archive is
+`~/.local/state/vinix/r14-manual-release-refresh-dBKsQA/qualification.tar.gz`.
+Its SHA-256 is `bee9e40252c82ec536070f794a2afead5bb77f97911bce5d979d8ba04a73708d`.
+Independent extraction matched all 919 inventory entries.
