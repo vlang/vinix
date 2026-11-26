@@ -133,5 +133,8 @@ fn recovery_key_file(input &char, recovery &char, destination &char, backup bool
 	}
 	if !open_plan_destination(destination, mut work.edit, true) { return 1 }
 	if !publish_recovery(&work.edit, if backup { &work.envelope[0] } else { &work.key[0] }, if backup { recovery_bytes } else { 64 }) { return 1 }
-	return finish_bundle_report(C.printf(if backup { c'key backup published\n' } else { c'key recovery published\n' }) >= 0)
+	if backup {
+		return finish_bundle_report(C.printf(c'key backup published\n') >= 0)
+	}
+	return finish_bundle_report(C.printf(c'key recovery published\n') >= 0)
 }

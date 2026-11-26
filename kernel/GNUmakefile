@@ -374,7 +374,6 @@ override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'aarch64/*' \
     ! -path 'apple/*' \
     ! -path 'devicetree/*' \
-    ! -path 'drm/*' \
     ! -path 'gpu/*' \
     ! -path 'dev/pointerdev/*' \
     ! -path 'syscall/common.v' \
