@@ -45,6 +45,10 @@ fn contents(read_only bool) {
 	mut data := [256]u8{}
 	check(C.read(fd, unsafe { &data[0] }, 256) == 22, 2)
 	check(C.memcmp(unsafe { &data[0] }, c'external Linux volume\n', 22) == 0, 3)
+	if read_only {
+		C.printf(c'EXT4 READ /marker: %.*s', 22, unsafe { &char(&data[0]) })
+		C.fflush(unsafe { nil })
+	}
 	check(C.close(fd) == 0, 4)
 	check(C.readlink(c'/mnt/short-link', unsafe { &char(&data[0]) }, 256) == 6, 5)
 	check(C.memcmp(unsafe { &data[0] }, c'marker', 6) == 0, 6)

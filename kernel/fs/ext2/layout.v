@@ -4,7 +4,7 @@ module ext2
 import errno
 
 const ext4_inode_extents = u32(0x80000)
-const ext4_incompat_supported = u32(0x2 | 0x40 | 0x80 | 0x100 | 0x200 | 0x2000)
+const ext4_incompat_supported = u32(0x2 | 0x40 | 0x80 | 0x200 | 0x2000)
 
 struct VolumeLayout {
 	block_bytes      u64
@@ -51,12 +51,12 @@ fn volume_layout(mut sb EXT2Superblock, data voidptr, bytes u64, ext4 bool) ?Vol
 		// JBD2 recovery and orphan cleanup must happen in Linux before this
 		// read-only driver reads home metadata. Inline/encrypted data, meta_bg,
 		// bigalloc and unknown incompatible formats cannot be interpreted here.
-		if sb.req_features & ~ext4_incompat_supported != 0
-			|| sb.non_supported_features & u32(0x200 | 0x10000) != 0 {
+		if sb.os_id != 0 || sb.req_features & ~ext4_incompat_supported != 0
+			|| sb.non_supported_features & u32(0x200 | 0x8000 | 0x10000) != 0 {
 			errno.set(errno.eopnotsupp)
 			return none
 		}
-		if sb.fs_state & 1 == 0 || sb.fs_state & 6 != 0 || disk_u32(data, 0xe8) != 0 {
+		if sb.fs_state != 1 || disk_u32(data, 0xe8) != 0 {
 			errno.set(errno.euclean)
 			return none
 		}
@@ -68,11 +68,15 @@ fn volume_layout(mut sb EXT2Superblock, data voidptr, bytes u64, ext4 bool) ?Vol
 				return none
 			}
 			descriptor_bytes = disk_u16(data, 0xfe)
-			if descriptor_bytes < 64 || descriptor_bytes > block_bytes
-				|| descriptor_bytes & (descriptor_bytes - 1) != 0 {
+			if descriptor_bytes != 64 {
 				errno.set(errno.einval)
 				return none
 			}
+		}
+		if (u64(sb.sb_block) + 1) * block_bytes > u64(sb.block_cnt) * block_bytes
+			|| groups > (u64(sb.block_cnt) * block_bytes - (u64(sb.sb_block) + 1) * block_bytes) / descriptor_bytes {
+			errno.set(errno.einval)
+			return none
 		}
 	} else if sb.req_features & ~u32(2) != 0 || sb.opt_features & 4 != 0 {
 		errno.set(errno.eopnotsupp)

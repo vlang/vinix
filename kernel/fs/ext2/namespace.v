@@ -46,6 +46,7 @@ fn flush_on_return() {
 }
 
 fn (mut this EXT2Resource) persist_metadata() ? {
+	if this.filesystem.read_only { errno.set(errno.erofs); return none }
 	if this.stat.uid > 0xffff || this.stat.gid > 0xffff {
 		errno.set(errno.eoverflow)
 		return none
@@ -65,6 +66,7 @@ fn (mut this EXT2Resource) persist_metadata() ? {
 }
 
 fn (mut this EXT2Resource) chmod_mode(mode u32) ? {
+	if this.filesystem.read_only { errno.set(errno.erofs); return none }
 	this.l.acquire()
 	defer { this.l.release() }
 	this.filesystem.l.acquire()
@@ -424,6 +426,7 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 }
 
 fn (mut this EXT2Resource) link(_handle voidptr) ? {
+	if this.filesystem.read_only { errno.set(errno.erofs); return none }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
 	this.filesystem.begin_transaction()?
@@ -444,6 +447,7 @@ fn (mut this EXT2Resource) link(_handle voidptr) ? {
 }
 
 fn (mut this EXT2Resource) unlink(handle voidptr) ? {
+	if this.filesystem.read_only { errno.set(errno.erofs); return none }
 	if handle == unsafe { nil } { errno.set(errno.einval); return none }
 	mut node := unsafe { &vfs.VFSNode(handle) }
 	if unsafe { node.parent == nil } { errno.set(errno.einval); return none }
