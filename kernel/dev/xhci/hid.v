@@ -34,6 +34,12 @@ mut:
 	buf_virt u64
 	packet   u32
 	kind     int
+	// One Normal TRB owns the report buffer until its matching completion.
+	outstanding      u64
+	queued           bool
+	disabled         bool
+	recovery_pending bool
+	recovery_code    u32
 	// Pointer layout, from the report descriptor. With report IDs in use,
 	// only reports carrying `report_id` describe the pointer.
 	uses_ids       bool
@@ -51,6 +57,8 @@ mut:
 __global (
 	// Software key repeat: the boot protocol reports a held key once.
 	xhci_repeat_code u16
+	xhci_repeat_slot u32
+	xhci_repeat_dci u32
 	xhci_repeat_next u64
 	// Reports taken from keyboards and from pointers, for /sys.
 	xhci_keyboard_reports u64
@@ -246,11 +254,6 @@ fn configure_endpoints(mut dev Device, first int, candidates [4]Candidate, count
 		// Keep nothing that would wait on an endpoint that does not exist.
 		xhci_function_cnt = first
 	}
-}
-
-fn queue_report(mut f HidFunction) {
-	f.ring.push(u32(f.buf_phys), u32(f.buf_phys >> 32), f.packet, (trb_normal << 10) | trb_ioc | trb_isp)
-	ring_doorbell(f.slot, f.dci)
 }
 
 // Parse the items of a HID report descriptor for the pointer fields.
@@ -521,6 +524,8 @@ fn (mut f HidFunction) keyboard_report(length u32) {
 		if code != 0 {
 			sink_key(code, 1)
 			xhci_repeat_code = code
+			xhci_repeat_slot = f.slot
+			xhci_repeat_dci = f.dci
 			xhci_repeat_next = now_ns() + repeat_delay_ns
 		}
 	}
@@ -549,28 +554,35 @@ fn repeat_keys() {
 	xhci_repeat_next = now + repeat_interval_ns
 }
 
-// The devices are about to be forgotten: every key a keyboard last said was
-// down is let go, so that nobody goes on thinking Shift is held by a
-// keyboard that will be asked again from nothing.
+// Release only this function's held state when it is permanently disabled
+// or forgotten. Repeat ownership includes the endpoint: another keyboard
+// may be repeating the same keycode.
+fn forget_function_keys(mut f HidFunction) {
+	if f.kind != kind_keyboard {
+		return
+	}
+	for bit := 0; bit < 8; bit++ {
+		if f.modifiers & (u8(1) << bit) != 0 {
+			sink_key(modifier_codes[bit], 0)
+		}
+	}
+	for key in f.keys {
+		code := keycode(key)
+		if key > 3 && code != 0 {
+			sink_key(code, 0)
+		}
+	}
+	if xhci_repeat_slot == f.slot && xhci_repeat_dci == f.dci {
+		xhci_repeat_code = 0
+		xhci_repeat_next = 0
+	}
+	f.modifiers = 0
+	f.keys = [6]u8{}
+}
+
 fn forget_keys() {
 	for i := 0; i < xhci_function_cnt; i++ {
-		mut f := &xhci_functions[i]
-		if f.kind != kind_keyboard {
-			continue
-		}
-		for bit := 0; bit < 8; bit++ {
-			if f.modifiers & (u8(1) << bit) != 0 {
-				sink_key(modifier_codes[bit], 0)
-			}
-		}
-		for key in f.keys {
-			code := keycode(key)
-			if key > 3 && code != 0 {
-				sink_key(code, 0)
-			}
-		}
-		f.modifiers = 0
-		f.keys = [6]u8{}
+		forget_function_keys(mut xhci_functions[i])
 	}
 	xhci_repeat_code = 0
 }
