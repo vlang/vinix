@@ -1,0 +1,112 @@
+# Builds Vinix for aarch64, cross-builds V for the Vinix target, and builds
+# vlang/coreutils against it.
+#
+# The point of this image is the last step. V will not *link* a Vinix binary from
+# a foreign host: `v -os vinix -o hello.c` emits the C happily, but
+# `v -os vinix -o hello` stops with "linking target vinix/amd64 from host ... is
+# not supported by the default C compiler; use -o file.c and compile it with a
+# target toolchain". That refusal is correct - a Vinix binary needs Vinix's libc
+# and loader - and the supported way round it is what Vinix's own
+# scripts/build-v-aarch64.sh sets up.
+#
+# That script produces a V which is a *static aarch64-linux-musl* executable
+# (built with `-cross -os linux -arch arm64 -musl`), installed with a
+# `v-command` wrapper that defaults every build to `-os vinix -arch arm64 -musl
+# -cc tcc`. Because the compiler itself is static and for the guest's own
+# architecture, it can be run on this x86_64 host under qemu-aarch64 user-mode
+# emulation, and it links Vinix programs natively. No VM boot is needed to
+# *build*; the VM is only needed to run.
+#
+#   docker build -t vinix-coreutils .
+#   docker run --rm vinix-coreutils
+
+#   V_COMMIT      the *host* compiler, which builds Vinix itself. Defaults to
+#                 master, which is what bootstraps cleanly here.
+#
+# Note on pins: scripts/build-v-aarch64.sh defaults its own V_COMMIT to
+# 4c70190a5059f5b4bfc977f55bb0a6d2c9917dd8, and vlang/vinix/.github/workflows/
+# nightly.yml sets V_COMMIT=9bfa1dc3f3... for the host compiler. Neither of those
+# bootstraps with a plain `make` in a clean checkout: both revisions carry
+# `if (if x > 0.0 { ... } else { ... })` at vlib/math/bits/bits.v:621, which the
+# bootstrap compiler built from vc/ rejects with "the condition of an `if` cannot
+# start with a parenthesized `if` expression". Vinix never bites on this because
+# it consumes that V through an existing host `v` with `-cross`, so the
+# bootstrap never sees the construct. That is why VINIX_V_COMMIT exists below as
+# a separate argument rather than being reused here.
+# vlang/v defaults to master and vlang/vinix defaults to master, but
+# vlang/coreutils defaults to main - pinning all three to master fails on that
+# clone with "pathspec 'master' did not match any file(s)".
+ARG V_COMMIT=master
+ARG VINIX_COMMIT=master
+ARG COREUTILS_COMMIT=main
+
+FROM ubuntu:24.04
+
+LABEL org.opencontainers.image.title="vinix-coreutils"
+LABEL org.opencontainers.image.description="Builds vlang/coreutils for the Vinix aarch64 target"
+LABEL org.opencontainers.image.source="https://github.com/vlang/vinix"
+LABEL org.opencontainers.image.licenses="GPL-2.0-only"
+
+# Host toolchain. clang+lld build the kernel and link the com; rsync and make
+# drive the build; xorriso/cpio assemble images; qemu-system-aarch64 boots the
+# result under TCG and qemu-user-static runs the aarch64 compiler on this x86_64
+# host. binutils-aarch64-linux-gnu gives `file` the arch names the Vinix scripts
+# grep for.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    build-essential clang lld llvm make diffutils findutils perl \
+    rsync xorriso cpio xz-utils zstd patch \
+    git curl ca-certificates unzip python3 file \
+    qemu-system-aarch64 qemu-user-static qemu-utils \
+    binutils-aarch64-linux-gnu && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ARG V_COMMIT
+ARG VINIX_COMMIT
+ARG COREUTILS_COMMIT
+
+WORKDIR /work
+
+# --- 1. V, the host compiler -------------------------------------------------
+# Vinix's build-support/find-v.sh looks for `v` on PATH, then ~/code/v/v, then
+# ~/v/v, so a symlink on PATH is enough.
+RUN git clone --quiet https://github.com/vlang/v /opt/v && \
+    git -C /opt/v checkout --quiet "${V_COMMIT}" && \
+    make -C /opt/v >/tmp/v-build.log 2>&1 || { tail -20 /tmp/v-build.log; exit 1; } && \
+    ln -s /opt/v/v /usr/local/bin/v && \
+    v version
+
+# --- 2. the two source trees ---------------------------------------------------
+RUN git clone --quiet https://github.com/vlang/vinix /work/vinix && \
+    git -C /work/vinix checkout --quiet "${VINIX_COMMIT}"
+RUN git clone --quiet https://github.com/vlang/coreutils /work/coreutils && \
+    git -C /work/coreutils checkout --quiet "${COREUTILS_COMMIT}"
+
+# VINIX_V_COMMIT is deliberately left unset: scripts/build-v-aarch64.sh carries
+# its own default for the compiler it cross-builds for the Vinix target, and
+# pointing it at the host compiler's revision is the mistake described above.
+# Override it explicitly if you want a different target V.
+ENV VJOBS=1
+
+# --- 3. the Vinix aarch64 kernel and the Alpine guest userland -----------------
+# --no-iso: this image exists to build and run programs, not to ship a boot
+# disk. The userland matters for more than the kernel - it is the aarch64 musl
+# sysroot that build-v-aarch64.sh links V against, and it is what gives the
+# guest a working gcc and tcc.
+RUN /work/vinix/scripts/build-aarch64.sh --no-iso
+
+# --- 4. V, cross-built for the Vinix target -------------------------------------
+RUN /work/vinix/scripts/build-v-aarch64.sh
+
+# --- 5. coreutils, compiled for Vinix -------------------------------------------
+# The staged tree is a self-contained musl userland: /usr/bin/v is the wrapper
+# that defaults to Vinix, /usr/lib/vlang/v is the static compiler beside vlib,
+# and the aarch64 sysroot the compiler was linked against sits in the Vinix
+# userland build. Running the wrapper under qemu-aarch64 with that sysroot as
+# the library prefix is the whole trick: a host process, an aarch64 musl
+# compiler, and Vinix output.
+COPY build-coreutils.sh /usr/local/bin/build-coreutils.sh
+RUN chmod +x /usr/local/bin/build-coreutils.sh && \
+    /usr/local/bin/build-coreutils.sh
+
+CMD ["bash"]

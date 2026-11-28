@@ -1,0 +1,55 @@
+#### Build coreutils for the Vinix aarch64 target
+name: Build coreutils for Vinix
+
+# The image cross-builds vlang/coreutils for Vinix and runs the resulting
+# compiler under qemu-aarch64 user-mode emulation. It was not fully built where
+# it was written, because kernel/get-deps clones freestnd-c-hdrs, cc-runtime and
+# flanterm from codeberg.org, which is unreachable from that host. GitHub's
+# runners can reach it, so this workflow is the rest of the verification.
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'Dockerfile.coreutils'
+      - 'build-coreutils.sh'
+      - '.github/workflows/coreutils.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'Dockerfile.coreutils'
+      - 'build-coreutils.sh'
+      - '.github/workflows/coreutils.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: coreutils-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      # build-coreutils.sh prints BUILD_COREUTILS_DONE as its last line on
+      # success, so the log is the verdict and this step enforces it. Without
+      # that check a build that silently produced nothing would still be green.
+      - name: Build the image and coreutils for Vinix
+        run: |
+          set -euo pipefail
+          docker build -t vinix-coreutils:build -f Dockerfile.coreutils . 2>&1 | tee build.log
+          if ! grep -q 'BUILD_COREUTILS_DONE' build.log; then
+            echo "::error::build-coreutils.sh did not report success"
+            exit 1
+          fi
+          # At least one binary must actually be for the target architecture.
+          if ! grep -q 'ARM aarch64' build.log; then
+            echo "::error::no aarch64 executables were produced"
+            exit 1
+          fi
+          echo "coreutils built for the Vinix aarch64 target"
