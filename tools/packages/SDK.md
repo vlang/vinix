@@ -870,12 +870,15 @@ bytes, including when using the administrator transport. Use the result
 after the command exits successfully.
 
 `deployment-media-save MEDIA_DIRECTORY NEW_FILE [EXPECTED_SHA256]` checks the
-bundle's nonempty format-2 lock against the current authenticated catalog,
-policy and installed state. It saves the exact bytes to a new file outside the
-bundle. Supply `deployment_sha256` from the trusted release receipt to require
-that exact digest. `--json` reports the destination, architecture, digest and
-root and package counts. Run it directly as the owner of the destination.
-After it succeeds you can disconnect the media and review the local file.
+bundle's nonempty format-2 lock against the current authenticated catalog and
+saves its exact bytes to a new file outside the bundle. Supply
+`deployment_sha256` from the trusted release receipt to verify and save the
+complete release lock even when local policy or installed packages block its
+deployment. Without a digest, saving requires a valid additive plan under the
+current policy and installed state. `--json` reports the destination,
+architecture, digest and root and package counts. Run it directly as the owner
+of the destination. After it succeeds you can disconnect the media and review
+the local file.
 In Software, open **Deployment → Offline media…** and enter the media
 directory. **Import media** uses the enrolled keys and asks for administrator
 approval. Choose **Import with receipt…** to bind the import to a reviewed ISO
@@ -889,7 +892,9 @@ view. To supply the digest manually, enter `deployment_sha256` from the
 trusted release receipt into **Expected SHA-256**. The save receipt shows
 the saved digest.
 **Check coverage**, **Review additions**, and the separately approved apply
-carry that digest forward.
+carry that digest forward. The Deployment form keeps the most recently saved
+media file bound to its digest and offers those additive actions when that path
+is selected, including on retry after a failed review.
 
 The equivalent CLI commands `deployment-add-audit FILE`, `deployment-add-review
 FILE` and `deployment-add-apply REVIEW_FINGERPRINT FILE` each accept an optional

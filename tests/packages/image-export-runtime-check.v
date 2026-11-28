@@ -42,6 +42,7 @@ fn image_export_suite() hwhost.Suite {
 				'ISO OFFLINE MEDIA exact dependency closure rejects missing, incompatible and unused pins across publishers PASS',
 				'DEPLOYMENT MEDIA SAVE preserves exact bytes, refuses digest and policy drift, and supports reviewed installation after disconnect PASS',
 				'DEPLOYMENT MEDIA CLI ordinary UID 1000 saves the exact lock from root-owned media PASS',
+				'DEPLOYMENT MEDIA CLI verified lock saves under policy refusal and reviews offline after policy recovery PASS',
 				'DEPLOYMENT PIN CLI ordinary UID 1000 reviews and checks coverage without the source media PASS',
 				'DEPLOYMENT PIN CLI exact bytes across coverage, review and apply, digest substitution and omission refusal, and restored retry PASS',
 				'DEPLOYMENT MEDIA CLI receipt lock pins must match the bundled signed indexes before acquisition PASS',

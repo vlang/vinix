@@ -111,6 +111,8 @@ fn software_media_import_service_fixture() !bool {
 		return true
 	}
 	if args == ['--offline', 'deployment-add-review', software_import_fixture_lock, 'c'.repeat(64)] {
+		if mode == 'receipt-review-blocked' { eprintln('editor: blocked by organization allowlist'); exit(1) }
+		if mode == 'receipt-review-changed' { eprintln('deployment file SHA-256 differs from the expected digest'); exit(1) }
 		review := fixture_review('deploy-add', ['editor'])
 		println(json2.encode(pkgprotocol.Review{ ...review, fingerprint: 'e'.repeat(64) }))
 		return true
@@ -310,7 +312,41 @@ fn check_software_media_receipt_import(mut app SoftwareApp, work string) ! {
 	app.handle('software.snapshot.save')!
 	wait_for_software(mut app)
 	assert app.snapshot_ready && app.snapshot_media_saved.sha256 == 'c'.repeat(64)
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'receipt-review-blocked', true)
 	app.handle('software.snapshot.review')!
+	assert app.worker.args == ['--offline', 'deployment-add-review', software_import_fixture_lock, 'c'.repeat(64)]
+	wait_for_software(mut app)
+	assert !app.review_ready && app.status.contains('organization allowlist')
+	app.handle('software.deployment.back')!
+	app.handle('software.deployment')!
+	assert app.status.contains('review additions for the saved media lock')
+	wide := app.build(ui2.rect(0, 0, 640, 610))!
+	assert wide.children.any(it.id == 'software.deployment.review' && it.text == 'Review additions')
+	assert wide.children.any(it.id == 'software.deployment.audit' && it.text == 'Check coverage')
+	free_window_tree(wide)
+	app.deployment_action = 1
+	compact_retry := app.build(ui2.rect(0, 0, 320, 240))!
+	deployment_form_geometry(compact_retry, 320, 240)
+	assert compact_retry.children.any(it.id == 'software.deployment.review' && it.text == 'Review additions')
+	free_window_tree(compact_retry)
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'receipt-review-changed', true)
+	app.handle('software.deployment.review')!
+	assert app.worker.args == ['--offline', 'deployment-add-review', software_import_fixture_lock, 'c'.repeat(64)]
+	wait_for_software(mut app)
+	assert !app.review_ready && app.status.contains('SHA-256 differs')
+	app.handle('software.deployment.audit')!
+	assert app.worker.args == ['--offline', '--json', 'deployment-add-audit', software_import_fixture_lock, 'c'.repeat(64)]
+	app.handle('software.audit.stop')!
+	app.handle('software.audit.back')!
+	app.handle('software.deployment.path')!
+	app.key_input('\x01'); app.paste_input('/different-deployment.json')
+	app.handle('software.deployment.review')!
+	assert app.worker.args == ['--offline', 'deployment-review', '/different-deployment.json']
+	app.handle('software.deployment.stop')!
+	app.handle('software.deployment.path')!
+	app.key_input('\x01'); app.paste_input(software_import_fixture_lock)
+	os.setenv('VINIX_SOFTWARE_MEDIA_IMPORT_MODE', 'receipt-hold', true)
+	app.handle('software.deployment.review')!
 	assert app.worker.args == ['--offline', 'deployment-add-review', software_import_fixture_lock, 'c'.repeat(64)]
 	wait_for_software(mut app)
 	assert app.review_ready
@@ -694,6 +730,7 @@ fn check_software_snapshot_memory() ! {
 			}
 		}
 		app.set_status('')
+		app.clear_saved_media_deployment()
 		kept := C.vinix_heap_end(); assert kept == 0, 'deployment save UI retained ${kept} bytes'
 		println('Software deployment saving: 1000 installed and 1000 media paste/render/receipt/paging/mismatch/retirement cycles retain zero tracked bytes')
 	}

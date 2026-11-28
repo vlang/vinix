@@ -29,7 +29,20 @@ fn (mut a SoftwareApp) initialize_deployment_field() {
 }
 
 fn (mut a SoftwareApp) begin_deployment_review() {
-	a.begin_deployment_review_mode(false)
+	digest := a.saved_media_deployment_digest()
+	a.begin_deployment_review_with_digest(digest != '', digest)
+}
+
+fn (a &SoftwareApp) saved_media_deployment_digest() string {
+	return if editor_bytes_text(a.deployment_path) == a.deployment_saved_media_path {
+		a.deployment_saved_media_sha256
+	} else { '' }
+}
+
+fn (mut a SoftwareApp) clear_saved_media_deployment() {
+	unsafe { a.deployment_saved_media_path.free(); a.deployment_saved_media_sha256.free() }
+	a.deployment_saved_media_path = ''
+	a.deployment_saved_media_sha256 = ''
 }
 
 fn (mut a SoftwareApp) begin_deployment_review_mode(additions bool) {
@@ -148,22 +161,28 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 	// Include the actions, progress and failure controls without growing
 	// the manual-free frame buffer on each redraw.
 	mut children := frame_elements(21)
+	pinned_media := a.saved_media_deployment_digest() != ''
 	children << software_label('Software · Deployment', 14, 8, width - 188, 28, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.deployment.back', 'Back to catalog', width - 174, 8, 160)
 	}
-	children << software_label('Deployment file (absolute path)', 14, 52, width - 28, 28, false)
+	children << software_label(if pinned_media { 'Saved media lock (SHA-256 required)' }
+		else { 'Deployment file (absolute path)' }, 14, 52, width - 28, 28, false)
 	children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 86, width - 202, a.focus)
 	if a.deployment_choice_pending {
 		children << software_label('Choosing file…', width - 174, 86, 160, 28, false)
 	} else if a.worker == unsafe { nil } {
 		children << software_button('software.deployment.choose', 'Choose file…', width - 174, 86, 160)
 	}
-	children << software_label('Use a deployment file supplied by your organization. Check installed compares an exact lock with recorded installed metadata. Review deployment checks the full application set before any changes.', 14, 128, width - 28, 60, false)
-	children << software_label('The review includes installs, retained packages, updates and removals, with publisher keys, permissions, licenses and disk requirements. Empty deployments remove all packages. Personal data stays on disk.', 14, 204, width - 28, 60, false)
+	children << software_label(if pinned_media {
+		'Check coverage compares the saved release with installed metadata. Review additions keeps your existing application selections.'
+	} else { 'Use a deployment file supplied by your organization. Check installed compares an exact lock with recorded installed metadata. Review deployment checks the full application set before any changes.' }, 14, 128, width - 28, 60, false)
+	children << software_label(if pinned_media {
+		'Software checks the saved SHA-256, publisher trust and organization policy. Applying the reviewed changes requires separate approval.'
+	} else { 'The review includes installs, retained packages, updates and removals, with publisher keys, permissions, licenses and disk requirements. Empty deployments remove all packages. Personal data stays on disk.' }, 14, 204, width - 28, 60, false)
 	if a.worker == unsafe { nil } {
-		children << software_button('software.deployment.review', 'Review deployment', 14, 286, 180)
-		children << software_button('software.deployment.audit', 'Check installed', 210, 286, 160)
+		children << software_button('software.deployment.review', if pinned_media { 'Review additions' } else { 'Review deployment' }, 14, 286, 180)
+		children << software_button('software.deployment.audit', if pinned_media { 'Check coverage' } else { 'Check installed' }, 210, 286, 160)
 		children << software_button('software.policy', 'Organization policy', 14, 330, 180)
 		children << software_button('software.deployment.snapshot', 'Save installed…', 210, 330, 160)
 		children << software_button('software.deployment.media-save', 'Offline media…', 386, 330, 184)

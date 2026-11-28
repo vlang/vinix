@@ -37,7 +37,8 @@ fn (mut a SoftwareApp) read_deployment_audit() {
 }
 
 fn (mut a SoftwareApp) begin_deployment_audit() {
-	a.begin_deployment_audit_mode(false)
+	digest := a.saved_media_deployment_digest()
+	a.begin_deployment_audit_with_digest(digest != '', digest)
 }
 
 fn (mut a SoftwareApp) begin_deployment_audit_mode(additions bool) {

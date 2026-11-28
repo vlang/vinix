@@ -257,6 +257,11 @@ fn (mut a SoftwareApp) load_deployment_snapshot() bool {
 		a.set_status('The save receipt has a different SHA-256. The file may exist. Check the destination before retrying.')
 		return false
 	}
+	if a.snapshot_media {
+		a.clear_saved_media_deployment()
+		a.deployment_saved_media_path = a.snapshot_media_saved.destination.clone()
+		a.deployment_saved_media_sha256 = a.snapshot_media_saved.sha256.clone()
+	}
 	a.snapshot_ready = true
 	a.prepare_deployment_snapshot_details()
 	a.set_status(if a.snapshot_media { 'Media lock saved. You can disconnect the media and review additions from the saved file.' }

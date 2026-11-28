@@ -264,6 +264,16 @@ fn check_saved_media_deployment(work string, exported string, deployment string,
 	os.write_file(config_path, json2.encode(wrong_policy))!
 	if _ := service.save_media_deployment(media, refused, '') { assert false }
 	else { assert err.msg().contains('organization allowlist') }
+	mut document := decode_deployment(deployment, config.architecture)!
+	defer { document.close() }
+	partial := json2.encode(DeploymentLock{ ...document, locked: document.locked.filter(it.id != 'support') })
+	os.write_file(path, partial)!
+	if _ := service.save_media_deployment(media, refused, index_digest(partial)) { assert false }
+	else { assert err.msg().contains('candidate satisfies support') }
+	os.write_file(path, deployment)!
+	os.write_file(config_path, json2.encode(Config{ ...config, repositories: [] }))!
+	if _ := service.save_media_deployment(media, refused, index_digest(deployment)) { assert false }
+	else { assert err.msg().contains('publisher is absent from the authenticated catalog') }
 	os.write_file(config_path, json2.encode(config))!
 
 	os.rm(path)!

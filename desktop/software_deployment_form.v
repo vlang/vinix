@@ -61,17 +61,24 @@ fn (mut a SoftwareApp) build_deployment_form(width int, height int) ui2.Element 
 	a.deployment_form_compact = true
 	mut children := frame_elements(10)
 	content := width - 28
+	pinned_media := a.saved_media_deployment_digest() != ''
 	children << software_label('Deployment', 14, 8, width - 98, 28, false)
 	children << software_button('software.deployment.back', 'Back', width - 70, 8, 56)
-	children << software_label('Deployment file (absolute path)', 14, 42, content, 18, false)
+	children << software_label(if pinned_media { 'Saved media lock (SHA-256 required)' }
+		else { 'Deployment file (absolute path)' }, 14, 42, content, 18, false)
 	children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 64, content, a.focus)
 	if a.deployment_action == 0 && a.deployment_choice_pending {
 		children << software_label('Choosing file…', 14, 104, content, 28, false)
 	} else {
-		children << software_button(software_deployment_form_actions[a.deployment_action],
-			software_deployment_form_titles[a.deployment_action], 14, 104, content)
+		title := if pinned_media && a.deployment_action == 1 { 'Review additions' }
+			else if pinned_media && a.deployment_action == 2 { 'Check coverage' }
+			else { software_deployment_form_titles[a.deployment_action] }
+		children << software_button(software_deployment_form_actions[a.deployment_action], title, 14, 104, content)
 	}
-	children << software_label(software_deployment_form_help[a.deployment_action], 14, 142, content, height - 186, false)
+	help := if pinned_media && a.deployment_action == 1 { 'Review additions using the saved SHA-256. Applying them needs separate approval.' }
+		else if pinned_media && a.deployment_action == 2 { 'Check the exact saved lock against installed metadata.' }
+		else { software_deployment_form_help[a.deployment_action] }
+	children << software_label(help, 14, 142, content, height - 186, false)
 	button := (content - 16) / 3
 	children << software_button('software.deployment.action.previous', 'Previous', 14, height - 36, button)
 	if a.status_readable() { children << software_button('software.status', 'Status', 14 + button + 8, height - 36, button) }

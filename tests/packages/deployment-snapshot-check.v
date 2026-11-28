@@ -373,9 +373,21 @@ fn check() ! {
 			index_sha256: release.index_sha256, payload_bytes: payload_bytes }]
 	})!
 	assert os.read_file(consumer_config)! == consumer_config_text
+	mut consumer_settings := pkgcore.load_config(consumer)!
+	defer { consumer_settings.close() }
+	blocked := json2.encode(pkgcore.Config{ ...consumer_settings,
+		policy: pkgcore.Policy{ ...consumer_settings.policy, allowed: ['unrelated'] } })
+	os.write_file(consumer_config, blocked)!
+	assert command_status(binary, consumer, ['deployment-media-save', media, work + '/unpinned-release.json'], 1)!.contains('organization allowlist')
+	assert !os.exists(work + '/unpinned-release.json')
 	local_lock := save_media_lock(binary, consumer, media, work + '/saved-release', architecture, first, saved.sha256)!
 	os.rename(media, work + '/disconnected-media')!
 	assert !os.exists(media)
+	assert command_status(binary, consumer, ['deployment-add-review', local_lock, saved.sha256], 1)!.contains('organization allowlist')
+	assert os.read_file(consumer_config)! == blocked && os.read_file(local_lock)! == first
+	assert (pkgcore.Service{ root: consumer }).state()!.generation == 0
+	os.write_file(consumer_config, consumer_config_text)!
+	println('DEPLOYMENT MEDIA CLI verified lock saves under policy refusal and reviews offline after policy recovery PASS')
 	check_pinned_additions(binary, consumer, local_lock, first, saved.sha256)!
 	command(binary, consumer, ['--offline', 'verify'])!
 	println('DEPLOYMENT MEDIA CLI imports a signed bundle, saves its lock and installs from cache after disconnect PASS')

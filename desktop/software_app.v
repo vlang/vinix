@@ -183,6 +183,8 @@ mut:
 	deployment_form_compact bool
 	deployment_action int
 	deployment_path []u8
+	deployment_saved_media_path string
+	deployment_saved_media_sha256 string
 	deployment_pending string // frozen file path for deployment-review/apply
 	deployment_pending_sha256 string
 	deployment_choice_pending bool
@@ -1036,7 +1038,9 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.find_release_deployment()
 		a.focus = false
 		a.select_all = false
-		a.set_status('Enter an absolute deployment file path. Review the complete application set and removals before applying it.')
+		a.set_status(if a.saved_media_deployment_digest() != '' {
+			'Check coverage or review additions for the saved media lock.'
+		} else { 'Enter an absolute deployment file path. Review the complete application set and removals before applying it.' })
 		return
 	}
 	if a.deployment_mode && a.review == '' { a.handle_deployment(event_id); return }
@@ -1608,6 +1612,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_cleanup()
 	a.clear_deployment_audit()
 	a.clear_deployment_snapshot()
+	a.clear_saved_media_deployment()
 	a.clear_mirror_source()
 	unsafe {
 		a.launch_request.free()

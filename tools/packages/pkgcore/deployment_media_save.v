@@ -19,8 +19,8 @@ pub fn (mut saved DeploymentMediaSaved) close() {
 	saved = DeploymentMediaSaved{}
 }
 
-// Save the exact media lock after resolving its additions against the local
-// authenticated catalog. A later deployment still needs its own review.
+// Save the exact media lock using the local authenticated catalog. A supplied
+// digest allows saving the signed release graph before an installation review.
 pub fn (service Service) save_media_deployment(source string, destination string, expected_sha256 string) !DeploymentMediaSaved {
 	if !source.starts_with('/') || !printable(source, 4096) {
 		return error('deployment media save requires an absolute media directory')
@@ -60,10 +60,21 @@ pub fn (service Service) save_media_deployment(source string, destination string
 	defer { close_decoded_configuration(config) }
 	mut document := decode_deployment(text, config.architecture)!
 	defer { document.close() }
-	current := read_state(directory, config.architecture)!
-	defer { if current.generation != 0 { close_decoded_state(current) } }
-	mut prepared := prepare_deployment_plan(config, directory, current, document, .additions)!
-	defer { prepared.close() }
+	if expected_sha256 != '' {
+		if document.format != 2 || document.packages.len == 0 {
+			return error('saving a media lock requires a nonempty format-2 deployment lock')
+		}
+		catalog := load_catalog(config, directory)!
+		defer { close_authenticated_catalog(catalog) }
+		candidates := locked_deployment_candidates(catalog, document)!
+		defer { unsafe { (&array(&candidates)).free() } }
+		check_offline_deployment_closure(document, candidates)!
+	} else {
+		current := read_state(directory, config.architecture)!
+		defer { if current.generation != 0 { close_decoded_state(current) } }
+		mut prepared := prepare_deployment_plan(config, directory, current, document, .additions)!
+		prepared.close()
+	}
 	media.check()!
 	export_stage_metadata(path, text)!
 	media.check()!
