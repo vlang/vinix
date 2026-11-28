@@ -61,15 +61,8 @@ done
 V="${V:-}"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 
-if [ -n "${VINIX_UI2_SOURCE:-}" ]; then
-    UI2_SOURCE="$VINIX_UI2_SOURCE"
-elif [ -f "$SCRIPT_DIR/../ui2/v.mod" ]; then
-    # A sibling development checkout is the source requested by local Vinix
-    # work; packaged/CI builds retain the conventional third_party fallback.
-    UI2_SOURCE="$SCRIPT_DIR/../ui2"
-else
-    UI2_SOURCE="$SCRIPT_DIR/third_party/ui2"
-fi
+UI2_SOURCE="$(sh "$SCRIPT_DIR/build-support/run-v-tool.sh" \
+    "$SCRIPT_DIR/build-support/resolve-ui2.v" "$SCRIPT_DIR")"
 
 # pkg with apk, curl and git. X.org with Mesa and LLVM, Firefox with its GTK
 # and media runtime, Python, and V with TCC only on request.
@@ -123,17 +116,6 @@ if [ -z "$CLANG" ] || [ -z "$LLVM_STRIP" ] || ! command -v ld.lld >/dev/null 2>&
     echo "ERROR: clang, ld.lld, and llvm-strip (or strip) are required." >&2
     exit 1
 fi
-if [ ! -f "$UI2_SOURCE/v.mod" ]; then
-    echo "ERROR: ui2 not found at $UI2_SOURCE. Clone it at third_party/ui2:" >&2
-    echo "    git clone https://github.com/vlang/ui2 third_party/ui2" >&2
-    exit 1
-fi
-if [ ! -f "$UI2_SOURCE/ui/vml_compiled.v" ] || \
-   [ ! -f "$UI2_SOURCE/examples/calculator/calculator.vml" ]; then
-    echo "ERROR: this ui2 checkout has no compile-time VML support; update it." >&2
-    exit 1
-fi
-
 echo "==> Staging Alpine's prebuilt amd64 userland and toolchain..."
 VINIX_AMD64_USERLAND_BUILD_DIR="$USERLAND_DIR" VINIX_ALPINE_DEVTOOLS=1 \
     "$SCRIPT_DIR/scripts/build-userland-amd64.sh"
