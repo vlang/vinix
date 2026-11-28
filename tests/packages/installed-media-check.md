@@ -117,3 +117,17 @@ Boot 7 verifies the rolled-back release, the update's catalog and replay history
 and the unchanged application data. The original signed index and signature,
 saved from boot 2, are refused as a replay without restoring either release disk.
 [Maintenance fixture](installed-media-guest/maintenance.v)
+
+At `7670d02b607e33f20b1968ce435f4a6725f98fc8`, AArch64 passed in 607.038 seconds
+and x86-64 passed in 418.541 seconds under QEMU TCG. Each completed seven
+guest-initiated shutdowns. The update used the retained sequence-2 mixed
+publisher export, freshly built target package tools, and the already-qualified
+kernels and sandboxes. The host refused the baseline sequence as an update and
+refused maintenance mode without a sandbox before creating either workspace.
+
+The independent archive checker verified all 192 sealed entries, including
+both guests' serial and QMP logs, source and fixture inputs, and the compressed
+installed and removable disks. Each of the six images decoded to its original
+SHA-256. The archive SHA-256 is
+`e8d555b7115d56f01a5500046d5a77ca62f43869c19d33c47af7ecced847262c`.
+[Offline maintenance archive](/Users/alex/.local/state/vinix/mupd.65ZLXw/qualification.tar.gz)
