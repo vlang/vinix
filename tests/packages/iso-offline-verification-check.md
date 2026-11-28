@@ -61,3 +61,33 @@ the tar byte for byte and passed independent verification of 2,631 sealed
 files and links. The delta SHA-256 is
 `541b0e401e14db632e8ba56229212893c43a613255934ab679d57c747bddea0d`.
 [Restore instructions](/Users/alex/.local/state/vinix/r14-archive-media-mQstkM/RESTORE.md)
+
+## Match deployment pins to signed indexes
+
+At `95ef3e231de9180ca2d81f957615bed6c7adf0b3`, current and historical
+`verify-offline` match each locked package to its bundled signed index.
+Each advertised application needs a lock record. The fixture refused a
+missing version, a changed manifest digest, a higher minimum sequence, a
+publisher outside the bundle and an omitted application pin. The receipt
+and lock digests agreed in each case. The original media passed after
+restoration. An older CLI accepted the altered manifest digest that the
+updated CLI refused.
+
+All 136 production ISO scenarios and 70 ASan/UBSan scenarios passed, with
+sanitizer leak detection disabled. The two retained seven-app releases
+reproduced their original verification reports byte for byte. The expired
+copies passed at their recorded release times and refused at current time.
+The separate tracked publisher test reported the same 48 bytes across two
+allocations at its first assertion on the base and patched builds.
+
+Both full QEMU image-export suites passed and shut down cleanly. AArch64
+completed in 287.7 seconds and x86-64 in 249.1 seconds. Both first runs
+passed the new verification cases and reached the 240-second limit during
+later checks. The reruns reused the built guest binaries with an explicit
+480-second limit.
+
+The independent archive checker verified 2,526 sealed entries. PAX binary
+filename encoding preserves the original UTF-8 bytes. The archive SHA-256 is
+`a20f70af8a4a90139d9cb6106295e4ed316fa405e4b33a41f88f858ae70847aa`.
+[Qualification archive](/Users/alex/.local/state/vinix/mverify-En3Ak6/qualification.tar.gz)
+and [verification record](/Users/alex/.local/state/vinix/mverify-En3Ak6/archive-check.log).
