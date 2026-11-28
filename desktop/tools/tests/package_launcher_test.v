@@ -546,6 +546,7 @@ fn software_mirror_memory(locked bool) ! {
 	}
 	row_text := software_review_fixture.replace('"operation":"install"', '"operation":"mirror"')
 		.replace('"generation":1', '"generation":0').replace('"action":"update"', '"action":"export"')
+		.replace('"installed_version":"1.0.0"', '"installed_version":""')
 	text := '{"format":1,"input_destination":"${path}","destination":"${path}","cache_needed":1024,"cache_available":65536,"shared_disk":true,"review":${row_text}}'
 	if locked {
 		digest := 'e'.repeat(64)

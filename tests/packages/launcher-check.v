@@ -47,6 +47,10 @@ fn check() ! {
 	$if macos { cflags << ['-x', 'objective-c', '-framework', 'Cocoa', '-framework', 'QuartzCore'] }
 	cflags << [work + '/test.c', work + '/runtime.c']
 	$if macos { cflags << ['-x', 'none'] }
+	fontstash := toolchain + '/fontstash/fontstash_impl.c'
+	if os.is_file(fontstash) {
+		cflags << ['-I', os.dir(toolchain) + '/thirdparty/fontstash', fontstash]
+	}
 	cflags << [work + '/presenter.o', '-lpthread', '-lm', '-o', work + '/test']
 	workflowbuild.run('clang', cflags)!
 	println('Running package launchers')
