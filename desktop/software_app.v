@@ -1612,6 +1612,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_cleanup()
 	a.clear_deployment_audit()
 	a.clear_deployment_snapshot()
+	a.clear_imported_media_pin()
 	a.clear_saved_media_deployment()
 	a.clear_mirror_source()
 	unsafe {

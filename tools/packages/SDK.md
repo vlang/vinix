@@ -886,11 +886,13 @@ release. Enter the absolute receipt path and **Receipt SHA-256** from the
 trusted release checksums, then approve **Import media**. After a successful
 import, Software reloads its catalog in offline mode. If the bundle includes a
 deployment lock, choose **Save media lock** and enter a new local filename.
-After a receipt-bound import, Software requires the verified deployment
-SHA-256 when saving from the approved directory in the same **Offline media**
-view. To supply the digest manually, enter `deployment_sha256` from the
-trusted release receipt into **Expected SHA-256**. The save receipt shows
-the saved digest.
+After a receipt-bound import, Software remembers the approved directory while
+the window stays open. Returning to **Offline media** fills in that directory
+and saving from it requires the verified deployment SHA-256. A successful
+subsequent import supersedes this selection. When saving from another
+directory, enter `deployment_sha256` from its trusted release receipt into
+**Expected SHA-256** to require the exact lock. The save receipt shows the saved
+digest.
 **Check coverage**, **Review additions**, and the separately approved apply
 carry that digest forward. The Deployment form keeps the most recently saved
 media file bound to its digest and offers those additive actions when that path

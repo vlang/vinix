@@ -2023,6 +2023,14 @@ with the same ID/key, then `update`. Expiry and sequence checks still apply;
 publishers must plan suitable expiry for offline use. Indexes may advertise apps
 outside the exported closure; those requests report missing payloads.
 
+For a release bundle, open **Software → Deployment → Offline media…** and
+choose **Import with receipt…**. Enter the ISO package receipt path and its
+trusted SHA-256, then approve the import. Software reloads the offline catalog.
+**Save media lock** uses the verified deployment SHA-256 for
+that directory, including when you return to the screen in the same window.
+Once the lock is saved locally, disconnect the media and use **Review additions**
+to prepare installation from cache. [Release bundle workflow](../tools/packages/SDK.md#offline-repository-bundles-in-release-images)
+
 In Software, choose **Go offline**, then **Refresh** to authenticate a signed
 local or bundled catalog. An image can ship a bundle for its configured HTTPS
 publisher. Use **Deployment** to review the release application file, then

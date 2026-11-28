@@ -18,7 +18,6 @@ fn (mut a SoftwareApp) clear_deployment_snapshot() {
 	a.snapshot_media_source = ''
 	a.clear_media_receipt()
 	a.clear_media_import_result()
-	a.clear_imported_media_pin()
 	a.snapshot_media = false
 	a.snapshot_mode = false; a.snapshot_ready = false
 	a.focus = false; a.select_all = false
@@ -57,6 +56,12 @@ fn (mut a SoftwareApp) begin_deployment_snapshot_mode(media bool) {
 	a.deployment_path.clear()
 	a.snapshot_mode = true; a.focus = true
 	a.snapshot_media = media
+	if media && a.snapshot_import_source != '' {
+		software_repository_text(mut a.deployment_path, a.snapshot_import_source)
+		a.select_all = true
+		a.set_status('Save the verified deployment lock, or enter another media directory.')
+		return
+	}
 	a.set_status(if media { 'Import signed repositories with administrator approval, or save the release lock from media you already imported.' }
 		else { 'Choose a new filename for the installed deployment. Existing files are preserved.' })
 }
@@ -163,7 +168,6 @@ fn (mut a SoftwareApp) save_deployment_snapshot() {
 	path := editor_bytes_text(a.deployment_path)
 	if a.snapshot_media && a.snapshot_media_source == '' {
 		if !a.media_directory_valid(path) { return }
-		if path != a.snapshot_import_source { a.clear_imported_media_pin() }
 		a.snapshot_media_source = path.clone()
 		a.deployment_path.clear()
 		a.focus = true; a.select_all = false
