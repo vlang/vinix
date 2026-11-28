@@ -67,3 +67,26 @@ The archive passed the independent check again and the delta matched its
 recorded checksum.
 [Qualification archive](/Users/alex/.local/state/vinix/r14-media-digest-handoff-k943lK/qualification.tar.gz)
 and [verification record](/Users/alex/.local/state/vinix/r14-media-digest-handoff-k943lK/restored-archive-check.log).
+
+## Returning to verified media
+
+At `2051d908a4e470e7b772a518cc729f26a1d00348`, reopening **Offline media**
+in the same Software window prefills the last receipt-verified directory.
+Saving from that directory requires the verified deployment SHA-256. Selecting
+another directory offers its own expected digest field. A canceled or refused
+re-import preserves the earlier binding. A successful import replaces it and
+an import without a receipt leaves the selection unbound.
+
+The headless fixture reproduced an empty media field on baseline `87a5f234f`.
+The corrected fixture verified source isolation, navigation through the catalog,
+and the original digest on the save and additive review commands. The complete
+Software driver passed, including both Linux desktop typechecks and the launcher
+fixture. The full headless suite passed under ASan/UBSan with process leak
+detection disabled. The tracked allocation check retained zero bytes across
+1,000 installed-deployment and 1,000 media cycles, including pin retirement.
+[Software fixture](software_snapshot_fixture.v)
+
+The independent checker verified all 1,719 sealed files, including the baseline
+and patched sources, host binaries, and test logs. The archive SHA-256 is
+`e2edf639604aa55e847763f92372c87b9b1d90149cf3c234ac40aa7d0daf395a`.
+[Qualification archive](/Users/alex/.local/state/vinix/mpin.m9ZoYY/qualification.tar.gz)
