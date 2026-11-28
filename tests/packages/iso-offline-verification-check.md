@@ -91,3 +91,30 @@ filename encoding preserves the original UTF-8 bytes. The archive SHA-256 is
 `a20f70af8a4a90139d9cb6106295e4ed316fa405e4b33a41f88f858ae70847aa`.
 [Qualification archive](/Users/alex/.local/state/vinix/mverify-En3Ak6/qualification.tar.gz)
 and [verification record](/Users/alex/.local/state/vinix/mverify-En3Ak6/archive-check.log).
+
+## Verify the exact dependency closure
+
+At `03f53df7c6aa5436f23ea8c4cc8d1ed166c68afd`, current and historical
+`verify-offline` and receipt-bound `update-media` use the deployment resolver
+over the exact authenticated records in the lock. Verification tests refuse
+an omitted dependency, an incompatible pinned runtime version and an unused
+signed package. They also accept a dependency pinned to a second publisher.
+Import refuses an omitted transitive dependency before acquiring payloads or
+publishing catalog and replay history. Restoring the original receipt and lock
+allows installation from cache after the media is disconnected. Both baseline
+paths accepted the missing dependency control.
+
+The host application and import suites passed with ASan and UBSan, with
+sanitizer leak detection disabled. The production and sanitized receipt tools
+each passed 70 ISO cases. Both retained seven-app releases reproduced their
+original verification reports, and both retained expired copies passed at their
+recorded release times.
+
+The full QEMU image-export suites passed with freshly built guest programs and
+retained kernels. AArch64 ran in 286.9 seconds and x86-64 in 242.2 seconds.
+Both used the runner's explicit 480-second timeout and shut down cleanly.
+
+The independent checker verified 1,955 sealed entries. The archive SHA-256 is
+`66046c4623d3e7a753e10dae99df2261947c01873caf1e32757f9c09a0957759`.
+[Qualification archive](/Users/alex/.local/state/vinix/mclose-hWGUzv/qualification.tar.gz)
+and [verification record](/Users/alex/.local/state/vinix/mclose-hWGUzv/archive-check.log).
