@@ -137,6 +137,7 @@ pub fn command(arguments []string, family string) int {
 	match family {
 		'track' { tracker() or { eprintln(err.msg()); return 1 } }
 		'print' { console() or { eprintln(err.msg()); return 1 } }
+		'serial-console' { serial_console() or { eprintln(err.msg()); return 1 } }
 		'diagnostic' { diagnostics() or { eprintln(err.msg()); return 1 } }
 		'cpu' { cpu() or { eprintln(err.msg()); return 1 } }
 		else { eprintln('Unknown policy command'); return 2 }
