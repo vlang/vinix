@@ -62,7 +62,8 @@ installed-deployment cycles.
 The independent checker verified all 1,456 sealed files and links in the gzip
 archive and again after reconstructing the tar from its delta. The gzip
 SHA-256 is `05af70ec52eb7d3ab4d6bdaca7381564184717ef2b7a47d6fddbf5ba7b2b38a2`.
-The full bundle remains on the RAM volume because the internal disk refused
-the 52 MiB copy. The logs, seal, checksums and restore instructions are on disk.
-[Verified RAM archive](/Volumes/VinixMediaDigestEvidence/qualification.tar.gz) ·
-[Retained records and restore instructions](/Users/alex/.local/state/vinix/r14-media-digest-handoff-k943lK/RESTORE.md)
+The full archive and its delta were copied to persistent storage on 2026-11-28.
+The archive passed the independent check again and the delta matched its
+recorded checksum.
+[Qualification archive](/Users/alex/.local/state/vinix/r14-media-digest-handoff-k943lK/qualification.tar.gz)
+and [verification record](/Users/alex/.local/state/vinix/r14-media-digest-handoff-k943lK/restored-archive-check.log).

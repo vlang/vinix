@@ -159,6 +159,7 @@ detection disabled. The tracked protocol decoder also passed.
 
 The checker verified 170 sealed files and links. The gzip SHA-256 is
 `155443ce7ae0a49620ecce2d9cff2801970d95057f185d5078ba2a840ed6c50e`.
-The shared checkout could not create its Git index lock because the host disk
-was full. Both commits and the verified archive are retained on a RAM volume.
-[Evidence and restore instructions](/Volumes/VinixAdminMediaEvidence/RESTORE.md)
+The two recovered commits are in the repository. The full archive was copied
+to persistent storage and independently reverified on 2026-11-28.
+[Qualification archive](/Users/alex/.local/state/vinix/r14-admin-media-LWmo35/qualification.tar.gz)
+and [verification record](/Users/alex/.local/state/vinix/r14-admin-media-LWmo35/restored-archive-check.log).
