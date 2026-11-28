@@ -30,7 +30,7 @@ and the `mke2fs` and `debugfs` from the same e2fsprogs installation. Set
 `VINIX_PLAIN_ISO_LIMINE` for the raw-initramfs fixture loader.
 
 ```sh
-v -prod -enable-globals -path '@vlib|@vmodules|.|tools/accounts|tests/hardware-platform' \
+v -prod -no-skip-unused -enable-globals -path '@vlib|@vmodules|.|tools/accounts|tests/hardware-platform' \
   -o /tmp/installed-media-runtime-check tests/packages/installed-media-runtime-check.v
 VINIX_HWTEST_TCG=1 /tmp/installed-media-runtime-check ARCH KERNEL MEDIA RECEIPT CONFIG NEW_WORK
 ```
@@ -40,3 +40,28 @@ bundle is a separate disk. This qualification covers package acquisition and
 persistence on the installed root using a disposable publisher and the CLI.
 Production publisher enrollment, graphical presentation and runtime execution
 have separate acceptance checks.
+
+## Qualification, 2026-11-28
+
+At `b137bca5618452dd86624871b8e9690a8e8cd10a` both QEMU TCG guests passed.
+AArch64 took 313.215 seconds and x86-64 took 226.420 seconds. Each run recorded
+four guest-initiated shutdowns and attached its ext2 release disk exclusively
+on boot 2. The controlling host also refused a receipt for the other target,
+a different consumer configuration and mismatched media before creating a
+work directory.
+
+The runs used paired ISO receipts and the original reviewed configurations
+with the retained signed mixed release. Both used previously qualified VJFS
+kernels and freshly built static package CLIs. Earlier attempts recorded the
+strict directory-ownership refusal, a consumer configuration with an uncached
+additional publisher and the missing x86-64 serial routing. The accepted runs
+use guest-root-owned media directories, receipt-matched configurations and
+explicit serial routing.
+
+The two installed disks and the two media images decoded to their original
+SHA-256 values. The independent archive checker verified 4,491 sealed entries,
+including those compressed images, the signed inputs, builds and both guests'
+serial and QMP logs. Use `zstd -dc` with the `*.zst` images and compare their
+decoded SHA-256 values with the corresponding `*.raw-sha256` files. The archive
+SHA-256 is `a6ecf8ffff118837e04c8679c5fb80661cd978dfd6552d0062ea41acdcaaf9b0`.
+[Qualification archive](/Users/alex/.local/state/vinix/mdisk.Zv3ZqN/qualification.tar.gz)
