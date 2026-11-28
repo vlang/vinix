@@ -65,3 +65,19 @@ serial and QMP logs. Use `zstd -dc` with the `*.zst` images and compare their
 decoded SHA-256 values with the corresponding `*.raw-sha256` files. The archive
 SHA-256 is `a6ecf8ffff118837e04c8679c5fb80661cd978dfd6552d0062ea41acdcaaf9b0`.
 [Qualification archive](/Users/alex/.local/state/vinix/mdisk.Zv3ZqN/qualification.tar.gz)
+
+## Application execution after media removal
+
+Set `VINIX_INSTALLED_MEDIA_SANDBOX` to a matching target `vinix-sandbox`
+executable before running the same four-boot fixture. It stages and hashes the
+sandbox on the installed root. The final two boots still have no release media
+or network device. Package maintenance uses `--offline`. Application launches
+use `run` and `run-args` against the installed generation.
+
+On boot 3, UID 1000 launches native Hello with an explicit document grant,
+starts headless Neovim and checks its UID from inside the editor, creates a
+SQLite WAL database, and uses FFmpeg to save a private WAV file. FFprobe must
+refuse the WAV before the file grant and identify its PCM format after the grant.
+On boot 4, the fixture checks the database and WAV hashes on disk before opening
+them again. It verifies ordinary ownership, the stored SQLite value and
+integrity check, and the same FFprobe grant behavior. [Launch fixture](installed-media-guest/launch.v)

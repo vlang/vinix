@@ -37,27 +37,36 @@ const bundled_lock = media_directory + '/' + pkgprotocol.deployment_mirror_filen
 const home = '/home/offline-fixture'
 const saved_lock = home + '/approved release.json'
 const reviewed = home + '/review.json'
+const sandbox_path = '/usr/bin/vinix-sandbox'
 
 struct ImportBinding {
 	receipt_sha256 string
 	deployment_sha256 string
 	configuration_sha256 string
+	sandbox_sha256 string
 }
 
 fn require(condition bool, reason string) ! {
 	if !condition { return error(reason) }
 }
 
-fn package_command(args []string, status int, diagnostic string) !string {
+fn package_exchange(args []string, input string) (int, string) {
 	mut child := os.new_process('/usr/bin/vinix-package')
 	defer { child.close() }
-	child.set_args(['--offline', ...args])
+	child.set_args(args)
 	child.set_redirect_stdio_merged()
 	child.run()
+	if input != '' { child.stdin_write(input) }
+	C.close(child.stdio_fd[0])
+	child.stdio_fd[0] = -1
 	output := child.stdout_slurp()
 	child.wait()
-	require(child.code == status && output.contains(diagnostic),
-		'package ${args[0]} returned ${child.code}: ${output}')!
+	return child.code, output
+}
+
+fn package_command(args []string, status int, diagnostic string) !string {
+	code, output := package_exchange(['--offline', ...args], '')
+	require(code == status && output.contains(diagnostic), 'package ${args[0]} returned ${code}: ${output}')!
 	return output
 }
 
@@ -82,6 +91,12 @@ fn installed_root(binding ImportBinding) !u64 {
 		info := os.lstat(path)!
 		require(u64(info.dev) == device && info.uid == 0 && info.nlink == 1 && info.mode & 0o170022 == 0o100000,
 			'expected an installed image input: ' + path)!
+	}
+	if binding.sandbox_sha256 != '' {
+		info := os.lstat(sandbox_path)!
+		require(u64(info.dev) == device && info.uid == 0 && info.nlink == 1 && info.mode & 0o177777 == 0o100755
+			&& sha256.hexhash(os.read_file(sandbox_path)!) == binding.sandbox_sha256,
+			'the package sandbox does not match the staged executable on the installed root')!
 	}
 	require(sha256.hexhash(os.read_file(config)!) == binding.configuration_sha256
 		&& sha256.hexhash(os.read_file(assets + '/receipt.json')!) == binding.receipt_sha256,
@@ -186,6 +201,7 @@ fn run() ! {
 			defer { document.close() }
 			if phase == 'detached' { install_from_cache(binding, document)! }
 			verify_generation(binding, document)!
+			if binding.sandbox_sha256 != '' { launch_installed_apps(phase == 'detached', device)! }
 			state := sha256.hexhash(os.read_file(store + '/current/state.json')!)
 			if phase == 'detached' {
 				os.write_file(checkpoint_path, state)!

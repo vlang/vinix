@@ -13,6 +13,7 @@ struct ImportBinding {
 	receipt_sha256 string
 	deployment_sha256 string
 	configuration_sha256 string
+	sandbox_sha256 string
 }
 
 fn check() ! {
@@ -38,6 +39,9 @@ fn check() ! {
 	host := hwhost.find_host(root, arch, '')!
 	formatter := os.getenv_opt('VINIX_MKE2FS') or { os.find_abs_path_of_executable('mke2fs')! }
 	debugfs := os.dir(os.real_path(formatter)) + '/debugfs'
+	sandbox := os.getenv_opt('VINIX_INSTALLED_MEDIA_SANDBOX') or { '' }
+	sandbox_path := if sandbox != '' { os.real_path(sandbox) } else { '' }
+	sandbox_sha256 := if sandbox_path != '' { pkgcore.hash_file(sandbox_path)! } else { '' }
 	os.mkdir(work)!
 	boot := work + '/boot'
 	extras := work + '/staging'
@@ -53,6 +57,7 @@ fn check() ! {
 		receipt_sha256: pkgcore.hash_file(fixture + '/receipt.json')!
 		deployment_sha256: receipt.deployment_sha256
 		configuration_sha256: config_sha256
+		sandbox_sha256: sandbox_sha256
 	}) + '\n')!
 	os.write_file(extras + '/.vinix-image-id', image_id + '\n')!
 	media_image := work + '/release.ext2'
@@ -77,7 +82,7 @@ fn check() ! {
 	os.write_file(ownership, commands.join('\n') + '\n')!
 	hwhost.run_tool([debugfs, '-w', '-f', ownership, media_image], map[string]string{}, work + '/media-ownership.log', 120)!
 	media_sha256 := pkgcore.hash_file(media_image)!
-	guest_source := root + '/tests/packages/installed-media-guest/main.v'
+	guest_source := root + '/tests/packages/installed-media-guest'
 	guest := hwhost.build_program_with_flags(host, guest_source, work + '/guest-build', 'init', ['.'], ['-prod'])!
 	cli := hwhost.build_program_with_flags(host, root + '/tools/packages/main.v', work + '/cli-build',
 		'vinix-package', ['.', 'tools/accounts'], ['-prod', '-manualfree', '-enable-globals'])!
@@ -85,7 +90,15 @@ fn check() ! {
 	os.cp(cli, extras + '/usr/bin/vinix-package')!
 	os.chmod(extras + '/usr/bin/vinix-package', 0o755)!
 	mut inputs := map[string]string{}
-	for path in [@FILE, guest_source, kernel, host.v, host.qemu, host.firmware, formatter, debugfs, configuration,
+	if sandbox_path != '' {
+		target := extras + '/usr/bin/vinix-sandbox'
+		os.cp(sandbox_path, target)!
+		os.chmod(target, 0o755)!
+		if pkgcore.hash_file(target)! != sandbox_sha256 { return error('sandbox changed during staging') }
+		inputs[sandbox_path] = sandbox_sha256
+	}
+	for path in [@FILE, guest_source + '/main.v', guest_source + '/launch.v', kernel,
+		host.v, host.qemu, host.firmware, formatter, debugfs, configuration,
 		receipt_path, media_image, guest, cli] {
 		physical := os.real_path(path)
 		inputs[physical] = pkgcore.hash_file(physical)!
@@ -114,6 +127,10 @@ fn check() ! {
 			'HWTEST PASS receipt-bound media imported and UID 1000 saved its lock on the installed disk',
 			'HWTEST PASS detached media and cold boot allowed exact reviewed cache-only installation',
 			'HWTEST PASS seven release roots and their complete closure survived another cold boot',
+			...if sandbox_path != '' {
+				['HWTEST PASS five offline-installed applications ran as UID 1000',
+					'HWTEST PASS offline-installed applications reopened unchanged private data after cold boot']
+			} else { []string{} },
 		]
 		forbidden: ['HWTEST FAIL', 'V panic:', 'Kernel panic', 'running from memory', 'sysdisk: updating the system on']
 	}, hwhost.Run{ kernel: kernel, guest: guest, extras: extras, state: boot, timeout: 1500,
