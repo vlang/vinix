@@ -92,20 +92,51 @@ fn verify_iso_offline_media_at(directory string, architecture string, applicatio
 			return error('${pin.id}: offline media deployment publisher is absent from the bundle: ${pin.repository}')
 		}
 	}
+	mut matched := ReleaseDeploymentMatches{ packages: []Installed{cap: document.locked.len} }
+	defer {
+		mut catalog := Catalog{ packages: matched.packages }
+		catalog.close()
+	}
 	mut expires := max_i64
 	for publisher in publishers {
 		if !atomic_captured_parent_matches(root, fd) { return error('ISO offline media root changed during verification') }
 		repository := os.join_path(root, publisher.id)
 		pins := document.locked.filter(it.repository == publisher.id)
 		defer { unsafe { repository.free(); (&array(&pins)).free() } }
+		matched.pins = pins
 		mut checked := check_signed_release(repository, publisher.id, publisher.public_key,
-			SignedReleaseCheck{ media_pin: unsafe { &publisher }, deployment_pins: pins, archived_at: release_time })!
+			SignedReleaseCheck{ media_pin: unsafe { &publisher }, deployment_pins: unsafe { &matched }, archived_at: release_time })!
 		defer { checked.close() }
 		if checked.expires < expires { expires = checked.expires }
 	}
+	check_offline_deployment_closure(document, matched.packages)!
 	export_stage_metadata(lock_path, deployment)!
 	check_offline_media_root(root, fd, entries)!
 	if expires <= release_index_time(release_time) { return error('offline media repository expired during verification') }
+}
+
+// The shared audit retains only matched manifests after an index is closed.
+struct ReleaseDeploymentMatches {
+mut:
+	pins []DeploymentPackage // borrowed for the publisher currently being verified
+	packages []Installed     // owned until the joint closure check finishes
+}
+
+fn check_offline_deployment_closure(document DeploymentLock, candidates []Installed) ! {
+	mut licenses := []string{cap: candidates.len}
+	defer { unsafe { (&array(&licenses)).free() } }
+	for installed in candidates {
+		p := installed.package
+		if p.proprietary && p.license !in licenses {
+			unsafe { licenses.push_many(&p.license, 1) }
+		}
+	}
+	// Check the signed graph independently of the consumer's policy. Actual
+	// acquisition and deployment still enforce that consumer's policy.
+	policy := Policy{ licenses: licenses, allow_firmware: true, reserve_bytes: 0 }
+	defer { unsafe { (&array(&policy.permissions)).free() } }
+	plan := resolve_deployment_candidates(Config{ architecture: document.architecture, policy: policy }, State{}, document, candidates)!
+	unsafe { (&array(&plan.requested)).free(); (&array(&plan.packages)).free() }
 }
 
 fn decode_offline_application_lock(deployment string, architecture string, applications []string) !DeploymentLock {

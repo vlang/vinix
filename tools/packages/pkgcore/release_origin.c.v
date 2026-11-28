@@ -43,7 +43,7 @@ struct SignedReleaseCheck {
 	origin string
 	pin_parent_fd int = -1
 	media_pin ?&IsoOfflinePublisher
-	deployment_pins ?[]DeploymentPackage
+	deployment_pins ?&ReleaseDeploymentMatches
 	archived_at i64
 }
 

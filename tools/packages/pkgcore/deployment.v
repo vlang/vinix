@@ -153,6 +153,10 @@ fn prepare_deployment_plan(config Config, directory string, current State, docum
 fn resolve_locked_deployment(config Config, catalog Catalog, current State, document DeploymentLock) !Plan {
 	candidates := locked_deployment_candidates(catalog, document)!
 	defer { unsafe { (&array(&candidates)).free() } }
+	return resolve_deployment_candidates(config, current, document, candidates)
+}
+
+fn resolve_deployment_candidates(config Config, current State, document DeploymentLock, candidates []Installed) !Plan {
 	// The normal solver still enforces architecture, organization policy,
 	// installed publisher ownership, dependency ranges and runtime entrypoints.
 	// It can only select the exact authenticated packages in this document.

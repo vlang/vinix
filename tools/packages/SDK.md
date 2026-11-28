@@ -817,10 +817,12 @@ This read-only check needs only the copied directory and the trusted receipt.
 It compares the lock and application list and verifies each bundled publisher's
 index, signature, sequence, expiry and complete object inventory. Each listed
 application must have a lock record, and each locked record must match the
-corresponding signed index in the copy. Success reports the ISO digest named
-by the receipt, architecture, deployment digest, application IDs and
-repository IDs. Enrollment and deployment still require their own reviews on
-the destination system.
+corresponding signed index in the copy. The exact locked set must resolve
+every requested application and all of its dependencies, including runtime
+entrypoints. Success reports the ISO digest named by the receipt,
+architecture, deployment digest, application IDs and repository IDs.
+Enrollment and deployment still require their own reviews on the destination
+system.
 
 For a retained copy whose indexes have expired, pass the independently
 established Unix release timestamp as the last operand. The checker verifies
@@ -851,9 +853,11 @@ its ISO package receipt and the receipt's SHA-256 from the trusted release
 checksums. The import checks the exact receipt bytes, target architecture,
 deployment lock, publisher set and enrolled keys. Before acquiring payloads,
 it matches every locked package version, architecture, publisher, metadata
-SHA-256 and minimum sequence against the bundled signed indexes. Use the
-receipt's `deployment_sha256` again when saving the lock and reviewing its
-deployment on the installed system.
+SHA-256 and minimum sequence against the bundled signed indexes and resolves
+the complete dependency closure from those exact records. Acquisition and
+deployment use the installed system's policy. Use the receipt's
+`deployment_sha256` again when saving the lock and reviewing its deployment
+on the installed system.
 
 ```sh
 vinix-package admin update-media /media/usb/release-apps /review/vinix-packages-arm64.json RECEIPT_SHA256

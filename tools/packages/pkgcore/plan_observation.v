@@ -22,11 +22,15 @@ fn owned_plan_package(p Package) Package {
 		dependencies: dependencies, files: files}
 }
 
+fn owned_plan_installed(installed Installed) Installed {
+	return Installed{...installed, package: owned_plan_package(installed.package),
+		repository: installed.repository.clone(), public_key: installed.public_key.clone()}
+}
+
 fn owned_plan(plan Plan) Plan {
 	mut packages := []Installed{cap: plan.packages.len}
 	for installed in plan.packages {
-		value := Installed{...installed, package: owned_plan_package(installed.package),
-			repository: installed.repository.clone(), public_key: installed.public_key.clone()}
+		value := owned_plan_installed(installed)
 		pointer := unsafe { &value }; unsafe { packages.push_many(pointer, 1) }
 	}
 	return Plan{requested: review_strings(plan.requested), packages: packages}

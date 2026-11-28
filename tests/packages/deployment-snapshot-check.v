@@ -230,8 +230,19 @@ fn import_pinned_media(binary string, work string, root string, media string, re
 		assert !os.exists(state + '/catalog.json') && !os.exists(state + '/trust-history.json')
 		assert os.ls(state + '/objects')!.len == 0
 	}
+	changed := json2.encode(pkgcore.DeploymentLock{ ...document, locked: document.locked.filter(it.id != 'assets') }) + '\n'
+	changed_receipt := json2.encode(pkgcore.IsoPackageReceipt{ ...receipt,
+		deployment_sha256: sha256.hexhash(changed) }) + '\n'
+	os.write_file(lock_path, changed)!
+	os.write_file(path, changed_receipt)!
+	incomplete := command_status(binary, root, ['--progress', 'update-media', media, path,
+		sha256.hexhash(changed_receipt)], 1)!
+	assert incomplete.contains('candidate satisfies assets') && !incomplete.contains(pkgprotocol.media_import_result_prefix), incomplete
+	assert !os.exists(state + '/catalog.json') && !os.exists(state + '/trust-history.json')
+	assert os.ls(state + '/objects')!.len == 0
 	os.write_file(lock_path, original)!
 	os.write_file(path, text)!
+	println('DEPLOYMENT MEDIA CLI incomplete dependency closure refuses before acquisition PASS')
 	println('DEPLOYMENT MEDIA CLI receipt lock pins must match the bundled signed indexes before acquisition PASS')
 	command(binary, root, args)!
 	output := command(binary, root, ['--progress', ...args])!

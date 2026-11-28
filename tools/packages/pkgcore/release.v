@@ -90,7 +90,7 @@ fn release_closures(index Index, public_key string) ! {
 	release_closures_with_pins(index, public_key, none)!
 }
 
-fn release_closures_with_pins(index Index, public_key string, deployment_pins ?[]DeploymentPackage) ! {
+fn release_closures_with_pins(index Index, public_key string, deployment_pins ?&ReleaseDeploymentMatches) ! {
 	mut licenses := []string{}
 	mut candidates := []Installed{}
 	unsafe { licenses.flags |= .noslices; candidates.flags |= .noslices }
@@ -102,9 +102,13 @@ fn release_closures_with_pins(index Index, public_key string, deployment_pins ?[
 		}
 		candidates << Installed{ package: p, repository: index.repository, public_key: public_key, sequence: index.sequence }
 	}
-	if pins := deployment_pins {
-		matched := locked_deployment_candidates(Catalog{ packages: candidates }, DeploymentLock{ locked: pins })!
-		unsafe { (&array(&matched)).free() }
+	if mut deployment := deployment_pins {
+		matched := locked_deployment_candidates(Catalog{ packages: candidates }, DeploymentLock{ locked: deployment.pins })!
+		defer { unsafe { (&array(&matched)).free() } }
+		for candidate in matched {
+			owned := owned_plan_installed(candidate)
+			unsafe { deployment.packages.push_many(&owned, 1) }
+		}
 	}
 	candidates.sort_with_compare(candidate_order)
 	policy := Policy{ licenses: licenses, allow_firmware: true, reserve_bytes: 0 }

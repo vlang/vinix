@@ -134,7 +134,14 @@ fn check_offline_media_pin_refusals(directory string, publishers []IsoOfflinePub
 	defer { document.close() }
 	assert document.locked[0].id == 'editor'
 	pin := document.locked[0]
-	for mode in ['version', 'metadata', 'sequence', 'publisher', 'missing-root']! {
+	index := json2.decode[Index](os.read_file(directory + '/native/index.json')!)!
+	defer { close_decoded_index(index) }
+	unused := index.packages.filter(it.id == 'arm-only')[0]
+	unused_pin := DeploymentPackage{ ...pin, id: unused.id, version: unused.version,
+		architecture: unused.architecture, metadata_sha256: package_metadata_digest(unused)! }
+	older_runtime := index.packages.filter(it.id == 'runtime' && it.architecture == 'aarch64' && it.version == '1.0.0')[0]
+	older_digest := package_metadata_digest(older_runtime)!
+	for mode in ['version', 'metadata', 'sequence', 'publisher', 'missing-root', 'missing-dependency', 'wrong-runtime', 'unused-package']! {
 		mut locked := document.locked.clone()
 		locked[0] = match mode {
 			'version' { DeploymentPackage{ ...pin, version: '99.0.0' } }
@@ -144,18 +151,33 @@ fn check_offline_media_pin_refusals(directory string, publishers []IsoOfflinePub
 			else { pin }
 		}
 		if mode == 'missing-root' { locked.delete(0) }
+		if mode == 'missing-dependency' { locked = locked.filter(it.id != 'support') }
+		if mode == 'wrong-runtime' {
+			for offset, item in locked {
+				if item.id == 'runtime' { locked[offset] = DeploymentPackage{ ...item, version: older_runtime.version, metadata_sha256: older_digest } }
+			}
+		}
+		if mode == 'unused-package' { locked << unused_pin }
 		text := json2.encode(DeploymentLock{ ...document, locked: locked }) + '\n'
 		os.write_file(path, text)!
 		expected := match mode {
 			'version' { 'publisher is absent from the authenticated catalog' }
 			'publisher' { 'offline media deployment publisher is absent from the bundle' }
 			'missing-root' { 'offline media deployment lock is missing an application pin: editor' }
+			'missing-dependency' { 'candidate satisfies support' }
+			'wrong-runtime' { 'candidate satisfies runtime' }
+			'unused-package' { 'outside the requested dependency closure' }
 			else { 'sequence or package metadata changed' }
 		}
 		if _ := verify_iso_offline_media_at(directory, 'aarch64', document.packages, index_digest(text), publishers, release_time) {
 			return error('offline media verified an inconsistent deployment pin: ${mode}')
 		} else { assert err.msg().contains(expected), err.msg() }
 	}
+	// The requested app can use a pinned dependency from a second signed index.
+	shared := document.locked.map(if it.id == 'support' { DeploymentPackage{ ...it, repository: 'organization' } } else { it })
+	shared_text := json2.encode(DeploymentLock{ ...document, locked: shared }) + '\n'
+	os.write_file(path, shared_text)!
+	verify_iso_offline_media_at(directory, 'aarch64', document.packages, index_digest(shared_text), publishers, release_time)!
 	os.write_file(path, original)!
 	verify_iso_offline_media_at(directory, 'aarch64', document.packages, index_digest(original), publishers, release_time)!
 	assert os.read_file(path)! == original
@@ -204,6 +226,7 @@ fn check_archived_media(work string, source string, digest string, pins []IsoOff
 	assert os.read_file(index_path)! == text && os.read_file(signature_path)! == signature
 	println('ISO OFFLINE MEDIA archived verification checks signed bytes and exact expiry while current verification refuses PASS')
 	println('ISO OFFLINE MEDIA current and archived verification match deployment pins to bundled signed indexes PASS')
+	println('ISO OFFLINE MEDIA exact dependency closure rejects missing, incompatible and unused pins across publishers PASS')
 }
 
 fn check_saved_media_deployment(work string, exported string, deployment string, key string) ! {

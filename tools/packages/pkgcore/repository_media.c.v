@@ -117,7 +117,8 @@ fn (batch &RepositoryMediaBatch) check_receipt_deployment(catalog Catalog) ! {
 			}
 		}
 		candidates := locked_deployment_candidates(catalog, document)!
-		unsafe { (&array(&candidates)).free() }
+		defer { unsafe { (&array(&candidates)).free() } }
+		check_offline_deployment_closure(document, candidates)!
 	}
 }
 
