@@ -815,10 +815,12 @@ use a copy whose directories are owned by the account running the check.
 
 This read-only check needs only the copied directory and the trusted receipt.
 It compares the lock and application list and verifies each bundled publisher's
-index, signature, sequence, expiry and complete object inventory. Success
-reports the ISO digest named by the receipt, architecture, deployment digest,
-application IDs and repository IDs. Enrollment and deployment still require
-their own reviews on the destination system.
+index, signature, sequence, expiry and complete object inventory. Each listed
+application must have a lock record, and each locked record must match the
+corresponding signed index in the copy. Success reports the ISO digest named
+by the receipt, architecture, deployment digest, application IDs and
+repository IDs. Enrollment and deployment still require their own reviews on
+the destination system.
 
 For a retained copy whose indexes have expired, pass the independently
 established Unix release timestamp as the last operand. The checker verifies

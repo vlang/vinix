@@ -43,6 +43,7 @@ struct SignedReleaseCheck {
 	origin string
 	pin_parent_fd int = -1
 	media_pin ?&IsoOfflinePublisher
+	deployment_pins ?[]DeploymentPackage
 	archived_at i64
 }
 
@@ -91,7 +92,7 @@ fn check_signed_release(directory string, id string, public_key string, options 
 		}
 		check_iso_offline_payload_bytes(*pin, objects)!
 	}
-	release_closures(index, public_key)!
+	release_closures_with_pins(index, public_key, options.deployment_pins)!
 	verify_release_stage(release, text, trimmed, objects, true)!
 	if options.origin != '' {
 		check_hosted_release(fd, options.origin, text, signature, objects)!

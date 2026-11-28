@@ -87,6 +87,10 @@ fn release_history(repository string) !TrustHistory {
 // consumer policy. Force each advertised version so a newer working version
 // cannot hide a broken older one. Data declared "all" must resolve on both hosts.
 fn release_closures(index Index, public_key string) ! {
+	release_closures_with_pins(index, public_key, none)!
+}
+
+fn release_closures_with_pins(index Index, public_key string, deployment_pins ?[]DeploymentPackage) ! {
 	mut licenses := []string{}
 	mut candidates := []Installed{}
 	unsafe { licenses.flags |= .noslices; candidates.flags |= .noslices }
@@ -97,6 +101,10 @@ fn release_closures(index Index, public_key string) ! {
 			unsafe { licenses.push_many(pointer, 1) }
 		}
 		candidates << Installed{ package: p, repository: index.repository, public_key: public_key, sequence: index.sequence }
+	}
+	if pins := deployment_pins {
+		matched := locked_deployment_candidates(Catalog{ packages: candidates }, DeploymentLock{ locked: pins })!
+		unsafe { (&array(&matched)).free() }
 	}
 	candidates.sort_with_compare(candidate_order)
 	policy := Policy{ licenses: licenses, allow_firmware: true, reserve_bytes: 0 }

@@ -635,6 +635,17 @@ fn check_verified_media(tool string, media string, receipt string, work string, 
 	root := expected['applications']!.as_array()[0]!.str()
 	os.write_file(changed, source.replace('"${root}"', '"unreviewed-root"'))!
 	refuse_offline_verification(tool, copy, changed, 'application declaration differs from the ISO package receipt')!
+	mut document := json2.decode[pkgcore.DeploymentLock](text)!
+	defer { document.close() }
+	pin := document.locked[0]
+	mut locked := document.locked.clone()
+	locked[0] = pkgcore.DeploymentPackage{ ...pin, metadata_sha256: '0'.repeat(64) }
+	os.write_file(deployment, json2.encode(pkgcore.DeploymentLock{ ...document, locked: locked }) + '\n')!
+	os.write_file(changed, source.replace(expected['deployment_sha256']!.str(), pkgcore.hash_file(deployment)!))!
+	refuse_offline_verification(tool, copy, changed, 'sequence or package metadata changed')!
+	refused_archived, archived_diagnostic := command([tool, 'verify-offline', copy, changed, release_time.str()])
+	assert refused_archived == 1 && archived_diagnostic.contains('sequence or package metadata changed'), archived_diagnostic
+	os.write_file(deployment, text)!
 	refused, usage := command([tool, 'verify-offline', copy])
 	assert refused == 1 && usage.contains('usage: package-receipt verify-offline')
 	retry, resulting := command(args)

@@ -120,10 +120,45 @@ fn test_iso_offline_media_exclusive_publication_retires_stages_and_preserves_out
 	}
 	assert refused
 	assert os.ls(root)!.len == 0
+	check_offline_media_pin_refusals(destination, pins, 0)!
 	check_saved_media_deployment(work, destination, deployment, key)!
 	check_archived_media(work, destination, report.image_application_deployment_sha256, pins)!
 	println('ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS')
 	println('ISO OFFLINE MEDIA verification checks both signed publishers and rejects duplicate receipt pins PASS')
+}
+
+fn check_offline_media_pin_refusals(directory string, publishers []IsoOfflinePublisher, release_time i64) ! {
+	path := directory + '/' + pkgprotocol.deployment_mirror_filename
+	original := os.read_file(path)!
+	mut document := decode_deployment(original, 'aarch64')!
+	defer { document.close() }
+	assert document.locked[0].id == 'editor'
+	pin := document.locked[0]
+	for mode in ['version', 'metadata', 'sequence', 'publisher', 'missing-root']! {
+		mut locked := document.locked.clone()
+		locked[0] = match mode {
+			'version' { DeploymentPackage{ ...pin, version: '99.0.0' } }
+			'metadata' { DeploymentPackage{ ...pin, metadata_sha256: '0'.repeat(64) } }
+			'sequence' { DeploymentPackage{ ...pin, minimum_sequence: 100 } }
+			'publisher' { DeploymentPackage{ ...pin, repository: 'missing-publisher' } }
+			else { pin }
+		}
+		if mode == 'missing-root' { locked.delete(0) }
+		text := json2.encode(DeploymentLock{ ...document, locked: locked }) + '\n'
+		os.write_file(path, text)!
+		expected := match mode {
+			'version' { 'publisher is absent from the authenticated catalog' }
+			'publisher' { 'offline media deployment publisher is absent from the bundle' }
+			'missing-root' { 'offline media deployment lock is missing an application pin: editor' }
+			else { 'sequence or package metadata changed' }
+		}
+		if _ := verify_iso_offline_media_at(directory, 'aarch64', document.packages, index_digest(text), publishers, release_time) {
+			return error('offline media verified an inconsistent deployment pin: ${mode}')
+		} else { assert err.msg().contains(expected), err.msg() }
+	}
+	os.write_file(path, original)!
+	verify_iso_offline_media_at(directory, 'aarch64', document.packages, index_digest(original), publishers, release_time)!
+	assert os.read_file(path)! == original
 }
 
 fn check_archived_media(work string, source string, digest string, pins []IsoOfflinePublisher) ! {
@@ -165,8 +200,10 @@ fn check_archived_media(work string, source string, digest string, pins []IsoOff
 	else { assert err.msg().contains('signature') }
 	os.write_file(signature_path, signature)!
 	verify_archived_iso_offline_media(archive, 'aarch64', apps, digest, archived_pins, release_time)!
+	check_offline_media_pin_refusals(archive, archived_pins, release_time)!
 	assert os.read_file(index_path)! == text && os.read_file(signature_path)! == signature
 	println('ISO OFFLINE MEDIA archived verification checks signed bytes and exact expiry while current verification refuses PASS')
+	println('ISO OFFLINE MEDIA current and archived verification match deployment pins to bundled signed indexes PASS')
 }
 
 fn check_saved_media_deployment(work string, exported string, deployment string, key string) ! {

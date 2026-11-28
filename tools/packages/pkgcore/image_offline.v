@@ -86,14 +86,20 @@ fn verify_iso_offline_media_at(directory string, architecture string, applicatio
 	deployment := read_release_lock_matching_digest(lock_path, deployment_sha256)!
 	defer { unsafe { deployment.free() } }
 	mut document := decode_offline_application_lock(deployment, architecture, applications)!
-	document.close()
+	defer { document.close() }
+	for pin in document.locked {
+		if pin.repository == pkgprotocol.deployment_mirror_filename || pin.repository !in entries {
+			return error('${pin.id}: offline media deployment publisher is absent from the bundle: ${pin.repository}')
+		}
+	}
 	mut expires := max_i64
 	for publisher in publishers {
 		if !atomic_captured_parent_matches(root, fd) { return error('ISO offline media root changed during verification') }
 		repository := os.join_path(root, publisher.id)
-		defer { unsafe { repository.free() } }
+		pins := document.locked.filter(it.repository == publisher.id)
+		defer { unsafe { repository.free(); (&array(&pins)).free() } }
 		mut checked := check_signed_release(repository, publisher.id, publisher.public_key,
-			SignedReleaseCheck{ media_pin: unsafe { &publisher }, archived_at: release_time })!
+			SignedReleaseCheck{ media_pin: unsafe { &publisher }, deployment_pins: pins, archived_at: release_time })!
 		defer { checked.close() }
 		if checked.expires < expires { expires = checked.expires }
 	}
@@ -104,10 +110,20 @@ fn verify_iso_offline_media_at(directory string, architecture string, applicatio
 
 fn decode_offline_application_lock(deployment string, architecture string, applications []string) !DeploymentLock {
 	mut document := decode_deployment(deployment, architecture)!
+	mut accepted := false
+	defer { if !accepted { document.close() } }
 	if document.format != 2 || document.packages.len == 0 || document.packages != applications {
-		document.close()
 		return error('offline media application declaration differs from the ISO package receipt')
 	}
+	// The decoder sorts both lists. Every requested application needs a pin.
+	mut index := 0
+	for id in document.packages {
+		for index < document.locked.len && document.locked[index].id < id { index++ }
+		if index == document.locked.len || document.locked[index].id != id {
+			return error('offline media deployment lock is missing an application pin: ${id}')
+		}
+	}
+	accepted = true
 	return document
 }
 

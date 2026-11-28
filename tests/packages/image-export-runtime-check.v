@@ -38,6 +38,7 @@ fn image_export_suite() hwhost.Suite {
 				'ISO OFFLINE MEDIA complete signed bundle, concurrent destination and parent replacement, cleanup and retry PASS',
 				'ISO OFFLINE MEDIA verification checks both signed publishers and rejects duplicate receipt pins PASS',
 				'ISO OFFLINE MEDIA archived verification checks signed bytes and exact expiry while current verification refuses PASS',
+				'ISO OFFLINE MEDIA current and archived verification match deployment pins to bundled signed indexes PASS',
 				'DEPLOYMENT MEDIA SAVE preserves exact bytes, refuses digest and policy drift, and supports reviewed installation after disconnect PASS',
 				'DEPLOYMENT MEDIA CLI ordinary UID 1000 saves the exact lock from root-owned media PASS',
 				'DEPLOYMENT PIN CLI ordinary UID 1000 reviews and checks coverage without the source media PASS',
