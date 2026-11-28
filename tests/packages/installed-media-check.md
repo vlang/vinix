@@ -81,3 +81,19 @@ refuse the WAV before the file grant and identify its PCM format after the grant
 On boot 4, the fixture checks the database and WAV hashes on disk before opening
 them again. It verifies ordinary ownership, the stored SQLite value and
 integrity check, and the same FFprobe grant behavior. [Launch fixture](installed-media-guest/launch.v)
+
+At `e72eb4ac395a921658e7ff39d75cc454447d99da`, the full launch scenario passed
+on AArch64 in 294.788 seconds and x86-64 in 222.183 seconds under QEMU TCG.
+Both completed four guest shutdowns. The retained sandbox executables match
+their original input digests from the installed mixed-catalog qualification.
+The host refused a missing sandbox before creating a workspace. The initial
+guest attempts retained the CLI refusal of `--offline` on `run`, and the
+final launches use the installed application command directly.
+[Earlier installed mixed-catalog qualification](signed-legacy-routing-check.md#mixed-catalog-maintenance-on-an-installed-disk)
+
+The independent checker verified 170 sealed entries. The archive retains
+the launch fixture, source and sandbox pins, both runs, and the compressed
+installed and removable disk images. All four images decoded to their original
+SHA-256 values. The archive SHA-256 is
+`f87d8e97a737b01324513f59ef298134f1182c3601c6d35797ef0b794e5acf7b`.
+[Launch qualification archive](/Users/alex/.local/state/vinix/mlaunch.6wt6JK/qualification.tar.gz)
