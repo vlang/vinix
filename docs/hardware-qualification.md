@@ -98,7 +98,7 @@ driver has none, that is said.
 | --- | --- | --- | --- | --- |
 | Storage | VirtIO block (MMIO) | `aarch64/virtio_blk` | implemented (VM) | the disk-root and storage suites; legacy MMIO transport only |
 | Storage | VirtIO block (PCI), NVMe, AHCI | none on AArch64 | open | why VirtualBox's arm64 machine runs from memory |
-| Ethernet | VirtIO net (MMIO) | `aarch64/virtio_net` | implemented (VM) | the default network of every AArch64 test |
+| Ethernet | VirtIO net (MMIO) | `dev/virtio_net` | implemented (VM) | the default network of every AArch64 test |
 | Ethernet | Intel 8254x | `dev/e1000` | implemented (VM) | hardware-platform `devices`, `suspend` |
 | Graphics | ramfb, VirtIO GPU | `aarch64/virtio_gpu`, `drm` | implemented (VM) | [kekvm-gpu](kekvm-gpu.md) |
 | Audio | VirtIO sound | `aarch64/virtio_snd` | implemented (VM) | `tests/sound`; playback only |

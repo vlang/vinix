@@ -20,7 +20,7 @@ import aarch64.uart
 import aarch64.virtio_input
 import aarch64.virtio_gpu
 import aarch64.virtio_blk
-import aarch64.virtio_net
+import dev.virtio_net
 import aarch64.virtio_snd
 import dev.xhci
 import apple.smc

@@ -40,6 +40,7 @@ import dev.serial
 import dev.streams
 import dev.ahci
 import dev.e1000
+import dev.virtio_net
 import dev.rtl8169
 import dev.ath10k
 import dev.hda
@@ -67,6 +68,7 @@ import security
 // stack, then run the stack's timers -- DHCP, ARP, TCP retransmission.
 fn poll_network() {
 	e1000.poll()
+	virtio_net.poll()
 	rtl8169.poll()
 	ath10k.poll()
 	inet.poll()
@@ -105,6 +107,7 @@ fn kmain_thread() {
 	// Polled whether or not a card was found: one can arrive later, in a
 	// slot, and with none the poll costs a test of a flag.
 	e1000.initialise()
+	virtio_net.initialise(memory.get_hhdm_offset())
 	rtl8169.initialise()
 	$if net_carrier_selftest ? { inet.carrier_selftest() }
 	sched.set_device_poll_callback(voidptr(poll_network))
