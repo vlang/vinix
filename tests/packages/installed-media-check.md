@@ -97,3 +97,23 @@ installed and removable disk images. All four images decoded to their original
 SHA-256 values. The archive SHA-256 is
 `f87d8e97a737b01324513f59ef298134f1182c3601c6d35797ef0b794e5acf7b`.
 [Launch qualification archive](/Users/alex/.local/state/vinix/mlaunch.6wt6JK/qualification.tar.gz)
+
+## Signed updates from separate media
+
+Set `VINIX_INSTALLED_MEDIA_UPDATE` to a complete, current publisher export
+alongside `VINIX_INSTALLED_MEDIA_SANDBOX`. Use the mixed-catalog update that
+advances the baseline publisher's sequence and changes only SQLite's runtime
+from 1.0.0 to the math-enabled 1.1.0. The controller checks the export against
+the publisher key in the baseline ISO receipt. [Signed update inputs](signed-legacy-routing-check.md#mixed-catalog-maintenance-on-an-installed-disk)
+
+The four baseline boots remain in the run. Boot 5 mounts a second release disk,
+imports the signed update and checks that the authenticated catalog and replay
+history advance while the active generation stays byte-identical. On boot 6,
+both disks are disconnected. The reviewed upgrade must change only SQLite's
+runtime, and a real math query confirms the change. Reviewed rollback restores
+the original release lock and preserves the database and WAV file.
+
+Boot 7 verifies the rolled-back release, the update's catalog and replay history,
+and the unchanged application data. The original signed index and signature,
+saved from boot 2, are refused as a replay without restoring either release disk.
+[Maintenance fixture](installed-media-guest/maintenance.v)

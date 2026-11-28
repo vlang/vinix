@@ -44,6 +44,8 @@ struct ImportBinding {
 	deployment_sha256 string
 	configuration_sha256 string
 	sandbox_sha256 string
+	update_publisher string
+	update_index_sha256 string
 }
 
 fn require(condition bool, reason string) ! {
@@ -105,14 +107,14 @@ fn installed_root(binding ImportBinding) !u64 {
 	return device
 }
 
-fn mount_media(device u64, digest string) ! {
+fn mount_media(device u64, metadata string, digest string) ! {
 	os.mkdir_all(mount_root)!
 	for name in os.ls('/dev')!.sorted() {
 		path := '/dev/' + name
 		if (os.lstat(path)!).mode & 0o170000 != 0o060000 { continue }
 		if C.mount(path.str, mount_root.str, c'ext2', 1, unsafe { nil }) != 0 { continue }
-		if os.is_file(bundled_lock) && u64((os.stat(bundled_lock)!).dev) != device
-			&& sha256.hexhash(os.read_file(bundled_lock)!) == digest {
+		if os.is_file(metadata) && u64((os.stat(metadata)!).dev) != device
+			&& sha256.hexhash(os.read_file(metadata)!) == digest {
 			println('HWTEST INFO read-only offline medium mounted from ' + path)
 			return
 		}
@@ -122,7 +124,7 @@ fn mount_media(device u64, digest string) ! {
 }
 
 fn import_media(binding ImportBinding, device u64) ! {
-	mount_media(device, binding.deployment_sha256)!
+	mount_media(device, bundled_lock, binding.deployment_sha256)!
 	args := ['update-media', media_directory, assets + '/receipt.json']
 	package_command([...args, '0'.repeat(64)], 1, 'ISO package receipt SHA-256 differs')!
 	require(!os.exists(store + '/catalog.json') && !os.exists(store + '/trust-history.json')
@@ -138,6 +140,7 @@ fn import_media(binding ImportBinding, device u64) ! {
 	})!
 	require(os.read_file(saved_lock)! == os.read_file(bundled_lock)!, 'saved lock differs from the mounted media')!
 	require(!os.is_link(store + '/current'), 'media import activated packages')!
+	if binding.update_publisher != '' { retain_baseline_index(binding.update_publisher)! }
 	require(C.umount(mount_root.str) == 0, 'cannot unmount the offline medium')!
 }
 
@@ -209,9 +212,11 @@ fn run() ! {
 				println('HWTEST PASS detached media and cold boot allowed exact reviewed cache-only installation')
 			} else {
 				require(state == os.read_file(checkpoint_path)!, 'installed generation changed across cold boot')!
+				if binding.update_publisher != '' { os.write_file(phase_path, 'update-import')! }
 				println('HWTEST PASS seven release roots and their complete closure survived another cold boot')
 			}
 		}
+		'update-import', 'update-detached', 'update-verified' { maintain_offline_release(phase, binding, device)! }
 		else { return error('unexpected installed offline media checkpoint') }
 	}
 	C.sync()

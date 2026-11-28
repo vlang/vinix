@@ -35,15 +35,28 @@ fn application_data_hashes(device u64) !map[string]string {
 	return values
 }
 
-fn run_offline_workload(first_boot bool, device u64) ! {
+fn use_ordinary_home() ! {
 	require(os.getuid() == 1000 && os.geteuid() == 1000 && os.setenv('HOME', home, true) == 0,
 		'expected the ordinary application session')!
+}
+
+fn verify_retained_data(device u64) ! {
+	retained := json2.decode[map[string]string](os.read_file(data_checkpoint)!)!
+	require(application_data_hashes(device)! == retained, 'application data changed across cold boot or maintenance')!
+}
+
+fn verify_private_database() ! {
+	saved := launch_output(['run', sqlite_app], '.bail on\nSELECT sum(value) FROM saved; PRAGMA integrity_check;\n')!
+	require(saved.trim_space() == '42\nok', 'SQLite did not reopen an intact private database')!
+}
+
+fn run_offline_workload(first_boot bool, device u64) ! {
+	use_ordinary_home()!
 	document_text := 'Receipt-bound offline native document'
 	if first_boot {
 		os.write_file(launch_document, document_text + '\n')!
 	} else {
-		retained := json2.decode[map[string]string](os.read_file(data_checkpoint)!)!
-		require(application_data_hashes(device)! == retained, 'application data changed across cold boot')!
+		verify_retained_data(device)!
 	}
 	hello := launch_output(['run', hello_app, launch_document], '')!
 	require(hello.contains('Application: ' + hello_app) && hello.contains(document_text),
@@ -59,8 +72,7 @@ fn run_offline_workload(first_boot bool, device u64) ! {
 		launch_output(['run-args', ffmpeg_app, '--data-cwd', '--', '-v', 'error', '-f', 'lavfi',
 			'-i', 'sine=frequency=440:duration=0.1', '-c:a', 'pcm_s16le', wave_name], '')!
 	}
-	saved := launch_output(sqlite, '.bail on\nSELECT sum(value) FROM saved; PRAGMA integrity_check;\n')!
-	require(saved.trim_space() == '42\nok', 'SQLite did not reopen an intact private database')!
+	verify_private_database()!
 	probe := ['--', '-v', 'error', '-select_streams', 'a:0', '-show_entries',
 		'stream=codec_name,sample_rate,channels', '-of', 'csv=p=0', wave_path]
 	code, _ := package_exchange(['run-args', ffprobe_app, ...probe], '')
