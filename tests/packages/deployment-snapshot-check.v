@@ -208,6 +208,31 @@ fn import_pinned_media(binary string, work string, root string, media string, re
 	assert os.ls(state + '/objects')!.len == 0
 	os.rename(publisher, work + '/other-publisher')!
 	os.rename(saved, publisher)!
+	mut document := json2.decode[pkgcore.DeploymentLock](original)!
+	defer { document.close() }
+	first_pin := document.locked[0]
+	for index, replacement_pin in [pkgcore.DeploymentPackage{ ...first_pin, version: '99.0.0' },
+		pkgcore.DeploymentPackage{ ...first_pin, minimum_sequence: pin.sequence + 1 },
+		pkgcore.DeploymentPackage{ ...first_pin, metadata_sha256: '0'.repeat(64) },
+		pkgcore.DeploymentPackage{ ...first_pin, repository: 'outside-media' }] {
+		mut locked := document.locked.clone()
+		locked[0] = replacement_pin
+		changed := json2.encode(pkgcore.DeploymentLock{ ...document, locked: locked }) + '\n'
+		changed_receipt := json2.encode(pkgcore.IsoPackageReceipt{ ...receipt,
+			deployment_sha256: sha256.hexhash(changed) }) + '\n'
+		os.write_file(lock_path, changed)!
+		os.write_file(path, changed_receipt)!
+		output := command_status(binary, root, ['--progress', 'update-media', media, path,
+			sha256.hexhash(changed_receipt)], 1)!
+		expected := ['publisher is absent from the authenticated catalog', 'sequence or package metadata changed',
+			'sequence or package metadata changed', 'offline media deployment publisher is absent from the bundle']
+		assert output.contains(expected[index]) && !output.contains(pkgprotocol.media_import_result_prefix), output
+		assert !os.exists(state + '/catalog.json') && !os.exists(state + '/trust-history.json')
+		assert os.ls(state + '/objects')!.len == 0
+	}
+	os.write_file(lock_path, original)!
+	os.write_file(path, text)!
+	println('DEPLOYMENT MEDIA CLI receipt lock pins must match the bundled signed indexes before acquisition PASS')
 	command(binary, root, args)!
 	output := command(binary, root, ['--progress', ...args])!
 	mut results := 0

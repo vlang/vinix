@@ -42,6 +42,7 @@ fn image_export_suite() hwhost.Suite {
 				'DEPLOYMENT MEDIA CLI ordinary UID 1000 saves the exact lock from root-owned media PASS',
 				'DEPLOYMENT PIN CLI ordinary UID 1000 reviews and checks coverage without the source media PASS',
 				'DEPLOYMENT PIN CLI exact bytes across coverage, review and apply, digest substitution and omission refusal, and restored retry PASS',
+				'DEPLOYMENT MEDIA CLI receipt lock pins must match the bundled signed indexes before acquisition PASS',
 				'DEPLOYMENT MEDIA CLI exact receipt, deployment lock and signed index gate import before acquisition PASS',
 				'DEPLOYMENT MEDIA CLI imports a signed bundle, saves its lock and installs from cache after disconnect PASS',
 				'REPOSITORY MEDIA keeps HTTPS identity, checks replay and objects, caches policy-allowed payloads and installs after disconnect PASS',

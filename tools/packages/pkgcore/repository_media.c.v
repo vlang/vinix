@@ -20,6 +20,7 @@ mut:
 	bundle ?RepositoryMedia
 	has_deployment bool
 	receipt ?IsoPackageReceipt
+	deployment_text string
 }
 
 fn (mut batch RepositoryMediaBatch) close() {
@@ -27,7 +28,7 @@ fn (mut batch RepositoryMediaBatch) close() {
 		C.close(media.fd)
 		unsafe { id.free(); media.path.free() }
 	}
-	unsafe { batch.sources.free() }
+	unsafe { batch.sources.free(); batch.deployment_text.free() }
 	if bundle := batch.bundle {
 		C.close(bundle.fd)
 		unsafe { bundle.path.free() }
@@ -55,6 +56,11 @@ fn (mut batch RepositoryMediaBatch) open_bundle(directory string, config Config)
 	batch.check_receipt_publishers(config)!
 	batch.check_bundle()!
 	if batch.sources.len == 0 { return error('offline media bundle contains no enrolled repositories') }
+	if receipt := batch.receipt {
+		path := bundle.path + '/' + pkgprotocol.deployment_mirror_filename
+		defer { unsafe { path.free() } }
+		batch.deployment_text = read_release_lock_matching_digest(path, receipt.deployment_sha256)!
+	}
 }
 
 fn (batch &RepositoryMediaBatch) check_receipt_publishers(config Config) ! {
@@ -89,17 +95,29 @@ fn (batch &RepositoryMediaBatch) check_bundle() ! {
 			entries[name] = 0
 			path := bundle.path + '/' + name
 			defer { unsafe { path.free() } }
-			export_stage_file(path)!
-			if receipt := batch.receipt {
-				deployment := read_release_lock_matching_digest(path, receipt.deployment_sha256)!
-				defer { unsafe { deployment.free() } }
-				check_offline_application_list(deployment, receipt.architecture, receipt.applications)!
-			}
+			if batch.deployment_text == '' { export_stage_file(path)! }
+			else { export_stage_metadata(path, batch.deployment_text)! }
 		} else if batch.receipt != none {
 			return error('offline media is missing the ISO package receipt deployment lock')
 		}
 		export_stage_directory(bundle.path, entries, 0)!
 		bundle.check()!
+	}
+}
+
+fn (batch &RepositoryMediaBatch) check_receipt_deployment(catalog Catalog) ! {
+	if receipt := batch.receipt {
+		mut document := decode_offline_application_lock(batch.deployment_text, receipt.architecture, receipt.applications)!
+		defer { document.close() }
+		// The combined catalog can also contain snapshots from earlier imports.
+		// Every pin in this release must be backed by one of the delivered indexes.
+		for pin in document.locked {
+			if pin.repository !in batch.sources {
+				return error('${pin.id}: offline media deployment publisher is absent from the bundle: ${pin.repository}')
+			}
+		}
+		candidates := locked_deployment_candidates(catalog, document)!
+		unsafe { (&array(&candidates)).free() }
 	}
 }
 

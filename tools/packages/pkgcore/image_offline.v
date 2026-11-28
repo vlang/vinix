@@ -85,7 +85,8 @@ fn verify_iso_offline_media_at(directory string, architecture string, applicatio
 	export_stage_file(lock_path)!
 	deployment := read_release_lock_matching_digest(lock_path, deployment_sha256)!
 	defer { unsafe { deployment.free() } }
-	check_offline_application_list(deployment, architecture, applications)!
+	mut document := decode_offline_application_lock(deployment, architecture, applications)!
+	document.close()
 	mut expires := max_i64
 	for publisher in publishers {
 		if !atomic_captured_parent_matches(root, fd) { return error('ISO offline media root changed during verification') }
@@ -101,12 +102,13 @@ fn verify_iso_offline_media_at(directory string, architecture string, applicatio
 	if expires <= release_index_time(release_time) { return error('offline media repository expired during verification') }
 }
 
-fn check_offline_application_list(deployment string, architecture string, applications []string) ! {
+fn decode_offline_application_lock(deployment string, architecture string, applications []string) !DeploymentLock {
 	mut document := decode_deployment(deployment, architecture)!
-	defer { document.close() }
 	if document.format != 2 || document.packages.len == 0 || document.packages != applications {
+		document.close()
 		return error('offline media application declaration differs from the ISO package receipt')
 	}
+	return document
 }
 
 fn check_offline_media_root(root string, fd int, entries map[string]u64) ! {

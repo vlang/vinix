@@ -277,6 +277,7 @@ fn refresh_progress_from(config Config, directory string, selected string, media
 	mut published := false
 	defer { if !published { close_authenticated_catalog(catalog) } }
 	if batch := media {
+		batch.check_receipt_deployment(catalog)!
 		batch.import_payloads(config, directory, catalog, report)!
 		if expires <= time.now().unix() { return error('repository index expired during offline media import') }
 	}
