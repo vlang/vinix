@@ -67,3 +67,28 @@ Zstandard delta and passed independent verification of 1,215 sealed files and
 links. The delta SHA-256 is
 `c7ad34397c6ac3acf879f6e3b6003aedd274dda0699310e196445961de4d3ca1`.
 [Restore instructions](/Users/alex/.local/state/vinix/r14-pinned-media-import-pBycTy/RESTORE.md)
+
+### Match lock records to the delivered indexes
+
+At `6b95815074e7c7a98c859f4f29ac4233550f3cd6`, receipt-bound import matches
+each deployment pin against the authenticated index delivered for its publisher.
+The production CLI refused a missing version, a higher minimum sequence, a
+changed manifest digest and a publisher outside the media. The receipt and
+lock digests matched in each case. Refusal left the object cache empty and
+published neither catalog nor replay history. The baseline accepted the first
+mismatch. Restoring the original receipt and lock allowed offline installation
+after the media was disconnected. The host fixture also passed with LLVM
+ASan/UBSan and leak detection disabled. The existing matcher retained zero
+tracked bytes across 1,000 iterations of its matching and digest cases.
+
+The complete image-export suites passed in 180.3 seconds on AArch64 and
+171.0 seconds on x86-64. The real administrator workflow passed on both
+architectures in 48.3 and 76.9 seconds respectively. All four QEMU guests used
+retained kernels and freshly built userspace and shut down cleanly. The image
+suites ran at shorter state paths after the initial paths exceeded the Unix
+socket limit.
+
+The independent checker verified 328 sealed entries. The archive SHA-256 is
+`1b7a8e62999a531d1453cf40e62ca2021dcc0acf76451a6399853514f10e5447`.
+[Qualification archive](/Users/alex/.local/state/vinix/r14-media-lock-admission-eqCRJH/qualification.tar.gz)
+and [verification record](/Users/alex/.local/state/vinix/r14-media-lock-admission-eqCRJH/archive-check.log).
